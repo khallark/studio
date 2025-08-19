@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings } from 'lucide-react';
+import { Home, Package, Settings, PanelLeft } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -51,8 +51,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen w-full bg-background">
+     <SidebarProvider>
         <Sidebar>
           <SidebarContent>
             <SidebarHeader>
@@ -123,17 +122,15 @@ export default function DashboardLayout({
             )}
           </SidebarFooter>
         </Sidebar>
-
-        <SidebarInset>
-          <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6">
-            <SidebarTrigger />
-            <div className="w-full flex-1">
-              {/* Future search bar or header content can go here */}
-            </div>
-          </header>
-          {children}
-        </SidebarInset>
-      </div>
+        <div className="flex flex-col flex-1 w-full">
+            <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 lg:h-[60px] lg:px-6">
+              <SidebarTrigger className="md:hidden" />
+              <div className="w-full flex-1">
+                {/* Future search bar or header content can go here */}
+              </div>
+            </header>
+            {children}
+        </div>
     </SidebarProvider>
   );
 }

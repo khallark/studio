@@ -27,6 +27,7 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -53,11 +54,30 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err) {
       const authError = err as AuthError;
-      console.error('Error signing in:', authError);
-      setError(authError.message);
-       toast({
-        title: 'Error signing in',
-        description: authError.message,
+      console.error('Error signing in:', authError.code, authError.message);
+      
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      switch (authError.code) {
+        case 'auth/user-not-found':
+        case 'auth/invalid-email':
+          errorMessage = 'No account found with that email address.';
+          break;
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many login attempts. Please try again later.';
+          break;
+        default:
+          errorMessage = authError.message;
+          break;
+      }
+      
+      setError(errorMessage);
+      toast({
+        title: 'Login Failed',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -111,7 +131,7 @@ export default function LoginPage() {
                   disabled={loading}
                 />
               </div>
-              {error && <p className="text-destructive text-sm">{error}</p>}
+              {error && <p className="text-destructive text-sm text-center">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Logging in...' : 'Login'}
               </Button>

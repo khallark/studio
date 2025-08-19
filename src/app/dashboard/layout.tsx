@@ -122,14 +122,16 @@ export default function DashboardLayout({
             )}
           </SidebarFooter>
         </Sidebar>
-        <div className="flex flex-col flex-1 w-full">
-            <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 lg:h-[60px] lg:px-6">
+        <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
+            <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
               <SidebarTrigger className="md:hidden" />
               <div className="w-full flex-1">
                 {/* Future search bar or header content can go here */}
               </div>
             </header>
-            {children}
+            <main className="flex-1 overflow-y-auto">
+              {children}
+            </main>
         </div>
     </SidebarProvider>
   );

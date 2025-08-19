@@ -29,7 +29,7 @@ export default function SignupPage() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      router.push('/');
+      router.push('/dashboard');
     } catch (error) {
       console.error('Error during Google signup:', error);
        toast({
@@ -48,21 +48,16 @@ export default function SignupPage() {
     setLoading(true);
 
     const actionCodeSettings = {
-      // URL you want to redirect back to. The domain (www.example.com) for this
-      // URL must be in the authorized domains list in the Firebase Console.
       url: `${window.location.origin}/signup/verify`,
       handleCodeInApp: true,
     };
 
     try {
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      // The link was successfully sent. Inform the user.
-      // Save the email locally so you don't need to ask the user for it again
-      // if they open the link on the same device.
       window.localStorage.setItem('emailForSignIn', email);
       toast({
         title: 'Verification Email Sent',
-        description: 'A verification link has been sent to your email address.',
+        description: 'A verification link has been sent to your email address. Please check your inbox.',
       });
       router.push('/signup/verify');
     } catch (err) {
@@ -70,7 +65,7 @@ export default function SignupPage() {
       console.error('Error sending sign-in link:', authError);
       setError(authError.message);
       toast({
-        title: 'Error',
+        title: 'Error sending email',
         description: authError.message,
         variant: 'destructive',
       });

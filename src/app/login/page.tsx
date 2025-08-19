@@ -70,7 +70,7 @@ export default function LoginPage() {
           errorMessage = 'Too many login attempts. Please try again later.';
           break;
         default:
-          errorMessage = authError.message;
+          errorMessage = 'An unexpected error occurred. Please try again.';
           break;
       }
       

@@ -12,7 +12,7 @@ import { auth } from '@/lib/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup,
-  sendSignInLinkToEmail,
+  createUserWithEmailAndPassword,
   AuthError
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,25 +48,19 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
 
-    const actionCodeSettings = {
-      url: `${window.location.origin}/signup/verify`,
-      handleCodeInApp: true,
-    };
-
     try {
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      window.localStorage.setItem('emailForSignIn', email);
+      await createUserWithEmailAndPassword(auth, email, password);
       toast({
-        title: 'Verification Email Sent',
-        description: 'A verification link has been sent to your email address. Please check your inbox.',
+        title: 'Account Created',
+        description: "Your account has been successfully created.",
       });
-      router.push('/signup/verify');
+      router.push('/dashboard');
     } catch (err) {
       const authError = err as AuthError;
-      console.error('Error sending sign-in link:', authError);
+      console.error('Error creating user:', authError);
       setError(authError.message);
       toast({
-        title: 'Error sending email',
+        title: 'Error creating account',
         description: authError.message,
         variant: 'destructive',
       });
@@ -83,7 +78,7 @@ export default function SignupPage() {
           <div className="space-y-1">
             <CardTitle className="text-2xl font-headline">Create an account</CardTitle>
             <CardDescription>
-              Enter your email to get started
+              Enter your email and password to get started
             </CardDescription>
           </div>
         </CardHeader>
@@ -102,10 +97,31 @@ export default function SignupPage() {
                   disabled={loading}
                 />
               </div>
+               <div className="grid gap-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
               {error && <p className="text-destructive text-sm">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Sending...' : 'Continue with Email'}
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                    </span>
+                </div>
+              </div>
               <Button variant="outline" className="w-full" type="button" onClick={handleGoogleSignup} disabled={loading}>
                 Sign up with Google
               </Button>

@@ -126,7 +126,7 @@ export default function DashboardLayout({
 
         <SidebarInset>
           <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6">
-            <SidebarTrigger className="md:hidden" />
+            <SidebarTrigger />
             <div className="w-full flex-1">
               {/* Future search bar or header content can go here */}
             </div>

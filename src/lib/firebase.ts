@@ -11,7 +11,8 @@ const firebaseConfig = {
   "storageBucket": "orderflow-jnig7.firebasestorage.app",
   "apiKey": "AIzaSyD5mhKWYl-SAY_BB-D8y2q5rqa_kha42no",
   "authDomain": "orderflow-jnig7.firebaseapp.com",
-  "messagingSenderId": "1005907384516"
+  "messagingSenderId": "1005907384516",
+  "measurementId": "G-5G3W9259T3"
 };
 
 // Initialize Firebase

@@ -8,7 +8,7 @@ import { getAuth } from "firebase/auth";
 const firebaseConfig = {
   "projectId": "orderflow-jnig7",
   "appId": "1:1005907384516:web:b079b9512e64c4788b5191",
-  "storageBucket": "orderflow-jnig7.firebasestorage.app",
+  "storageBucket": "orderflow-jnig7.appspot.com",
   "apiKey": "AIzaSyD5mhKWYl-SAY_BB-D8y2q5rqa_kha42no",
   "authDomain": "orderflow-jnig7.firebaseapp.com",
   "messagingSenderId": "1005907384516",

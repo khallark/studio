@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -7,13 +9,28 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebase';
 
 export default function Dashboard() {
+  const [user, loading] = useAuthState(auth);
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline font-semibold text-lg md:text-2xl">Dashboard</h1>
       </div>
+      {user && !loading && (
+        <div className="border rounded-lg p-4 mb-4 bg-card">
+          <h2 className="text-lg font-semibold text-card-foreground">User Information</h2>
+          <p className="text-sm text-muted-foreground">
+            Welcome, {user.displayName || 'User'}!
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Email: {user.email}
+          </p>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

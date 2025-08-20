@@ -28,7 +28,7 @@ import { Logo } from '@/components/logo';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function DashboardLayout({
@@ -38,6 +38,7 @@ export default function DashboardLayout({
 }) {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -78,7 +79,7 @@ export default function DashboardLayout({
             </SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
                   <Link href="/dashboard">
                     <Home />
                     Dashboard
@@ -86,8 +87,8 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="#">
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/orders'}>
+                  <Link href="/dashboard/orders">
                     <Package />
                     Orders
                   </Link>

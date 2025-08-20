@@ -29,6 +29,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function DashboardLayout({
   children,
@@ -37,6 +38,13 @@ export default function DashboardLayout({
 }) {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -51,6 +59,14 @@ export default function DashboardLayout({
       return email.charAt(0).toUpperCase();
     }
     return 'U';
+  }
+  
+  if (loading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
   }
 
   return (

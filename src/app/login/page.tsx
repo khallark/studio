@@ -8,13 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
   signInWithEmailAndPassword,
   AuthError
 } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -30,7 +31,32 @@ export default function LoginPage() {
     setError(null);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        // Create user document for new user
+        await setDoc(userRef, {
+          primaryAccountId: null,
+          activeAccountId: null,
+          accounts: [],
+          profile: {
+            displayName: user.displayName || user.email,
+            email: user.email,
+            phone: null,
+          },
+          lastLoginAt: serverTimestamp(),
+        });
+      } else {
+        // Update last login for existing user
+        await updateDoc(userRef, {
+          lastLoginAt: serverTimestamp(),
+        });
+      }
+
       router.push('/dashboard');
     } catch (error) {
       console.error('Error during Google login:', error);
@@ -50,7 +76,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      await updateDoc(userRef, {
+        lastLoginAt: serverTimestamp(),
+      });
       router.push('/dashboard');
     } catch (err) {
       const authError = err as AuthError;
@@ -146,7 +176,7 @@ export default function LoginPage() {
                 </div>
               </div>
               <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={loading}>
-                Login with Google
+                {loading ? 'Processing...' : 'Login with Google'}
               </Button>
             </div>
           </form>

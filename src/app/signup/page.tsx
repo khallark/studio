@@ -16,7 +16,7 @@ import {
   updateProfile,
   AuthError
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
@@ -30,17 +30,25 @@ export default function SignupPage() {
 
   const createUserDocument = async (uid: string, email: string, displayName: string) => {
     const userRef = doc(db, 'users', uid);
-    await setDoc(userRef, {
-      primaryAccountId: null,
-      activeAccountId: null,
-      accounts: [],
-      profile: {
-        displayName: displayName || email,
-        email: email,
-        phone: null,
-      },
-      lastLoginAt: serverTimestamp(),
-    });
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+        await setDoc(userRef, {
+        primaryAccountId: null,
+        activeAccountId: null,
+        accounts: [],
+        profile: {
+            displayName: displayName || email,
+            email: email,
+            phone: null,
+        },
+        lastLoginAt: serverTimestamp(),
+        });
+    } else {
+        await updateDoc(userRef, {
+           lastLoginAt: serverTimestamp(),
+        });
+    }
   };
 
   const handleGoogleSignup = async () => {
@@ -160,7 +168,7 @@ export default function SignupPage() {
                 </div>
               </div>
               <Button variant="outline" className="w-full" type="button" onClick={handleGoogleSignup} disabled={loading}>
-                Sign up with Google
+                {loading ? 'Processing...' : 'Sign up with Google'}
               </Button>
             </div>
           </form>

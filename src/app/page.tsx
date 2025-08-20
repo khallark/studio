@@ -18,13 +18,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useRouter } from 'next/navigation';
 
 
 export default function Home() {
   const [user, loading, error] = useAuthState(auth);
+  const router = useRouter();
 
   const handleLogout = async () => {
     await signOut(auth);
+    router.push('/');
   };
   
   return (

@@ -28,6 +28,7 @@ import { Logo } from '@/components/logo';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardLayout({
   children,
@@ -35,9 +36,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [user, loading] = useAuthState(auth);
+  const router = useRouter();
 
   const handleLogout = async () => {
     await signOut(auth);
+    router.push('/');
   };
 
   const getInitials = (name?: string | null, email?: string | null) => {
@@ -124,7 +127,7 @@ export default function DashboardLayout({
         </Sidebar>
         <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
             <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger />
               <div className="w-full flex-1">
                 {/* Future search bar or header content can go here */}
               </div>

@@ -25,10 +25,11 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const createUserDocument = async (uid: string, email: string, displayName: string) => {
+  const createUserDocument = async (uid: string, email: string, displayName: string, phone: string | null) => {
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
 
@@ -40,13 +41,14 @@ export default function SignupPage() {
         profile: {
             displayName: displayName || email,
             email: email,
-            phone: null,
+            phone: phone,
         },
         lastLoginAt: serverTimestamp(),
         });
     } else {
         await updateDoc(userRef, {
            lastLoginAt: serverTimestamp(),
+           'profile.phone': phone,
         });
     }
   };
@@ -57,7 +59,7 @@ export default function SignupPage() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      await createUserDocument(user.uid, user.email!, user.displayName || '');
+      await createUserDocument(user.uid, user.email!, user.displayName || '', user.phoneNumber);
       router.push('/dashboard');
     } catch (error) {
       console.error('Error during Google signup:', error);
@@ -80,7 +82,7 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       await updateProfile(user, { displayName });
-      await createUserDocument(user.uid, user.email!, displayName);
+      await createUserDocument(user.uid, user.email!, displayName, phone);
 
       toast({
         title: 'Account Created',
@@ -138,6 +140,17 @@ export default function SignupPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+1 234 567 890"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   disabled={loading}
                 />
               </div>

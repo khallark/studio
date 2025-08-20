@@ -25,7 +25,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +40,7 @@ export default function SignupPage() {
         profile: {
             displayName: displayName || email,
             email: email,
-            phone: phone,
+            phone: null,
         },
         lastLoginAt: serverTimestamp(),
         });
@@ -82,7 +81,7 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       await updateProfile(user, { displayName });
-      await createUserDocument(user.uid, user.email!, displayName, phone);
+      await createUserDocument(user.uid, user.email!, displayName, null);
 
       toast({
         title: 'Account Created',
@@ -140,17 +139,6 @@ export default function SignupPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 234 567 890"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
                   disabled={loading}
                 />
               </div>

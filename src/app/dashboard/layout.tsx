@@ -12,7 +12,6 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarTrigger,
-  SidebarInset,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,6 +59,17 @@ export default function DashboardLayout({
       return email.charAt(0).toUpperCase();
     }
     return 'U';
+  }
+
+  const getTitle = () => {
+    switch (pathname) {
+      case '/dashboard':
+        return 'Dashboard';
+      case '/dashboard/orders':
+        return 'Orders';
+      default:
+        return 'Dashboard';
+    }
   }
   
   if (loading || !user) {
@@ -145,9 +155,7 @@ export default function DashboardLayout({
         <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
             <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
               <SidebarTrigger />
-              <div className="w-full flex-1">
-                {/* Future search bar or header content can go here */}
-              </div>
+              <h1 className="font-headline font-semibold text-lg md:text-2xl">{getTitle()}</h1>
             </header>
             <main className="flex-1 overflow-y-auto">
               {children}

@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup,
   createUserWithEmailAndPassword,
+  updateProfile,
   AuthError
 } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
@@ -22,14 +24,32 @@ export default function SignupPage() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const createUserDocument = async (uid: string, email: string, displayName: string) => {
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, {
+      primaryAccountId: null,
+      activeAccountId: null,
+      accounts: [],
+      profile: {
+        displayName: displayName || email,
+        email: email,
+        phone: null,
+      },
+      lastLoginAt: serverTimestamp(),
+    });
+  };
 
   const handleGoogleSignup = async () => {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      await createUserDocument(user.uid, user.email!, user.displayName || '');
       router.push('/dashboard');
     } catch (error) {
       console.error('Error during Google signup:', error);
@@ -49,7 +69,11 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await updateProfile(user, { displayName });
+      await createUserDocument(user.uid, user.email!, displayName);
+
       toast({
         title: 'Account Created',
         description: "Your account has been successfully created.",
@@ -78,13 +102,25 @@ export default function SignupPage() {
           <div className="space-y-1">
             <CardTitle className="text-2xl font-headline">Create an account</CardTitle>
             <CardDescription>
-              Enter your email and password to get started
+              Enter your details below to get started
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleEmailSignup}>
             <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="displayName">Full Name</Label>
+                <Input
+                  id="displayName"
+                  type="text"
+                  placeholder="John Doe"
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -106,6 +142,7 @@ export default function SignupPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
+                  minLength={6}
                 />
               </div>
               {error && <p className="text-destructive text-sm">{error}</p>}

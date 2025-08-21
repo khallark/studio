@@ -67,6 +67,8 @@ export default function DashboardLayout({
         return 'Dashboard';
       case '/dashboard/orders':
         return 'Orders';
+      case '/dashboard/connect':
+        return 'Connect your store';
       default:
         return 'Dashboard';
     }

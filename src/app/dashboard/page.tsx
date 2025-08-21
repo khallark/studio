@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -91,7 +92,9 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground max-w-sm">
             You have not connected any stores yet. Connect your store to start seeing your orders and analytics.
           </p>
-          <Button className="mt-4">Connect Store</Button>
+          <Button className="mt-4" asChild>
+            <Link href="/dashboard/connect">Connect Store</Link>
+          </Button>
         </div>
       </div>
     </main>

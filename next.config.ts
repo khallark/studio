@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -17,6 +18,18 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/shopify/auth',
+        destination: '/api/shopify/auth/route',
+      },
+      {
+        source: '/api/shopify/callback',
+        destination: '/api/shopify/callback/route',
+      },
+    ]
   },
 };
 

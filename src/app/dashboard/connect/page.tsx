@@ -1,6 +1,8 @@
+
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -13,11 +15,46 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebase';
+import Cookies from 'js-cookie';
 
 export default function ConnectStorePage() {
   const [storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const [user] = useAuthState(auth);
+
+  useEffect(() => {
+    // Store user UID in a cookie to be accessed by the server-side callback
+    if (user) {
+      Cookies.set('user_uid', user.uid, { expires: 1 }); // Expires in 1 day
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error) {
+      let title = 'Connection Failed';
+      let description = 'An unknown error occurred. Please try again.';
+      if (error === 'invalid_callback') {
+        description = 'The callback from Shopify was invalid. Please try reconnecting.';
+      } else if (error === 'token_exchange_failed') {
+        description = 'Could not verify the connection with Shopify. Please ensure your store name is correct and try again.';
+      } else if (error === 'internal_error') {
+        description = 'An internal error occurred. Please try again later.';
+      } else if (error === 'config_error') {
+          description = 'Server configuration error. Please contact support.'
+      }
+
+      toast({
+        title,
+        description,
+        variant: 'destructive',
+      });
+    }
+  }, [searchParams, toast]);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,17 +67,31 @@ export default function ConnectStorePage() {
       return;
     }
     setLoading(true);
-    // Here you would typically initiate the OAuth flow with Shopify
-    // For now, we'll just simulate a loading state
-    console.log(`Connecting to ${storeName}.myshopify.com`);
 
-    setTimeout(() => {
-      setLoading(false);
-      toast({
-        title: 'Connection in progress',
-        description: 'You will be redirected to Shopify to complete the connection.',
+    try {
+      const response = await fetch('/api/shopify/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shop: storeName }),
       });
-    }, 2000);
+
+      if (!response.ok) {
+          throw new Error('Failed to initiate authorization');
+      }
+
+      const { redirectUrl } = await response.json();
+      // Redirect the user to the Shopify authorization URL
+      window.location.href = redirectUrl;
+
+    } catch (error) {
+        console.error('Connection error:', error);
+        toast({
+            title: 'Connection Error',
+            description: 'Could not connect to the server. Please try again.',
+            variant: 'destructive',
+        });
+        setLoading(false);
+    }
   };
 
   return (
@@ -62,7 +113,7 @@ export default function ConnectStorePage() {
                     id="store-name"
                     placeholder="your-store"
                     value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
+                    onChange={(e) => setStoreName(e.target.value.replace(/\s+/g, '-'))}
                     required
                     disabled={loading}
                     className="rounded-r-none"
@@ -76,7 +127,7 @@ export default function ConnectStorePage() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Connecting...' : 'Connect to Shopify'}
+              {loading ? 'Redirecting to Shopify...' : 'Connect to Shopify'}
             </Button>
           </CardFooter>
         </form>

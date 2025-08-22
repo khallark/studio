@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/callback',
         destination: '/api/shopify/callback/route',
       },
+       {
+        source: '/api/webhooks/orders',
+        destination: '/api/webhooks/orders/route',
+      },
     ]
   },
 };

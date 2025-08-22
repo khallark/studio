@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// This is a simplified way to get the user. 
+// This is a simplified way to get the user.
 // In a real app, you'd use a more robust session management solution.
 async function getCurrentUserId() {
     // This is not a secure way to get the user, but it works for this prototype
@@ -12,6 +12,42 @@ async function getCurrentUserId() {
     const cookieStore = cookies();
     const userCookie = cookieStore.get('user_uid');
     return userCookie?.value || null;
+}
+
+async function registerWebhooks(shop: string, accessToken: string) {
+    const appUrl = process.env.SHOPIFY_APP_URL;
+    if (!appUrl) {
+        console.error('SHOPIFY_APP_URL is not defined. Cannot register webhooks.');
+        return;
+    }
+
+    const webhookUrl = `${appUrl}/api/webhooks/orders`;
+    const webhooks = [
+        { topic: 'orders/create', address: webhookUrl },
+        { topic: 'orders/updated', address: webhookUrl },
+        { topic: 'orders/delete', address: webhookUrl },
+    ];
+
+    for (const webhook of webhooks) {
+        try {
+            const response = await fetch(`https://${shop}/admin/api/2024-04/webhooks.json`, {
+                method: 'POST',
+                headers: {
+                    'X-Shopify-Access-Token': accessToken,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ webhook: { ...webhook, format: 'json' } }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                console.error(`Failed to register ${webhook.topic} webhook:`, data);
+            } else {
+                console.log(`Successfully registered ${webhook.topic} webhook.`);
+            }
+        } catch (error) {
+            console.error(`Error registering ${webhook.topic} webhook:`, error);
+        }
+    }
 }
 
 
@@ -95,6 +131,10 @@ export async function GET(req: NextRequest) {
       
       await userRef.update(updateData);
     }
+    
+    // 3. Register Webhooks
+    await registerWebhooks(shop, accessToken);
+
 
     // Redirect to the dashboard on success
     const dashboardUrl = new URL('/dashboard', process.env.SHOPIFY_APP_URL || req.url);

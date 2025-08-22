@@ -10,7 +10,7 @@ import { cookies } from 'next/headers';
 async function getCurrentUserId() {
     // This is not a secure way to get the user, but it works for this prototype
     // It relies on the client sending the UID in a cookie
-    const cookieStore = await cookies()
+    const cookieStore = cookies()
     const userCookie = cookieStore.get('user_uid');
     return userCookie?.value || null;
 }

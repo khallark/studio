@@ -1,16 +1,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp, getDoc, arrayUnion } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { db } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // This is a simplified way to get the user. 
 // In a real app, you'd use a more robust session management solution.
 async function getCurrentUserId() {
     // This is not a secure way to get the user, but it works for this prototype
     // It relies on the client sending the UID in a cookie
-    const cookieStore = cookies()
+    const cookieStore = cookies();
     const userCookie = cookieStore.get('user_uid');
     return userCookie?.value || null;
 }
@@ -23,7 +22,7 @@ export async function GET(req: NextRequest) {
   const hmac = searchParams.get('hmac'); // We should validate the HMAC for security
 
   if (!code || !shop) {
-    return NextResponse.redirect('/dashboard/connect?error=invalid_callback');
+    return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_callback', req.url));
   }
 
   // In a production app, you MUST validate the HMAC to ensure the request is from Shopify.
@@ -34,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   if (!shopifyApiKey || !shopifyApiSecret) {
     console.error('Shopify API credentials are not set in environment variables.');
-    return NextResponse.redirect('/dashboard/connect?error=config_error');
+    return NextResponse.redirect(new URL('/dashboard/connect?error=config_error', req.url));
   }
 
   try {
@@ -56,51 +55,54 @@ export async function GET(req: NextRequest) {
 
     if (!accessToken) {
       console.error('Failed to get access token:', data);
-      return NextResponse.redirect('/dashboard/connect?error=token_exchange_failed');
+      return NextResponse.redirect(new URL('/dashboard/connect?error=token_exchange_failed', req.url));
     }
 
     const userId = await getCurrentUserId();
     if (!userId) {
-        return NextResponse.redirect('/login?error=unauthenticated');
+        console.error('Could not determine user ID during Shopify callback.');
+        return NextResponse.redirect(new URL('/login?error=unauthenticated', req.url));
     }
 
     // --- Create Account and link to User ---
 
     // 1. Create a new document in the 'accounts' collection
-    const accountRef = doc(db, 'accounts', shop); // Using shop name as a unique ID for the account
-    await setDoc(accountRef, {
+    const accountRef = db.collection('accounts').doc(shop); // Using shop name as a unique ID for the account
+    await accountRef.set({
       type: 'shopify',
       shopName: shop,
       accessToken: accessToken, // IMPORTANT: In a real app, encrypt this token!
-      installedAt: serverTimestamp(),
+      installedAt: FieldValue.serverTimestamp(),
       installedBy: userId,
     });
 
     // 2. Update the user's document
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
+    const userRef = db.collection('users').doc(userId);
+    const userDoc = await userRef.get();
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       const userData = userDoc.data();
-      const isFirstAccount = !userData.accounts || userData.accounts.length === 0;
+      const isFirstAccount = !userData?.accounts || userData.accounts.length === 0;
+      
+      const updateData: { [key: string]: any } = {
+        accounts: FieldValue.arrayUnion(shop),
+      };
 
-      await updateDoc(userRef, {
-        accounts: arrayUnion(shop),
-        // If it's the first account, set it as primary and active
-        ...(isFirstAccount && {
-          primaryAccountId: shop,
-          activeAccountId: shop,
-        }),
-      });
+      if (isFirstAccount) {
+        updateData.primaryAccountId = shop;
+        updateData.activeAccountId = shop;
+      }
+      
+      await userRef.update(updateData);
     }
 
     // Redirect to the dashboard on success
-    const dashboardUrl = new URL('/dashboard', process.env.SHOPIFY_APP_URL);
+    const dashboardUrl = new URL('/dashboard', process.env.SHOPIFY_APP_URL || req.url);
     return NextResponse.redirect(dashboardUrl);
 
   } catch (error) {
     console.error('Error during Shopify callback:', error);
-    const connectUrl = new URL('/dashboard/connect', process.env.SHOPIFY_APP_URL);
+    const connectUrl = new URL('/dashboard/connect', process.env.SHOPIFY_APP_URL || req.url);
     connectUrl.searchParams.set('error', 'internal_error');
     return NextResponse.redirect(connectUrl);
   }

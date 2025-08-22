@@ -9,12 +9,14 @@ export async function POST(req: NextRequest) {
   }
 
   const shopifyApiKey = process.env.SHOPIFY_API_KEY;
-  if (!shopifyApiKey) {
-    throw new Error('SHOPIFY_API_KEY is not defined in environment variables');
+  const appUrl = process.env.SHOPIFY_APP_URL;
+
+  if (!shopifyApiKey || !appUrl) {
+    throw new Error('Required Shopify environment variables are not defined.');
   }
 
   const scopes = 'read_orders,read_products';
-  const redirectUri = `${process.env.SHOPIFY_APP_URL}/api/shopify/callback`;
+  const redirectUri = `${appUrl}/api/shopify/callback`;
 
   // Construct the authorization URL
   const authUrl = `https://${shop}.myshopify.com/admin/oauth/authorize?client_id=${shopifyApiKey}&scope=${scopes}&redirect_uri=${redirectUri}`;

@@ -54,8 +54,8 @@ async function registerWebhooks(shop: string, accessToken: string) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
-  const shop = searchParams.get('shop');
-  const hmac = searchParams.get('hmac'); // We should validate the HMAC for security
+  const shop = search_params.get('shop');
+  const hmac = search_params.get('hmac'); // We should validate the HMAC for security
 
   if (!code || !shop) {
     return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_callback', req.url));

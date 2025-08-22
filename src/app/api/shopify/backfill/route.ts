@@ -5,7 +5,10 @@ import { db } from '@/lib/firebase-admin';
 interface ShopifyOrder {
     id: number;
     name: string;
-    email: string;
+    // Customer data might be null due to permissions
+    customer: {
+        email?: string;
+    } | null;
     created_at: string;
     updated_at: string;
     financial_status: string;
@@ -83,7 +86,7 @@ export async function POST(req: NextRequest) {
             const orderData = {
                 orderId: order.id,
                 name: order.name,
-                email: order.email,
+                email: order.customer?.email || 'N/A',
                 createdAt: order.created_at,
                 updatedAt: order.updated_at,
                 financialStatus: order.financial_status,

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     throw new Error('SHOPIFY_API_KEY is not defined in environment variables');
   }
 
-  const scopes = 'read_orders,read_products,read_customers';
+  const scopes = 'read_orders,read_products';
   const redirectUri = `${process.env.SHOPIFY_APP_URL}/api/shopify/callback`;
 
   // Construct the authorization URL

@@ -1,0 +1,43 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // =============================================
+    // Users Collection
+    // =============================================
+    // - Users can read their own document.
+    // - Users can update their own document.
+    // - New users can create their own document during signup.
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // =============================================
+    // Accounts Collection
+    // =============================================
+    // - Only authenticated users who are part of an account can read it.
+    //   (We check if their user doc has the accountId in its 'accounts' array).
+    // - Writes are locked down and should only be handled by server-side logic 
+    //   (e.g., Cloud Functions, API routes with Admin SDK).
+    match /accounts/{accountId} {
+       allow read: if request.auth != null && 
+                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+       allow write: if false; // Handled by server-side logic only
+
+        // =============================================
+        // Orders Subcollection
+        // =============================================
+        // - Users can only read orders from accounts they are a member of.
+        // - Writes (create, update, delete) are locked down and should only be handled 
+        //   by server-side logic (e.g., the backfill API and webhooks).
+        match /orders/{orderId} {
+            allow read: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+        }
+    }
+  }
+}

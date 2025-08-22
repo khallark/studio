@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -26,91 +27,180 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
+import { Download, MoreHorizontal } from 'lucide-react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '@/lib/firebase';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// This is a placeholder for the actual order data type from Firestore
 interface Order {
-  id: string;
-  orderId: string;
-  date: string;
-  customerName: string;
-  total: number;
-  status: 'Fulfilled' | 'Unfulfilled' | 'Cancelled';
+  id: string; // Firestore document ID
+  name: string;
+  createdAt: string;
+  email: string;
+  totalPrice: number;
+  currency: string;
+  fulfillmentStatus: string;
 }
 
-const sampleOrders: Order[] = [
-  { id: '1', orderId: '#3210', date: '2023-10-22', customerName: 'Liam Johnson', total: 42.95, status: 'Fulfilled' },
-  { id: '2', orderId: '#3209', date: '2023-10-21', customerName: 'Olivia Smith', total: 89.90, status: 'Unfulfilled' },
-  { id: '3', orderId: '#3208', date: '2023-10-20', customerName: 'Noah Williams', total: 12.50, status: 'Fulfilled' },
-  { id: '4', orderId: '#3207', date: '2023-10-19', customerName: 'Emma Brown', total: 25.00, status: 'Cancelled' },
-  { id: '5', orderId: '#3206', date: '2023-10-18', customerName: 'Ava Jones', total: 150.00, status: 'Fulfilled' },
-  { id: '6', orderId: '#3205', date: '2023-10-17', customerName: 'William Garcia', total: 59.99, status: 'Fulfilled' },
-  { id: '7', orderId: '#3204', date: '2023-10-16', customerName: 'Sophia Miller', total: 75.25, status: 'Unfulfilled' },
-  { id: '8', orderId: '#3203', date: '2023-10-15', customerName: 'James Davis', total: 99.99, status: 'Fulfilled' },
-  { id: '9', orderId: '#3202', date: '2023-10-14', customerName: 'Isabella Rodriguez', total: 15.00, status: 'Cancelled' },
-  { id: '10', orderId: '#3201', date: '2023-10-13', customerName: 'Logan Martinez', total: 34.50, status: 'Fulfilled' },
-  { id: '11', orderId: '#3200', date: '2023-10-12', customerName: 'Mia Hernandez', total: 63.20, status: 'Unfulfilled' },
-  { id: '12', orderId: '#3199', date: '2023-10-11', customerName: 'Benjamin Lopez', total: 45.00, status: 'Fulfilled' },
-  { id: '13', orderId: '#3198', date: '2023-10-10', customerName: 'Charlotte Gonzalez', total: 22.80, status: 'Fulfilled' },
-  { id: '14', orderId: '#3197', date: '2023-10-09', customerName: 'Elijah Wilson', total: 199.99, status: 'Cancelled' },
-  { id: '15', orderId: '#3196', date: '2023-10-08', customerName: 'Amelia Anderson', total: 68.00, status: 'Fulfilled' },
-  { id: '16', orderId: '#3195', date: '2023-10-07', customerName: 'Lucas Thomas', total: 7.99, status: 'Fulfilled' },
-  { id: '17', orderId: '#3194', date: '2023-10-06', customerName: 'Harper Taylor', total: 49.95, status: 'Unfulfilled' },
-  { id: '18', orderId: '#3193', date: '2023-10-05', customerName: 'Mason Moore', total: 110.00, status: 'Fulfilled' },
-  { id: '19', orderId: '#3192', date: '2023-10-04', customerName: 'Evelyn Jackson', total: 5.50, status: 'Fulfilled' },
-  { id: '20', orderId: '#3191', date: '2023-10-03', customerName: 'Logan White', total: 82.00, status: 'Cancelled' },
-];
-
+interface UserData {
+  activeAccountId: string | null;
+}
 
 export default function OrdersPage() {
+  const [user, userLoading] = useAuthState(auth);
+  const { toast } = useToast();
+  
   const [orders, setOrders] = useState<Order[]>([]);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 50;
+  const rowsPerPage = 10;
 
+  // Fetch user data to get active account
   useEffect(() => {
-    // In a real application, you would fetch data from Firestore here.
-    // For now, we're using sample data.
-    setOrders(sampleOrders);
-    setLoading(false);
-  }, []);
+    const fetchUserData = async () => {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          setUserData(userDoc.data() as UserData);
+        } else {
+          setLoading(false);
+        }
+      }
+    };
+    if (!userLoading) {
+      fetchUserData();
+    }
+  }, [user, userLoading]);
+
+  // Listen for real-time order updates
+  useEffect(() => {
+    if (userData?.activeAccountId) {
+      setLoading(true);
+      const ordersRef = collection(db, 'accounts', userData.activeAccountId, 'orders');
+      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        setOrders(fetchedOrders);
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching orders:", error);
+        toast({
+          title: "Error fetching orders",
+          description: "Could not connect to the database. Please try again later.",
+          variant: "destructive",
+        });
+        setLoading(false);
+      });
+
+      return () => unsubscribe(); // Cleanup listener on component unmount
+    } else if (!userLoading && userData) {
+        setLoading(false);
+    }
+  }, [userData, toast, userLoading]);
+
+  const handleBackfill = useCallback(async () => {
+    if (!userData?.activeAccountId) {
+      toast({
+        title: "No active store",
+        description: "Please connect a Shopify store first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSyncing(true);
+    toast({
+      title: "Starting Order Sync",
+      description: "Fetching all your orders from Shopify. This might take a few minutes...",
+    });
+
+    try {
+      const response = await fetch('/api/shopify/backfill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: userData.activeAccountId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to start backfill');
+      }
+
+      toast({
+        title: "Sync Complete",
+        description: result.message,
+      });
+
+    } catch (error) {
+      console.error('Backfill error:', error);
+      toast({
+        title: 'Sync Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [userData, toast]);
+
 
   // Pagination logic
   const indexOfLastOrder = currentPage * rowsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - rowsPerPage;
   const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
-
   const totalPages = Math.ceil(orders.length / rowsPerPage);
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
-
   const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
+  
+  const getFulfillmentBadgeVariant = (status: string | null) => {
+    switch(status?.toLowerCase()) {
+        case 'fulfilled':
+            return 'default';
+        case 'unfulfilled':
+        case 'partial':
+            return 'secondary';
+        case 'cancelled':
+            return 'destructive';
+        default:
+            return 'outline';
+    }
+  }
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Your Orders</CardTitle>
-          <CardDescription>
-            A list of all the orders from your connected stores.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Your Orders</CardTitle>
+            <CardDescription>
+              A list of all the orders from your connected stores.
+            </CardDescription>
+          </div>
+          <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId}>
+            <Download className="mr-2" />
+            {isSyncing ? 'Syncing...' : 'Sync Orders'}
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Order</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead className="hidden sm:table-cell">Date</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
@@ -119,34 +209,28 @@ export default function OrdersPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    Loading orders...
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
               ) : currentOrders.length > 0 ? (
                 currentOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.orderId}</TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{order.customerName}</TableCell>
-                    <TableCell>
-                      {order.total.toLocaleString('en-US', {
-                        style: 'currency',
-                        currency: 'USD',
-                      })}
+                    <TableCell className="font-medium">{order.name}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{order.email}</TableCell>
+                    <TableCell className="text-right">
+                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          order.status === 'Fulfilled'
-                            ? 'default'
-                            : order.status === 'Cancelled'
-                            ? 'destructive'
-                            : 'secondary'
-                        }
-                      >
-                        {order.status}
+                      <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)}>
+                        {order.fulfillmentStatus || 'unknown'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -169,7 +253,7 @@ export default function OrdersPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center h-24">
-                    No orders found.
+                    {userData?.activeAccountId ? 'No orders found. Try syncing your orders.' : 'Please connect a store to see your orders.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -210,3 +294,4 @@ export default function OrdersPage() {
     </main>
   );
 }
+

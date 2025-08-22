@@ -1,8 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-import Cookies from 'js-cookie';
 
 interface ShopifyOrder {
     id: number;
@@ -16,23 +14,6 @@ interface ShopifyOrder {
     currency: string;
     // Add other fields as necessary from the raw order
 }
-
-// This function gets the current user's ID from the session cookie.
-// It's a simplified approach for this prototype.
-// In a production app, you might use a library to handle session management.
-async function getCurrentUserId(req: NextRequest): Promise<string | null> {
-    const sessionCookie = req.cookies.get('session')?.value || '';
-    if (!sessionCookie) return null;
-
-    try {
-        const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
-        return decodedClaims.uid;
-    } catch (error) {
-        console.error('Error verifying session cookie:', error);
-        return null;
-    }
-}
-
 
 async function fetchWithPagination(shop: string, accessToken: string, url: string, allOrders: any[] = []): Promise<any[]> {
     const response = await fetch(url, {

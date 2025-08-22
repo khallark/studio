@@ -130,7 +130,7 @@ export default function OrdersPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to start backfill');
+        throw new Error(result.details || 'Failed to start backfill');
       }
 
       toast({
@@ -294,4 +294,3 @@ export default function OrdersPage() {
     </main>
   );
 }
-

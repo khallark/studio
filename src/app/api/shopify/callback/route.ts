@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
 import { FieldValue } from 'firebase-admin/firestore';
+import crypto from 'crypto';
 
 // This is a simplified way to get the user.
 // In a real app, you'd use a more robust session management solution.
@@ -54,20 +55,44 @@ async function registerWebhooks(shop: string, accessToken: string) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
-  const shop = search_params.get('shop');
-  const hmac = search_params.get('hmac'); // We should validate the HMAC for security
+  const shop = searchParams.get('shop');
+  const hmac = searchParams.get('hmac');
+
+  const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
+
+  if (!shopifyApiSecret) {
+    console.error('Shopify API secret is not set.');
+    return NextResponse.redirect(new URL('/dashboard/connect?error=config_error', req.url));
+  }
+  
+  // HMAC Validation
+  if (hmac) {
+    const map = Object.fromEntries(searchParams.entries());
+    delete map['hmac'];
+    const message = new URLSearchParams(map).toString();
+    
+    const generatedHmac = crypto
+      .createHmac('sha256', shopifyApiSecret)
+      .update(message)
+      .digest('hex');
+
+    if (generatedHmac !== hmac) {
+      console.error('HMAC validation failed');
+      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_hmac', req.url));
+    }
+  } else {
+      console.error('HMAC missing from callback');
+      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_hmac', req.url));
+  }
+
 
   if (!code || !shop) {
     return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_callback', req.url));
   }
 
-  // In a production app, you MUST validate the HMAC to ensure the request is from Shopify.
-  // We are skipping this for simplicity in this prototype.
-
   const shopifyApiKey = process.env.SHOPIFY_API_KEY;
-  const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
 
-  if (!shopifyApiKey || !shopifyApiSecret) {
+  if (!shopifyApiKey) {
     console.error('Shopify API credentials are not set in environment variables.');
     return NextResponse.redirect(new URL('/dashboard/connect?error=config_error', req.url));
   }

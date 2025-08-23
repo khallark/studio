@@ -46,6 +46,8 @@ export default function ConnectStorePage() {
         description = 'An internal error occurred. Please try again later.';
       } else if (error === 'config_error') {
           description = 'Server configuration error. Please contact support.'
+      } else if (error === 'invalid_hmac') {
+          description = 'The connection request could not be verified. Please try again.';
       }
 
       toast({

@@ -57,6 +57,20 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code');
   const shop = searchParams.get('shop');
   const hmac = searchParams.get('hmac');
+  const state = searchParams.get('state');
+  
+  const cookieStore = cookies();
+  const savedState = cookieStore.get('shopify_oauth_state')?.value;
+
+  // 1. State Validation for CSRF protection
+  if (!state || !savedState || state !== savedState) {
+      console.error('State validation failed');
+      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_state', req.url));
+  }
+
+  // Clear the state cookie after validation
+  cookieStore.delete('shopify_oauth_state');
+
 
   const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
 
@@ -65,7 +79,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/connect?error=config_error', req.url));
   }
   
-  // HMAC Validation
+  // 2. HMAC Validation
   if (hmac) {
     const map = Object.fromEntries(searchParams.entries());
     delete map['hmac'];
@@ -98,7 +112,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Exchange the authorization code for an access token
+    // 3. Exchange the authorization code for an access token
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: {

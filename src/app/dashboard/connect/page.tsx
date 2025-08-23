@@ -48,6 +48,8 @@ export default function ConnectStorePage() {
           description = 'Server configuration error. Please contact support.'
       } else if (error === 'invalid_hmac') {
           description = 'The connection request could not be verified. Please try again.';
+      } else if (error === 'invalid_state') {
+          description = 'The connection request has expired or is invalid. Please try again.';
       }
 
       toast({

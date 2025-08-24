@@ -27,6 +27,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
@@ -45,6 +53,14 @@ interface Order {
   fulfillmentStatus: string;
   raw: {
     line_items: any[];
+    shipping_address?: {
+        address1: string;
+        address2: string;
+        city: string;
+        zip: string;
+        province: string;
+        country: string;
+    }
   }
 }
 
@@ -60,6 +76,7 @@ export default function OrdersPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -199,6 +216,7 @@ export default function OrdersPage() {
   }
 
   return (
+    <>
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -275,8 +293,10 @@ export default function OrdersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Customer Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Confirm Order</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -324,5 +344,72 @@ export default function OrdersPage() {
         </CardFooter>
       </Card>
     </main>
+
+    <Dialog open={!!selectedOrder} onOpenChange={(isOpen) => !isOpen && setSelectedOrder(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          {selectedOrder && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Order {selectedOrder.name}</DialogTitle>
+                <DialogDescription>
+                  Details for order placed on {new Date(selectedOrder.createdAt).toLocaleString()}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 py-4">
+                <div className="grid grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="font-semibold mb-2">Customer</h3>
+                        <p className="text-sm">{selectedOrder.email}</p>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold mb-2">Shipping Address</h3>
+                        {selectedOrder.raw.shipping_address ? (
+                            <div className="text-sm">
+                                <p>{selectedOrder.raw.shipping_address.address1}{selectedOrder.raw.shipping_address.address2}</p>
+                                <p>{selectedOrder.raw.shipping_address.city}, {selectedOrder.raw.shipping_address.province} {selectedOrder.raw.shipping_address.zip}</p>
+                                <p>{selectedOrder.raw.shipping_address.country}</p>
+                            </div>
+                        ): (
+                            <p className="text-sm text-muted-foreground">No shipping address provided.</p>
+                        )}
+                    </div>
+                </div>
+                <Separator />
+                <div>
+                  <h3 className="font-semibold mb-2">Items</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead className="text-center">Quantity</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedOrder.raw.line_items.map((item: any, index: number) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{item.title}</TableCell>
+                          <TableCell>{item.sku || 'N/A'}</TableCell>
+                          <TableCell className="text-center">{item.quantity}</TableCell>
+                           <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price)}</TableCell>
+                          <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price * item.quantity)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                 <Separator />
+                 <div className="flex justify-end items-center gap-4 text-lg font-bold">
+                    <div>Total:</div>
+                    <div>{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(selectedOrder.totalPrice)}</div>
+                 </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -95,13 +95,27 @@ export async function POST(req: NextRequest) {
                 totalPrice: parseFloat(order.total_price),
                 currency: order.currency,
                 raw: order,
-                customStatus: 'New', // Default custom status
                 isDeleted: false, // Default tombstone state
                 receivedAt: FieldValue.serverTimestamp()
             };
             batch.set(orderRef, orderData, { merge: true });
+
+            // Set default custom status only if document is new
+            // Note: This requires a read for each item, which can be slow.
+            // A more performant but complex way would be to fetch all existing IDs first.
+            // For this prototype, we will rely on the webhook to set the initial status,
+            // and backfill will only update existing data, not change its custom status.
+            
             count++;
         });
+
+        // Set a default status for any documents that don't have one yet.
+        // This is a separate step to avoid overwriting existing statuses.
+        const ordersSnapshot = await accountRef.collection('orders').where('customStatus', '==', null).get();
+        ordersSnapshot.forEach(doc => {
+            batch.update(doc.ref, { customStatus: 'New' });
+        });
+
 
         await batch.commit();
 

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -40,6 +41,8 @@ export async function POST(req: NextRequest) {
 
     // 3) Safe to parse AFTER verifying
     const orderData = JSON.parse(raw);
+    const orderId = String(orderData.id);
+
 
     if (!shopDomain) {
       console.error('Missing x-shopify-shop-domain header');
@@ -48,18 +51,28 @@ export async function POST(req: NextRequest) {
 
     // Firestore refs
     const accountRef = db.collection('accounts').doc(shopDomain);
-    const orderRef   = accountRef.collection('orders').doc(String(orderData.id));
+    const orderRef   = accountRef.collection('orders').doc(orderId);
 
-    // 4) Topic handling
+    // 4) Topic handling with Tombstone logic
     if (topic === 'orders/delete') {
-      await orderRef.delete();
-      console.log(`Deleted order ${orderData.id} for shop ${shopDomain}`);
+      await orderRef.update({
+        isDeleted: true,
+        deletedAt: FieldValue.serverTimestamp(),
+        lastWebhookTopic: topic
+      });
+      console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
       return new NextResponse(null, { status: 200 });
     }
 
-    // For create, set the default custom status. For updates, it will be merged.
+    // For create/update, check for tombstone first
+    const existingOrderSnap = await orderRef.get();
+    if (existingOrderSnap.exists && existingOrderSnap.data()?.isDeleted) {
+        console.log(`Ignoring webhook topic ${topic} for already deleted order ${orderId}`);
+        return new NextResponse(null, { status: 200 }); // Acknowledge webhook, but do nothing
+    }
+
     const dataToSave: { [key: string]: any } = {
-      orderId: String(orderData.id),
+      orderId: orderId,
       name: orderData.name,
       email: orderData.customer?.email ?? null,
       createdAt: orderData.created_at ?? null,
@@ -69,20 +82,23 @@ export async function POST(req: NextRequest) {
       totalPrice: orderData.total_price ? Number(orderData.total_price) : null,
       currency: orderData.currency ?? null,
       raw: orderData,
-      _lastTopic: topic,
-      _receivedAt: new Date().toISOString(),
+      lastWebhookTopic: topic,
+      receivedAt: FieldValue.serverTimestamp(),
     };
     
+    // Only set default status on creation
     if (topic === 'orders/create') {
         dataToSave.customStatus = 'New';
+        dataToSave.isDeleted = false; // Explicitly set on create
     }
 
 
     await orderRef.set(dataToSave, { merge: true });
-    console.log(`Upserted order ${orderData.id} for ${shopDomain} via ${topic}`);
+    console.log(`Upserted order ${orderId} for ${shopDomain} via ${topic}`);
     return new NextResponse(null, { status: 200 });
   } catch (err) {
     console.error('Error processing Shopify webhook:', err);
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+    const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+    return NextResponse.json({ error: 'Webhook processing failed', details: errorMessage }, { status: 500 });
   }
 }

@@ -40,7 +40,7 @@ import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -56,6 +56,7 @@ interface Order {
   financialStatus: string;
   fulfillmentStatus: string;
   customStatus: CustomStatus;
+  isDeleted?: boolean; // Tombstone flag
   raw: {
     line_items: any[];
     shipping_address?: {
@@ -110,7 +111,8 @@ export default function OrdersPage() {
     if (userData?.activeAccountId) {
       setLoading(true);
       const ordersRef = collection(db, 'accounts', userData.activeAccountId, 'orders');
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+      // Exclude documents where isDeleted is true
+      const q = query(ordersRef, where('isDeleted', '!=', true), orderBy('isDeleted'), orderBy('createdAt', 'desc'));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
@@ -201,6 +203,7 @@ export default function OrdersPage() {
   const handleDeleteOrder = useCallback(async (orderId: string) => {
     if (!userData?.activeAccountId) return;
     try {
+      // The API will now only delete from Shopify, and the webhook will update Firestore
       const response = await fetch('/api/shopify/orders/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,7 +211,7 @@ export default function OrdersPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.details || 'Failed to delete order');
-      toast({ title: 'Order Deleted', description: `Order has been successfully deleted.` });
+      toast({ title: 'Order Deletion Initiated', description: `Order will be removed shortly.` });
     } catch (error) {
       console.error('Delete order error:', error);
       toast({
@@ -221,6 +224,8 @@ export default function OrdersPage() {
   
   const statusCounts = useMemo(() => {
     return orders.reduce((acc, order) => {
+      // Exclude deleted orders from counts
+      if (order.isDeleted) return acc;
       const status = order.customStatus || 'New';
       acc[status] = (acc[status] || 0) + 1;
       return acc;
@@ -228,7 +233,7 @@ export default function OrdersPage() {
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => order.customStatus === activeTab);
+    return orders.filter(order => !order.isDeleted && order.customStatus === activeTab);
   }, [orders, activeTab]);
 
   // Pagination logic

@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 interface ShopifyOrder {
     id: number;
@@ -95,6 +96,8 @@ export async function POST(req: NextRequest) {
                 currency: order.currency,
                 raw: order,
                 customStatus: 'New', // Default custom status
+                isDeleted: false, // Default tombstone state
+                receivedAt: FieldValue.serverTimestamp()
             };
             batch.set(orderRef, orderData, { merge: true });
             count++;

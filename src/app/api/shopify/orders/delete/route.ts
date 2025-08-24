@@ -34,18 +34,17 @@ export async function POST(req: NextRequest) {
     });
 
     // Shopify returns 200 OK on successful deletion.
-    // We should also handle cases where the order is already deleted (404).
+    // If the order is already deleted (404), we can consider it a success.
     if (!shopifyResponse.ok && shopifyResponse.status !== 404) {
       const errorData = await shopifyResponse.json();
       console.error('Shopify API delete failed:', errorData);
       return NextResponse.json({ error: 'Failed to delete order from Shopify', details: errorData.errors || 'Unknown Shopify API error' }, { status: shopifyResponse.status });
     }
 
-    // --- Step 3: Delete the order from Firestore ---
-    const orderRef = accountRef.collection('orders').doc(String(orderId));
-    await orderRef.delete();
+    // --- Step 3: Rely on the `orders/delete` webhook to delete from Firestore ---
+    // The webhook will handle the Firestore deletion, ensuring data consistency.
 
-    return NextResponse.json({ message: 'Order successfully deleted from Shopify and Firestore' });
+    return NextResponse.json({ message: 'Order successfully deleted from Shopify. Firestore will be updated via webhook.' });
   } catch (error) {
     console.error('Error deleting order:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';

@@ -88,7 +88,6 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // Fetch user data to get active account
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
@@ -106,7 +105,6 @@ export default function OrdersPage() {
     }
   }, [user, userLoading]);
 
-  // Listen for real-time order updates
   useEffect(() => {
     if (userData?.activeAccountId) {
       setLoading(true);
@@ -116,7 +114,7 @@ export default function OrdersPage() {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedOrders = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Order))
-          .filter(order => order.isDeleted !== true); // Filter on the client-side
+          .filter(order => order.isDeleted !== true);
           
         setOrders(fetchedOrders);
         setLoading(false);
@@ -124,15 +122,13 @@ export default function OrdersPage() {
         console.error("Error fetching orders:", error);
         toast({
           title: "Error fetching orders",
-          description: "Could not connect to the database. " + (error.message.includes("requires an index") 
-            ? "A database index is being prepared. Please check back in a few minutes."
-            : "Please check your connection or Firestore security rules."),
+          description: "Could not connect to the database. Please try again.",
           variant: "destructive",
         });
         setLoading(false);
       });
 
-      return () => unsubscribe(); // Cleanup listener on component unmount
+      return () => unsubscribe();
     } else if (!userLoading && userData) {
         setLoading(false);
     }
@@ -184,11 +180,15 @@ export default function OrdersPage() {
   }, [userData, toast]);
 
   const handleUpdateStatus = useCallback(async (orderId: string, status: CustomStatus) => {
-    if (!userData?.activeAccountId) return;
+    if (!userData?.activeAccountId || !user) return;
     try {
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/shopify/orders/update-status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({ shop: userData.activeAccountId, orderId, status }),
       });
       const result = await response.json();
@@ -202,12 +202,11 @@ export default function OrdersPage() {
         variant: 'destructive',
       });
     }
-  }, [userData, toast]);
+  }, [userData, toast, user]);
 
   const handleDeleteOrder = useCallback(async (orderId: string) => {
     if (!userData?.activeAccountId) return;
     try {
-      // The API will now only delete from Shopify, and the webhook will update Firestore
       const response = await fetch('/api/shopify/orders/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,7 +227,6 @@ export default function OrdersPage() {
   
   const statusCounts = useMemo(() => {
     return orders.reduce((acc, order) => {
-      // isDeleted check is redundant because of client-side filter, but safe to keep
       if (order.isDeleted) return acc;
       const status = order.customStatus || 'New';
       acc[status] = (acc[status] || 0) + 1;
@@ -237,10 +235,9 @@ export default function OrdersPage() {
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => order.customStatus === activeTab);
+    return orders.filter(order => (order.customStatus || 'New') === activeTab && !order.isDeleted);
   }, [orders, activeTab]);
 
-  // Pagination logic
   const indexOfLastOrder = currentPage * rowsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - rowsPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
@@ -542,9 +539,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    
-
-    
-
-    

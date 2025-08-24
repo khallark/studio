@@ -1,7 +1,8 @@
+
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, PanelLeft } from 'lucide-react';
+import { Home, Package, Settings, History } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -62,11 +63,12 @@ export default function DashboardLayout({
   }
 
   const getTitle = () => {
+    if (pathname.startsWith('/dashboard/orders')) return 'Orders';
+    if (pathname.startsWith('/dashboard/logs')) return 'Logs';
+
     switch (pathname) {
       case '/dashboard':
         return 'Dashboard';
-      case '/dashboard/orders':
-        return 'Orders';
       case '/dashboard/connect':
         return 'Connect your store';
       default:
@@ -103,6 +105,14 @@ export default function DashboardLayout({
                   <Link href="/dashboard/orders">
                     <Package />
                     Orders
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/logs'}>
+                  <Link href="/dashboard/logs">
+                    <History />
+                    Logs
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

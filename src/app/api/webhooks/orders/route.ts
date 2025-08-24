@@ -18,6 +18,28 @@ function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string):
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
 }
 
+async function logWebhook(db: FirebaseFirestore.Firestore, shopDomain: string, topic: string, orderId: string, payload: any, hmac: string) {
+    const logEntry = {
+        type: 'WEBHOOK',
+        topic: topic,
+        orderId: orderId,
+        timestamp: FieldValue.serverTimestamp(),
+        payload: payload,
+        hmacVerified: true,
+        source: 'Shopify',
+        headers: {
+            shopDomain,
+            topic,
+            hmac,
+        },
+    };
+    try {
+        await db.collection('accounts').doc(shopDomain).collection('logs').add(logEntry);
+    } catch (error) {
+        console.error("Failed to write webhook log:", error);
+    }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
@@ -29,31 +51,27 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Server misconfigured', { status: 500 });
     }
 
-    // 1) Read RAW body once (do NOT parse yet)
     const raw = await req.text();
-
-    // 2) Verify HMAC on the raw body (base64 header vs raw bytes)
     const ok = verifyWebhookHmac(raw, hmacHeader, process.env.SHOPIFY_API_SECRET);
     if (!ok) {
       console.warn('Webhook HMAC verification failed', { topic, shopDomain });
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // 3) Safe to parse AFTER verifying
     const orderData = JSON.parse(raw);
-    const orderId = String(orderData.id);
-
+    const orderId = String(orderData.id || (topic === 'orders/delete' ? orderData.id : 'N/A'));
 
     if (!shopDomain) {
       console.error('Missing x-shopify-shop-domain header');
       return NextResponse.json({ error: 'Shop domain is required' }, { status: 400 });
     }
 
-    // Firestore refs
+    // Log the incoming webhook regardless of outcome
+    await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
+
     const accountRef = db.collection('accounts').doc(shopDomain);
     const orderRef   = accountRef.collection('orders').doc(orderId);
 
-    // 4) Topic handling with Tombstone logic
     if (topic === 'orders/delete') {
       await orderRef.update({
         isDeleted: true,
@@ -64,15 +82,14 @@ export async function POST(req: NextRequest) {
       return new NextResponse(null, { status: 200 });
     }
 
-    // For create/update, check for tombstone first
     const existingOrderSnap = await orderRef.get();
     if (existingOrderSnap.exists && existingOrderSnap.data()?.isDeleted) {
         console.log(`Ignoring webhook topic ${topic} for already deleted order ${orderId}`);
-        return new NextResponse(null, { status: 200 }); // Acknowledge webhook, but do nothing
+        return new NextResponse(null, { status: 200 });
     }
 
     const dataToSave: { [key: string]: any } = {
-      orderId: orderData.id, // Use original ID
+      orderId: orderData.id,
       name: orderData.name,
       email: orderData.customer?.email ?? 'N/A',
       createdAt: orderData.created_at,
@@ -86,12 +103,10 @@ export async function POST(req: NextRequest) {
       receivedAt: FieldValue.serverTimestamp(),
     };
     
-    // Only set default status on creation
     if (topic === 'orders/create') {
         dataToSave.customStatus = 'New';
-        dataToSave.isDeleted = false; // Explicitly set on create
+        dataToSave.isDeleted = false;
     }
-
 
     await orderRef.set(dataToSave, { merge: true });
     console.log(`Upserted order ${orderId} for ${shopDomain} via ${topic}`);

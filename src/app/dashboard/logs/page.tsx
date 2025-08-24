@@ -4,15 +4,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, limit, startAfter, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, query, orderBy, limit, startAfter, getDocs, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Log {
   id: string;
@@ -50,38 +48,35 @@ export default function LogsPage() {
         const userDoc = await getDoc(userRef);
         if (userDoc.exists()) {
           setUserData(userDoc.data() as UserData);
-        } else {
-          setLoading(false);
         }
       }
+      // Set loading to false only after user data check is complete
+      setLoading(false); 
     };
     if (!userLoading) {
       fetchUserData();
     }
   }, [user, userLoading]);
 
-  const loadMoreLogs = useCallback(async () => {
-    if (!userData?.activeAccountId || loadingMore || !hasMore) return;
+  const loadMoreLogs = useCallback(async (isInitialLoad = false) => {
+    if (!userData?.activeAccountId || loadingMore) return;
   
     setLoadingMore(true);
     try {
       const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
       let q = query(logsRef, orderBy('timestamp', 'desc'), limit(LOGS_PER_PAGE));
       
-      if (lastVisible) {
+      if (lastVisible && !isInitialLoad) {
         q = query(q, startAfter(lastVisible));
       }
   
       const documentSnapshots = await getDocs(q);
   
-      const newLogs = documentSnapshots.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp
-        } as Log;
-      });
+      const newLogs = documentSnapshots.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp
+      } as Log));
   
       const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
       setLastVisible(newLastVisible);
@@ -100,32 +95,25 @@ export default function LogsPage() {
     }
   }, [userData?.activeAccountId, loadingMore, hasMore, toast, lastVisible]);
   
-
-  // Initial load
+  // Initial load effect
   useEffect(() => {
     if (userData?.activeAccountId) {
-      setLoading(true);
-      setLogs([]);
-      setLastVisible(null);
-      setHasMore(true);
-      
-      // We are calling loadMoreLogs here, but since lastVisible is null, it fetches the first page.
-      loadMoreLogs().finally(() => {
-          setLoading(false);
-          // Scroll to bottom after initial load
-          setTimeout(() => {
-            const scrollable = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-            if (scrollable) {
-                scrollable.scrollTop = scrollable.scrollHeight;
-            }
-          }, 100);
-      });
-    } else if (!userLoading && userData) {
-      setLoading(false);
+        setLoading(true);
+        setLogs([]);
+        setLastVisible(null);
+        setHasMore(true);
+        
+        loadMoreLogs(true).finally(() => {
+            setLoading(false);
+            setTimeout(() => {
+              const scrollableViewport = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+              if (scrollableViewport) {
+                scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
+              }
+            }, 100);
+        });
     }
-    // We want this to run only when userData becomes available.
-    // loadMoreLogs is a dependency, so we include it.
-  }, [userData, userLoading]);
+  }, [userData?.activeAccountId]);
 
 
   const topLoaderRef = useCallback((node: HTMLDivElement) => {
@@ -152,7 +140,8 @@ export default function LogsPage() {
         description = `Order ID: ${log.orderId || 'N/A'}`;
     } else if (log.type === 'USER_ACTION') {
         title = `User Action: ${log.action.replace(/_/g, ' ')}`;
-        description = `${log.user.displayName} changed order ${log.details.orderId} from ${log.details.oldStatus} to ${log.details.newStatus}`;
+        const details = log.details || {};
+        description = `${log.user?.displayName || 'A user'} changed order ${details.orderId} from ${details.oldStatus} to ${details.newStatus}`;
     }
 
     return (
@@ -179,7 +168,7 @@ export default function LogsPage() {
 
   return (
     <>
-      <main className="flex flex-1 flex-col p-4 md:p-6">
+      <main className="flex flex-1 flex-col p-4 md:p-6 h-full">
         <Card className="flex-1 flex flex-col">
           <CardHeader>
             <CardTitle>Activity Logs</CardTitle>
@@ -208,7 +197,7 @@ export default function LogsPage() {
                         </>
                     ) : (
                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            {userData?.activeAccountId ? 'No logs found yet. Activity will appear here.' : 'Please connect a store to see logs.'}
+                            {userLoading ? 'Loading user data...' : userData?.activeAccountId ? 'No logs found yet. Activity will appear here.' : 'Please connect a store to see logs.'}
                         </div>
                     )}
                 </div>
@@ -230,7 +219,6 @@ export default function LogsPage() {
               <ScrollArea className="max-h-[60vh] mt-4 rounded-md border p-4">
                   <pre className="text-sm">
                     {JSON.stringify(selectedLog, (key, value) => {
-                        // Convert Firestore Timestamps to readable strings
                         if (value && value.seconds && typeof value.toDate === 'function') {
                             return value.toDate().toISOString();
                         }
@@ -245,4 +233,3 @@ export default function LogsPage() {
     </>
   );
 }
-

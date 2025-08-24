@@ -219,6 +219,14 @@ export default function OrdersPage() {
     }
   }, [userData, toast]);
   
+  const statusCounts = useMemo(() => {
+    return orders.reduce((acc, order) => {
+      const status = order.customStatus || 'New';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<CustomStatus, number>);
+  }, [orders]);
+  
   const filteredOrders = useMemo(() => {
     return orders.filter(order => order.customStatus === activeTab);
   }, [orders, activeTab]);
@@ -335,10 +343,10 @@ export default function OrdersPage() {
         <CardContent>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)}>
             <TabsList>
-              <TabsTrigger value="New">New</TabsTrigger>
-              <TabsTrigger value="Confirmed">Confirmed</TabsTrigger>
-              <TabsTrigger value="Ready To Dispatch">Ready To Dispatch</TabsTrigger>
-              <TabsTrigger value="Cancelled">Cancelled</TabsTrigger>
+              <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
+              <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
+              <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
+              <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
             </TabsList>
             <TabsContent value={activeTab}>
               <Table>

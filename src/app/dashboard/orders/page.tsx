@@ -111,19 +111,22 @@ export default function OrdersPage() {
     if (userData?.activeAccountId) {
       setLoading(true);
       const ordersRef = collection(db, 'accounts', userData.activeAccountId, 'orders');
-      // Query for non-deleted orders and sort them.
-      // This compound query requires a composite index in Firestore.
-      const q = query(ordersRef, where('isDeleted', '==', false), orderBy('createdAt', 'desc'));
+      const q = query(ordersRef, orderBy('createdAt', 'desc'));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        const fetchedOrders = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Order))
+          .filter(order => order.isDeleted !== true); // Filter on the client-side
+          
         setOrders(fetchedOrders);
         setLoading(false);
       }, (error) => {
         console.error("Error fetching orders:", error);
         toast({
           title: "Error fetching orders",
-          description: "Could not connect to the database. Please check your connection or Firestore security rules.",
+          description: "Could not connect to the database. " + (error.message.includes("requires an index") 
+            ? "A database index is being prepared. Please check back in a few minutes."
+            : "Please check your connection or Firestore security rules."),
           variant: "destructive",
         });
         setLoading(false);
@@ -225,7 +228,7 @@ export default function OrdersPage() {
   
   const statusCounts = useMemo(() => {
     return orders.reduce((acc, order) => {
-      // Exclude deleted orders from counts
+      // isDeleted check is redundant because of client-side filter, but safe to keep
       if (order.isDeleted) return acc;
       const status = order.customStatus || 'New';
       acc[status] = (acc[status] || 0) + 1;
@@ -539,6 +542,8 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    
 
     
 

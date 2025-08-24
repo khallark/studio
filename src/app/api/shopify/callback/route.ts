@@ -22,7 +22,7 @@ async function registerWebhooks(shop: string, accessToken: string) {
         return;
     }
 
-    const webhookUrl = `${appUrl}/api/webhooks/orders`;
+    const webhookUrl = `${appUrl}/webhooks/orders`;
     const webhooks = [
         { topic: 'orders/create', address: webhookUrl },
         { topic: 'orders/updated', address: webhookUrl },
@@ -31,7 +31,7 @@ async function registerWebhooks(shop: string, accessToken: string) {
 
     for (const webhook of webhooks) {
         try {
-            const response = await fetch(`https://${shop}/admin/api/2024-04/webhooks.json`, {
+            const response = await fetch(`https://${shop}/admin/api/2025-07/webhooks.json`, {
                 method: 'POST',
                 headers: {
                     'X-Shopify-Access-Token': accessToken,

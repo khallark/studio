@@ -111,8 +111,9 @@ export default function OrdersPage() {
     if (userData?.activeAccountId) {
       setLoading(true);
       const ordersRef = collection(db, 'accounts', userData.activeAccountId, 'orders');
-      // Exclude documents where isDeleted is true
-      const q = query(ordersRef, where('isDeleted', '!=', true), orderBy('isDeleted'), orderBy('createdAt', 'desc'));
+      // Query for non-deleted orders and sort them.
+      // This compound query requires a composite index in Firestore.
+      const q = query(ordersRef, where('isDeleted', '==', false), orderBy('createdAt', 'desc'));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
@@ -122,7 +123,7 @@ export default function OrdersPage() {
         console.error("Error fetching orders:", error);
         toast({
           title: "Error fetching orders",
-          description: "Could not connect to the database. Please try again later.",
+          description: "Could not connect to the database. Please check your connection or Firestore security rules.",
           variant: "destructive",
         });
         setLoading(false);
@@ -233,7 +234,7 @@ export default function OrdersPage() {
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => !order.isDeleted && order.customStatus === activeTab);
+    return orders.filter(order => order.customStatus === activeTab);
   }, [orders, activeTab]);
 
   // Pagination logic
@@ -538,5 +539,7 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    
 
     

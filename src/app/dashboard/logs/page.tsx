@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, query, orderBy, limit, startAfter, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, query, orderBy, limit, startAfter, getDocs, Timestamp, onSnapshot, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +38,7 @@ export default function LogsPage() {
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
   const observer = useRef<IntersectionObserver>();
+  const isInitialLoadDone = useRef(false);
 
   // Fetch user data to get active account
   useEffect(() => {
@@ -48,11 +49,10 @@ export default function LogsPage() {
         if (userDoc.exists()) {
           setUserData(userDoc.data() as UserData);
         } else {
-            // User doc doesn't exist, not an error, just means no connected account
             setUserData(null);
         }
       }
-      setLoading(false);
+      // setLoading(false) will be called after initial logs are fetched.
     };
 
     if (!userLoading) {
@@ -60,17 +60,49 @@ export default function LogsPage() {
     }
   }, [user, userLoading]);
 
-  const loadMoreLogs = useCallback(async (isInitialLoad = false) => {
-    if (!userData?.activeAccountId || loadingMore) return;
+  // Real-time listener for new logs
+  useEffect(() => {
+    if (!userData?.activeAccountId || !isInitialLoadDone.current) return;
+
+    const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
+    // Listen for logs newer than the newest one we have
+    const newestLogTimestamp = logs.length > 0 ? logs[0].timestamp : new Timestamp(0, 0);
+
+    const q = query(
+        logsRef, 
+        where('timestamp', '>', newestLogTimestamp),
+        orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const newLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Log));
+        if (newLogs.length > 0) {
+            setLogs(prevLogs => [...newLogs, ...prevLogs]);
+        }
+    }, (error) => {
+        console.error("Error with real-time log listener:", error);
+        toast({
+            title: "Real-time Update Error",
+            description: "Could not listen for new logs.",
+            variant: "destructive",
+        });
+    });
+
+    return () => unsubscribe();
+
+  }, [userData?.activeAccountId, logs, toast]);
+
+
+  const loadMoreLogs = useCallback(async () => {
+    if (!userData?.activeAccountId || loadingMore || !hasMore) return;
   
     setLoadingMore(true);
-    if(isInitialLoad) setLoading(true);
 
     try {
       const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
       let q = query(logsRef, orderBy('timestamp', 'desc'), limit(LOGS_PER_PAGE));
       
-      if (lastVisible && !isInitialLoad) {
+      if (lastVisible) {
         q = query(q, startAfter(lastVisible));
       }
   
@@ -85,7 +117,7 @@ export default function LogsPage() {
       
       setHasMore(documentSnapshots.docs.length === LOGS_PER_PAGE);
       setLastVisible(newLastVisible);
-      setLogs(prevLogs => isInitialLoad ? newLogs : [...prevLogs, ...newLogs]);
+      setLogs(prevLogs => [...prevLogs, ...newLogs]);
   
     } catch (error) {
       console.error("Error fetching more logs:", error);
@@ -96,20 +128,23 @@ export default function LogsPage() {
       });
     } finally {
       setLoadingMore(false);
-      if(isInitialLoad) setLoading(false);
+      if (!isInitialLoadDone.current) {
+        setLoading(false);
+        isInitialLoadDone.current = true;
+      }
     }
-  }, [userData?.activeAccountId, lastVisible, toast, loadingMore]);
+  }, [userData?.activeAccountId, lastVisible, toast, loadingMore, hasMore]);
   
   // Initial load effect
   useEffect(() => {
-    if (userData?.activeAccountId) {
-        // Reset state for initial load when account changes
+    if (userData?.activeAccountId && !isInitialLoadDone.current) {
+        setLoading(true);
         setLogs([]);
         setLastVisible(null);
         setHasMore(true);
-        loadMoreLogs(true);
+        loadMoreLogs();
     }
-  }, [userData?.activeAccountId]);
+  }, [userData?.activeAccountId, loadMoreLogs]);
 
 
   const bottomLoaderRef = useCallback((node: HTMLDivElement) => {
@@ -167,7 +202,7 @@ export default function LogsPage() {
           <CardHeader>
             <CardTitle>Activity Logs</CardTitle>
             <CardDescription>
-              A stream of all events from Shopify and user actions, from newest to oldest.
+              A stream of all events from Shopify and user actions, from newest to oldest. New logs appear in real-time.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
@@ -213,11 +248,6 @@ export default function LogsPage() {
               <ScrollArea className="max-h-[60vh] mt-4 rounded-md border p-4">
                   <pre className="text-sm">
                     {JSON.stringify(selectedLog, (key, value) => {
-                        // BigInts can't be stringified, so convert to string
-                        if (typeof value === 'bigint') {
-                            return value.toString();
-                        }
-                        // Firestore Timestamps
                         if (value && value.seconds && typeof value.toDate === 'function') {
                             return value.toDate().toISOString();
                         }

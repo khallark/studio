@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, query, orderBy, limit, startAfter, getDocs, Timestamp } from 'firebase/firestore';
@@ -37,7 +37,6 @@ export default function LogsPage() {
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver>();
 
   // Fetch user data to get active account
@@ -50,7 +49,6 @@ export default function LogsPage() {
           setUserData(userDoc.data() as UserData);
         }
       }
-      // Set loading to false only after user data check is complete
       if (!user) {
         setLoading(false); 
       }
@@ -60,16 +58,7 @@ export default function LogsPage() {
     }
   }, [user, userLoading]);
 
-  const scrollToBottom = () => {
-      setTimeout(() => {
-        const scrollableViewport = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-        if (scrollableViewport) {
-          scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
-        }
-      }, 100);
-  }
-
-  const loadMoreLogs = useCallback(async (isInitialLoad = false) => {
+  const loadMoreLogs = useCallback(async () => {
     if (!userData?.activeAccountId || loadingMore || !hasMore) return;
   
     setLoadingMore(true);
@@ -77,7 +66,7 @@ export default function LogsPage() {
       const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
       let q = query(logsRef, orderBy('timestamp', 'desc'), limit(LOGS_PER_PAGE));
       
-      if (lastVisible && !isInitialLoad) {
+      if (lastVisible) {
         q = query(q, startAfter(lastVisible));
       }
   
@@ -92,14 +81,9 @@ export default function LogsPage() {
       const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
       setLastVisible(newLastVisible);
       
-      // Prepend older logs to the list
-      setLogs(prevLogs => [...newLogs, ...prevLogs]);
+      setLogs(prevLogs => [...prevLogs, ...newLogs]);
 
       setHasMore(documentSnapshots.docs.length === LOGS_PER_PAGE);
-
-      if (isInitialLoad) {
-          scrollToBottom();
-      }
   
     } catch (error) {
       console.error("Error fetching more logs:", error);
@@ -121,16 +105,16 @@ export default function LogsPage() {
         setLastVisible(null);
         setHasMore(true);
         
-        loadMoreLogs(true).finally(() => {
+        loadMoreLogs().finally(() => {
             setLoading(false);
         });
     } else if (!userLoading && userData === null) {
         setLoading(false);
     }
-  }, [userData]);
+  }, [userData, loadMoreLogs, userLoading]);
 
 
-  const topLoaderRef = useCallback((node: HTMLDivElement) => {
+  const bottomLoaderRef = useCallback((node: HTMLDivElement) => {
     if (loadingMore || loading) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
@@ -177,8 +161,6 @@ export default function LogsPage() {
     );
   };
   
-  const displayedLogs = useMemo(() => [...logs].reverse(), [logs]);
-
 
   return (
     <>
@@ -187,11 +169,11 @@ export default function LogsPage() {
           <CardHeader>
             <CardTitle>Activity Logs</CardTitle>
             <CardDescription>
-              A stream of all events from Shopify and user actions. Newest logs are at the bottom.
+              A stream of all events from Shopify and user actions, from newest to oldest.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full" ref={scrollContainerRef}>
+            <ScrollArea className="h-full">
                 <div className="space-y-2">
                     {loading ? (
                         Array.from({ length: 10 }).map((_, i) => (
@@ -205,9 +187,9 @@ export default function LogsPage() {
                         ))
                     ) : logs.length > 0 ? (
                         <>
-                           {hasMore && <div ref={topLoaderRef} className="h-1" />}
+                           {logs.map((log) => <LogItem key={log.id} log={log} />)}
+                           {hasMore && <div ref={bottomLoaderRef} className="h-1" />}
                            {loadingMore && <div className="p-4 text-center text-sm">Loading older logs...</div>}
-                           {displayedLogs.map((log) => <LogItem key={log.id} log={log} />)}
                         </>
                     ) : (
                          <div className="flex items-center justify-center h-full text-muted-foreground">

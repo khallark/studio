@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   });
 
   const scopes =
-  'read_products,write_products,read_inventory,write_inventory,read_locations,read_metafields,write_metafields,write_files,read_orders,write_orders,read_all_orders,read_draft_orders,write_draft_orders,read_fulfillments,write_fulfillments,read_customers,read_analytics,write_order_edits';
+  'read_products,write_products,read_inventory,write_inventory,read_locations,write_files,read_orders,write_orders,read_all_orders,read_draft_orders,write_draft_orders,read_fulfillments,write_fulfillments,read_customers,read_analytics,write_order_edits';
 
   const redirectUri = `${appUrl}/api/shopify/callback`;
 

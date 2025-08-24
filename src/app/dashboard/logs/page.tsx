@@ -60,43 +60,46 @@ export default function LogsPage() {
     }
   }, [user, userLoading]);
 
-  const loadMoreLogs = useCallback(async (currentLastVisible: any) => {
+  const loadMoreLogs = useCallback(async () => {
     if (!userData?.activeAccountId || loadingMore || !hasMore) return;
-
+  
     setLoadingMore(true);
     try {
-        const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
-        let q = query(logsRef, orderBy('timestamp', 'desc'), limit(LOGS_PER_PAGE));
-        if (currentLastVisible) {
-            q = query(q, startAfter(currentLastVisible));
-        }
-
-        const documentSnapshots = await getDocs(q);
-
-        const newLogs = documentSnapshots.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                timestamp: data.timestamp
-            } as Log;
-        });
-
-        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-        setLogs(prevLogs => [...prevLogs, ...newLogs]);
-        setHasMore(documentSnapshots.docs.length === LOGS_PER_PAGE);
-
+      const logsRef = collection(db, 'accounts', userData.activeAccountId, 'logs');
+      let q = query(logsRef, orderBy('timestamp', 'desc'), limit(LOGS_PER_PAGE));
+      
+      if (lastVisible) {
+        q = query(q, startAfter(lastVisible));
+      }
+  
+      const documentSnapshots = await getDocs(q);
+  
+      const newLogs = documentSnapshots.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp
+        } as Log;
+      });
+  
+      const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
+      setLastVisible(newLastVisible);
+      setLogs(prevLogs => [...prevLogs, ...newLogs]);
+      setHasMore(documentSnapshots.docs.length === LOGS_PER_PAGE);
+  
     } catch (error) {
-        console.error("Error fetching more logs:", error);
-        toast({
-            title: "Error fetching logs",
-            description: "Could not fetch older logs.",
-            variant: "destructive",
-        });
+      console.error("Error fetching more logs:", error);
+      toast({
+        title: "Error fetching logs",
+        description: error instanceof Error ? error.message : "Could not fetch older logs.",
+        variant: "destructive",
+      });
     } finally {
-        setLoadingMore(false);
+      setLoadingMore(false);
     }
-  }, [userData?.activeAccountId, loadingMore, hasMore, toast]);
+  }, [userData?.activeAccountId, loadingMore, hasMore, toast, lastVisible]);
+  
 
   // Initial load
   useEffect(() => {
@@ -106,23 +109,35 @@ export default function LogsPage() {
       setLastVisible(null);
       setHasMore(true);
       
-      loadMoreLogs(null).finally(() => setLoading(false));
+      // We are calling loadMoreLogs here, but since lastVisible is null, it fetches the first page.
+      loadMoreLogs().finally(() => {
+          setLoading(false);
+          // Scroll to bottom after initial load
+          setTimeout(() => {
+            const scrollable = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollable) {
+                scrollable.scrollTop = scrollable.scrollHeight;
+            }
+          }, 100);
+      });
     } else if (!userLoading && userData) {
       setLoading(false);
     }
-  }, [userData, loadMoreLogs, userLoading]);
+    // We want this to run only when userData becomes available.
+    // loadMoreLogs is a dependency, so we include it.
+  }, [userData, userLoading]);
 
 
-  const topElementRef = useCallback((node: HTMLDivElement) => {
+  const topLoaderRef = useCallback((node: HTMLDivElement) => {
     if (loading) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        loadMoreLogs(lastVisible);
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        loadMoreLogs();
       }
     });
     if (node) observer.current.observe(node);
-  }, [loading, hasMore, loadMoreLogs, lastVisible]);
+  }, [loading, hasMore, loadMoreLogs, loadingMore]);
 
 
   const LogItem = ({ log }: { log: Log }) => {
@@ -136,7 +151,7 @@ export default function LogsPage() {
         title = `Webhook Received: ${log.topic}`;
         description = `Order ID: ${log.orderId || 'N/A'}`;
     } else if (log.type === 'USER_ACTION') {
-        title = `User Action: ${log.action.replace('_', ' ')}`;
+        title = `User Action: ${log.action.replace(/_/g, ' ')}`;
         description = `${log.user.displayName} changed order ${log.details.orderId} from ${log.details.oldStatus} to ${log.details.newStatus}`;
     }
 
@@ -158,6 +173,9 @@ export default function LogsPage() {
       </div>
     );
   };
+  
+  const reversedLogs = useMemo(() => [...logs].reverse(), [logs]);
+
 
   return (
     <>
@@ -166,7 +184,7 @@ export default function LogsPage() {
           <CardHeader>
             <CardTitle>Activity Logs</CardTitle>
             <CardDescription>
-              A real-time stream of all events from Shopify and user actions.
+              A stream of all events from Shopify and user actions. Newest logs are at the bottom.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
@@ -184,9 +202,9 @@ export default function LogsPage() {
                         ))
                     ) : logs.length > 0 ? (
                         <>
-                           <div ref={topElementRef} />
-                            {loadingMore && <div className="p-4 text-center">Loading more...</div>}
-                            {logs.map((log) => <LogItem key={log.id} log={log} />)}
+                           <div ref={topLoaderRef} className="h-1" />
+                            {loadingMore && <div className="p-4 text-center text-sm">Loading older logs...</div>}
+                            {reversedLogs.map((log) => <LogItem key={log.id} log={log} />)}
                         </>
                     ) : (
                          <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -227,3 +245,4 @@ export default function LogsPage() {
     </>
   );
 }
+

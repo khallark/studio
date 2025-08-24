@@ -18,6 +18,28 @@ function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string):
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
 }
 
+async function logWebhook(db: FirebaseFirestore.Firestore, shopDomain: string, topic: string, orderId: string, payload: any, hmac: string) {
+    const logEntry = {
+        type: 'WEBHOOK',
+        topic: topic,
+        orderId: orderId,
+        timestamp: FieldValue.serverTimestamp(),
+        payload: payload,
+        hmacVerified: true,
+        source: 'Shopify',
+        headers: {
+            shopDomain,
+            topic,
+            hmac,
+        },
+    };
+    try {
+        await db.collection('accounts').doc(shopDomain).collection('logs').add(logEntry);
+    } catch (error) {
+        console.error("Failed to write webhook log:", error);
+    }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
@@ -48,6 +70,9 @@ export async function POST(req: NextRequest) {
       console.error('Missing x-shopify-shop-domain header');
       return NextResponse.json({ error: 'Shop domain is required' }, { status: 400 });
     }
+
+    // Log the incoming webhook regardless of outcome
+    await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
 
     // Firestore refs
     const accountRef = db.collection('accounts').doc(shopDomain);

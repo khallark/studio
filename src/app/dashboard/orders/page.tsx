@@ -41,7 +41,11 @@ interface Order {
   email: string;
   totalPrice: number;
   currency: string;
+  financialStatus: string;
   fulfillmentStatus: string;
+  raw: {
+    line_items: any[];
+  }
 }
 
 interface UserData {
@@ -171,10 +175,26 @@ export default function OrdersPage() {
         case 'unfulfilled':
         case 'partial':
             return 'secondary';
-        case 'cancelled':
-            return 'destructive';
-        default:
+        case 'restocked':
             return 'outline';
+        default:
+            return 'destructive';
+    }
+  }
+
+  const getPaymentBadgeVariant = (status: string | null) => {
+    switch(status?.toLowerCase()) {
+        case 'paid':
+            return 'default';
+        case 'pending':
+            return 'secondary';
+        case 'refunded':
+        case 'partially_refunded':
+            return 'outline';
+        case 'voided':
+            return 'destructive'
+        default:
+            return 'secondary';
     }
   }
 
@@ -197,11 +217,13 @@ export default function OrdersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead className="hidden sm:table-cell">Date</TableHead>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Payment Status</TableHead>
+                <TableHead>Fulfillment Status</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -212,10 +234,12 @@ export default function OrdersPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
@@ -223,15 +247,23 @@ export default function OrdersPage() {
                 currentOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>{order.email}</TableCell>
                     <TableCell className="text-right">
                       {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)}>
-                        {order.fulfillmentStatus || 'unknown'}
+                      <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
+                        {order.financialStatus?.replace('_', ' ') || 'N/A'}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
+                        {order.fulfillmentStatus || 'unfulfilled'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {order.raw?.line_items?.length || 0}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -252,7 +284,7 @@ export default function OrdersPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
+                  <TableCell colSpan={8} className="text-center h-24">
                     {userData?.activeAccountId ? 'No orders found. Try syncing your orders.' : 'Please connect a store to see your orders.'}
                   </TableCell>
                 </TableRow>

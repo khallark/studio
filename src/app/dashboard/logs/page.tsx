@@ -51,15 +51,26 @@ export default function LogsPage() {
         }
       }
       // Set loading to false only after user data check is complete
-      setLoading(false); 
+      if (!user) {
+        setLoading(false); 
+      }
     };
     if (!userLoading) {
       fetchUserData();
     }
   }, [user, userLoading]);
 
+  const scrollToBottom = () => {
+      setTimeout(() => {
+        const scrollableViewport = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollableViewport) {
+          scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
+        }
+      }, 100);
+  }
+
   const loadMoreLogs = useCallback(async (isInitialLoad = false) => {
-    if (!userData?.activeAccountId || loadingMore) return;
+    if (!userData?.activeAccountId || loadingMore || !hasMore) return;
   
     setLoadingMore(true);
     try {
@@ -80,8 +91,15 @@ export default function LogsPage() {
   
       const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
       setLastVisible(newLastVisible);
-      setLogs(prevLogs => [...prevLogs, ...newLogs]);
+      
+      // Prepend older logs to the list
+      setLogs(prevLogs => [...newLogs, ...prevLogs]);
+
       setHasMore(documentSnapshots.docs.length === LOGS_PER_PAGE);
+
+      if (isInitialLoad) {
+          scrollToBottom();
+      }
   
     } catch (error) {
       console.error("Error fetching more logs:", error);
@@ -93,7 +111,7 @@ export default function LogsPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [userData?.activeAccountId, loadingMore, hasMore, toast, lastVisible]);
+  }, [userData?.activeAccountId, lastVisible, toast, loadingMore, hasMore]);
   
   // Initial load effect
   useEffect(() => {
@@ -105,27 +123,23 @@ export default function LogsPage() {
         
         loadMoreLogs(true).finally(() => {
             setLoading(false);
-            setTimeout(() => {
-              const scrollableViewport = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-              if (scrollableViewport) {
-                scrollableViewport.scrollTop = scrollableViewport.scrollHeight;
-              }
-            }, 100);
         });
+    } else if (!userLoading && userData === null) {
+        setLoading(false);
     }
-  }, [userData?.activeAccountId]);
+  }, [userData]);
 
 
   const topLoaderRef = useCallback((node: HTMLDivElement) => {
-    if (loading) return;
+    if (loadingMore || loading) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+      if (entries[0].isIntersecting && hasMore) {
         loadMoreLogs();
       }
     });
     if (node) observer.current.observe(node);
-  }, [loading, hasMore, loadMoreLogs, loadingMore]);
+  }, [hasMore, loadMoreLogs, loadingMore, loading]);
 
 
   const LogItem = ({ log }: { log: Log }) => {
@@ -163,7 +177,7 @@ export default function LogsPage() {
     );
   };
   
-  const reversedLogs = useMemo(() => [...logs].reverse(), [logs]);
+  const displayedLogs = useMemo(() => [...logs].reverse(), [logs]);
 
 
   return (
@@ -191,9 +205,9 @@ export default function LogsPage() {
                         ))
                     ) : logs.length > 0 ? (
                         <>
-                           <div ref={topLoaderRef} className="h-1" />
-                            {loadingMore && <div className="p-4 text-center text-sm">Loading older logs...</div>}
-                            {reversedLogs.map((log) => <LogItem key={log.id} log={log} />)}
+                           {hasMore && <div ref={topLoaderRef} className="h-1" />}
+                           {loadingMore && <div className="p-4 text-center text-sm">Loading older logs...</div>}
+                           {displayedLogs.map((log) => <LogItem key={log.id} log={log} />)}
                         </>
                     ) : (
                          <div className="flex items-center justify-center h-full text-muted-foreground">

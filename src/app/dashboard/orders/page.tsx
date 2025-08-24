@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -25,6 +25,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -34,13 +35,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+
+type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Cancelled';
 
 interface Order {
   id: string; // Firestore document ID
@@ -51,6 +55,7 @@ interface Order {
   currency: string;
   financialStatus: string;
   fulfillmentStatus: string;
+  customStatus: CustomStatus;
   raw: {
     line_items: any[];
     shipping_address?: {
@@ -78,6 +83,7 @@ export default function OrdersPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   
+  const [activeTab, setActiveTab] = useState<CustomStatus>('New');
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
@@ -171,12 +177,61 @@ export default function OrdersPage() {
     }
   }, [userData, toast]);
 
+  const handleUpdateStatus = useCallback(async (orderId: string, status: CustomStatus) => {
+    if (!userData?.activeAccountId) return;
+    try {
+      const response = await fetch('/api/shopify/orders/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: userData.activeAccountId, orderId, status }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.details || 'Failed to update status');
+      toast({ title: 'Status Updated', description: `Order status changed to ${status}.` });
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast({
+        title: 'Update Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    }
+  }, [userData, toast]);
+
+  const handleDeleteOrder = useCallback(async (orderId: string) => {
+    if (!userData?.activeAccountId) return;
+    try {
+      const response = await fetch('/api/shopify/orders/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: userData.activeAccountId, orderId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.details || 'Failed to delete order');
+      toast({ title: 'Order Deleted', description: `Order has been successfully deleted.` });
+    } catch (error) {
+      console.error('Delete order error:', error);
+      toast({
+        title: 'Delete Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    }
+  }, [userData, toast]);
+  
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => order.customStatus === activeTab);
+  }, [orders, activeTab]);
 
   // Pagination logic
   const indexOfLastOrder = currentPage * rowsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - rowsPerPage;
-  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
-  const totalPages = Math.ceil(orders.length / rowsPerPage);
+  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -215,6 +270,52 @@ export default function OrdersPage() {
     }
   }
 
+  const renderActionItems = (order: Order) => {
+    switch (order.customStatus) {
+      case 'New':
+        return (
+          <>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
+              Confirm
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+              Cancel
+            </DropdownMenuItem>
+          </>
+        );
+      case 'Confirmed':
+        return (
+          <>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Ready To Dispatch')}>
+              Ready To Dispatch
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+              Cancel
+            </DropdownMenuItem>
+          </>
+        );
+      case 'Ready To Dispatch':
+        return (
+          <>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+              Cancel
+            </DropdownMenuItem>
+          </>
+        );
+      case 'Cancelled':
+        return (
+          <>
+            <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Order
+            </DropdownMenuItem>
+          </>
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
     <>
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -232,95 +333,106 @@ export default function OrdersPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Payment Status</TableHead>
-                <TableHead>Fulfillment Status</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)}>
+            <TabsList>
+              <TabsTrigger value="New">New</TabsTrigger>
+              <TabsTrigger value="Confirmed">Confirmed</TabsTrigger>
+              <TabsTrigger value="Ready To Dispatch">Ready To Dispatch</TabsTrigger>
+              <TabsTrigger value="Cancelled">Cancelled</TabsTrigger>
+            </TabsList>
+            <TabsContent value={activeTab}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Payment Status</TableHead>
+                    <TableHead>Fulfillment Status</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
-                ))
-              ) : currentOrders.length > 0 ? (
-                currentOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.name}</TableCell>
-                    <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell>{order.email}</TableCell>
-                    <TableCell className="text-right">
-                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
-                        {order.financialStatus?.replace('_', ' ') || 'N/A'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
-                        {order.fulfillmentStatus || 'unfulfilled'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {order.raw?.line_items?.length || 0}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Confirm Order</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">
-                    {userData?.activeAccountId ? 'No orders found. Try syncing your orders.' : 'Please connect a store to see your orders.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : currentOrders.length > 0 ? (
+                    currentOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.name}</TableCell>
+                        <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{order.email}</TableCell>
+                        <TableCell className="text-right">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
+                            {order.financialStatus?.replace('_', ' ') || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
+                            {order.fulfillmentStatus || 'unfulfilled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {order.raw?.line_items?.length || 0}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                               <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {renderActionItems(order)}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center h-24">
+                        {userData?.activeAccountId ? `No ${activeTab.toLowerCase()} orders found.` : 'Please connect a store to see your orders.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TabsContent>
+          </Tabs>
         </CardContent>
         <CardFooter>
           <div className="flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground">
               Showing{' '}
               <strong>
-                {orders.length > 0 ? indexOfFirstOrder + 1 : 0}-
-                {Math.min(indexOfLastOrder, orders.length)}
+                {filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-
+                {Math.min(indexOfLastOrder, filteredOrders.length)}
               </strong>{' '}
-              of <strong>{orders.length}</strong> orders
+              of <strong>{filteredOrders.length}</strong> orders
             </div>
             <div className="flex gap-2">
               <Button

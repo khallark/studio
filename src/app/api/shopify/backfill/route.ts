@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
                 totalPrice: parseFloat(order.total_price),
                 currency: order.currency,
                 raw: order,
+                customStatus: 'New', // Default custom status
             };
             batch.set(orderRef, orderData, { merge: true });
             count++;

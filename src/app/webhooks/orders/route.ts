@@ -57,9 +57,8 @@ export async function POST(req: NextRequest) {
       return new NextResponse(null, { status: 200 });
     }
 
-    // Treat create/updated/cancelled as upserts
-    // (If you also subscribe to orders/cancelled, it will land here.)
-    const dataToSave = {
+    // For create, set the default custom status. For updates, it will be merged.
+    const dataToSave: { [key: string]: any } = {
       orderId: String(orderData.id),
       name: orderData.name,
       email: orderData.customer?.email ?? null,
@@ -73,6 +72,11 @@ export async function POST(req: NextRequest) {
       _lastTopic: topic,
       _receivedAt: new Date().toISOString(),
     };
+    
+    if (topic === 'orders/create') {
+        dataToSave.customStatus = 'New';
+    }
+
 
     await orderRef.set(dataToSave, { merge: true });
     console.log(`Upserted order ${orderData.id} for ${shopDomain} via ${topic}`);

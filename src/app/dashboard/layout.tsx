@@ -29,7 +29,8 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 export default function DashboardLayout({
   children,
@@ -119,16 +120,27 @@ export default function DashboardLayout({
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-             <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                    <Link href="#">
-                        <Settings />
-                        Settings
-                    </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+            <Sheet>
+              <SidebarMenu>
+                  <SidebarMenuItem>
+                      <SheetTrigger asChild>
+                        <SidebarMenuButton>
+                          <Settings />
+                          Settings
+                        </SidebarMenuButton>
+                      </SheetTrigger>
+                  </SidebarMenuItem>
+              </SidebarMenu>
+              <SheetContent side="bottom" className="h-[95vh] flex flex-col">
+                  <SheetHeader className="p-6">
+                      <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex-1 overflow-y-auto p-6">
+                      <p>Settings content goes here.</p>
+                  </div>
+              </SheetContent>
+            </Sheet>
+
             {user && !loading && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

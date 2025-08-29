@@ -30,7 +30,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import SettingsPage from './settings/page';
 
 export default function DashboardLayout({
@@ -133,6 +133,9 @@ export default function DashboardLayout({
                   </SidebarMenuItem>
               </SidebarMenu>
               <SheetContent side="bottom" className="h-[95vh] flex flex-col p-0">
+                  <SheetHeader className="p-6 border-b">
+                    <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
+                  </SheetHeader>
                   <SettingsPage />
               </SheetContent>
             </Sheet>

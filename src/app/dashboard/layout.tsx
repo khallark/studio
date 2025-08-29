@@ -29,8 +29,9 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useEffect } from 'react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import SettingsPage from './settings/page';
 
 export default function DashboardLayout({
   children,
@@ -131,13 +132,8 @@ export default function DashboardLayout({
                       </SheetTrigger>
                   </SidebarMenuItem>
               </SidebarMenu>
-              <SheetContent side="bottom" className="h-[95vh] flex flex-col">
-                  <SheetHeader className="p-6">
-                      <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
-                  </SheetHeader>
-                  <div className="flex-1 overflow-y-auto p-6">
-                      <p>Settings content goes here.</p>
-                  </div>
+              <SheetContent side="bottom" className="h-[95vh] flex flex-col p-0">
+                  <SettingsPage />
               </SheetContent>
             </Sheet>
 

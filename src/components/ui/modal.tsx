@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sheet,
@@ -23,9 +23,6 @@ export function Modal({ children }: { children: React.ReactNode }) {
         className="h-[95vh] flex flex-col p-0"
         onInteractOutside={onDismiss}
         >
-        <SheetHeader className="p-6 border-b">
-          <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
-        </SheetHeader>
         <div className="flex-1 overflow-y-auto">
           {children}
         </div>

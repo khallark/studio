@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -30,13 +29,13 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import SettingsPage from './settings/page';
 
 export default function DashboardLayout({
   children,
+  modal
 }: {
   children: React.ReactNode;
+  modal: React.ReactNode;
 }) {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
@@ -67,6 +66,7 @@ export default function DashboardLayout({
   const getTitle = () => {
     if (pathname.startsWith('/dashboard/orders')) return 'Orders';
     if (pathname.startsWith('/dashboard/logs')) return 'Logs';
+    if (pathname.startsWith('/dashboard/settings')) return 'Settings';
 
     switch (pathname) {
       case '/dashboard':
@@ -103,7 +103,7 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/orders'}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/orders')}>
                   <Link href="/dashboard/orders">
                     <Package />
                     Orders
@@ -111,7 +111,7 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
                <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard/logs'}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/logs')}>
                   <Link href="/dashboard/logs">
                     <History />
                     Logs
@@ -121,24 +121,16 @@ export default function DashboardLayout({
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-            <Sheet>
-              <SidebarMenu>
-                  <SidebarMenuItem>
-                      <SheetTrigger asChild>
-                        <SidebarMenuButton>
-                          <Settings />
-                          Settings
-                        </SidebarMenuButton>
-                      </SheetTrigger>
-                  </SidebarMenuItem>
-              </SidebarMenu>
-              <SheetContent side="bottom" className="h-[95vh] flex flex-col p-0">
-                  <SheetHeader className="p-6 border-b">
-                    <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
-                  </SheetHeader>
-                  <SettingsPage />
-              </SheetContent>
-            </Sheet>
+            <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/settings')}>
+                    <Link href="/dashboard/settings">
+                      <Settings />
+                      Settings
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
 
             {user && !loading && (
               <DropdownMenu>
@@ -184,6 +176,7 @@ export default function DashboardLayout({
             </header>
             <main className="flex-1 overflow-y-auto">
               {children}
+              {modal}
             </main>
         </div>
     </SidebarProvider>

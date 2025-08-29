@@ -116,17 +116,19 @@ export default function DashboardLayout({
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="#">
-                    <Settings />
-                    Settings
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
+             <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                    <Link href="#">
+                        <Settings />
+                        Settings
+                    </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
             {user && !loading && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

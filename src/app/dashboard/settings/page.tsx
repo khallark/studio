@@ -7,7 +7,7 @@ import { SheetHeader, SheetTitle } from "@/components/ui/sheet";
 export default function SettingsPage() {
   return (
     <>
-      <SheetHeader className="p-6">
+      <SheetHeader className="p-6 border-b">
         <SheetTitle className="text-2xl font-headline">Settings</SheetTitle>
       </SheetHeader>
       <ScrollArea className="flex-1 overflow-y-auto p-6">

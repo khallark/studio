@@ -110,7 +110,7 @@ export default function DashboardLayout({
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
+               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/logs'}>
                   <Link href="/dashboard/logs">
                     <History />

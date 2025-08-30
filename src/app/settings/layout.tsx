@@ -30,7 +30,7 @@ import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-export default function DashboardLayout({
+export default function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -59,20 +59,6 @@ export default function DashboardLayout({
       return email.charAt(0).toUpperCase();
     }
     return 'U';
-  }
-
-  const getTitle = () => {
-    if (pathname.startsWith('/dashboard/orders')) return 'Orders';
-    if (pathname.startsWith('/dashboard/logs')) return 'Logs';
-
-    switch (pathname) {
-      case '/dashboard':
-        return 'Dashboard';
-      case '/dashboard/connect':
-        return 'Connect your store';
-      default:
-        return 'Dashboard';
-    }
   }
   
   if (loading || !user) {
@@ -169,7 +155,7 @@ export default function DashboardLayout({
         <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
             <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
               <SidebarTrigger />
-              <h1 className="font-headline font-semibold text-lg md:text-2xl">{getTitle()}</h1>
+              <h1 className="font-headline font-semibold text-lg md:text-2xl">Settings</h1>
             </header>
             <main className="flex-1 overflow-y-auto">
               {children}

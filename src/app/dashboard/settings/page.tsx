@@ -1,5 +1,7 @@
 'use client';
 
+import DashboardPage from '@/app/dashboard/page';
+import { Modal } from '@/components/ui/modal';
 import {
   Card,
   CardContent,
@@ -8,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-export default function SettingsPage() {
+function SettingsContent() {
   return (
     <div className="flex justify-center items-start h-full p-4 md:p-6">
       <Card className="w-full max-w-4xl">
@@ -39,4 +41,16 @@ export default function SettingsPage() {
       </Card>
     </div>
   )
+}
+
+
+export default function SettingsPage() {
+  return (
+    <>
+      <DashboardPage />
+      <Modal>
+        <SettingsContent />
+      </Modal>
+    </>
+  );
 }

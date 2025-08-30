@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, History, Bot, User } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, History, Bot, User, Loader2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
@@ -45,6 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -89,6 +90,13 @@ interface UserData {
   activeAccountId: string | null;
 }
 
+interface ProcessingOrder {
+    id: string;
+    name: string;
+    status: 'pending' | 'processing' | 'done';
+}
+
+
 export default function OrdersPage() {
   const [user, userLoading] = useAuthState(auth);
   const { toast } = useToast();
@@ -105,6 +113,10 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const rowsPerPage = 10;
+  
+  const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
+  const [ordersForAwb, setOrdersForAwb] = useState<Order[]>([]);
+  const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -151,6 +163,38 @@ export default function OrdersPage() {
         setLoading(false);
     }
   }, [userData, toast, userLoading]);
+  
+  const handleAssignAwb = (orderIds: string[]) => {
+      const ordersToProcess = orders.filter(o => orderIds.includes(o.id));
+      setOrdersForAwb(ordersToProcess);
+      setIsAwbDialogOpen(true);
+  };
+
+  const processAwbAssignments = useCallback(async (ordersToProcess: Order[]) => {
+    const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
+    setProcessingQueue(queue);
+    
+    // Simulate processing
+    for (let i = 0; i < queue.length; i++) {
+        // Set current to 'processing'
+        setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'processing' } : item));
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+        // Update status in Firestore
+        await handleUpdateStatus(queue[i].id, 'Ready To Dispatch');
+
+        // Set current to 'done'
+        setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'done' } : item));
+    }
+    
+    // Wait a bit before clearing the queue display
+    setTimeout(() => {
+        setProcessingQueue([]);
+    }, 2000);
+
+  }, []);
 
   const handleBackfill = useCallback(async () => {
     if (!userData?.activeAccountId) {
@@ -363,7 +407,7 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <>
-            <DropdownMenuItem onClick={() => console.log("Assigning AWB for:", order.id)}>
+            <DropdownMenuItem onClick={() => handleAssignAwb([order.id])}>
               Assign AWB
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
@@ -435,7 +479,7 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => console.log("Assigning AWBs for:", selectedOrders)}>
+            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleAssignAwb(selectedOrders)}>
                 Assign AWBs
             </Button>
             <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
@@ -472,6 +516,28 @@ export default function OrdersPage() {
   return (
     <>
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
+        {processingQueue.length > 0 && (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Processing Shipments</CardTitle>
+                    <CardDescription>Assigning AWBs and updating orders. Please do not refresh the page.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-2">
+                        {processingQueue.map(order => (
+                            <div key={order.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/50">
+                                <span className="font-medium">Order {order.name}</span>
+                                <div className="flex items-center gap-2">
+                                    {order.status === 'pending' && <span className="text-muted-foreground">Waiting...</span>}
+                                    {order.status === 'processing' && <><Loader2 className="h-4 w-4 animate-spin" /> <span>Processing...</span></>}
+                                    {order.status === 'done' && <span className="text-green-600">Done</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        )}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -633,6 +699,14 @@ export default function OrdersPage() {
         </CardFooter>
       </Card>
     </main>
+
+    <AssignAwbDialog
+        isOpen={isAwbDialogOpen}
+        onClose={() => setIsAwbDialogOpen(false)}
+        orders={ordersForAwb}
+        onConfirm={processAwbAssignments}
+        shopId={userData?.activeAccountId || ''}
+     />
 
     <Dialog open={!!selectedOrder} onOpenChange={(isOpen) => !isOpen && setSelectedOrder(null)}>
         <DialogContent className="sm:max-w-2xl">

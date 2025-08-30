@@ -69,6 +69,10 @@ interface Order {
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
   raw: {
+    customer?: {
+      first_name?: string;
+      last_name?: string;
+    };
     line_items: any[];
     shipping_address?: {
         address1: string;
@@ -511,58 +515,61 @@ export default function OrdersPage() {
                       </TableRow>
                     ))
                   ) : currentOrders.length > 0 ? (
-                    currentOrders.map((order) => (
-                      <TableRow key={order.id} data-state={selectedOrders.includes(order.id) && "selected"}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedOrders.includes(order.id)}
-                            onCheckedChange={() => handleSelectOrder(order.id)}
-                            aria-label={`Select order ${order.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{order.name}</TableCell>
-                        <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>{order.email}</TableCell>
-                        <TableCell className="text-right">
-                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
-                            {order.financialStatus?.replace('_', ' ') || 'N/A'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
-                            {order.fulfillmentStatus || 'unfulfilled'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {order.raw?.line_items?.length || 0}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                               <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
-                                View Details
-                              </DropdownMenuItem>
-                               <DropdownMenuItem onClick={() => setViewingLogsFor(order)}>
-                                <History className="mr-2 h-4 w-4" />
-                                View Logs
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {renderActionItems(order)}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    currentOrders.map((order) => {
+                      const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
+                      return (
+                        <TableRow key={order.id} data-state={selectedOrders.includes(order.id) && "selected"}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedOrders.includes(order.id)}
+                              onCheckedChange={() => handleSelectOrder(order.id)}
+                              aria-label={`Select order ${order.name}`}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">{order.name}</TableCell>
+                          <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell>{customerName || order.email}</TableCell>
+                          <TableCell className="text-right">
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
+                              {order.financialStatus?.replace('_', ' ') || 'N/A'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
+                              {order.fulfillmentStatus || 'unfulfilled'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {order.raw?.line_items?.length || 0}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Toggle menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                 <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
+                                  View Details
+                                </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={() => setViewingLogsFor(order)}>
+                                  <History className="mr-2 h-4 w-4" />
+                                  View Logs
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {renderActionItems(order)}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   ) : (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center h-24">
@@ -620,7 +627,8 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-2 gap-8">
                     <div>
                         <h3 className="font-semibold mb-2">Customer</h3>
-                        <p className="text-sm">{selectedOrder.email}</p>
+                        <p className="text-sm">{`${selectedOrder.raw.customer?.first_name || ''} ${selectedOrder.raw.customer?.last_name || ''}`.trim()}</p>
+                        <p className="text-sm text-muted-foreground">{selectedOrder.email}</p>
                     </div>
                     <div>
                         <h3 className="font-semibold mb-2">Shipping Address</h3>
@@ -654,8 +662,7 @@ export default function OrdersPage() {
                           <TableCell className="font-medium">{item.title}</TableCell>
                           <TableCell>{item.sku || 'N/A'}</TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                           <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price)}</TableCell>
-                          <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price * item.quantity)}</TableCell>
+                           <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price)}</TableCell>                          <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price * item.quantity)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -721,3 +728,4 @@ export default function OrdersPage() {
   );
 }
 
+    

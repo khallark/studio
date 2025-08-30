@@ -43,6 +43,7 @@ import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Cancelled';
 
@@ -86,6 +87,7 @@ export default function OrdersPage() {
   
   const [activeTab, setActiveTab] = useState<CustomStatus>('New');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const rowsPerPage = 10;
 
   useEffect(() => {
@@ -245,6 +247,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedOrders([]);
   }, [activeTab]);
 
   const handleNextPage = () => {
@@ -329,6 +332,51 @@ export default function OrdersPage() {
         return null;
     }
   }
+  
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+    );
+  };
+  
+  const handleSelectAll = (isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedOrders(currentOrders.map(o => o.id));
+    } else {
+      setSelectedOrders([]);
+    }
+  };
+
+  const renderBulkActionButtons = () => {
+    const isAnyOrderSelected = selectedOrders.length > 0;
+  
+    switch (activeTab) {
+      case 'New':
+        return (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={!isAnyOrderSelected}>Confirm</Button>
+            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+          </div>
+        );
+      case 'Confirmed':
+        return (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={!isAnyOrderSelected}>Assign AWBs</Button>
+            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+          </div>
+        );
+      case 'Ready To Dispatch':
+        return (
+          <div className="flex gap-2">
+            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+          </div>
+        );
+      case 'Cancelled':
+      default:
+        return null; // No buttons for Cancelled or other states
+    }
+  };
+
 
   return (
     <>
@@ -341,10 +389,13 @@ export default function OrdersPage() {
               A list of all the orders from your connected stores.
             </CardDescription>
           </div>
-          <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId}>
-            <Download className="mr-2" />
-            {isSyncing ? 'Syncing...' : 'Sync Orders'}
-          </Button>
+          <div className="flex items-center gap-2">
+              {renderBulkActionButtons()}
+              <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId}>
+                  <Download className="mr-2" />
+                  {isSyncing ? 'Syncing...' : 'Sync Orders'}
+              </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)}>
@@ -358,6 +409,13 @@ export default function OrdersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                     <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={currentOrders.length > 0 && selectedOrders.length === currentOrders.length}
+                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead>Order ID</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Customer</TableHead>
@@ -374,6 +432,7 @@ export default function OrdersPage() {
                   {loading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-5" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
@@ -386,7 +445,14 @@ export default function OrdersPage() {
                     ))
                   ) : currentOrders.length > 0 ? (
                     currentOrders.map((order) => (
-                      <TableRow key={order.id}>
+                      <TableRow key={order.id} data-state={selectedOrders.includes(order.id) && "selected"}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedOrders.includes(order.id)}
+                            onCheckedChange={() => handleSelectOrder(order.id)}
+                            aria-label={`Select order ${order.name}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{order.name}</TableCell>
                         <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>{order.email}</TableCell>
@@ -428,7 +494,7 @@ export default function OrdersPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center h-24">
+                      <TableCell colSpan={9} className="text-center h-24">
                         {userData?.activeAccountId ? `No ${activeTab.toLowerCase()} orders found.` : 'Please connect a store to see your orders.'}
                       </TableCell>
                     </TableRow>
@@ -441,12 +507,10 @@ export default function OrdersPage() {
         <CardFooter>
           <div className="flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground">
-              Showing{' '}
-              <strong>
-                {filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-
-                {Math.min(indexOfLastOrder, filteredOrders.length)}
-              </strong>{' '}
-              of <strong>{filteredOrders.length}</strong> orders
+                {selectedOrders.length > 0
+                ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
+                : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
+              }
             </div>
             <div className="flex gap-2">
               <Button
@@ -539,3 +603,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

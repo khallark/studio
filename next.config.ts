@@ -37,6 +37,10 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/locations/add',
         destination: '/api/shopify/locations/add/route',
       },
+       {
+        source: '/api/shopify/locations/update',
+        destination: '/api/shopify/locations/update/route',
+      },
     ]
   },
 };

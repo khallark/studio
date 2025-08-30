@@ -52,7 +52,9 @@ export async function POST(req: NextRequest) {
     if (!orderSnap.exists) {
         return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
     }
-    const oldStatus = orderSnap.data()?.customStatus || 'N/A';
+    const orderData = orderSnap.data();
+    const oldStatus = orderData?.customStatus || 'N/A';
+    const orderName = orderData?.name || orderId; // Fallback to ID if name is not there
 
     const logEntry = {
         type: 'USER_ACTION',
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
         timestamp: now, // Use JS Date object here
         details: {
             orderId: orderId,
+            orderName: orderName,
             newStatus: status,
             oldStatus: oldStatus,
         },

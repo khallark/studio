@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface Log {
   id: string;
   type: 'WEBHOOK' | 'USER_ACTION';
+  action: string;
   timestamp: Timestamp;
   [key: string]: any;
 }
@@ -168,11 +169,16 @@ export default function LogsPage() {
 
     if (log.type === 'WEBHOOK') {
         title = `Webhook Received: ${log.topic}`;
-        description = `Order ID: ${log.orderId || 'N/A'}`;
+        description = `Order ID: ${log.payload?.name || log.orderId || 'N/A'}`;
     } else if (log.type === 'USER_ACTION') {
-        title = `User Action: ${log.action.replace(/_/g, ' ')}`;
         const details = log.details || {};
-        description = `${log.user?.displayName || 'A user'} changed order ${details.orderId} from ${details.oldStatus} to ${details.newStatus}`;
+        title = `User Action: ${log.action.replace(/_/g, ' ')}`;
+
+        if (log.action === 'BULK_UPDATE_ORDER_STATUS') {
+            description = `${log.user?.displayName || 'A user'} updated ${details.count} order(s) to ${details.newStatus}.`;
+        } else { // Handle single order update
+            description = `${log.user?.displayName || 'A user'} changed order ${details.orderName || details.orderId} from ${details.oldStatus} to ${details.newStatus}.`;
+        }
     }
 
     return (
@@ -248,6 +254,10 @@ export default function LogsPage() {
               <ScrollArea className="max-h-[60vh] mt-4 rounded-md border p-4">
                   <pre className="text-sm">
                     {JSON.stringify(selectedLog, (key, value) => {
+                        // BigInts can't be stringified, so convert to string
+                        if (typeof value === 'bigint') {
+                            return value.toString();
+                        }
                         if (value && value.seconds && typeof value.toDate === 'function') {
                             return value.toDate().toISOString();
                         }

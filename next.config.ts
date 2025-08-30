@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
         source: '/api/webhooks/orders',
         destination: '/api/webhooks/orders/route',
       },
+       {
+        source: '/api/shopify/locations/add',
+        destination: '/api/shopify/locations/add/route',
+      },
     ]
   },
 };

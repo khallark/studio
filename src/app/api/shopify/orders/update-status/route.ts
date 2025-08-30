@@ -45,31 +45,38 @@ export async function POST(req: NextRequest) {
 
 
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
+    const logsColRef = db.collection('accounts').doc(shop).collection('logs');
+    const timestamp = FieldValue.serverTimestamp();
     
-    // Log the action
-    const logRef = db.collection('accounts').doc(shop).collection('logs');
     const orderSnap = await orderRef.get();
+    if (!orderSnap.exists) {
+        return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
+    }
     const oldStatus = orderSnap.data()?.customStatus || 'N/A';
 
+    const logEntry = {
+        type: 'USER_ACTION',
+        action: 'UPDATE_ORDER_STATUS',
+        timestamp: timestamp,
+        details: {
+            orderId: orderId,
+            newStatus: status,
+            oldStatus: oldStatus,
+        },
+        user: userRefData,
+    };
+
     await db.runTransaction(async (transaction) => {
+        // Update the order document
         transaction.update(orderRef, {
             customStatus: status,
-            lastUpdatedAt: FieldValue.serverTimestamp(),
+            lastUpdatedAt: timestamp,
             lastUpdatedBy: userRefData,
+            logs: FieldValue.arrayUnion(logEntry), // Append log to order's log array
         });
         
-        const logEntry = {
-            type: 'USER_ACTION',
-            action: 'UPDATE_ORDER_STATUS',
-            timestamp: FieldValue.serverTimestamp(),
-            details: {
-                orderId: orderId,
-                newStatus: status,
-                oldStatus: oldStatus,
-            },
-            user: userRefData,
-        };
-        transaction.set(logRef.doc(), logEntry);
+        // Create a log in the central logs collection
+        transaction.set(logsColRef.doc(), logEntry);
     });
 
     return NextResponse.json({ message: 'Order status successfully updated' });

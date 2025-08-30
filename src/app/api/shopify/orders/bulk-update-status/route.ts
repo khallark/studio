@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
     const userRecord = await adminAuth.getUser(userId);
-    const userRef = {
+    const userRefData = {
         uid: userId,
         email: userRecord.email || 'N/A',
         displayName: userRecord.displayName || 'N/A'
@@ -45,32 +45,48 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
     const logsColRef = accountRef.collection('logs');
+    const timestamp = FieldValue.serverTimestamp();
 
     await db.runTransaction(async (transaction) => {
         // We don't fetch the old status for bulk updates to keep it simple and performant.
         // A more advanced implementation could fetch all docs first if old status is crucial for logging.
+        // For now, we'll log it as "N/A" for individual order logs.
+        
+        // Log entry for individual orders
+        const individualLogEntry = {
+            type: 'USER_ACTION',
+            action: 'UPDATE_ORDER_STATUS',
+            timestamp: timestamp,
+            details: {
+                newStatus: status,
+                oldStatus: 'N/A (Bulk Action)', // Old status is not fetched in bulk updates
+            },
+            user: userRefData,
+        };
+
         orderIds.forEach(orderId => {
             const orderRef = ordersColRef.doc(String(orderId));
             transaction.update(orderRef, {
                 customStatus: status,
-                lastUpdatedAt: FieldValue.serverTimestamp(),
-                lastUpdatedBy: userRef,
+                lastUpdatedAt: timestamp,
+                lastUpdatedBy: userRefData,
+                logs: FieldValue.arrayUnion(individualLogEntry), // Append to order's log array
             });
         });
 
-        // Add a single log entry for the bulk action
-        const logEntry = {
+        // Add a single log entry for the bulk action to the main log collection
+        const bulkLogEntry = {
             type: 'USER_ACTION',
             action: 'BULK_UPDATE_ORDER_STATUS',
-            timestamp: FieldValue.serverTimestamp(),
+            timestamp: timestamp,
             details: {
                 orderIds: orderIds,
                 count: orderIds.length,
                 newStatus: status,
             },
-            user: userRef,
+            user: userRefData,
         };
-        transaction.set(logsColRef.doc(), logEntry);
+        transaction.set(logsColRef.doc(), bulkLogEntry);
     });
 
     return NextResponse.json({ message: `${orderIds.length} order(s) successfully updated to ${status}` });

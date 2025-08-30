@@ -37,15 +37,24 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, History, Bot, User } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Cancelled';
+
+interface OrderLog {
+  type: 'USER_ACTION' | 'WEBHOOK';
+  action: string;
+  timestamp: Timestamp;
+  details: any;
+  user?: { displayName: string };
+}
 
 interface Order {
   id: string; // Firestore document ID
@@ -58,6 +67,7 @@ interface Order {
   fulfillmentStatus: string;
   customStatus: CustomStatus;
   isDeleted?: boolean; // Tombstone flag
+  logs?: OrderLog[];
   raw: {
     line_items: any[];
     shipping_address?: {
@@ -85,6 +95,7 @@ export default function OrdersPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [viewingLogsFor, setViewingLogsFor] = useState<Order | null>(null);
   
   const [activeTab, setActiveTab] = useState<CustomStatus>('New');
   const [currentPage, setCurrentPage] = useState(1);
@@ -429,7 +440,7 @@ export default function OrdersPage() {
         );
       case 'Cancelled':
       default:
-        return null; // No buttons for Cancelled or other states
+        return null;
     }
   };
 
@@ -540,6 +551,10 @@ export default function OrdersPage() {
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
                                 View Details
+                              </DropdownMenuItem>
+                               <DropdownMenuItem onClick={() => setViewingLogsFor(order)}>
+                                <History className="mr-2 h-4 w-4" />
+                                View Logs
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               {renderActionItems(order)}
@@ -656,6 +671,53 @@ export default function OrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={!!viewingLogsFor} onOpenChange={(isOpen) => !isOpen && setViewingLogsFor(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          {viewingLogsFor && (
+            <>
+              <DialogHeader>
+                <DialogTitle>History for Order {viewingLogsFor.name}</DialogTitle>
+                <DialogDescription>
+                  A chronological list of all actions taken on this order.
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] mt-4 rounded-md border">
+                <div className="p-6 space-y-6">
+                  {(viewingLogsFor.logs && viewingLogsFor.logs.length > 0) ? (
+                     [...viewingLogsFor.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
+                      <div key={index} className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                            {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">
+                            {log.action.replace(/_/g, ' ')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {log.type === 'USER_ACTION' ? 
+                              `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
+                              `Webhook received with topic: ${log.details.topic}`
+                            }
+                          </p>
+                           <p className="text-xs text-muted-foreground mt-1">
+                            {log.timestamp?.toDate().toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-12">
+                      <p>No history found for this order.</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+

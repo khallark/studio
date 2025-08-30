@@ -17,8 +17,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, MapPin, Edit, Trash2 } from 'lucide-react';
@@ -173,6 +183,33 @@ export default function PickupLocationsPage() {
     }
   };
 
+  const handleDeleteLocation = async (locationId: string) => {
+     if (!userData?.activeAccountId) {
+      toast({ title: "No store connected", description: "Please connect a store first.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/shopify/locations/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: userData.activeAccountId, locationId }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.details || 'Failed to delete location');
+      }
+      toast({
+        title: 'Location Deleted',
+        description: 'The pickup location has been removed.',
+      });
+    } catch (error) {
+       console.error('Failed to delete location:', error);
+      toast({ title: 'Delete Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
+    }
+  };
+
+
   return (
     <div className="flex justify-center items-start h-full p-4 md:p-6">
       <Card className="w-full max-w-4xl">
@@ -222,7 +259,27 @@ export default function PickupLocationsPage() {
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(location)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the pickup location &quot;{location.name}&quot;.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteLocation(location.id)}>
+                            Yes, delete it
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

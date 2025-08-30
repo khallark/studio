@@ -83,6 +83,7 @@ export default function OrdersPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   
   const [activeTab, setActiveTab] = useState<CustomStatus>('New');
@@ -205,6 +206,50 @@ export default function OrdersPage() {
       });
     }
   }, [userData, toast, user]);
+
+  const handleBulkUpdateStatus = useCallback(async (status: CustomStatus) => {
+    if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
+    
+    setIsBulkUpdating(true);
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/shopify/orders/bulk-update-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                shop: userData.activeAccountId,
+                orderIds: selectedOrders,
+                status,
+            }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.details || `Failed to update ${selectedOrders.length} orders.`);
+        }
+
+        toast({
+            title: 'Bulk Update Successful',
+            description: result.message,
+        });
+
+        setSelectedOrders([]); // Clear selection after successful update
+
+    } catch (error) {
+        console.error('Bulk update error:', error);
+        toast({
+            title: 'Bulk Update Failed',
+            description: error instanceof Error ? error.message : 'An unknown error occurred.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsBulkUpdating(false);
+    }
+}, [userData, user, selectedOrders, toast]);
+
 
   const handleDeleteOrder = useCallback(async (orderId: string) => {
     if (!userData?.activeAccountId) return;
@@ -349,26 +394,37 @@ export default function OrdersPage() {
 
   const renderBulkActionButtons = () => {
     const isAnyOrderSelected = selectedOrders.length > 0;
+    const isDisabled = !isAnyOrderSelected || isBulkUpdating;
   
     switch (activeTab) {
       case 'New':
         return (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={!isAnyOrderSelected}>Confirm</Button>
-            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+            </Button>
+            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+            </Button>
           </div>
         );
       case 'Confirmed':
         return (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={!isAnyOrderSelected}>Assign AWBs</Button>
-            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => console.log("Assigning AWBs for:", selectedOrders)}>
+                Assign AWBs
+            </Button>
+            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+            </Button>
           </div>
         );
       case 'Ready To Dispatch':
         return (
           <div className="flex gap-2">
-            <Button variant="destructive" size="sm" disabled={!isAnyOrderSelected}>Cancel</Button>
+             <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+            </Button>
           </div>
         );
       case 'Cancelled':
@@ -603,5 +659,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    

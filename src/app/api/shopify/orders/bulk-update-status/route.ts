@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -21,10 +20,10 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderId, status } = await req.json();
+    const { shop, orderIds, status } = await req.json();
 
-    if (!shop || !orderId || !status) {
-      return NextResponse.json({ error: 'Shop, orderId, and status are required' }, { status: 400 });
+    if (!shop || !Array.isArray(orderIds) || orderIds.length === 0 || !status) {
+      return NextResponse.json({ error: 'Shop, a non-empty array of orderIds, and status are required' }, { status: 400 });
     }
 
     const validStatuses = ['New', 'Confirmed', 'Ready To Dispatch', 'Cancelled'];
@@ -33,49 +32,51 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = await getUserIdFromToken(req);
-     if (!userId) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
     const userRecord = await adminAuth.getUser(userId);
-    const userRefData = {
+    const userRef = {
         uid: userId,
         email: userRecord.email || 'N/A',
         displayName: userRecord.displayName || 'N/A'
     };
 
-
-    const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
-    
-    // Log the action
-    const logRef = db.collection('accounts').doc(shop).collection('logs');
-    const orderSnap = await orderRef.get();
-    const oldStatus = orderSnap.data()?.customStatus || 'N/A';
+    const accountRef = db.collection('accounts').doc(shop);
+    const ordersColRef = accountRef.collection('orders');
+    const logsColRef = accountRef.collection('logs');
 
     await db.runTransaction(async (transaction) => {
-        transaction.update(orderRef, {
-            customStatus: status,
-            lastUpdatedAt: FieldValue.serverTimestamp(),
-            lastUpdatedBy: userRefData,
+        // We don't fetch the old status for bulk updates to keep it simple and performant.
+        // A more advanced implementation could fetch all docs first if old status is crucial for logging.
+        orderIds.forEach(orderId => {
+            const orderRef = ordersColRef.doc(String(orderId));
+            transaction.update(orderRef, {
+                customStatus: status,
+                lastUpdatedAt: FieldValue.serverTimestamp(),
+                lastUpdatedBy: userRef,
+            });
         });
-        
+
+        // Add a single log entry for the bulk action
         const logEntry = {
             type: 'USER_ACTION',
-            action: 'UPDATE_ORDER_STATUS',
+            action: 'BULK_UPDATE_ORDER_STATUS',
             timestamp: FieldValue.serverTimestamp(),
             details: {
-                orderId: orderId,
+                orderIds: orderIds,
+                count: orderIds.length,
                 newStatus: status,
-                oldStatus: oldStatus,
             },
-            user: userRefData,
+            user: userRef,
         };
-        transaction.set(logRef.doc(), logEntry);
+        transaction.set(logsColRef.doc(), logEntry);
     });
 
-    return NextResponse.json({ message: 'Order status successfully updated' });
+    return NextResponse.json({ message: `${orderIds.length} order(s) successfully updated to ${status}` });
   } catch (error) {
-    console.error('Error updating order status:', error);
+    console.error('Error during bulk order status update:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ error: 'Failed to update order status', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to bulk update order status', details: errorMessage }, { status: 500 });
   }
 }

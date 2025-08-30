@@ -45,6 +45,10 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/locations/delete',
         destination: '/api/shopify/locations/delete/route',
       },
+      {
+        source: '/api/shopify/orders/bulk-update-status',
+        destination: '/api/shopify/orders/bulk-update-status/route',
+      },
     ]
   },
 };

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
     const logsColRef = db.collection('accounts').doc(shop).collection('logs');
-    const timestamp = FieldValue.serverTimestamp();
+    const now = new Date(); // Use a standard JS Date for arrayUnion
     
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const logEntry = {
         type: 'USER_ACTION',
         action: 'UPDATE_ORDER_STATUS',
-        timestamp: timestamp,
+        timestamp: now, // Use JS Date object here
         details: {
             orderId: orderId,
             newStatus: status,
@@ -65,18 +65,24 @@ export async function POST(req: NextRequest) {
         },
         user: userRefData,
     };
+    
+    // Create a separate log entry for the central collection that CAN use serverTimestamp
+    const centralLogEntry = {
+        ...logEntry,
+        timestamp: FieldValue.serverTimestamp(), // This is fine, not in an array
+    };
 
     await db.runTransaction(async (transaction) => {
         // Update the order document
         transaction.update(orderRef, {
             customStatus: status,
-            lastUpdatedAt: timestamp,
+            lastUpdatedAt: FieldValue.serverTimestamp(),
             lastUpdatedBy: userRefData,
             logs: FieldValue.arrayUnion(logEntry), // Append log to order's log array
         });
         
         // Create a log in the central logs collection
-        transaction.set(logsColRef.doc(), logEntry);
+        transaction.set(logsColRef.doc(), centralLogEntry);
     });
 
     return NextResponse.json({ message: 'Order status successfully updated' });

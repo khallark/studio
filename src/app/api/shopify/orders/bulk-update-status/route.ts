@@ -45,18 +45,20 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
     const logsColRef = accountRef.collection('logs');
-    const timestamp = FieldValue.serverTimestamp();
+    
+    // Use a server-generated JS Date for array unions
+    const now = new Date();
 
     await db.runTransaction(async (transaction) => {
         // We don't fetch the old status for bulk updates to keep it simple and performant.
         // A more advanced implementation could fetch all docs first if old status is crucial for logging.
         // For now, we'll log it as "N/A" for individual order logs.
         
-        // Log entry for individual orders
+        // Log entry for individual orders, using a standard Date object
         const individualLogEntry = {
             type: 'USER_ACTION',
             action: 'UPDATE_ORDER_STATUS',
-            timestamp: timestamp,
+            timestamp: now, // Use JS Date object here
             details: {
                 newStatus: status,
                 oldStatus: 'N/A (Bulk Action)', // Old status is not fetched in bulk updates
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
             const orderRef = ordersColRef.doc(String(orderId));
             transaction.update(orderRef, {
                 customStatus: status,
-                lastUpdatedAt: timestamp,
+                lastUpdatedAt: FieldValue.serverTimestamp(), // This is fine, not in an array
                 lastUpdatedBy: userRefData,
                 logs: FieldValue.arrayUnion(individualLogEntry), // Append to order's log array
             });
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
         const bulkLogEntry = {
             type: 'USER_ACTION',
             action: 'BULK_UPDATE_ORDER_STATUS',
-            timestamp: timestamp,
+            timestamp: FieldValue.serverTimestamp(), // This is fine, not in an array
             details: {
                 orderIds: orderIds,
                 count: orderIds.length,

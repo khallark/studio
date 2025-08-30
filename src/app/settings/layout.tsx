@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History } from 'lucide-react';
+import { Home, Package, Settings, History, User, Smartphone, MapPin } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -29,6 +29,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 export default function SettingsLayout({
   children,
@@ -68,6 +69,12 @@ export default function SettingsLayout({
       </div>
     );
   }
+
+  const navItems = [
+    { href: '/settings', label: 'General', icon: User },
+    { href: '/settings/apps', label: 'Apps', icon: Smartphone },
+    { href: '/settings/pickup-locations', label: 'Pickup Locations', icon: MapPin },
+  ];
 
   return (
      <SidebarProvider>
@@ -157,8 +164,33 @@ export default function SettingsLayout({
               <SidebarTrigger />
               <h1 className="font-headline font-semibold text-lg md:text-2xl">Settings</h1>
             </header>
-            <main className="flex-1 overflow-y-auto">
-              {children}
+            <main className="flex-1 overflow-hidden">
+              <div className="grid md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] h-full">
+                <div className="hidden border-r bg-muted/40 md:block">
+                  <div className="flex h-full max-h-screen flex-col gap-2">
+                    <div className="flex-1">
+                      <nav className="grid items-start px-2 py-4 text-sm font-medium lg:px-4">
+                        {navItems.map((item) => (
+                           <Link
+                            key={item.label}
+                            href={item.href}
+                            className={cn(
+                                'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                                pathname === item.href && 'bg-muted text-primary'
+                            )}
+                            >
+                            <item.icon className="h-4 w-4" />
+                            {item.label}
+                          </Link>
+                        ))}
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col overflow-auto">
+                    {children}
+                </div>
+              </div>
             </main>
         </div>
     </SidebarProvider>

@@ -363,8 +363,8 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <>
-            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Ready To Dispatch')}>
-              Ready To Dispatch
+            <DropdownMenuItem onClick={() => console.log("Assigning AWB for:", order.id)}>
+              Assign AWB
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
               Cancel

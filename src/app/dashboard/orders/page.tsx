@@ -770,5 +770,3 @@ export default function OrdersPage({ processAwbAssignments }: OrdersPageProps) {
     </>
   );
 }
-
-    

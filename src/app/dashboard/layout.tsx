@@ -26,13 +26,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ProcessingQueueToast } from '@/components/processing-queue-toast';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface ProcessingOrder {
     id: string;
@@ -57,6 +58,16 @@ export default function DashboardLayout({
         toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
         return;
     }
+    
+    // Get active shop ID from user's document
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists() || !userDoc.data()?.activeAccountId) {
+        toast({ title: "No Active Store", description: "Could not find an active store to process orders for.", variant: "destructive" });
+        return;
+    }
+    const shopId = userDoc.data()?.activeAccountId;
+
 
     const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
     setProcessingQueue(queue);
@@ -79,7 +90,7 @@ export default function DashboardLayout({
                     'Authorization': `Bearer ${idToken}`
                 },
                 body: JSON.stringify({ 
-                    shop: (await (await auth.currentUser?.getIdTokenResult())?.claims?.activeAccountId),
+                    shop: shopId,
                     orderId: orderId, 
                     status: 'Ready To Dispatch' 
                 }),

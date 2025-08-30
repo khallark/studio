@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -28,7 +29,15 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { ProcessingQueueToast } from '@/components/processing-queue-toast';
+
+interface ProcessingOrder {
+    id: string;
+    name: string;
+    status: 'pending' | 'processing' | 'done' | 'error';
+}
 
 export default function DashboardLayout({
   children,
@@ -38,6 +47,64 @@ export default function DashboardLayout({
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
+
+  const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
+
+  const processAwbAssignments = useCallback(async (ordersToProcess: {id: string, name: string}[]) => {
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
+        return;
+    }
+
+    const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
+    setProcessingQueue(queue);
+    
+    for (let i = 0; i < queue.length; i++) {
+        const orderId = queue[i].id;
+        try {
+            // Set current to 'processing'
+            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'processing' } : item));
+            
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+            // Actual API call to update status in Firestore
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/shopify/orders/update-status', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ 
+                    shop: (await (await auth.currentUser?.getIdTokenResult())?.claims?.activeAccountId), // This is a bit of a hack, better to get from user doc
+                    orderId: orderId, 
+                    status: 'Ready To Dispatch' 
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to update status');
+
+            // Set current to 'done'
+            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'done' } : item));
+        } catch (error) {
+            console.error(`Failed to process order ${orderId}:`, error);
+            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'error' } : item));
+        }
+    }
+    
+    // Wait a bit before clearing the queue display
+    setTimeout(() => {
+        setProcessingQueue([]);
+        toast({
+            title: "Shipment Processing Complete",
+            description: `${ordersToProcess.length} order(s) are now Ready To Dispatch.`
+        })
+    }, 2000);
+
+  }, [user, toast]);
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -172,8 +239,9 @@ export default function DashboardLayout({
               <h1 className="font-headline font-semibold text-lg md:text-2xl">{getTitle()}</h1>
             </header>
             <main className="flex-1 overflow-y-auto">
-              {children}
+              {React.cloneElement(children as React.ReactElement, { processAwbAssignments })}
             </main>
+            {processingQueue.length > 0 && <ProcessingQueueToast queue={processingQueue} />}
         </div>
     </SidebarProvider>
   );

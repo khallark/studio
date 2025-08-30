@@ -32,6 +32,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ProcessingQueueToast } from '@/components/processing-queue-toast';
+import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 
 interface ProcessingOrder {
     id: string;
@@ -78,7 +79,7 @@ export default function DashboardLayout({
                     'Authorization': `Bearer ${idToken}`
                 },
                 body: JSON.stringify({ 
-                    shop: (await (await auth.currentUser?.getIdTokenResult())?.claims?.activeAccountId), // This is a bit of a hack, better to get from user doc
+                    shop: (await (await auth.currentUser?.getIdTokenResult())?.claims?.activeAccountId),
                     orderId: orderId, 
                     status: 'Ready To Dispatch' 
                 }),
@@ -151,98 +152,100 @@ export default function DashboardLayout({
   }
 
   return (
-     <SidebarProvider>
-        <Sidebar>
-          <SidebarContent>
-            <SidebarHeader>
-              <Logo />
-            </SidebarHeader>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
-                  <Link href="/dashboard">
-                    <Home />
-                    Dashboard
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/orders')}>
-                  <Link href="/dashboard/orders">
-                    <Package />
-                    Orders
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/logs')}>
-                  <Link href="/dashboard/logs">
-                    <History />
-                    Logs
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarContent>
-          <SidebarFooter>
-            <SidebarMenu>
+     <ProcessingQueueProvider processAwbAssignments={processAwbAssignments}>
+        <SidebarProvider>
+            <Sidebar>
+            <SidebarContent>
+                <SidebarHeader>
+                <Logo />
+                </SidebarHeader>
+                <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
-                    <Link href="/settings">
-                      <Settings />
-                      Settings
+                    <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
+                    <Link href="/dashboard">
+                        <Home />
+                        Dashboard
                     </Link>
-                  </SidebarMenuButton>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
-            </SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/orders')}>
+                    <Link href="/dashboard/orders">
+                        <Package />
+                        Orders
+                    </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/logs')}>
+                    <Link href="/dashboard/logs">
+                        <History />
+                        Logs
+                    </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarContent>
+            <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
+                        <Link href="/settings">
+                        <Settings />
+                        Settings
+                        </Link>
+                    </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
 
-            {user && !loading && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="justify-start gap-3 w-full px-2 h-12">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.photoURL ?? "https://placehold.co/32x32.png"} alt={user.displayName ?? "User"} data-ai-hint="user avatar" />
-                      <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
-                    </Avatar>
-                    <div className="text-left">
-                      <p className="text-sm font-medium leading-none">{user.displayName || 'User Name'}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
-                      </p>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.displayName || 'User Name'}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem>Settings</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </SidebarFooter>
-        </Sidebar>
-        <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
-            <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
-              <SidebarTrigger />
-              <h1 className="font-headline font-semibold text-lg md:text-2xl">{getTitle()}</h1>
-            </header>
-            <main className="flex-1 overflow-y-auto">
-              {React.cloneElement(children as React.ReactElement, { processAwbAssignments })}
-            </main>
-            {processingQueue.length > 0 && <ProcessingQueueToast queue={processingQueue} />}
-        </div>
-    </SidebarProvider>
+                {user && !loading && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="justify-start gap-3 w-full px-2 h-12">
+                        <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.photoURL ?? "https://placehold.co/32x32.png"} alt={user.displayName ?? "User"} data-ai-hint="user avatar" />
+                        <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
+                        </Avatar>
+                        <div className="text-left">
+                        <p className="text-sm font-medium leading-none">{user.displayName || 'User Name'}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                        </p>
+                        </div>
+                    </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.displayName || 'User Name'}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                        </p>
+                        </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>Profile</DropdownMenuItem>
+                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                        Log out
+                    </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                )}
+            </SidebarFooter>
+            </Sidebar>
+            <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
+                <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 shrink-0 lg:h-[60px] lg:px-6">
+                <SidebarTrigger />
+                <h1 className="font-headline font-semibold text-lg md:text-2xl">{getTitle()}</h1>
+                </header>
+                <main className="flex-1 overflow-y-auto">
+                    {children}
+                </main>
+                {processingQueue.length > 0 && <ProcessingQueueToast queue={processingQueue} />}
+            </div>
+        </SidebarProvider>
+    </ProcessingQueueProvider>
   );
 }

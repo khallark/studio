@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
 import {
   Table,
   TableBody,
@@ -46,6 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
+import { useProcessingQueue } from '@/contexts/processing-queue-context';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -90,13 +91,10 @@ interface UserData {
   activeAccountId: string | null;
 }
 
-interface OrdersPageProps {
-  processAwbAssignments: (orders: {id: string, name: string}[]) => Promise<void>;
-}
-
-export default function OrdersPage({ processAwbAssignments }: OrdersPageProps) {
+export default function OrdersPage() {
   const [user, userLoading] = useAuthState(auth);
   const { toast } = useToast();
+  const { processAwbAssignments } = useProcessingQueue();
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [userData, setUserData] = useState<UserData | null>(null);

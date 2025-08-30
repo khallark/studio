@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -90,67 +91,66 @@ export default function AppsSettingsPage() {
           <CardDescription>Manage your connected applications and integrations.</CardDescription>
         </CardHeader>
         <CardContent>
-          {dataLoading ? (
-             <div className="rounded-lg border p-6">
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                        <Skeleton className="w-16 h-16 rounded-md" />
-                        <div>
-                           <Skeleton className="h-6 w-24 mb-2" />
-                           <Skeleton className="h-4 w-48" />
-                        </div>
-                    </div>
-                    <Skeleton className="h-6 w-20 rounded-full" />
+          <div className="rounded-lg border p-6">
+            {dataLoading ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="w-16 h-16 rounded-md" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-6 w-24" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
                 </div>
-                 <div className="mt-4 pt-4 border-t flex justify-end">
-                    <Skeleton className="h-10 w-32" />
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-10 w-28" />
                 </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border">
-                <div className="p-6 flex flex-row items-start justify-between">
-                    <div className="flex items-center gap-4">
-                        <Image src="https://placehold.co/64x64/7047A3/FFFFFF?text=S" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
-                        <div>
-                            <h3 className="text-xl font-semibold">Shopify</h3>
-                            <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>
-                        </div>
-                    </div>
-                    {hasConnectedStore ? (
-                        <Badge variant="default">Connected</Badge>
-                    ) : (
-                        <Badge variant="secondary">Not Connected</Badge>
-                    )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Image src="https://placehold.co/64x64/7047A3/FFFFFF?text=S" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
+                  <div>
+                    <h3 className="text-xl font-semibold">Shopify</h3>
+                    <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>
+                  </div>
                 </div>
-                <CardFooter className="border-t bg-muted/50 py-3 px-6 flex justify-end">
-                    {hasConnectedStore ? (
-                       <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive">Disconnect</Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will disconnect your Shopify store. You will need to reconnect to continue syncing orders.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={handleDisconnect}>
-                                Yes, Disconnect
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                    ) : (
-                        <Button asChild>
-                            <Link href="/dashboard/connect">Connect</Link>
-                        </Button>
-                    )}
-                </CardFooter>
-            </div>
-          )}
+                <div className="flex items-center gap-4">
+                  {hasConnectedStore ? (
+                    <>
+                      <Badge variant="default">Connected</Badge>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive">Disconnect</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will disconnect your Shopify store. You will need to reconnect to continue syncing orders.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDisconnect}>
+                              Yes, Disconnect
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="secondary">Not Connected</Badge>
+                      <Button asChild>
+                        <Link href="/dashboard/connect">Connect</Link>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

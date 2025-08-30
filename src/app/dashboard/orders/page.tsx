@@ -46,7 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Cancelled';
+type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
 interface OrderLog {
   type: 'USER_ACTION' | 'WEBHOOK';
@@ -374,10 +374,19 @@ export default function OrdersPage() {
       case 'Ready To Dispatch':
         return (
           <>
+             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Dispatched')}>
+              Dispatch
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
               Cancel
             </DropdownMenuItem>
           </>
+        );
+      case 'Dispatched':
+        return (
+           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+              Cancel
+            </DropdownMenuItem>
         );
       case 'Cancelled':
         return (
@@ -435,6 +444,17 @@ export default function OrdersPage() {
           </div>
         );
       case 'Ready To Dispatch':
+         return (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
+            </Button>
+            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+            </Button>
+          </div>
+        );
+      case 'Dispatched':
         return (
           <div className="flex gap-2">
              <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
@@ -474,6 +494,7 @@ export default function OrdersPage() {
               <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
               <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
               <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
+              <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
               <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
             </TabsList>
             <TabsContent value={activeTab}>
@@ -727,5 +748,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    

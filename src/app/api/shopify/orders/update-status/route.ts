@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop, orderId, and status are required' }, { status: 400 });
     }
 
-    const validStatuses = ['New', 'Confirmed', 'Ready To Dispatch', 'Cancelled'];
+    const validStatuses = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'Cancelled'];
     if (!validStatuses.includes(status)) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
     }

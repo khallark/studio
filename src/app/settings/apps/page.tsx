@@ -108,12 +108,12 @@ export default function AppsSettingsPage() {
             </div>
           ) : (
             <div className="rounded-lg border">
-                <CardHeader className="flex flex-row items-start justify-between">
+                <div className="p-6 flex flex-row items-start justify-between">
                     <div className="flex items-center gap-4">
                         <Image src="https://placehold.co/64x64/7047A3/FFFFFF?text=S" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
                         <div>
-                            <CardTitle className="text-xl">Shopify</CardTitle>
-                            <CardDescription>Sync your orders and products from Shopify.</CardDescription>
+                            <h3 className="text-xl font-semibold">Shopify</h3>
+                            <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>
                         </div>
                     </div>
                     {hasConnectedStore ? (
@@ -121,8 +121,8 @@ export default function AppsSettingsPage() {
                     ) : (
                         <Badge variant="secondary">Not Connected</Badge>
                     )}
-                </CardHeader>
-                <CardFooter className="border-t pt-6 flex justify-end">
+                </div>
+                <CardFooter className="border-t bg-muted/50 py-3 px-6 flex justify-end">
                     {hasConnectedStore ? (
                        <AlertDialog>
                           <AlertDialogTrigger asChild>

@@ -42,7 +42,7 @@ export default function Home() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">
                    <Avatar className="h-8 w-8">
-                     <AvatarImage src={user.photoURL || "https://placehold.co/32x32.png"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
+                     <AvatarImage src={user.photoURL || "https://picsum.photos/32/32"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
                      <AvatarFallback>{user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                   <span>{user.displayName || user.email}</span>
@@ -98,7 +98,7 @@ export default function Home() {
             </div>
             <div className="flex justify-center">
               <Image
-                src="https://placehold.co/600x400.png"
+                src="https://picsum.photos/600/400"
                 alt="Dashboard screenshot"
                 width={600}
                 height={400}

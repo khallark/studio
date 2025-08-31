@@ -53,7 +53,11 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/api/shopify/account/update-contact',
-        destination: '/api/shopify/account/update-contact/route',
+        destination: '/api/g/api/shopify/account/update-contact/route',
+      },
+      {
+        source: '/api/integrations/courier/update',
+        destination: '/api/integrations/courier/update/route',
       },
     ]
   },

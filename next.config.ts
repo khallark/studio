@@ -49,6 +49,14 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/bulk-update-status',
         destination: '/api/shopify/orders/bulk-update-status/route',
       },
+       {
+        source: '/api/shopify/account/update-address',
+        destination: '/api/shopify/account/update-address/route',
+      },
+      {
+        source: '/api/shopify/account/update-contact',
+        destination: '/api/shopify/account/update-contact/route',
+      },
     ]
   },
 };

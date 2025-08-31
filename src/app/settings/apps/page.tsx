@@ -226,7 +226,7 @@ export default function AppsSettingsPage() {
                         <div className="flex items-center gap-4">
                             <div>
                                 <h3 className="text-xl font-semibold">Delhivery</h3>
-                                <p className="text-sm text-muted-foreground">Integrate with your Delhivery account.</p>
+                                <p className="text-sm text-muted-foreground">Integrate APIs from your Delhivery account.</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">

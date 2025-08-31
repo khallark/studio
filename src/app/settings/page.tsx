@@ -105,10 +105,10 @@ export default function SettingsPage() {
   const hasContact = !!accountData?.primaryContact;
 
   const handleSaveAddress = async () => {
-    if (!activeAccountId) return;
+    if (!activeAccountId || !user) return;
     setIsSubmittingAddress(true);
     try {
-        const idToken = await user?.getIdToken();
+        const idToken = await user.getIdToken();
         const response = await fetch('/api/shopify/account/update-address', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
@@ -126,10 +126,10 @@ export default function SettingsPage() {
   };
 
   const handleSaveContact = async () => {
-      if (!activeAccountId) return;
+      if (!activeAccountId || !user) return;
       setIsSubmittingContact(true);
       try {
-        const idToken = await user?.getIdToken();
+        const idToken = await user.getIdToken();
         const response = await fetch('/api/shopify/account/update-contact', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },

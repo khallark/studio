@@ -108,7 +108,7 @@ export default function AppsSettingsPage() {
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Image src="https://picsum.photos/64/64" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
+                  {/* <Image src="https://picsum.photos/64/64" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" /> */}
                   <div>
                     <h3 className="text-xl font-semibold">Shopify</h3>
                     <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>

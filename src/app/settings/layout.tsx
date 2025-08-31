@@ -72,7 +72,7 @@ export default function SettingsLayout({
 
   const navItems = [
     { href: '/dashboard', label: 'Back to Dashboard', icon: Home },
-    { href: '/settings', label: 'General', icon: User },
+    { href: '/settings', label: 'Store Details', icon: User },
     { href: '/settings/apps', label: 'Apps', icon: Smartphone },
     { href: '/settings/pickup-locations', label: 'Pickup Locations', icon: MapPin },
   ];

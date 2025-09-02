@@ -44,15 +44,35 @@ export async function POST(req: NextRequest) {
     };
     
     const body = {
-      countryCode: '+91',
-      phoneNumber: phoneNumber.substring(3), // Remove '+91'
-      callbackData: 'OTP sent via checkout',
-      type: 'Template',
-      template: {
-        name: 'otp_verification_template', // Replace with your actual template name
-        languageCode: 'en',
-        bodyValues: [otp], // Pass the OTP as a variable
-      },
+        phoneNumber: phoneNumber.substring(3), // Remove '+91'
+        countryCode: '+91',
+        type: 'Template',
+        template: {
+            name: 'otp_verification_template',
+            languageCode: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: otp,
+                        },
+                    ],
+                },
+                {
+                    type: 'button',
+                    sub_type: 'url',
+                    index: '0',
+                    parameters: [
+                        {
+                            type: 'text',
+                            text: 'checkout', // Placeholder value for the button URL variable
+                        },
+                    ],
+                },
+            ],
+        },
     };
 
     const response = await fetch(endpoint, {
@@ -71,7 +91,7 @@ export async function POST(req: NextRequest) {
     // so the frontend can verify it.
     // In a real application, you would NOT return the OTP to the client.
     // The verification step would also be an API call.
-    return NextResponse.json({ message: 'OTP sent successfully', otp: otp });
+    return NextResponse.json({ message: 'OTP sent successfully via Interakt.', otp: otp });
 
   } catch (error) {
     console.error('Error in send-otp route:', error);

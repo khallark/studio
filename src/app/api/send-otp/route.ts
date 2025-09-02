@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid Indian phone number format. Expected +91XXXXXXXXXX' }, { status: 400 });
     }
 
-    const interaktApiKey = process.env.INTERAKT_API_KEY || 'YOUR_INTERAKT_API_KEY_HERE';
-    if (interaktApiKey === 'YOUR_INTERAKT_API_KEY_HERE') {
-        console.warn("Interakt API key is not set. Using hardcoded key.");
+    const interaktApiKey = process.env.INTERAKT_API_KEY;
+    if (!interaktApiKey) {
+        console.error("Interakt API key is not set in environment variables.");
+        return NextResponse.json({ error: 'Server configuration error: Interakt API key missing.' }, { status: 500 });
     }
     
     const otp = generateOtp();
@@ -54,9 +55,6 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    // We are simulating the API call for now.
-    // In a real implementation, you would uncomment the fetch call.
-    /*
     const response = await fetch(endpoint, {
         method: 'POST',
         headers: headers,
@@ -66,17 +64,14 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
         const errorData = await response.json();
         console.error('Interakt API Error:', errorData);
-        return NextResponse.json({ error: 'Failed to send OTP via Interakt' }, { status: response.status });
+        return NextResponse.json({ error: 'Failed to send OTP via Interakt', details: errorData }, { status: response.status });
     }
-    */
    
-    console.log(`Simulating sending OTP ${otp} to ${phoneNumber} via Interakt.`);
-    
     // For this example, we'll return the OTP in the response
     // so the frontend can verify it.
     // In a real application, you would NOT return the OTP to the client.
     // The verification step would also be an API call.
-    return NextResponse.json({ message: 'OTP sent successfully (simulation)', otp: otp });
+    return NextResponse.json({ message: 'OTP sent successfully', otp: otp });
 
   } catch (error) {
     console.error('Error in send-otp route:', error);

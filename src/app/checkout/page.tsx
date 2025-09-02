@@ -68,7 +68,7 @@ export default function CheckoutPage() {
       setStep('otp');
       toast({
         title: 'OTP Sent',
-        description: `An OTP has been sent to ${phoneNumber} on WhatsApp. (OTP: ${result.otp})`,
+        description: `An OTP has been sent to ${phoneNumber} on WhatsApp.`,
       });
     } catch (error) {
       toast({

@@ -44,35 +44,27 @@ export async function POST(req: NextRequest) {
     };
     
     const body = {
-        phoneNumber: phoneNumber.substring(3), // Remove '+91'
-        countryCode: '+91',
-        type: 'Template',
-        template: {
-            name: 'otp_verification_template',
-            languageCode: 'en',
-            components: [
-                {
-                    type: 'body',
-                    parameters: [
-                        {
-                            type: 'text',
-                            text: otp,
-                        },
-                    ],
-                },
-                {
-                    type: 'button',
-                    sub_type: 'url',
-                    index: '0',
-                    parameters: [
-                        {
-                            type: 'text',
-                            text: 'checkout', // Placeholder value for the button URL variable
-                        },
-                    ],
-                },
+      phoneNumber: phoneNumber.substring(3), // Remove '+91'
+      countryCode: '+91',
+      type: 'Template',
+      template: {
+        name: 'otp_verification_template',
+        languageCode: 'en',
+        bodyValues: [otp], // This is the correct place for body variables
+        components: [
+          {
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [
+              {
+                type: 'text',
+                text: 'checkout', // Placeholder value for the button URL variable
+              },
             ],
-        },
+          },
+        ],
+      },
     };
 
     const response = await fetch(endpoint, {

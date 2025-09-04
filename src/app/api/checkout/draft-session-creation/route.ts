@@ -100,11 +100,11 @@ export async function POST(req: NextRequest) {
     
     // Encrypt the session ID and set it in a secure cookie
     const encryptedSessionId = encrypt(sessionRef.id);
-    cookies().set('checkout_session', encryptedSessionId, {
+    (await cookies()).set('checkout_session', encryptedSessionId, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         path: '/',
-        maxAge: 30 * 60 // 30 minutes
+        sameSite: 'none',
     });
 
     return NextResponse.json(

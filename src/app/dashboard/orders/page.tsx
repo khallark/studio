@@ -165,7 +165,7 @@ export default function OrdersPage() {
   };
 
   const handleBackfill = useCallback(async () => {
-    if (!userData?.activeAccountId) {
+    if (!userData?.activeAccountId || !user) {
       toast({
         title: "No active store",
         description: "Please connect a Shopify store first.",
@@ -180,9 +180,13 @@ export default function OrdersPage() {
     });
 
     try {
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/shopify/backfill', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({ shop: userData.activeAccountId }),
       });
 
@@ -207,7 +211,7 @@ export default function OrdersPage() {
     } finally {
       setIsSyncing(false);
     }
-  }, [userData, toast]);
+  }, [userData, toast, user]);
 
   const handleUpdateStatus = useCallback(async (orderId: string, status: CustomStatus) => {
     if (!userData?.activeAccountId || !user) return;

@@ -32,20 +32,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "origin not allowed" }, { status: 403 });
   }
 
-  let snapshot: any;
+  let draftOrder: any;
   try {
-    snapshot = await req.json();
+    draftOrder = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400, headers: corsHeaders(origin) });
   }
 
   // TODO: SECURITY — do not trust client prices. Recompute/validate here:
   // 1) For each line variant_id, fetch Admin or Storefront price
-  // 2) Recalculate totals and compare to snapshot.totals
+  // 2) Recalculate totals and compare to draftOrder.totals
   // 3) If OK, create Draft Order via Admin API
 
   return NextResponse.json(
-    { ok: true, received: snapshot },
+    { ok: true, received: draftOrder },
     { status: 200, headers: corsHeaders(origin) }
   );
 }

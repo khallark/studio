@@ -144,7 +144,7 @@ export default function PickupLocationsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userData?.activeAccountId) {
+    if (!userData?.activeAccountId || !user) {
       toast({ title: "No store connected", description: "Please connect a store first.", variant: "destructive" });
       return;
     }
@@ -152,6 +152,7 @@ export default function PickupLocationsPage() {
 
     const locationData = { name, address, city, postcode, country };
     const isEditing = !!editingLocation;
+    const idToken = await user.getIdToken();
 
     const url = isEditing ? '/api/shopify/locations/update' : '/api/shopify/locations/add';
     const body = isEditing 
@@ -161,7 +162,10 @@ export default function PickupLocationsPage() {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+        },
         body: body,
       });
 
@@ -184,15 +188,19 @@ export default function PickupLocationsPage() {
   };
 
   const handleDeleteLocation = async (locationId: string) => {
-     if (!userData?.activeAccountId) {
+     if (!userData?.activeAccountId || !user) {
       toast({ title: "No store connected", description: "Please connect a store first.", variant: "destructive" });
       return;
     }
 
     try {
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/shopify/locations/delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({ shop: userData.activeAccountId, locationId }),
       });
       const result = await response.json();

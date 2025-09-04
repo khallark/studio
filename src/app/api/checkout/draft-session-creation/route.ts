@@ -51,21 +51,40 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop_domain);
     const draftOrdersCollection = accountRef.collection('draft_orders');
 
-    await draftOrdersCollection.add({
+    // 1. Save the draft order
+    const draftOrderRef = await draftOrdersCollection.add({
         ...draft_order,
         receivedAt: FieldValue.serverTimestamp()
     });
 
+    // 2. Create the checkout session document
+    const sessionsCollection = db.collection('checkout_sessions');
+    const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+
+    const sessionRef = await sessionsCollection.add({
+        customerPhone: null,
+        shopDomain: shop_domain,
+        draftOrderId: draftOrderRef.id,
+        status: 'pending',
+        expiresAt: Timestamp.fromDate(sessionExpiry),
+        createdAt: FieldValue.serverTimestamp(),
+    });
+
     return NextResponse.json(
-      { ok: true, message: "Draft order saved successfully." },
+      { 
+        ok: true, 
+        message: "Draft order and checkout session created successfully.",
+        sessionId: sessionRef.id,
+        draftOrderId: draftOrderRef.id,
+      },
       { status: 200, headers: corsHeaders(origin) }
     );
 
   } catch (error) {
-    console.error("Error saving draft order:", error);
+    console.error("Error creating draft session:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json(
-        { error: "Failed to save draft order", details: errorMessage }, 
+        { error: "Failed to create draft session", details: errorMessage }, 
         { status: 500, headers: corsHeaders(origin) }
     );
   }

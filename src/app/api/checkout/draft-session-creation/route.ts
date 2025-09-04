@@ -6,7 +6,7 @@ import { FieldValue } from "firebase-admin/firestore";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ORIGINS = new Set(["https://owr.life"]);
+const ALLOWED_ORIGINS = new Set(["https://ghamandclo.com"]);
 
 function corsHeaders(origin: string) {
   return {

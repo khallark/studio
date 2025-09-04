@@ -1,5 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
+import { db } from '@/lib/firebase-admin';
+import { FieldValue } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,20 +34,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "origin not allowed" }, { status: 403 });
   }
 
-  let draftOrder: any;
+  let body: any;
   try {
-    draftOrder = await req.json();
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400, headers: corsHeaders(origin) });
   }
+  
+  const { shop_domain, draft_order } = body;
 
-  // TODO: SECURITY — do not trust client prices. Recompute/validate here:
-  // 1) For each line variant_id, fetch Admin or Storefront price
-  // 2) Recalculate totals and compare to draftOrder.totals
-  // 3) If OK, create Draft Order via Admin API
+  if (!shop_domain || !draft_order) {
+      return NextResponse.json({ error: "shop_domain and draft_order are required" }, { status: 400, headers: corsHeaders(origin) });
+  }
 
-  return NextResponse.json(
-    { ok: true, received: draftOrder },
-    { status: 200, headers: corsHeaders(origin) }
-  );
+  try {
+    const accountRef = db.collection('accounts').doc(shop_domain);
+    const draftOrdersCollection = accountRef.collection('draft_orders');
+
+    await draftOrdersCollection.add({
+        ...draft_order,
+        receivedAt: FieldValue.serverTimestamp()
+    });
+
+    return NextResponse.json(
+      { ok: true, message: "Draft order saved successfully." },
+      { status: 200, headers: corsHeaders(origin) }
+    );
+
+  } catch (error) {
+    console.error("Error saving draft order:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return NextResponse.json(
+        { error: "Failed to save draft order", details: errorMessage }, 
+        { status: 500, headers: corsHeaders(origin) }
+    );
+  }
 }

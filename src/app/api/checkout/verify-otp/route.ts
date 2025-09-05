@@ -90,7 +90,19 @@ export async function POST(req: NextRequest) {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // 6) Issue same-domain HttpOnly JWT cookie
+    // 6) Create/update customer document
+    const customerRef = db.collection("checkout_customers").doc(tempPhone);
+    await customerRef.set(
+      {
+        phone: tempPhone,
+        lastVerifiedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(), // only sets on first creation
+      },
+      { merge: true } // Creates if !exists, merges if exists
+    );
+
+
+    // 7) Issue same-domain HttpOnly JWT cookie
     const nowSec = Math.floor(Date.now() / 1000);
     const token = jwt.sign(
       {

@@ -1,44 +1,61 @@
-// app/api/checkout/session/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import crypto from "crypto";
+// api/checkout/session/route.ts
+import type { NextRequest } from "next/server";
 
-const ALGO = "aes-256-gcm";
-const IV_LEN = 16;
-const SALT_LEN = 64;
-const TAG_LEN = 16;
-const KEY = process.env.CHECKOUT_SESSION_SECRET!; // must be 32 chars
+const ALLOWED_REFERRERS = [
+  "https://ghamandclo.com",
+  "https://www.ghamandclo.com",
+]; // tighten as needed
 
-function keyFromSalt(salt: Buffer) {
-  return crypto.pbkdf2Sync(KEY, salt, 100000, 32, "sha512");
-}
-function decrypt(hex: string) {
-  const buf = Buffer.from(hex, "hex");
-  const salt = buf.subarray(0, SALT_LEN);
-  const iv   = buf.subarray(SALT_LEN, SALT_LEN + IV_LEN);
-  const tag  = buf.subarray(SALT_LEN + IV_LEN, SALT_LEN + IV_LEN + TAG_LEN);
-  const enc  = buf.subarray(SALT_LEN + IV_LEN + TAG_LEN);
-  const k = keyFromSalt(salt);
-  const d = crypto.createDecipheriv(ALGO, k, iv);
-  d.setAuthTag(tag);
-  return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
+function isAllowed(req: NextRequest) {
+  const origin = req.headers.get("origin") || "";
+  const referer = req.headers.get("referer") || "";
+  return ALLOWED_REFERRERS.some(d => origin.startsWith(d) || referer.startsWith(d));
 }
 
-export async function GET(_req: NextRequest) {
-  try {
-    const c = (await cookies()).get("checkout_session");
-    if (!c) {
-        console.error("No checkout_session cookie found.");
-        return NextResponse.json({ error: "no_cookie" }, { status: 401 });
-    }
-
-    // Decrypt to raw value (sessionId)
-    const sessionId = decrypt(c.value);
-
-    // Return only what you need right now
-    return NextResponse.json({ sessionId }, { status: 200 });
-  } catch (err) {
-    console.error("Error decrypting checkout_session cookie:", err);
-    return NextResponse.json({ error: "bad_cookie" }, { status: 401 });
+export async function POST(req: NextRequest) {
+  // (Optional but recommended) origin/referer enforcement
+  if (!isAllowed(req)) {
+    return new Response("Forbidden", { status: 403 });
   }
+
+  // Read form data
+  const form = await req.formData();
+  const sessionId = form.get("sessionId");
+  const shopDomain = form.get("shopDomain"); // optional
+
+  if (typeof sessionId !== "string" || !sessionId) {
+    return new Response("Bad Request", { status: 400 });
+  }
+
+  // Return a tiny HTML bootstrap that writes to localStorage, then navigates
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta http-equiv="Referrer-Policy" content="no-referrer">
+        <title>Starting Checkout…</title>
+      </head>
+      <body>
+        <script>
+          try {
+            localStorage.setItem('checkout_session', ${JSON.stringify(sessionId)});
+            // ${typeof shopDomain === "string" ? `localStorage.setItem('checkout_shop', ${JSON.stringify(shopDomain)});` : ""}
+          } catch (e) {}
+          // Prevent form resubmission on refresh
+          location.replace('/checkout');
+        </script>
+      </body>
+    </html>
+  `;
+
+  return new Response(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+// (Optional) for users that hit /start directly with GET:
+export function GET() {
+  return new Response("Use POST", { status: 405 });
 }

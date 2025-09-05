@@ -5,38 +5,17 @@ import { useEffect, useState } from "react";
 import CheckoutClient from "./checkoutClient";
 
 export default function CheckoutPage() {
-  const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    // Read from localStorage on mount
+    const sid = typeof window !== "undefined"
+      ? window.localStorage.getItem("checkout_session")
+      : null;
 
-    (async () => {
-      try {
-        // same-origin → browser will send HttpOnly cookie automatically
-        const res = await fetch("/api/checkout/session", { cache: "no-store" });
-        if (!res.ok) {
-          // e.g., 401 when cookie missing/invalid
-          setError("No valid checkout session. Redirecting…");
-          // Optional: redirect
-          // setTimeout(() => { window.location.href = "/start"; }, 800);
-          return;
-        }
-        const json = await res.json();
-        if (!cancelled) {
-          setSessionId(json.sessionId as string);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError("Failed to load session. Please retry.");
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
+    setSessionId(sid && sid.trim() ? sid : null);
+    setLoading(false);
   }, []);
 
   if (loading) {
@@ -48,15 +27,16 @@ export default function CheckoutPage() {
     );
   }
 
-  if (error) {
+  if (!sessionId) {
+    // Optionally redirect to a start page if no session is found:
+    // if (typeof window !== "undefined") window.location.replace("/start");
     return (
       <main className="p-6">
         <h1 className="text-xl font-semibold">Checkout</h1>
-        <p>{error}</p>
+        <p>No active checkout session found. Please start checkout again.</p>
       </main>
     );
   }
 
-  // sessionId is the decrypted cookie value
-  return <CheckoutClient sessionId={sessionId!} />;
+  return <CheckoutClient sessionId={sessionId} />;
 }

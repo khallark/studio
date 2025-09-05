@@ -90,16 +90,26 @@ export async function POST(req: NextRequest) {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // 6) Create/update customer document
+    // 6) Create/update customer document using a transaction
     const customerRef = db.collection("checkout_customers").doc(tempPhone);
-    await customerRef.set(
-      {
-        phone: tempPhone,
-        lastVerifiedAt: FieldValue.serverTimestamp(),
-        createdAt: FieldValue.serverTimestamp(), // only sets on first creation
-      },
-      { merge: true } // Creates if !exists, merges if exists
-    );
+    
+    await db.runTransaction(async (transaction) => {
+        const customerDoc = await transaction.get(customerRef);
+        if (!customerDoc.exists) {
+            transaction.create(customerRef, {
+                phone: tempPhone,
+                name: null,
+                email: null,
+                address: null,
+                lastVerifiedAt: FieldValue.serverTimestamp(),
+                createdAt: FieldValue.serverTimestamp(),
+            });
+        } else {
+            transaction.update(customerRef, {
+                lastVerifiedAt: FieldValue.serverTimestamp(),
+            });
+        }
+    });
 
 
     // 7) Issue same-domain HttpOnly JWT cookie

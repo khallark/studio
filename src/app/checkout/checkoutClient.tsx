@@ -1,7 +1,7 @@
 // app/checkout/CheckoutClient.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import CartSummary from "./cart-summary";
 type Step = "phone" | "otp" | "confirmed";
 
 const tenDigitIndian = /^[6-9]\d{9}$/;
+const OTP_EXPIRY_SECONDS = 300; // 5 minutes
 
 type Props = { sessionId: string };
 
@@ -27,13 +28,68 @@ export default function CheckoutClient({ sessionId }: Props) {
   const [fullPhone, setFullPhone] = useState<string | null>(null); // "+91XXXXXXXXXX" (normalized)
   const [otpInput, setOtpInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  const [timer, setTimer] = useState(OTP_EXPIRY_SECONDS);
+  const [canResend, setCanResend] = useState(false);
+
   const { toast } = useToast();
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined;
+
+    if (step === 'otp' && timer > 0) {
+        setCanResend(false);
+        interval = setInterval(() => {
+            setTimer(prevTimer => prevTimer - 1);
+        }, 1000);
+    } else if (timer <= 0) {
+        setCanResend(true);
+        if(interval) clearInterval(interval);
+    }
+    
+    return () => {
+        if(interval) clearInterval(interval);
+    }
+  }, [step, timer]);
+
 
   const variants = {
     enter: (d: number) => ({ x: d > 0 ? "100%" : "-100%", opacity: 0 }),
     center: { zIndex: 1, x: 0, opacity: 1 },
     exit: (d: number) => ({ zIndex: 0, x: d < 0 ? "100%" : "-100%", opacity: 0 }),
   };
+
+  const startOtpFlow = async (phoneNumber: string) => {
+    try {
+        const resp = await fetch("/api/checkout/send-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, phoneNumber }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data?.error || "Failed to send OTP");
+        }
+
+        setFullPhone(phoneNumber);
+        setDirection(1);
+        setStep("otp");
+        setTimer(OTP_EXPIRY_SECONDS); // Reset timer
+        setCanResend(false); // Disable resend on new OTP
+        toast({
+            title: "OTP Sent",
+            description: `A code was sent to ${maskPhone(phoneNumber)} on WhatsApp.`,
+        });
+    } catch (err) {
+        toast({
+            title: "Error",
+            description: err instanceof Error ? err.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  }
+
 
   // --- Send OTP flow (calls /api/checkout/send-otp) ---
   const handlePhoneNumberSubmit = async (e: React.FormEvent) => {
@@ -51,34 +107,17 @@ export default function CheckoutClient({ sessionId }: Props) {
     const normalized = `+91${cleaned}`;
 
     setIsLoading(true);
-    try {
-      const resp = await fetch("/api/checkout/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, phoneNumber: normalized }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data?.error || "Failed to send OTP");
-      }
-
-      setFullPhone(normalized);
-      setDirection(1);
-      setStep("otp");
-      toast({
-        title: "OTP Sent",
-        description: `A code was sent to ${maskPhone(normalized)} on WhatsApp.`,
-      });
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "An unknown error occurred.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await startOtpFlow(normalized);
+    setIsLoading(false);
   };
+  
+  const handleResendOtp = async () => {
+    if (!fullPhone || !canResend) return;
+    
+    setResendLoading(true);
+    await startOtpFlow(fullPhone);
+    setResendLoading(false);
+  }
 
   // --- Verify OTP flow (calls /api/checkout/verify-otp and sets HttpOnly JWT cookie) ---
   const handleOtpSubmit = async (e: React.FormEvent) => {
@@ -124,6 +163,12 @@ export default function CheckoutClient({ sessionId }: Props) {
     setStep("phone");
     setOtpInput("");
   };
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-secondary/50 p-4">
@@ -195,18 +240,32 @@ export default function CheckoutClient({ sessionId }: Props) {
                         className="text-center tracking-[0.5em] text-lg"
                         />
                     </div>
+                    <div className="text-center text-sm text-muted-foreground">
+                        {canResend ? "OTP expired. " : `Expires in: ${formatTime(timer)}`}
+                    </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? <Loader2 className="animate-spin" /> : "Verify"}
                     </Button>
-                    <Button
-                        type="button"
-                        variant="link"
-                        className="w-full text-sm"
-                        onClick={handleBack}
-                        disabled={isLoading}
-                    >
-                        Use a different number
-                    </Button>
+                    <div className="flex justify-between items-center text-sm">
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="p-0 h-auto"
+                            onClick={handleBack}
+                            disabled={isLoading || resendLoading}
+                        >
+                            Use a different number
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="p-0 h-auto"
+                            onClick={handleResendOtp}
+                            disabled={!canResend || resendLoading || isLoading}
+                        >
+                            {resendLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Resending...</> : "Resend OTP"}
+                        </Button>
+                    </div>
                     </CardContent>
                 </form>
                 )}
@@ -266,3 +325,5 @@ function maskPhone(p: string | null) {
   // "+91XXXXXXXXXX" -> "+91******1234"
   return p.slice(0, 3) + "******" + p.slice(-4);
 }
+
+    

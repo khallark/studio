@@ -84,7 +84,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6 text-center md:text-left">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-headline text-primary">
-                All your Shopify orders, in one place.
+                All Your Shopify orders, in one place.
               </h1>
               <p className="text-lg text-muted-foreground">
                 OrderFlow brings all your Shopify data into a single, powerful dashboard. Stop switching tabs and start making smarter decisions.

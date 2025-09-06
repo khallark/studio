@@ -1,7 +1,6 @@
 // app/api/proxy/checkout/verify-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import { db } from "@/lib/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { verifyAppProxySignature } from "@/lib/verifyAppProxy";
@@ -10,11 +9,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const OTP_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
-const JWT_TTL_SECONDS = 30 * 60;      // 30 minutes
 
 const JWT_SECRET = process.env.CHECKOUT_JWT_SECRET || "";
 const APP_SECRET = process.env.SHOPIFY_API_SECRET || "";
-const isProd = process.env.NODE_ENV === "production";
 
 /** ---------- Helpers ---------- */
 function sha256Hex(s: string) {
@@ -154,35 +151,12 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Issue HttpOnly JWT (host-only cookie: no Domain=)
-    const nowSec = Math.floor(now / 1000);
-    const token = jwt.sign(
-      {
-        aud: "checkout",
-        iat: nowSec,
-        nbf: nowSec,
-        exp: nowSec + JWT_TTL_SECONDS,
-        session_id: sessionId,
-        phone_no: tempPhone,
-      },
-      JWT_SECRET,
-      { algorithm: "HS256" }
-    );
-
-    const cookieParts = [
-      `checkout_token=${token}`,
-      "HttpOnly",
-      "SameSite=Lax",
-      "Path=/",
-      `Max-Age=${JWT_TTL_SECONDS}`,
-    ];
-    if (isProd) cookieParts.push("Secure"); // only on HTTPS
     const res = NextResponse.json({
       ok: true,
       sessionId,
       customerPhoneMasked: maskPhone(tempPhone),
     });
-    res.headers.set("Set-Cookie", cookieParts.join("; "));
+    
     return res;
 
   } catch (err) {

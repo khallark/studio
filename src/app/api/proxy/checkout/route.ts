@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
     return new NextResponse("bad signature", { status: 401 });
   }
 
+  console.log("Hello world");
+
   // Get your real page
   const upstream = await fetch(`${ORIGIN}${SOURCE_PATH}`, {
     headers: { Accept: "text/html" },

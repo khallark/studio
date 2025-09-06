@@ -1,5 +1,4 @@
 import admin from 'firebase-admin';
-// import serviceAccount from '../../service-account.json';
 
 if (!admin.apps.length) {
   const serviceAccount = {

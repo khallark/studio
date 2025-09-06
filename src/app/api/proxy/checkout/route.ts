@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { verifyAppProxySignature } from "@/lib/verifyAppProxy";
 
 const APP_SECRET = process.env.SHOPIFY_API_SECRET!;
-const ORIGIN = "https://7htx61xz-9002.inc1.devtunnels.ms";   // <- change me
+const ORIGIN = "https://studio-rose-three.vercel.app";   // <- change me
 const SOURCE_PATH = "/checkout";                // your existing page
 
 /** rewrite asset URLs inside your HTML so they load via the proxy */

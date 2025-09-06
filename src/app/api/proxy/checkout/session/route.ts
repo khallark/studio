@@ -55,6 +55,7 @@
 // }
 // app/api/proxy/checkout/session/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAppProxySignature as verify } from "@/lib/verifyAppProxy";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -63,21 +64,6 @@ export const dynamic = "force-dynamic";
 const APP_SECRET  = process.env.SHOPIFY_API_SECRET || "";
 const APP_ORIGIN  = process.env.APP_ORIGIN || "https://studio-rose-three.vercel.app";
 const SOURCE_PATH = "/checkout";
-
-function verify(fullUrl: string) {
-  try {
-    const u = new URL(fullUrl);
-    const given = u.searchParams.get("signature") ?? "";
-    const base = Array.from(u.searchParams.entries())
-      .filter(([k]) => k !== "signature")
-      .sort(([a,b]) => a.localeCompare(b))
-      .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join("&");
-    const expected = crypto.createHmac("sha256", APP_SECRET).update(base).digest("hex");
-    return given.length === expected.length &&
-           crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
-  } catch { return false; }
-}
 
 function rewriteAssetUrls(html: string) {
   html = html.replace(/(\b(?:href|src)=["'])\/_next\//g, `$1/apps/checkout/_next/`);
@@ -92,7 +78,7 @@ function rewriteAssetUrls(html: string) {
 
 export async function POST(req: NextRequest) {
   if (!APP_SECRET) return new NextResponse("server config error", { status: 500 });
-  if (!verify(req.url)) return new NextResponse("bad signature", { status: 401 });
+  if (!verify(req.url, APP_SECRET)) return new NextResponse("bad signature", { status: 401 });
 
   // read the form (so you keep sessionId, shopDomain, etc.)
   const form = await req.formData();

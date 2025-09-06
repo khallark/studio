@@ -397,10 +397,35 @@ function formatTime(seconds: number) {
   return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
+function storageKey() {
+  if (typeof window === "undefined") return "owr:checkout:sid";
+  const shop = (window as any).__CHECKOUT_SESSION__?.shop || window.location.host;
+  return `owr:checkout:sid:${shop}`;
+}
+
 // ---------- component ----------
 export default function CheckoutClient({ sessionId }: Props) {
   const boot = typeof window !== "undefined" ? window.__CHECKOUT_SESSION__ : undefined;
   const effectiveSessionId = useMemo(() => sessionId ?? boot?.id ?? "", [sessionId, boot?.id]);
+
+  // If the boot SID is different/newer, overwrite storage so future reloads/new tabs use it
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = storageKey();
+    const current =
+      window.sessionStorage.getItem(key) || window.localStorage.getItem(key) || "";
+
+    const fresh = boot?.id && String(boot.id);
+    if (fresh && fresh !== current) {
+      try { window.sessionStorage.setItem(key, fresh); } catch {}
+      try { window.localStorage.setItem(key, fresh); } catch {}
+    }
+  }, [boot?.id]);
+
+  useEffect(() => {
+    if (!effectiveSessionId) console.warn("CheckoutClient: missing sessionId");
+    else console.log("effectiveSessionId:", effectiveSessionId);
+  }, [effectiveSessionId]);
 
   const [step, setStep] = useState<Step>("phone");
   const [direction, setDirection] = useState(1);
@@ -427,14 +452,6 @@ export default function CheckoutClient({ sessionId }: Props) {
     const iv = setInterval(() => setTimer((t) => Math.max(0, t - 1)), 1000);
     return () => clearInterval(iv);
   }, [step, timer]);
-
-  useEffect(() => {
-    if (!effectiveSessionId) {
-      // helps catch missing boot data during development
-      console.warn("CheckoutClient: missing sessionId");
-    }
-    console.log("effectiveSessionId: ", effectiveSessionId);
-  }, [effectiveSessionId]);
 
   const variants = {
     enter: (d: number) => ({ x: d > 0 ? "100%" : "-100%", opacity: 0 }),

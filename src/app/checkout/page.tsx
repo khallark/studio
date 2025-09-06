@@ -1,21 +1,35 @@
-// app/checkout/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import CheckoutClient from "./checkoutClient";
 import { Loader2 } from "lucide-react";
 
+function storageKey() {
+  if (typeof window === "undefined") return "owr:checkout:sid";
+  const shop = (window as any).__CHECKOUT_SESSION__?.shop || window.location.host;
+  return `owr:checkout:sid:${shop}`;
+}
+
 export default function CheckoutPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Read from localStorage on mount
-    const sid = typeof window !== "undefined"
-      ? window.localStorage.getItem("checkout_session")
-      : null;
+    const key = storageKey();
+    const boot = (window as any).__CHECKOUT_SESSION__;
+    const fromStorage =
+      window.sessionStorage.getItem(key) || window.localStorage.getItem(key) || "";
 
-    setSessionId(sid && sid.trim() ? sid : null);
+    // prefer the fresh boot SID if present; otherwise fall back to storage
+    const chosen = (boot?.id && String(boot.id)) || fromStorage || "";
+
+    // write back so reload/new tab keep the newest SID
+    if (chosen) {
+      try { window.sessionStorage.setItem(key, chosen); } catch {}
+      try { window.localStorage.setItem(key, chosen); } catch {}
+    }
+
+    setSessionId(chosen || null);
     setLoading(false);
   }, []);
 
@@ -31,8 +45,6 @@ export default function CheckoutPage() {
   }
 
   if (!sessionId) {
-    // Optionally redirect to a start page if no session is found:
-    // if (typeof window !== "undefined") window.location.replace("/start");
     return (
       <main className="p-6">
         <h1 className="text-xl font-semibold">Checkout</h1>

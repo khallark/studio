@@ -432,8 +432,8 @@ export default function CheckoutClient({ sessionId }: Props) {
     if (!effectiveSessionId) {
       // helps catch missing boot data during development
       console.warn("CheckoutClient: missing sessionId");
-      console.log("effectiveSessionId: ", effectiveSessionId);
     }
+    console.log("effectiveSessionId: ", effectiveSessionId);
   }, [effectiveSessionId]);
 
   const variants = {

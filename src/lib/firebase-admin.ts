@@ -10,7 +10,7 @@ if (!admin.apps.length) {
   const serviceAccount: admin.ServiceAccount = {
     projectId: process.env.FIREBASE_SERVICE_ACC_PROJECT_ID!,
     clientEmail: process.env.FIREBASE_SERVICE_ACC_CLIENT_EMAIL!,
-    privateKey: privateKey,
+    privateKey: privateKey.replace(/\\n/g, '\n'),
   };
 
   admin.initializeApp({

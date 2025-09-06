@@ -37,7 +37,7 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
         const fetchCustomerData = async () => {
             setIsLoading(true);
             try {
-                const res = await fetch('/api/checkout/customer');
+                const res = await fetch('/apps/checkout/customer');
                 const data = await res.json();
 
                 if (!res.ok) throw new Error(data.error || 'Failed to fetch details');
@@ -65,7 +65,7 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const res = await fetch('/api/checkout/customer', {
+            const res = await fetch('/apps/checkout/customer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, address }),

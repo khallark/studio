@@ -10,43 +10,34 @@ export const dynamic = "force-dynamic";
 const APP_SECRET = process.env.SHOPIFY_API_SECRET || "";
 
 /** Read sessionId & phone from JSON body or form-data; fallback to query params if needed */
-async function readSessionAndPhone(req: NextRequest): Promise<
-  { sessionId: string; phone: string } | NextResponse
-> {
+// inside readSessionAndPhone(req)
+async function readSessionAndPhone(req: NextRequest) {
   let sessionId = "";
   let phone = "";
 
-  // Try JSON body
-  try {
-    const ct = req.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      const j = await req.json();
-      sessionId = String(j?.sessionId ?? "");
-      phone = String(j?.phone ?? "");
-    }
-  } catch {
-    /* ignore */
-  }
+  const ct = req.headers.get("content-type") || "";
 
-  // Try form-data
+  // JSON body (use a clone so the original stream is untouched)
   if (!sessionId || !phone) {
-    try {
-      const ct = req.headers.get("content-type") || "";
-      if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
-        const f = await req.formData();
-        sessionId ||= String(f.get("sessionId") ?? "");
-        phone ||= String(f.get("phone") ?? "");
-      }
-    } catch {
-      /* ignore */
+    if (ct.includes("application/json")) {
+      const j = await req.clone().json().catch(() => null);
+      if (j) { sessionId = String(j.sessionId ?? ""); phone = String(j.phone ?? ""); }
     }
   }
 
-  // Fallback: query params (useful for GET)
+  // form-data / urlencoded
+  if (!sessionId || !phone) {
+    if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
+      const f = await req.clone().formData().catch(() => null);
+      if (f) { sessionId ||= String(f.get("sessionId") ?? ""); phone ||= String(f.get("phone") ?? ""); }
+    }
+  }
+
+  // fallback to query params (GET)
   if (!sessionId || !phone) {
     const u = new URL(req.url);
     sessionId ||= u.searchParams.get("sessionId") || "";
-    phone ||= u.searchParams.get("phone") || "";
+    phone     ||= u.searchParams.get("phone") || "";
   }
 
   if (!sessionId || !phone) {
@@ -54,6 +45,7 @@ async function readSessionAndPhone(req: NextRequest): Promise<
   }
   return { sessionId, phone };
 }
+
 
 /** Ensure the request came from Shopify App Proxy and the session is valid for this phone */
 async function verifyContext(

@@ -108,40 +108,69 @@ export async function POST(req: NextRequest) {
 
     // 5) Shopify Admin GraphQL (batched)
     const query = /* GraphQL */ `
-      query VariantNodes($ids: [ID!]!) {
+    query VariantNodes($ids: [ID!]!) {
         nodes(ids: $ids) {
-          ... on ProductVariant {
+        ... on ProductVariant {
             __typename
             id
             legacyResourceId
             title
             sku
             barcode
-            price { amount currencyCode }
-            compareAtPrice { amount currencyCode }
+
+            # Admin GraphQL: Money scalars (strings)
+            price
+            compareAtPrice
+            unitPrice
+
+            # Rich/currency-aware sets if you need currency codes
+            priceSet {
+            shopMoney { amount currencyCode }
+            presentmentMoney { amount currencyCode }
+            }
+            compareAtPriceSet {
+            shopMoney { amount currencyCode }
+            presentmentMoney { amount currencyCode }
+            }
+
+            unitPriceMeasurement {
+            measuredType
+            quantity
+            unitOfMeasure
+            referenceUnit
+            referenceValue
+            }
+
             selectedOptions { name value }
             image { url altText }
-            weight
-            weightUnit
             inventoryPolicy
             taxable
-            product {
-              id
-              legacyResourceId
-              handle
-              title
-              vendor
-              productType
-              status
-              tags
-              featuredImage { url altText }
-              onlineStoreUrl
+
+            # Weight via inventoryItem measurement
+            inventoryItem {
+            measurement {
+                weight { value unit }
             }
-          }
-          ... on Node { id }
+            }
+
+            product {
+            id
+            legacyResourceId
+            handle
+            title
+            vendor
+            productType
+            status
+            tags
+            featuredImage { url altText }
+            onlineStoreUrl
+            }
         }
-      }
+        ... on Node { id }
+        }
+    }
     `;
+
 
     // Keep sequential to play nicely with GraphQL throttle; chunk size 60 is safe.
     const idsChunks = chunk(variantGids, 60);
@@ -174,38 +203,52 @@ export async function POST(req: NextRequest) {
 
     // 6) Normalize
     const variants = nodes
-      .filter(n => n && n.__typename === "ProductVariant")
-      .map((v: any) => ({
+    .filter((n) => n && n.__typename === "ProductVariant")
+    .map((v: any) => ({
         id: v.id,
         legacyId: v.legacyResourceId,
         title: v.title,
         sku: v.sku || null,
         barcode: v.barcode || null,
-        price: v.price || null,               // { amount, currencyCode }
-        compareAtPrice: v.compareAtPrice || null,
+
+        // Scalars (strings)
+        price: v.price ?? null,               // e.g. "19.99"
+        compareAtPrice: v.compareAtPrice ?? null,
+        unitPrice: v.unitPrice ?? null,
+
+        // Money objects with currency codes (use these for display/currency-aware math)
+        priceSet: v.priceSet ?? null,                 // { shopMoney, presentmentMoney }
+        compareAtPriceSet: v.compareAtPriceSet ?? null,
+
+        unitPriceMeasurement: v.unitPriceMeasurement ?? null,
+
         selectedOptions: v.selectedOptions || [],
         image: v.image ? { url: v.image.url, alt: v.image.altText || null } : null,
-        weight: v.weight ?? null,
-        weightUnit: v.weightUnit ?? null,
         inventoryPolicy: v.inventoryPolicy ?? null,
         taxable: v.taxable ?? null,
+
+        // Weight via inventoryItem.measurement.weight
+        weight: v.inventoryItem?.measurement?.weight?.value ?? null,
+        weightUnit: v.inventoryItem?.measurement?.weight?.unit ?? null,
+
         product: v.product
-          ? {
-              id: v.product.id,
-              legacyId: v.product.legacyResourceId,
-              handle: v.product.handle,
-              title: v.product.title,
-              vendor: v.product.vendor,
-              productType: v.product.productType,
-              status: v.product.status,
-              tags: v.product.tags,
-              featuredImage: v.product.featuredImage
+        ? {
+            id: v.product.id,
+            legacyId: v.product.legacyResourceId,
+            handle: v.product.handle,
+            title: v.product.title,
+            vendor: v.product.vendor,
+            productType: v.product.productType,
+            status: v.product.status,
+            tags: v.product.tags,
+            featuredImage: v.product.featuredImage
                 ? { url: v.product.featuredImage.url, alt: v.product.featuredImage.altText || null }
                 : null,
-              onlineStoreUrl: v.product.onlineStoreUrl || null,
+            onlineStoreUrl: v.product.onlineStoreUrl || null,
             }
-          : null,
-      }));
+        : null,
+    }));
+
 
     return ok({ ok: true, variants });
   } catch (e) {

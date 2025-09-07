@@ -217,6 +217,7 @@ export default function CheckoutClient({ sessionId }: Props) {
         const pdJson = await pd.json().catch(() => ({} as any));
         if (pd.ok && pdJson?.ok) {
           setCustomer(pdJson.customer ?? null);
+          console.log(Array.isArray(pdJson.products) ? pdJson.products : []);
           setProducts(Array.isArray(pdJson.products) ? pdJson.products : []);
         } else {
           console.warn("product-details failed", pd.status, pdJson);

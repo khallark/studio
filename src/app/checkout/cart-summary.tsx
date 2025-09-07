@@ -30,13 +30,15 @@ export default function CartSummary({ sessionId }: Props) {
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
-        fetch("/apps/checkout/products-details", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId }), // just the session id
-        })
-        .then((res) => console.log(res.json()))
-        .catch((err) => { console.error("Error fetching product details:", err); });
+        const resp = (async() => {
+            const resp = await fetch("/apps/checkout/products-details", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId }), // just the session id
+            })
+            return await resp.json();
+        })();
+        console.log("cart details response", resp);
     })
     
     return (

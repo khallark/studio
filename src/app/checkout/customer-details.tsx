@@ -1,7 +1,7 @@
 // app/checkout/customer-details.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,113 +10,130 @@ import { Edit, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface Props {
-  sessionId: string;
-  phone: string; // unmasked, verified
+interface Customer {
+  phone: string | null;
+  name: string | null;
+  email: string | null;
+  address: string | null;
 }
 
-// --- helpers: choose proxy base if we're under /apps/checkout ---
+interface Props {
+  customer: Customer;
+}
+
+/* --- helpers: detect proxy base if under /apps/checkout --- */
 function proxyPrefix(): string | null {
   if (typeof window === "undefined") return null;
-  const p = window.location.pathname.split("/").filter(Boolean);
-  return p[0] === "apps" && p[1] ? `/${p.slice(0, 2).join("/")}` : null;
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  return parts[0] === "apps" && parts[1] ? `/${parts.slice(0, 2).join("/")}` : null;
 }
 function apiBase(): string {
   const pp = proxyPrefix();
   return pp ?? "/api/checkout";
 }
 
-export default function CustomerDetails({ sessionId, phone }: Props) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+/* session id the API needs for auth */
+function storageKey(): string {
+  if (typeof window === "undefined") return "owr:checkout:sid";
+  const shop = (window as any).__CHECKOUT_SESSION__?.shop || window.location.host;
+  return `owr:checkout:sid:${shop}`;
+}
+function getEffectiveSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  const boot = (window as any).__CHECKOUT_SESSION__?.id as string | undefined;
+  if (boot && String(boot).trim()) return String(boot);
+  const key = storageKey();
+  return (
+    window.sessionStorage.getItem(key) ||
+    window.localStorage.getItem(key) ||
+    null
+  );
+}
 
-  // The verified phone number (display)
-  const [verifiedPhone, setVerifiedPhone] = useState("");
-
-  // Form fields
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-
+export default function CustomerDetails({ customer }: Props) {
   const { toast } = useToast();
 
-  // Store original values to revert on cancel
+  // derive once
+  const sessionId = useMemo(getEffectiveSessionId, []);
+  const initialPhone = customer?.phone ?? "";
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  // make the initial paint smooth (show skeleton for a blink)
+  const [isLoading, setIsLoading] = useState(true);
+
+  // form state
+  const [formName, setFormName] = useState(customer?.name ?? "");
+  const [formEmail, setFormEmail] = useState(customer?.email ?? "");
+  const [formAddress, setFormAddress] = useState(customer?.address ?? "");
+
+  // display phone as provided (already verified upstream)
+  const [verifiedPhone, setVerifiedPhone] = useState(initialPhone || "");
+
+  // keep originals for cancel
   const [originalValues, setOriginalValues] = useState({
-    name: "",
-    email: "",
-    address: "",
+    name: customer?.name ?? "",
+    email: customer?.email ?? "",
+    address: customer?.address ?? "",
   });
 
+  // first paint → populate from props, stop skeleton
   useEffect(() => {
-    const fetchCustomerData = async () => {
-      if (!sessionId || !phone) return;
-      setIsLoading(true);
-      try {
-        // GET must not have a body → pass sessionId & phone as query params
-        const url = `${apiBase()}/customer?sessionId=${encodeURIComponent(
-          sessionId
-        )}&phone=${encodeURIComponent(phone)}`;
-
-        const res = await fetch(url, {
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data?.error || "Failed to fetch details");
-
-        setName(data.name || "");
-        setEmail(data.email || "");
-        setAddress(data.address || "");
-        setVerifiedPhone(data.phone || phone);
-
-        setOriginalValues({
-          name: data.name || "",
-          email: data.email || "",
-          address: data.address || "",
-        });
-      } catch (err) {
-        toast({
-          title: "Error",
-          description:
-            err instanceof Error ? err.message : "Could not load your details.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCustomerData();
-  }, [sessionId, phone, toast]);
+    setFormName(customer?.name ?? "");
+    setFormEmail(customer?.email ?? "");
+    setFormAddress(customer?.address ?? "");
+    setVerifiedPhone(customer?.phone ?? "");
+    setOriginalValues({
+      name: customer?.name ?? "",
+      email: customer?.email ?? "",
+      address: customer?.address ?? "",
+    });
+    setIsLoading(false);
+  }, [customer]);
 
   const handleSave = async () => {
+    if (!sessionId) {
+      toast({
+        title: "Missing session",
+        description: "Reload the page and start checkout again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!verifiedPhone) {
+      toast({
+        title: "Missing phone",
+        description: "Verified phone number is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`${apiBase()}/customer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        // Send sessionId & phone in the body (new contract)
-        body: JSON.stringify({ sessionId, phone, name, email, address }),
+        // new contract: send sessionId & phone in body
+        body: JSON.stringify({
+          sessionId,
+          phone: verifiedPhone,
+          name: formName,
+          email: formEmail,
+          address: formAddress,
+        }),
       });
-      const data = await res.json();
+
+      const data = await res.json().catch(() => ({} as any));
       if (!res.ok) throw new Error(data?.error || "Failed to save details");
 
-      toast({
-        title: "Details Updated",
-        description: "Your shipping information has been saved.",
-      });
-      setOriginalValues({ name, email, address });
+      toast({ title: "Details Updated", description: "Your shipping information has been saved." });
+      setOriginalValues({ name: formName, email: formEmail, address: formAddress });
       setIsEditing(false);
     } catch (err) {
       toast({
         title: "Save Failed",
-        description:
-          err instanceof Error
-            ? err.message
-            : "An unknown error occurred.",
+        description: err instanceof Error ? err.message : "An unknown error occurred.",
         variant: "destructive",
       });
     } finally {
@@ -125,9 +142,9 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
   };
 
   const handleCancel = () => {
-    setName(originalValues.name);
-    setEmail(originalValues.email);
-    setAddress(originalValues.address);
+    setFormName(originalValues.name);
+    setFormEmail(originalValues.email);
+    setFormAddress(originalValues.address);
     setIsEditing(false);
   };
 
@@ -157,8 +174,8 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
               <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
                 disabled={isSaving}
               />
             </div>
@@ -167,8 +184,8 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
                 disabled={isSaving}
               />
             </div>
@@ -176,8 +193,8 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
               <Label htmlFor="address">Full Address</Label>
               <Input
                 id="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                value={formAddress}
+                onChange={(e) => setFormAddress(e.target.value)}
                 disabled={isSaving}
               />
             </div>
@@ -194,12 +211,10 @@ export default function CustomerDetails({ sessionId, phone }: Props) {
         </Card>
       ) : (
         <div className="text-sm text-muted-foreground">
-          <p className="text-foreground font-medium">
-            {name || "No name provided"}
-          </p>
-          <p>{email || "No email provided"}</p>
-          <p>{verifiedPhone}</p>
-          <p>{address || "No address provided"}</p>
+          <p className="text-foreground font-medium">{formName || "No name provided"}</p>
+          <p>{formEmail || "No email provided"}</p>
+          <p>{verifiedPhone || "No phone provided"}</p>
+          <p>{formAddress || "No address provided"}</p>
         </div>
       )}
     </div>

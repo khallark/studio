@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAppProxySignature } from "@/lib/verifyAppProxy";
 import { db } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,25 +27,48 @@ export async function POST(req: NextRequest) {
     const sessionId = String(body?.sessionId || "");
     if (!sessionId) return err("missing sessionId", 400);
 
-    // session
-    const sessSnap = await db.collection("checkout_sessions").doc(sessionId).get();
+    // --- 1) Load session (single read) ---
+    const sessRef = db.collection("checkout_sessions").doc(sessionId);
+    const sessSnap = await sessRef.get();
     if (!sessSnap.exists) return err("session not found", 404);
 
-    const s = sessSnap.data() as {
+    const s = (sessSnap.data() || {}) as {
       shopDomain?: string;
       draftOrderId?: string;
       expiresAt?: { toMillis?: () => number };
       status?: string;
+      customerPhone?: string;
+      customerName?: string | null;
+      customerEmail?: string | null;
+      customerAddress?: string | null;
+      products?: any[];
+      productVariantIds?: string[];
     };
 
-    const shopDomain = s?.shopDomain || "";
+    const shopDomain   = s?.shopDomain || "";
     const draftOrderId = s?.draftOrderId || "";
     if (!shopDomain || !draftOrderId) return err("session missing shopDomain or draftOrderId", 422);
     const expMs = s?.expiresAt?.toMillis?.();
     if (expMs && expMs <= Date.now()) return err("session expired", 410);
     if (s?.status && s.status !== "phone_verified") return err("session not verified", 403);
 
-    // shop account
+    // 👉 If products already cached in the session, return them immediately
+    if (Array.isArray(s.products) && s.products.length > 0) {
+      return ok({
+        ok: true,
+        customer: {
+          phone:   s.customerPhone ?? null,
+          name:    s.customerName ?? null,
+          email:   s.customerEmail ?? null,
+          address: s.customerAddress ?? null,
+        },
+        products: s.products,
+      });
+    }
+
+    // --- 2) We need to fetch from Shopify (no cached products) ---
+
+    // shop account / admin token
     const accountSnap = await db.collection("accounts").doc(shopDomain).get();
     if (!accountSnap.exists) return err("account not found", 404);
     const account = accountSnap.data() || {};
@@ -54,32 +78,50 @@ export async function POST(req: NextRequest) {
 
     // draft order doc (handle both shapes)
     const draftSnap = await db
-      .collection("accounts")
-      .doc(shopDomain)
-      .collection("draft_orders")
-      .doc(draftOrderId)
+      .collection("accounts").doc(shopDomain)
+      .collection("draft_orders").doc(draftOrderId)
       .get();
     if (!draftSnap.exists) return err("draft order not found", 404);
     const draft = draftSnap.data() as any;
 
-    const lineItems: Array<{ variant_id?: string | number; quantity?: number }> =
-      draft?.line_items ?? draft?.draft_order?.line_items ?? [];
+    type DraftLineItem = { variant_id?: string | number; quantity?: number };
+    const lineItems: DraftLineItem[] =
+      (draft?.line_items as DraftLineItem[] | undefined) ??
+      ((draft?.draft_order?.line_items as DraftLineItem[]) ?? []);
 
-    const variantIds = uniq(
+    const variantIds: string[] = uniq(
       lineItems
-        .map((li) => li?.variant_id)
+        .map(li => li?.variant_id)
         .filter((v): v is string | number => v != null && String(v).trim() !== "")
-        .map((v) => String(v))
+        .map(v => String(v))
     );
 
     if (variantIds.length === 0) {
-      console.warn("[product-details] no variant ids in draft", { shopDomain, draftOrderId });
-      return ok({ ok: true, variants: [] });
+      // persist empty products to session so we don't refetch next time
+      await sessRef.set(
+        {
+          products: [],
+          productVariantIds: [],
+          productsFetchedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return ok({
+        ok: true,
+        customer: {
+          phone:   s.customerPhone ?? null,
+          name:    s.customerName ?? null,
+          email:   s.customerEmail ?? null,
+          address: s.customerAddress ?? null,
+        },
+        products: [],
+      });
     }
 
     const variantGids = variantIds.map(toGID);
 
-    // Admin GraphQL (price/compareAtPrice are Money scalars; unitPrice is MoneyV2)
+    // Admin GraphQL (price/compareAtPrice Money; unitPrice MoneyV2)
     const query = /* GraphQL */ `
       query VariantNodes($ids: [ID!]!) {
         nodes(ids: $ids) {
@@ -124,10 +166,9 @@ export async function POST(req: NextRequest) {
         }
       }
     `;
-    // refs: price/compareAtPrice Money scalar; unitPrice MoneyV2; weight via inventoryItem.measurement.weight. :contentReference[oaicite:1]{index=1}
 
     const chunks = chunk(variantGids, 60);
-    const results: any[] = [];
+    const nodes: any[] = [];
 
     for (const ids of chunks) {
       const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`, {
@@ -147,10 +188,10 @@ export async function POST(req: NextRequest) {
       if (json?.errors) {
         return err(`[product-details] shopify graphql errors ${JSON.stringify(json.errors)}`, 502);
       }
-      results.push(...(json?.data?.nodes || []));
+      nodes.push(...(json?.data?.nodes || []));
     }
 
-    const variants = results
+    const variants = nodes
       .filter((n) => n && n.__typename === "ProductVariant")
       .map((v: any) => ({
         id: v.id,
@@ -158,7 +199,7 @@ export async function POST(req: NextRequest) {
         title: v.title,
         sku: v.sku ?? null,
         barcode: v.barcode ?? null,
-        price: v.price ?? null,                 // Money scalar (string in shop currency)
+        price: v.price ?? null,                 // Money scalar (string)
         compareAtPrice: v.compareAtPrice ?? null,
         unitPrice: v.unitPrice ?? null,         // { amount, currencyCode } | null
         unitPriceMeasurement: v.unitPriceMeasurement ?? null,
@@ -185,7 +226,28 @@ export async function POST(req: NextRequest) {
           : null,
       }));
 
-    return ok({ ok: true, variants });
+    // --- 3) Persist products to the session for subsequent requests ---
+    await sessRef.set(
+      {
+        products: variants,
+        productVariantIds: variantIds,
+        productsFetchedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // --- 4) Always return trimmed session info ---
+    return ok({
+      ok: true,
+      customer: {
+        phone:   s.customerPhone ?? null,
+        name:    s.customerName ?? null,
+        email:   s.customerEmail ?? null,
+        address: s.customerAddress ?? null,
+      },
+      products: variants,
+    });
   } catch (e) {
     console.error("product-details error:", e);
     return err("internal server error", 500);

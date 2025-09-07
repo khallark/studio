@@ -16,7 +16,43 @@ const ok  = (data: unknown, status = 200) =>
 const err = (m: string, status = 400) => ok({ error: m }, status);
 const toGID = (vid: string | number) => `gid://shopify/ProductVariant/${String(vid)}`;
 const uniq = <T,>(a: T[]) => Array.from(new Set(a));
-const chunk = <T,>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, (i + 1) * n));
+const chunk = <T,>(a: T[], n: number) =>
+  Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, (i + 1) * n));
+
+type SessionDoc = {
+  shopDomain?: string;
+  draftOrderId?: string;
+  expiresAt?: { toMillis?: () => number };
+  status?: string;
+  customerPhone?: string | null; // <-- we rely on this for lookup
+  products?: any[];
+  productVariantIds?: string[];
+};
+
+type CustomerDoc = {
+  phone?: string | null;
+  name?: string | null;
+  email?: string | null;
+  address?: string | null;
+};
+
+// because doc id == phone
+async function loadCustomerByPhone(phone: string | null | undefined) {
+  if (!phone) {
+    return { phone: null, name: null, email: null, address: null };
+  }
+  const snap = await db.collection("checkout_customers").doc(phone).get();
+  if (!snap.exists) {
+    return { phone, name: null, email: null, address: null };
+  }
+  const c = (snap.data() || {}) as CustomerDoc;
+  return {
+    phone: c.phone ?? phone ?? null,
+    name: c.name ?? null,
+    email: c.email ?? null,
+    address: c.address ?? null,
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,23 +63,12 @@ export async function POST(req: NextRequest) {
     const sessionId = String(body?.sessionId || "");
     if (!sessionId) return err("missing sessionId", 400);
 
-    // --- 1) Load session (single read) ---
+    // --- 1) Load session ---
     const sessRef = db.collection("checkout_sessions").doc(sessionId);
     const sessSnap = await sessRef.get();
     if (!sessSnap.exists) return err("session not found", 404);
 
-    const s = (sessSnap.data() || {}) as {
-      shopDomain?: string;
-      draftOrderId?: string;
-      expiresAt?: { toMillis?: () => number };
-      status?: string;
-      customerPhone?: string;
-      customerName?: string | null;
-      customerEmail?: string | null;
-      customerAddress?: string | null;
-      products?: any[];
-      productVariantIds?: string[];
-    };
+    const s = (sessSnap.data() || {}) as SessionDoc;
 
     const shopDomain   = s?.shopDomain || "";
     const draftOrderId = s?.draftOrderId || "";
@@ -52,23 +77,15 @@ export async function POST(req: NextRequest) {
     if (expMs && expMs <= Date.now()) return err("session expired", 410);
     if (s?.status && s.status !== "phone_verified") return err("session not verified", 403);
 
-    // 👉 If products already cached in the session, return them immediately
+    // Load customer via phone-based doc id
+    const customer = await loadCustomerByPhone(s.customerPhone ?? null);
+
+    // If products cached, return immediately
     if (Array.isArray(s.products) && s.products.length > 0) {
-      return ok({
-        ok: true,
-        customer: {
-          phone:   s.customerPhone ?? null,
-          name:    s.customerName ?? null,
-          email:   s.customerEmail ?? null,
-          address: s.customerAddress ?? null,
-        },
-        products: s.products,
-      });
+      return ok({ ok: true, customer, products: s.products });
     }
 
-    // --- 2) We need to fetch from Shopify (no cached products) ---
-
-    // shop account / admin token
+    // --- 2) Fetch from Shopify (no cached products) ---
     const accountSnap = await db.collection("accounts").doc(shopDomain).get();
     if (!accountSnap.exists) return err("account not found", 404);
     const account = accountSnap.data() || {};
@@ -76,7 +93,6 @@ export async function POST(req: NextRequest) {
       account.accessToken || account.access_token || account.adminAccessToken || "";
     if (!accessToken) return err("shop access token missing", 500);
 
-    // draft order doc (handle both shapes)
     const draftSnap = await db
       .collection("accounts").doc(shopDomain)
       .collection("draft_orders").doc(draftOrderId)
@@ -97,7 +113,6 @@ export async function POST(req: NextRequest) {
     );
 
     if (variantIds.length === 0) {
-      // persist empty products to session so we don't refetch next time
       await sessRef.set(
         {
           products: [],
@@ -107,21 +122,11 @@ export async function POST(req: NextRequest) {
         },
         { merge: true }
       );
-      return ok({
-        ok: true,
-        customer: {
-          phone:   s.customerPhone ?? null,
-          name:    s.customerName ?? null,
-          email:   s.customerEmail ?? null,
-          address: s.customerAddress ?? null,
-        },
-        products: [],
-      });
+      return ok({ ok: true, customer, products: [] });
     }
 
     const variantGids = variantIds.map(toGID);
 
-    // Admin GraphQL (price/compareAtPrice Money; unitPrice MoneyV2)
     const query = /* GraphQL */ `
       query VariantNodes($ids: [ID!]!) {
         nodes(ids: $ids) {
@@ -179,15 +184,12 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({ query, variables: { ids } }),
       });
-
       if (!resp.ok) {
         const peek = await resp.text().catch(() => "");
         return err(`shopify graphql ${resp.status}: ${peek.slice(0, 400)}`, 502);
       }
       const json = await resp.json();
-      if (json?.errors) {
-        return err(`[product-details] shopify graphql errors ${JSON.stringify(json.errors)}`, 502);
-      }
+      if (json?.errors) return err(`[product-details] shopify graphql errors ${JSON.stringify(json.errors)}`, 502);
       nodes.push(...(json?.data?.nodes || []));
     }
 
@@ -199,9 +201,9 @@ export async function POST(req: NextRequest) {
         title: v.title,
         sku: v.sku ?? null,
         barcode: v.barcode ?? null,
-        price: v.price ?? null,                 // Money scalar (string)
+        price: v.price ?? null,
         compareAtPrice: v.compareAtPrice ?? null,
-        unitPrice: v.unitPrice ?? null,         // { amount, currencyCode } | null
+        unitPrice: v.unitPrice ?? null,
         unitPriceMeasurement: v.unitPriceMeasurement ?? null,
         options: v.selectedOptions || [],
         image: v.image ? { url: v.image.url, alt: v.image.altText || null } : null,
@@ -226,7 +228,6 @@ export async function POST(req: NextRequest) {
           : null,
       }));
 
-    // --- 3) Persist products to the session for subsequent requests ---
     await sessRef.set(
       {
         products: variants,
@@ -237,17 +238,7 @@ export async function POST(req: NextRequest) {
       { merge: true }
     );
 
-    // --- 4) Always return trimmed session info ---
-    return ok({
-      ok: true,
-      customer: {
-        phone:   s.customerPhone ?? null,
-        name:    s.customerName ?? null,
-        email:   s.customerEmail ?? null,
-        address: s.customerAddress ?? null,
-      },
-      products: variants,
-    });
+    return ok({ ok: true, customer, products: variants });
   } catch (e) {
     console.error("product-details error:", e);
     return err("internal server error", 500);

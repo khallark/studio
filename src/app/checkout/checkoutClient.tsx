@@ -208,7 +208,7 @@ export default function CheckoutClient({ sessionId }: Props) {
 
       // 2) fetch products + customer from session via proxy (cached if already present)
       try {
-        const pd = await fetch(api("product-details"), {
+        const pd = await fetch(api("products-details"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: effectiveSessionId }),

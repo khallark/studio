@@ -1,7 +1,7 @@
 // app/checkout/cart-summary.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -29,6 +29,16 @@ const total = subtotal + shipping;
 export default function CartSummary({ sessionId }: Props) {
     const [isOpen, setIsOpen] = useState(false);
 
+    useEffect(() => {
+        fetch("/apps/checkout/products-details", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }), // just the session id
+        })
+        .then((res) => console.log(res.json()))
+        .catch((err) => { console.error("Error fetching product details:", err); });
+    })
+    
     return (
         <div className="space-y-4">
             <h3 className="text-lg font-semibold">Order Summary</h3>

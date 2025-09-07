@@ -82,16 +82,14 @@ export async function POST(req: NextRequest) {
     if (!draftSnap.exists) return err("draft order not found", 404);
 
     const draft = draftSnap.data() as {
-      draft_order?: {
         line_items?: Array<{
-          variant_id?: string | number;
-          quantity?: number;
+            variant_id?: string | number;
+            quantity?: number;
         }>;
-      };
       // cart_token, clientNonce, etc are present but not needed here
     };
 
-    const lineItems = draft?.draft_order?.line_items || [];
+    const lineItems = draft?.line_items || [];
     const variantIds = uniq(
       lineItems
         .map((li) => li?.variant_id)

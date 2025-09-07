@@ -1,4 +1,3 @@
-// app/api/proxy/checkout/product-details/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAppProxySignature } from "@/lib/verifyAppProxy";
 import { db } from "@/lib/firebase-admin";
@@ -9,39 +8,41 @@ export const dynamic = "force-dynamic";
 const APP_SECRET  = process.env.SHOPIFY_API_SECRET || "";
 const API_VERSION = process.env.SHOPIFY_API_VERSION || "2025-07";
 
-// ---------- utils ----------
+/* -------- utils -------- */
 const ok  = (data: unknown, status = 200) =>
   NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
-const err = (m: string, status = 400) => ok({ error: m }, status);
+
+const fail = (reason: string, status = 400, extra?: any) => {
+  // Surface a compact reason to the client and log server-side context
+  console.error("[product-details]", reason, extra ?? "");
+  return ok({ error: reason }, status);
+};
 
 const toGID = (variantId: string | number) =>
   `gid://shopify/ProductVariant/${String(variantId)}`;
 
-function uniq<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
+const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
+const chunk = <T,>(arr: T[], size: number) => {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
-}
+};
 
-// ---------- main ----------
+/* -------- handler -------- */
 export async function POST(req: NextRequest) {
   try {
-    // 0) Proxy HMAC
-    if (!APP_SECRET) return err("server config error", 500);
-    if (!verifyAppProxySignature(req.url, APP_SECRET)) return err("bad signature", 401);
+    // 0) App Proxy HMAC
+    if (!APP_SECRET) return fail("server config error: APP_SECRET missing", 500);
+    if (!verifyAppProxySignature(req.url, APP_SECRET)) return fail("bad signature", 401);
 
-    // 1) Read body
+    // 1) Body
     const body = await req.json().catch(() => ({} as any));
     const sessionId = String(body?.sessionId || "");
-    if (!sessionId) return err("missing sessionId", 400);
+    if (!sessionId) return fail("missing sessionId");
 
-    // 2) Load & validate session
+    // 2) Session
     const sessSnap = await db.collection("checkout_sessions").doc(sessionId).get();
-    if (!sessSnap.exists) return err("session not found", 404);
+    if (!sessSnap.exists) return fail("session not found", 404, { sessionId });
 
     const s = sessSnap.data() as {
       shopDomain: string;
@@ -53,57 +54,59 @@ export async function POST(req: NextRequest) {
     const shopDomain = s?.shopDomain || "";
     const draftOrderId = s?.draftOrderId || "";
     if (!shopDomain || !draftOrderId) {
-      return err("session missing shopDomain or draftOrderId", 422);
-    }
-    const expMs = s?.expiresAt?.toMillis?.();
-    if (expMs && expMs <= Date.now()) return err("session expired", 410);
-    // Optional: only allow after phone verification
-    if (s?.status && s.status !== "phone_verified") {
-      return err("session not verified", 403);
+      return fail("session missing shopDomain or draftOrderId", 422, { shopDomain, draftOrderId });
     }
 
-    // 3) Read account for access token
+    const expMs = s?.expiresAt?.toMillis?.();
+    if (expMs && expMs <= Date.now()) return fail("session expired", 410, { expMs });
+
+    // Optional gate: only after phone verification
+    if (s?.status && s.status !== "phone_verified") {
+      return fail("session not verified", 403, { status: s.status });
+    }
+
+    // 3) Account / Admin token
     const accountSnap = await db.collection("accounts").doc(shopDomain).get();
-    if (!accountSnap.exists) return err("account not found", 404);
+    if (!accountSnap.exists) return fail("account not found", 404, { shopDomain });
 
     const account = accountSnap.data() || {};
     const accessToken: string =
       account.accessToken || account.access_token || account.adminAccessToken || "";
-    if (!accessToken) return err("shop access token missing", 500);
+    if (!accessToken) return fail("shop access token missing", 500);
 
-    // 4) Read draft order doc under the account
+    // 4) Draft order doc (flattened: line_items at root)
     const draftSnap = await db
-      .collection("accounts")
-      .doc(shopDomain)
-      .collection("draft_orders")
-      .doc(draftOrderId)
+      .collection("accounts").doc(shopDomain)
+      .collection("draft_orders").doc(draftOrderId)
       .get();
 
-    if (!draftSnap.exists) return err("draft order not found", 404);
+    if (!draftSnap.exists) return fail("draft order not found", 404, { shopDomain, draftOrderId });
 
     const draft = draftSnap.data() as {
-        line_items?: Array<{
-            variant_id?: string | number;
-            quantity?: number;
-        }>;
-      // cart_token, clientNonce, etc are present but not needed here
+      line_items?: Array<{ variant_id?: string | number; quantity?: number }>;
     };
 
-    const lineItems = draft?.line_items || [];
-    const variantIds = uniq(
-      lineItems
-        .map((li) => li?.variant_id)
+    // strongly type the line items we expect
+    type DraftLineItem = { variant_id?: string | number; quantity?: number };
+
+    // prefer root line_items (your new shape)
+    const lineItems: DraftLineItem[] =
+    (draft?.line_items as DraftLineItem[] | undefined) ??
+    ((draft as any)?.draft_order?.line_items as DraftLineItem[] | undefined) ??
+    [];
+
+    // narrow + normalize to strings
+    const variantIds: string[] = uniq<string>(
+    lineItems
+        .map(li => li.variant_id)                                   // (string|number|undefined)[]
         .filter((v): v is string | number => v != null && String(v).trim() !== "")
-        .map((v) => String(v))
+        .map(v => String(v))                                        // string[]
     );
 
-    if (variantIds.length === 0) {
-      return ok({ ok: true, variants: [], products: [] });
-    }
-
+    // now this is happily typed
     const variantGids = variantIds.map(toGID);
 
-    // 5) Build GQL (one round-trip per chunk)
+    // 5) Shopify Admin GraphQL (batched)
     const query = /* GraphQL */ `
       query VariantNodes($ids: [ID!]!) {
         nodes(ids: $ids) {
@@ -140,11 +143,11 @@ export async function POST(req: NextRequest) {
       }
     `;
 
-    // Shopify GraphQL comfortably handles ~50-100 ids per call. Use 60 to be safe.
-    const chunks = chunk(variantGids, 60);
+    // Keep sequential to play nicely with GraphQL throttle; chunk size 60 is safe.
+    const idsChunks = chunk(variantGids, 60);
+    const nodes: any[] = [];
 
-    const results: any[] = [];
-    for (const ids of chunks) {
+    for (const ids of idsChunks) {
       const resp = await fetch(
         `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
         {
@@ -159,25 +162,26 @@ export async function POST(req: NextRequest) {
 
       if (!resp.ok) {
         const peek = await resp.text().catch(() => "");
-        return err(`shopify graphql ${resp.status}: ${peek.slice(0, 400)}`, 502);
+        return fail(`shopify graphql ${resp.status}`, 502, { peek: peek.slice(0, 400) });
       }
+
       const json = await resp.json();
       if (json?.errors) {
-        return err(`shopify graphql errors: ${JSON.stringify(json.errors).slice(0, 400)}`, 502);
+        return fail("shopify graphql errors", 502, json.errors);
       }
-      results.push(...(json?.data?.nodes || []));
+      nodes.push(...(json?.data?.nodes || []));
     }
 
     // 6) Normalize
-    const variants = results
-      .filter((n) => n && n.__typename === "ProductVariant")
+    const variants = nodes
+      .filter(n => n && n.__typename === "ProductVariant")
       .map((v: any) => ({
         id: v.id,
         legacyId: v.legacyResourceId,
         title: v.title,
         sku: v.sku || null,
         barcode: v.barcode || null,
-        price: v.price || null,           // { amount, currencyCode }
+        price: v.price || null,               // { amount, currencyCode }
         compareAtPrice: v.compareAtPrice || null,
         selectedOptions: v.selectedOptions || [],
         image: v.image ? { url: v.image.url, alt: v.image.altText || null } : null,
@@ -205,7 +209,7 @@ export async function POST(req: NextRequest) {
 
     return ok({ ok: true, variants });
   } catch (e) {
-    console.error("product-details error:", e);
-    return err("internal server error", 500);
+    console.error("[product-details] unhandled", e);
+    return fail("internal server error", 500);
   }
 }

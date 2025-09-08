@@ -142,36 +142,34 @@ export async function POST(req: NextRequest) {
 
 
     // 6) Build order payload (COD via pending financial_status)
-    const orderPayload: any = {
+    const orderPayload = {
       order: {
         line_items: lineItems
           .filter(li => li?.variant_id && (li?.quantity ?? 0) > 0)
           .map(li => ({
             variant_id: Number(li.variant_id),
-            quantity:   Number(li.quantity ?? 1),
+            quantity: Number(li.quantity ?? 1),
             properties: li.properties ?? undefined,
           })),
-        
-        customer: (firstName || lastName || email || finalPhone) ? {
-          first_name: firstName,
-          last_name:  lastName,
-          email:      email || undefined,
-          phone:      finalPhone || undefined,
-        } : undefined,
+
+        // EITHER use customer.id, OR omit this entire block to avoid phone duplication
+        // customer: { id: existingCustomerId },
 
         financial_status: "pending",
-        // Make the intent explicit
-        transactions: [
-          { kind: "sale", status: "pending", gateway: "Cash on Delivery" }
-        ],
+        payment_gateway_names: ["Cash on Delivery"], // optional but nice
 
-        tags: "storefront-checkout,cod,sample-order,do-not-process",
-        note: note || undefined,
+        // Prefer top-level email/phone to avoid new-customer creation attempts
         email: email || undefined,
         phone: finalPhone || undefined,
-        shipping_address,
+
+        // Provide a proper shipping address if you have it
+        shipping_address: shipping_address /* include city, country, zip if available */,
+
+        note: note || undefined,
+        tags: "storefront-checkout,cod,sample-order,do-not-process",
       },
     };
+
 
     // 7) Create order (Admin REST)
     const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json`, {

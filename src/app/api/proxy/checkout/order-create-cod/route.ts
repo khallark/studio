@@ -139,7 +139,8 @@ export async function POST(req: NextRequest) {
           phone: finalPhone || undefined,
         }
       : undefined;
-
+      
+      console.log(address, String(address).trim(), shipping_address, fullName, firstName, lastName, finalPhone);
 
     // 6) Build order payload (COD via pending financial_status)
     const orderPayload = {
@@ -172,25 +173,26 @@ export async function POST(req: NextRequest) {
 
 
     // 7) Create order (Admin REST)
-    const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-        "X-Request-Id": `cod-${sessionId}`, // idempotency against retries
-      },
-      body: JSON.stringify(orderPayload),
-    });
+    // const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json`, {
+    //   method: "POST",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //     "X-Shopify-Access-Token": accessToken,
+    //     "X-Request-Id": `cod-${sessionId}`, // idempotency against retries
+    //   },
+    //   body: JSON.stringify(orderPayload),
+    // });
 
-    if (!resp.ok) {
-      // const peek = await resp.text().catch(() => "");
-      // return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
-      const text = await resp.text().catch(() => "");
-      console.error("Shopify order creation error:", resp.status, text);
-      return err(`shopify orders ${resp.status}: ${text.slice(0, 400)}`, 502);
-    }
+    // if (!resp.ok) {
+    //   // const peek = await resp.text().catch(() => "");
+    //   // return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
+    //   const text = await resp.text().catch(() => "");
+    //   console.error("Shopify order creation error:", resp.status, text);
+    //   return err(`shopify orders ${resp.status}: ${text.slice(0, 400)}`, 502);
+    // }
 
-    const json = await resp.json().catch(() => ({} as any));
+    // const json = await resp.json().catch(() => ({} as any));
+    const json = { order: {id: null, name: null, order_number: null, order_status_url: null} };
     const order = json?.order;
     if (!order?.id) return err("shopify order create returned no order id", 502);
 

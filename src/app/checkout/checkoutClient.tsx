@@ -10,7 +10,7 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
 import { Separator } from "@/components/ui/separator";
-import CustomerDetails, { type CustomerDetail } from "./customer-details";
+import CustomerDetails from "./customer-details";
 import CartSummary from "./cart-summary";
 
 declare global {
@@ -23,9 +23,11 @@ declare global {
 type Step = "phone" | "otp" | "confirmed";
 type Props = { sessionId?: string };
 
-type CustomerData = {
+type Customer = {
   phone: string | null;
-  details: CustomerDetail[];
+  name: string | null;
+  email: string | null;
+  address: string | null;
 };
 
 type Product = any; // shape returned by /product-details (normalized variant objects)
@@ -46,7 +48,7 @@ function proxyPrefix(): string | null {
 
 function apiBase(): string {
   const pp = proxyPrefix();
-  return pp ?? "/api/proxy/checkout";
+  return pp ?? "/api/checkout";
 }
 
 const api = (path: string) => `${apiBase()}/${path}`;
@@ -79,6 +81,7 @@ export default function CheckoutClient({ sessionId }: Props) {
   const boot = typeof window !== "undefined" ? window.__CHECKOUT_SESSION__ : undefined;
   const effectiveSessionId = useMemo(() => sessionId ?? boot?.id ?? "", [sessionId, boot?.id]);
 
+  // Persist the latest boot sessionId so reload/new tab can pick it up
   useEffect(() => {
     if (typeof window === "undefined") return;
     const key = storageKey();
@@ -99,18 +102,20 @@ export default function CheckoutClient({ sessionId }: Props) {
   const [direction, setDirection] = useState(1);
 
   const [phoneInput, setPhoneInput] = useState("");
-  const [fullPhone, setFullPhone] = useState<string | null>(null);
+  const [fullPhone, setFullPhone] = useState<string | null>(null); // "+91XXXXXXXXXX"
   const [otpInput, setOtpInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [timer, setTimer] = useState(OTP_EXPIRY_SECONDS);
   const [canResend, setCanResend] = useState(false);
 
-  const [customerData, setCustomerData] = useState<CustomerData | null>(null);
+  // NEW: data captured from /product-details
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
 
   const { toast } = useToast();
 
+  // OTP countdown
   useEffect(() => {
     if (step !== "otp") return;
     if (timer <= 0) {
@@ -127,6 +132,7 @@ export default function CheckoutClient({ sessionId }: Props) {
     exit: (d: number) => ({ zIndex: 0, x: d < 0 ? "100%" : "-100%", opacity: 0 }),
   };
 
+  // ----- network calls (proxy-aware) -----
   const startOtpFlow = async (phoneNumber: string) => {
     try {
       const resp = await fetch(api("send-otp"), {
@@ -186,6 +192,7 @@ export default function CheckoutClient({ sessionId }: Props) {
 
     setIsLoading(true);
     try {
+      // 1) verify OTP
       const resp = await fetch(api("verify-otp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -194,8 +201,12 @@ export default function CheckoutClient({ sessionId }: Props) {
       const data = await resp.json().catch(() => ({} as any));
       if (!resp.ok || !data?.ok) throw new Error(data?.error || "OTP verification failed");
 
-      if (fullPhone) localStorage.setItem(phoneStorageKey(), fullPhone);
+      // store phone locally
+      try {
+        if (fullPhone) localStorage.setItem(phoneStorageKey(), fullPhone);
+      } catch {}
 
+      // 2) fetch products + customer from session via proxy (cached if already present)
       try {
         const pd = await fetch(api("products-details"), {
           method: "POST",
@@ -205,10 +216,11 @@ export default function CheckoutClient({ sessionId }: Props) {
         });
         const pdJson = await pd.json().catch(() => ({} as any));
         if (pd.ok && pdJson?.ok) {
-          setCustomerData(pdJson.customer ?? { phone: fullPhone, details: [] });
+          setCustomer(pdJson.customer ?? null);
           setProducts(Array.isArray(pdJson.products) ? pdJson.products : []);
         } else {
           console.warn("product-details failed", pd.status, pdJson);
+          // don’t block the flow on product fetch issues
         }
       } catch (e) {
         console.warn("product capture failed", e);
@@ -353,10 +365,16 @@ export default function CheckoutClient({ sessionId }: Props) {
                 <CardDescription>Please check your details and finalize your purchase.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Pass the captured customer & products */}
                 <CustomerDetails
-                  initialDetails={customerData?.details ?? []}
-                  verifiedPhone={customerData?.phone ?? fullPhone ?? ''}
-                  sessionId={effectiveSessionId}
+                  customer={
+                    customer ?? {
+                      phone: fullPhone ?? null,
+                      name: null,
+                      email: null,
+                      address: null,
+                    }
+                  }
                 />
                 <Separator />
                 <CartSummary products={products ?? []} />

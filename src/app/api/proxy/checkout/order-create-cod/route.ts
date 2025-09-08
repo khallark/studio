@@ -133,10 +133,13 @@ export async function POST(req: NextRequest) {
     const shipping_address = (address && String(address).trim())
       ? {
           address1: String(address).trim(),
-          name: fullName,
           first_name: firstName,
           last_name:  lastName,
           phone: finalPhone || undefined,
+          city: "Ludhiana", // dummy, Shopify API requires city/country/zip
+          country: "India",
+          province: "Punjab",
+          zip: "141002",
         }
       : undefined;
       
@@ -154,45 +157,50 @@ export async function POST(req: NextRequest) {
           })),
 
         // EITHER use customer.id, OR omit this entire block to avoid phone duplication
-        // customer: { id: existingCustomerId },
+        customer: (!firstName || !lastName || !email)
+        ? {
+          first_name: firstName || undefined,
+          last_name:  lastName  || undefined,
+          email: email || undefined,
+        } : undefined,
 
         financial_status: "pending",
         payment_gateway_names: ["Cash on Delivery"], // optional but nice
 
         // Prefer top-level email/phone to avoid new-customer creation attempts
         email: email || undefined,
-        phone: finalPhone || undefined,
+        // phone: finalPhone || undefined,
 
         // Provide a proper shipping address if you have it
         shipping_address: shipping_address /* include city, country, zip if available */,
+        billing_address: shipping_address /* include city, country, zip if available */,
 
         note: note || undefined,
-        tags: "storefront-checkout,cod,sample-order,do-not-process",
+        tags: "storefront-checkout,COD,sample-order,do-not-process",
       },
     };
 
 
     // 7) Create order (Admin REST)
-    // const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json`, {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //     "X-Shopify-Access-Token": accessToken,
-    //     "X-Request-Id": `cod-${sessionId}`, // idempotency against retries
-    //   },
-    //   body: JSON.stringify(orderPayload),
-    // });
+    const resp = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": accessToken,
+        "X-Request-Id": `cod-${sessionId}`, // idempotency against retries
+      },
+      body: JSON.stringify(orderPayload),
+    });
 
-    // if (!resp.ok) {
-    //   // const peek = await resp.text().catch(() => "");
-    //   // return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
-    //   const text = await resp.text().catch(() => "");
-    //   console.error("Shopify order creation error:", resp.status, text);
-    //   return err(`shopify orders ${resp.status}: ${text.slice(0, 400)}`, 502);
-    // }
+    if (!resp.ok) {
+      // const peek = await resp.text().catch(() => "");
+      // return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
+      const text = await resp.text().catch(() => "");
+      console.error("Shopify order creation error:", resp.status, text);
+      return err(`shopify orders ${resp.status}: ${text.slice(0, 400)}`, 502);
+    }
 
-    // const json = await resp.json().catch(() => ({} as any));
-    const json = { order: {id: null, name: null, order_number: null, order_status_url: null} };
+    const json = await resp.json().catch(() => ({} as any));
     const order = json?.order;
     if (!order?.id) return err("shopify order create returned no order id", 502);
 

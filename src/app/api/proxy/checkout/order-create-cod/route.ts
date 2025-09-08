@@ -165,12 +165,12 @@ export async function POST(req: NextRequest) {
           { kind: "sale", status: "pending", gateway: "Cash on Delivery" }
         ],
 
-        tags: "storefront-checkout,cod",
+        tags: "storefront-checkout,cod,sample-order,do-not-process",
         note: note || undefined,
         email: email || undefined,
         phone: finalPhone || undefined,
         shipping_address,
-          },
+      },
     };
 
     // 7) Create order (Admin REST)
@@ -185,8 +185,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!resp.ok) {
-      const peek = await resp.text().catch(() => "");
-      return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
+      // const peek = await resp.text().catch(() => "");
+      // return err(`shopify orders ${resp.status}: ${peek.slice(0, 400)}`, 502);
+      const text = await resp.text().catch(() => "");
+      console.error("Shopify order creation error:", resp.status, text);
+      return err(`shopify orders ${resp.status}: ${text.slice(0, 400)}`, 502);
     }
 
     const json = await resp.json().catch(() => ({} as any));

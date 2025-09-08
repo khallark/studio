@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     const sessionId = String(body?.sessionId || "");
     // Optional overrides (win over stored values if present)
     const override = {
-      name:    body?.name    as string | undefined,
+      first_name:    body?.first_name    as string | undefined,
+      last_name:    body?.last_name    as string | undefined,
       email:   body?.email   as string | undefined,
       phone:   body?.phone   as string | undefined,
       address: body?.address as string | undefined,
@@ -110,22 +111,35 @@ export async function POST(req: NextRequest) {
     const custRef  = db.collection("checkout_customers").doc(phone);
     const custSnap = await custRef.get();
     const cust = (custSnap.exists ? custSnap.data() : {}) as {
-      name?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
       email?: string | null;
       address?: string | null;
       phone?: string | null;
     };
 
     // Final customer values (override > profile > session fallback)
-    const name    = override.name    ?? (cust?.name   ?? undefined);
+    const first_name = override.first_name ?? (cust?.first_name ?? undefined);
+    const last_name = override.last_name ?? (cust?.last_name ?? undefined);
     const email   = override.email   ?? (cust?.email  ?? undefined);
     const address = override.address ?? (cust?.address ?? undefined);
     const finalPhone = phone; // already chosen above
 
-    // Minimal shipping address from a single string; expand if you store structured fields
-    const shipping_address = address
-      ? { address1: String(address), name: name || undefined, phone: finalPhone || undefined }
+    const firstName = (first_name ?? "").trim() || undefined;
+    const lastName  = (last_name  ?? "").trim()  || undefined;
+
+    const fullName = [firstName, lastName].filter(Boolean).join(" ") || undefined;
+
+    const shipping_address = (address && String(address).trim())
+      ? {
+          address1: String(address).trim(),
+          name: fullName,
+          first_name: firstName,
+          last_name:  lastName,
+          phone: finalPhone || undefined,
+        }
       : undefined;
+
 
     // 6) Build order payload (COD via pending financial_status)
     const orderPayload: any = {
@@ -137,13 +151,26 @@ export async function POST(req: NextRequest) {
             quantity:   Number(li.quantity ?? 1),
             properties: li.properties ?? undefined,
           })),
+        
+        customer: (firstName || lastName || email || finalPhone) ? {
+          first_name: firstName,
+          last_name:  lastName,
+          email:      email || undefined,
+          phone:      finalPhone || undefined,
+        } : undefined,
+
         financial_status: "pending",
-        tags: ["storefront-checkout", "cod"].join(","), // single comma-separated string
+        // Make the intent explicit
+        transactions: [
+          { kind: "sale", status: "pending", gateway: "Cash on Delivery" }
+        ],
+
+        tags: "storefront-checkout,cod",
         note: note || undefined,
         email: email || undefined,
         phone: finalPhone || undefined,
         shipping_address,
-      },
+          },
     };
 
     // 7) Create order (Admin REST)

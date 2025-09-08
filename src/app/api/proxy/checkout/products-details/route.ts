@@ -31,7 +31,8 @@ type SessionDoc = {
 
 type CustomerDoc = {
   phone?: string | null;
-  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   email?: string | null;
   address?: string | null;
 };
@@ -39,16 +40,17 @@ type CustomerDoc = {
 // because doc id == phone
 async function loadCustomerByPhone(phone: string | null | undefined) {
   if (!phone) {
-    return { phone: null, name: null, email: null, address: null };
+    return { phone: null, first_name: null, last_name: null, email: null, address: null };
   }
   const snap = await db.collection("checkout_customers").doc(phone).get();
   if (!snap.exists) {
-    return { phone, name: null, email: null, address: null };
+    return { phone, first_name: null, last_name: null, email: null, address: null };
   }
   const c = (snap.data() || {}) as CustomerDoc;
   return {
     phone: c.phone ?? phone ?? null,
-    name: c.name ?? null,
+    first_name: c.first_name ?? null,
+    last_name: c.last_name ?? null,
     email: c.email ?? null,
     address: c.address ?? null,
   };

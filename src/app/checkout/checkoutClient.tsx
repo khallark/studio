@@ -25,7 +25,8 @@ type Props = { sessionId?: string };
 
 type Customer = {
   phone: string | null;
-  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
   address: string | null;
 };
@@ -420,7 +421,8 @@ export default function CheckoutClient({ sessionId }: Props) {
                   customer={
                     customer ?? {
                       phone: fullPhone ?? null,
-                      name: null,
+                      first_name: null,
+                      last_name: null,
                       email: null,
                       address: null,
                     }

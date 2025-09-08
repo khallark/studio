@@ -140,7 +140,8 @@ export async function POST(req: NextRequest) {
       if (!doc.exists) {
         tx.set(customerRef, {
           phone: tempPhone,
-          name: null,
+          first_name: null,
+          last_name: null,
           email: null,
           address: null,
           lastVerifiedAt: FieldValue.serverTimestamp(),

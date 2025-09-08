@@ -12,7 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface Customer {
   phone: string | null;
-  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
   address: string | null;
 }
@@ -63,7 +64,8 @@ export default function CustomerDetails({ customer }: Props) {
   const [isLoading, setIsLoading] = useState(true);
 
   // form state
-  const [formName, setFormName] = useState(customer?.name ?? "");
+  const [formFirstName, setFormFirstName] = useState(customer?.first_name ?? "");
+  const [formLastName, setFormLastName] = useState(customer?.last_name ?? "");
   const [formEmail, setFormEmail] = useState(customer?.email ?? "");
   const [formAddress, setFormAddress] = useState(customer?.address ?? "");
 
@@ -72,19 +74,22 @@ export default function CustomerDetails({ customer }: Props) {
 
   // keep originals for cancel
   const [originalValues, setOriginalValues] = useState({
-    name: customer?.name ?? "",
+    first_name: customer?.first_name ?? "",
+    last_name: customer?.last_name ?? "",
     email: customer?.email ?? "",
     address: customer?.address ?? "",
   });
 
   // first paint → populate from props, stop skeleton
   useEffect(() => {
-    setFormName(customer?.name ?? "");
+    setFormFirstName(customer?.first_name ?? "");
+    setFormLastName(customer?.last_name ?? "");
     setFormEmail(customer?.email ?? "");
     setFormAddress(customer?.address ?? "");
     setVerifiedPhone(customer?.phone ?? "");
     setOriginalValues({
-      name: customer?.name ?? "",
+      first_name: customer?.first_name ?? "",
+      last_name: customer?.last_name ?? "",
       email: customer?.email ?? "",
       address: customer?.address ?? "",
     });
@@ -118,7 +123,8 @@ export default function CustomerDetails({ customer }: Props) {
         body: JSON.stringify({
           sessionId,
           phone: verifiedPhone,
-          name: formName,
+          first_name: formFirstName,
+          last_name: formLastName,
           email: formEmail,
           address: formAddress,
         }),
@@ -128,7 +134,7 @@ export default function CustomerDetails({ customer }: Props) {
       if (!res.ok) throw new Error(data?.error || "Failed to save details");
 
       toast({ title: "Details Updated", description: "Your shipping information has been saved." });
-      setOriginalValues({ name: formName, email: formEmail, address: formAddress });
+      setOriginalValues({ first_name: formFirstName, last_name: formLastName, email: formEmail, address: formAddress });
       setIsEditing(false);
     } catch (err) {
       toast({
@@ -142,7 +148,8 @@ export default function CustomerDetails({ customer }: Props) {
   };
 
   const handleCancel = () => {
-    setFormName(originalValues.name);
+    setFormFirstName(originalValues.first_name);
+    setFormLastName(originalValues.last_name);
     setFormEmail(originalValues.email);
     setFormAddress(originalValues.address);
     setIsEditing(false);
@@ -171,11 +178,20 @@ export default function CustomerDetails({ customer }: Props) {
         <Card>
           <CardContent className="space-y-4 pt-6">
             <div className="grid gap-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">First Name</Label>
               <Input
                 id="name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
+                value={formFirstName}
+                onChange={(e) => setFormFirstName(e.target.value)}
+                disabled={isSaving}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="name">Last Name</Label>
+              <Input
+                id="name"
+                value={formLastName}
+                onChange={(e) => setFormLastName(e.target.value)}
                 disabled={isSaving}
               />
             </div>
@@ -211,7 +227,8 @@ export default function CustomerDetails({ customer }: Props) {
         </Card>
       ) : (
         <div className="text-sm text-muted-foreground">
-          <p className="text-foreground font-medium">{formName || "No name provided"}</p>
+          <p className="text-foreground font-medium">{formFirstName || "No first name provided"}</p>
+          <p className="text-foreground font-medium">{formLastName || "No last name provided"}</p>
           <p>{formEmail || "No email provided"}</p>
           <p>{verifiedPhone || "No phone provided"}</p>
           <p>{formAddress || "No address provided"}</p>

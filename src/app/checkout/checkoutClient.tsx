@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle2, IndianRupee, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
 import { Separator } from "@/components/ui/separator";
@@ -20,7 +20,7 @@ declare global {
   }
 }
 
-type Step = "phone" | "otp" | "confirmed";
+type Step = "phone" | "otp" | "confirmed" | "thankyou";
 type Props = { sessionId?: string };
 
 type Customer = {
@@ -112,6 +112,11 @@ export default function CheckoutClient({ sessionId }: Props) {
   // NEW: data captured from /product-details
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
+
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<"paynow" | "cod">("cod");
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [orderInfo, setOrderInfo] = useState<{ id?: string | number; name?: string } | null>(null);
 
   const { toast } = useToast();
 
@@ -245,10 +250,56 @@ export default function CheckoutClient({ sessionId }: Props) {
     setOtpInput("");
   };
 
+  // --- Place COD Order ---
+  const placeCodOrder = async () => {
+    if (!effectiveSessionId) {
+      toast({ title: "Missing session", description: "No checkout session found.", variant: "destructive" });
+      return;
+    }
+    setPlacingOrder(true);
+    try {
+      // IMPORTANT: uses proxy-aware base -> will hit /apps/checkout/order-create-cod under proxy installs
+      const resp = await fetch(api("order-create-cod"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: effectiveSessionId }),
+      });
+      const data = await resp.json().catch(() => ({} as any));
+      if (!resp.ok || data?.error) throw new Error(data?.error || "Failed to create COD order");
+
+      // Expecting your API to return order identifiers if possible
+      setOrderInfo({ id: data?.order?.id ?? data?.orderId, name: data?.order?.name ?? data?.orderName });
+      toast({ title: "Order placed", description: "Your COD order has been created." });
+      setDirection(1);
+      setStep("thankyou");
+    } catch (err) {
+      toast({
+        title: "Order failed",
+        description: err instanceof Error ? err.message : "Unable to place the COD order.",
+        variant: "destructive",
+      });
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
+  const payNowCTA = (
+    <Button className="h-12 w-full text-lg" size="lg" disabled>
+      Pay Now (not available) <ArrowRight className="ml-2" />
+    </Button>
+  );
+
+  const codCTA = (
+    <Button className="h-12 w-full text-lg" size="lg" onClick={placeCodOrder} disabled={placingOrder}>
+      {placingOrder ? <Loader2 className="mr-2 animate-spin" /> : <Truck className="mr-2" />}
+      Place COD Order
+    </Button>
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/50 p-4">
       <AnimatePresence initial={false} custom={direction} mode="wait">
-        {step !== "confirmed" && (
+        {step !== "confirmed" && step !== "thankyou" && (
           <motion.div
             key={step === "phone" ? "phone-card" : "otp-card"}
             custom={direction}
@@ -362,10 +413,9 @@ export default function CheckoutClient({ sessionId }: Props) {
                   <CardTitle className="font-headline text-3xl">Review Your Order</CardTitle>
                   <Logo />
                 </div>
-                <CardDescription>Please check your details and finalize your purchase.</CardDescription>
+                <CardDescription>Please check your details and choose a payment method.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Pass the captured customer & products */}
                 <CustomerDetails
                   customer={
                     customer ?? {
@@ -379,15 +429,104 @@ export default function CheckoutClient({ sessionId }: Props) {
                 <Separator />
                 <CartSummary products={products ?? []} />
                 <Separator />
+
+                {/* Payment Methods */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Payment Method</h3>
-                  <div className="rounded-md border border-input p-4">
-                    <p className="text-muted-foreground">Payment gateway placeholder.</p>
+
+                  <div
+                    className={`rounded-xl border p-4 transition ${
+                      paymentMethod === "paynow" ? "ring-2 ring-primary" : ""
+                    }`}
+                    role="button"
+                    onClick={() => setPaymentMethod("paynow")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <IndianRupee className="h-5 w-5" />
+                        <div>
+                          <div className="font-medium">Pay Now</div>
+                          <div className="text-sm text-muted-foreground">Not available at the moment</div>
+                        </div>
+                      </div>
+                      <Button variant="outline" disabled>
+                        Coming Soon
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`rounded-xl border p-4 transition ${
+                      paymentMethod === "cod" ? "ring-2 ring-primary" : ""
+                    }`}
+                    role="button"
+                    onClick={() => setPaymentMethod("cod")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Truck className="h-5 w-5" />
+                        <div>
+                          <div className="font-medium">Cash On Delivery</div>
+                          <div className="text-sm text-muted-foreground">Pay at your doorstep</div>
+                        </div>
+                      </div>
+                      <Button variant="outline">Selected</Button>
+                    </div>
                   </div>
                 </div>
-                <Button className="h-12 w-full text-lg" size="lg">
-                  Pay Now <ArrowRight className="ml-2" />
-                </Button>
+
+                {/* Primary CTA */}
+                {paymentMethod === "paynow" ? payNowCTA : codCTA}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {step === "thankyou" && (
+          <motion.div
+            key="thankyou"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45 }}
+            className="w-full max-w-xl"
+          >
+            <Card className="text-center">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center justify-center">
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </div>
+                <CardTitle className="font-headline text-3xl">Thank you for shopping!</CardTitle>
+                <CardDescription>Your COD order has been placed successfully.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {orderInfo?.name || orderInfo?.id ? (
+                  <div className="rounded-md bg-muted p-3 text-sm">
+                    {orderInfo?.name ? (
+                      <div><span className="font-semibold">Order:</span> {orderInfo.name}</div>
+                    ) : null}
+                    {orderInfo?.id ? (
+                      <div className="text-muted-foreground"><span className="font-semibold">Order ID:</span> {String(orderInfo.id)}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <p className="text-muted-foreground">
+                  We've saved your details. You'll receive updates on your number {maskPhone(fullPhone ?? "")}.
+                </p>
+
+                <Separator />
+
+                <div className="text-left">
+                  <h4 className="mb-2 font-semibold">Order Summary</h4>
+                  <CartSummary products={products ?? []} />
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                  <Button onClick={() => (window.location.href = "/")}>Continue Shopping</Button>
+                  <Button variant="outline" onClick={() => window.location.reload()}>
+                    View Another Order
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

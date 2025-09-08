@@ -123,6 +123,18 @@ export async function POST(req: NextRequest) {
     if (!expiresAt || expiresAt <= now) {
       return NextResponse.json({ error: 'Session expired' }, { status: 410 });
     }
+    
+    const session_status: string | undefined = s?.status || undefined;
+    if (session_status && session_status === 'order_created') {
+      return NextResponse.json(
+        {
+          error: 'This checkout session has already been completed.',
+          hint: `Please start a new checkout to proceed.`,
+          code: 'CHECKOUT_COMPLETED',
+        },
+        { status: 403 }
+      );
+    }
 
     // 3) Ownership binders (if present on session, must match)
     if (s.cartToken && cartToken && s.cartToken !== cartToken) {
@@ -139,13 +151,14 @@ export async function POST(req: NextRequest) {
     if (alreadyVerifiedPhone && alreadyVerifiedPhone !== phoneNumber) {
       return NextResponse.json(
         {
-          error: 'This session is already tied to a different contact.',
+          error: 'This checkout session is already tied to a different contact.',
           hint: `Use ${maskPhone(alreadyVerifiedPhone)} to proceed.`,
           code: 'PHONE_MISMATCH',
         },
         { status: 403 }
       );
     }
+
 
     // 5) Per-session resend cooldown
     const lastSentMs: number | undefined = s?.otpLastSentAt?.toMillis?.();

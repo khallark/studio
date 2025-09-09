@@ -49,13 +49,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Delhivery API key not found for this shop. Please configure it in settings.' }, { status: 412 });
     }
 
-    const delhiveryApiUrl = `https://staging-express.delhivery.com/api/v1/packages?count=${count}`;
+    const delhiveryApiUrl = `https://staging-express.delhivery.com/waybill/api/bulk/json/?count=${count}`;
 
     const response = await fetch(delhiveryApiUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Token ${delhiveryApiKey}`,
-        'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
     });
@@ -66,10 +65,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch AWBs from Delhivery', details: errorData }, { status: response.status });
     }
 
-    const data = await response.json();
-
-    // The API returns packages as a comma-separated string
-    const awbs = data.packages[0]?.packages?.split(',').filter(Boolean) || [];
+    // The API returns a single comma-separated string in the response body.
+    const awbString = await response.text();
+    const awbs = awbString.split(',').filter(Boolean);
 
     return NextResponse.json({ awbs });
 

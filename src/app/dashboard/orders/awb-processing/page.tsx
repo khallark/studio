@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Download, FileText, PackagePlus } from 'lucide-react';
+import { FileText, PackagePlus } from 'lucide-react';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 
 export default function AwbProcessingPage() {

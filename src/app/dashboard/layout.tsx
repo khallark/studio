@@ -35,14 +35,25 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ProcessingQueueToast } from '@/components/processing-queue-toast';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ProcessingOrder {
     id: string;
     name: string;
     status: 'pending' | 'processing' | 'done' | 'error';
+    message?: string;
 }
 
 export default function DashboardLayout({
@@ -57,7 +68,7 @@ export default function DashboardLayout({
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
 
-  const processAwbAssignments = useCallback(async (ordersToProcess: {id: string, name: string}[]) => {
+  const processAwbAssignments = useCallback(async (ordersToProcess: {id: string, name: string}[], pickupLocationId: string) => {
     if (!user) {
         toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
         return;
@@ -71,19 +82,17 @@ export default function DashboardLayout({
     }
     const shopId = userDoc.data()?.activeAccountId;
 
-
     const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
     setProcessingQueue(queue);
     
+    let processedCount = 0;
     for (let i = 0; i < queue.length; i++) {
         const orderId = queue[i].id;
         try {
             setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'processing' } : item));
             
-            await new Promise(resolve => setTimeout(resolve, 1500)); 
-
             const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/update-status', {
+            const response = await fetch('/api/shopify/courier/assign-awb', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -91,27 +100,64 @@ export default function DashboardLayout({
                 },
                 body: JSON.stringify({ 
                     shop: shopId,
-                    orderId: orderId, 
-                    status: 'Ready To Dispatch' 
+                    orderId: orderId,
+                    pickupLocationId,
                 }),
             });
             const result = await response.json();
-            if (!response.ok) throw new Error(result.details || 'Failed to update status');
+            if (!response.ok) throw new Error(result.details || 'Failed to assign AWB');
 
             setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'done' } : item));
+            processedCount++;
         } catch (error) {
             console.error(`Failed to process order ${orderId}:`, error);
-            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'error' } : item));
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'error', message } : item));
         }
     }
     
+    const awbsRef = collection(db, 'accounts', shopId, 'unused_awbs');
+    const snapshot = await getCountFromServer(awbsRef);
+    const unusedAwbsCount = snapshot.data().count;
+
+    if (unusedAwbsCount < 100) {
+       toast({
+          title: "Low AWB Stock",
+          description: `You have ${unusedAwbsCount} AWBs remaining. Automatically fetching more...`,
+        });
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/shopify/courier/fetch-awbs', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ shop: shopId, count: 500 }),
+            });
+            const result = await response.json();
+             if (!response.ok) throw new Error(result.details || 'Failed to fetch new AWBs');
+             toast({
+                title: "AWBs Refilled",
+                description: `${result.count} new AWBs have been fetched.`
+            });
+        } catch (error) {
+            console.error("Auto AWB fetch failed:", error);
+            toast({
+                title: "Auto-Fetch Failed",
+                description: error instanceof Error ? error.message : 'Could not automatically fetch more AWBs.',
+                variant: 'destructive',
+            });
+        }
+    }
+
     setTimeout(() => {
         setProcessingQueue([]);
         toast({
-            title: "Shipment Processing Complete",
-            description: `${ordersToProcess.length} order(s) are now Ready To Dispatch.`
+            title: "AWB Assignment Complete",
+            description: `${processedCount} of ${ordersToProcess.length} order(s) are now Ready To Dispatch.`
         })
-    }, 2000);
+    }, 5000);
 
   }, [user, toast]);
 

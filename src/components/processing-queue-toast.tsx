@@ -3,13 +3,20 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface ProcessingOrder {
   id: string;
   name: string;
   status: 'pending' | 'processing' | 'done' | 'error';
+  message?: string;
 }
 
 interface ProcessingQueueToastProps {
@@ -34,7 +41,18 @@ export function ProcessingQueueToast({ queue }: ProcessingQueueToastProps) {
                                 {order.status === 'pending' && <span className="text-muted-foreground text-xs">Waiting...</span>}
                                 {order.status === 'processing' && <><Loader2 className="h-4 w-4 animate-spin" /> <span className="text-xs">Processing...</span></>}
                                 {order.status === 'done' && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                {order.status === 'error' && <XCircle className="h-4 w-4 text-destructive" />}
+                                {order.status === 'error' && (
+                                     <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <XCircle className="h-4 w-4 text-destructive" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{order.message || 'An unknown error occurred.'}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
                             </div>
                         </div>
                     ))}

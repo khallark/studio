@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -21,11 +22,15 @@ export async function POST(req: NextRequest) {
   try {
     const { shop, count } = await req.json();
 
-    if (!shop || !count) {
+    if (!shop || count === undefined) {
       return NextResponse.json({ error: 'Shop and count are required' }, { status: 400 });
     }
-    if (typeof count !== 'number' || count <= 0 || count > 100) {
-      return NextResponse.json({ error: 'Count must be a number between 1 and 100' }, { status: 400 });
+    if (typeof count !== 'number' || count < 0 || count > 500) {
+      return NextResponse.json({ error: 'Count must be a number between 0 and 500' }, { status: 400 });
+    }
+    
+    if (count === 0) {
+      return NextResponse.json({ awbs: [] });
     }
 
     const userId = await getUserIdFromToken(req);
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
     
     const delhiveryApiKey = accountDoc.data()?.integrations?.couriers?.delhivery?.apiKey as string | undefined;
     if (!delhiveryApiKey) {
-      return NextResponse.json({ error: 'Delhivery API key not found for this shop. Please configure it in settings.' }, { status: 412 });
+      return NextResponse.json({ error: 'Delhivery API key not found. Please configure it in settings.' }, { status: 412 });
     }
 
     const delhiveryApiUrl = `https://staging-express.delhivery.com/waybill/api/bulk/json/?count=${count}`;
@@ -65,11 +70,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch AWBs from Delhivery', details: errorData }, { status: response.status });
     }
 
-    // The API returns a single comma-separated string in the response body.
     const awbString = await response.text();
     const awbs = awbString.split(',').filter(Boolean);
 
-    return NextResponse.json({ awbs });
+    // Write AWBs to the unused_awbs collection
+    const awbsRef = accountRef.collection('unused_awbs');
+    const batch = db.batch();
+    let addedCount = 0;
+
+    for (const awb of awbs) {
+        // Use AWB as document ID to enforce uniqueness
+        const docRef = awbsRef.doc(awb);
+        // The get is to check if it exists before adding, to avoid failing the batch.
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) {
+            batch.set(docRef, {
+                status: 'unused',
+                createdAt: FieldValue.serverTimestamp(),
+            });
+            addedCount++;
+        }
+    }
+    await batch.commit();
+
+    return NextResponse.json({ awbs, count: addedCount });
 
   } catch (error) {
     console.error('Error fetching AWBs:', error);

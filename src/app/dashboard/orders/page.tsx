@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -35,12 +35,22 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal, Trash2, History, Bot, User, MoveRight } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, getCountFromServer } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -48,6 +58,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import Link from 'next/link';
+import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -69,6 +80,7 @@ interface Order {
   financialStatus: string;
   fulfillmentStatus: string;
   customStatus: CustomStatus;
+  awb?: string;
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
   raw: {
@@ -104,13 +116,16 @@ export default function OrdersPage() {
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [viewingLogsFor, setViewingLogsFor] = useState<Order | null>(null);
-  
+  const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
+
   const [activeTab, setActiveTab] = useState<CustomStatus>('New');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const rowsPerPage = 10;
   
   const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
+  const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
+  const [isLowAwbAlertOpen, setIsLowAwbAlertOpen] = useState(false);
   const [ordersForAwb, setOrdersForAwb] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -153,16 +168,30 @@ export default function OrdersPage() {
         setLoading(false);
       });
 
-      return () => unsubscribe();
+      // Listen for AWB count
+      const awbsRef = collection(db, 'accounts', userData.activeAccountId, 'unused_awbs');
+      const unsubscribeAwbs = onSnapshot(awbsRef, (snapshot) => {
+          setUnusedAwbsCount(snapshot.size);
+      });
+
+
+      return () => {
+        unsubscribe();
+        unsubscribeAwbs();
+      };
     } else if (!userLoading && userData) {
         setLoading(false);
     }
   }, [userData, toast, userLoading]);
   
-  const handleAssignAwb = (orderIds: string[]) => {
-      const ordersToProcess = orders.filter(o => orderIds.includes(o.id));
-      setOrdersForAwb(ordersToProcess);
-      setIsAwbDialogOpen(true);
+  const handleAssignAwbClick = () => {
+      const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
+      if (ordersToProcess.length > unusedAwbsCount) {
+          setIsLowAwbAlertOpen(true);
+      } else {
+          setOrdersForAwb(ordersToProcess);
+          setIsAwbDialogOpen(true);
+      }
   };
 
   const handleBackfill = useCallback(async () => {
@@ -380,7 +409,10 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <>
-            <DropdownMenuItem onClick={() => handleAssignAwb([order.id])}>
+            <DropdownMenuItem onClick={() => {
+              setSelectedOrders([order.id]);
+              handleAssignAwbClick();
+            }}>
               Assign AWB
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
@@ -452,7 +484,7 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleAssignAwb(selectedOrders)}>
+            <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                 Assign AWBs
             </Button>
             <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
@@ -532,6 +564,7 @@ export default function OrdersPage() {
                       />
                     </TableHead>
                     <TableHead>Order ID</TableHead>
+                    <TableHead>AWB</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Total</TableHead>
@@ -549,6 +582,7 @@ export default function OrdersPage() {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-5" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
@@ -571,6 +605,7 @@ export default function OrdersPage() {
                             />
                           </TableCell>
                           <TableCell className="font-medium">{order.name}</TableCell>
+                          <TableCell>{order.awb || 'N/A'}</TableCell>
                           <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                           <TableCell>{customerName || order.email}</TableCell>
                           <TableCell className="text-right">
@@ -616,7 +651,7 @@ export default function OrdersPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center h-24">
+                      <TableCell colSpan={10} className="text-center h-24">
                         {userData?.activeAccountId ? `No ${activeTab.toLowerCase()} orders found.` : 'Please connect a store to see your orders.'}
                       </TableCell>
                     </TableRow>
@@ -657,13 +692,38 @@ export default function OrdersPage() {
       </Card>
     </main>
 
+    <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Not Enough AWBs</AlertDialogTitle>
+                <AlertDialogDescription>
+                    You have selected {selectedOrders.length} orders but only have {unusedAwbsCount} unused AWBs available. Please fetch more to proceed.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>OK</AlertDialogCancel>
+                <AlertDialogAction onClick={() => {
+                  setIsLowAwbAlertOpen(false);
+                  setIsFetchAwbDialogOpen(true);
+                }}>
+                    Fetch More AWBs
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     <AssignAwbDialog
         isOpen={isAwbDialogOpen}
         onClose={() => setIsAwbDialogOpen(false)}
         orders={ordersForAwb}
-        onConfirm={processAwbAssignments}
+        onConfirm={(pickupLocationId) => processAwbAssignments(ordersForAwb, pickupLocationId)}
         shopId={userData?.activeAccountId || ''}
      />
+     
+     <GenerateAwbDialog 
+        isOpen={isFetchAwbDialogOpen}
+        onClose={() => setIsFetchAwbDialogOpen(false)}
+      />
 
     <Dialog open={!!selectedOrder} onOpenChange={(isOpen) => !isOpen && setSelectedOrder(null)}>
         <DialogContent className="sm:max-w-2xl">

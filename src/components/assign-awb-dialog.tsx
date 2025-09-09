@@ -35,7 +35,7 @@ interface AssignAwbDialogProps {
   isOpen: boolean;
   onClose: () => void;
   orders: Order[];
-  onConfirm: (orders: Order[]) => void;
+  onConfirm: (pickupLocationId: string) => void;
   shopId: string;
 }
 
@@ -44,7 +44,7 @@ const shippingModes = ['Surface', 'Express'];
 
 export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: AssignAwbDialogProps) {
   const [step, setStep] = useState(1);
-  const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
+  const [selectedCourier, setSelectedCourier] = useState<string | null>('Delhivery');
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   
@@ -59,6 +59,9 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
         const fetchedLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PickupLocation));
         setPickupLocations(fetchedLocations);
+        if (fetchedLocations.length > 0) {
+            setSelectedLocation(fetchedLocations[0].id);
+        }
         setLoadingLocations(false);
       }, (error) => {
         console.error("Error fetching locations:", error);
@@ -73,7 +76,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     // Reset state when dialog opens
     if (isOpen) {
       setStep(1);
-      setSelectedCourier(null);
+      setSelectedCourier('Delhivery');
       setSelectedLocation(null);
       setSelectedMode(null);
     }
@@ -100,7 +103,11 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
-    onConfirm(orders);
+    if (!selectedLocation) {
+        toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
+        return;
+    }
+    onConfirm(selectedLocation);
     onClose();
   };
 

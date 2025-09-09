@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, History, Bot, User } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, History, Bot, User, MoveRight } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
@@ -47,6 +47,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
+import Link from 'next/link';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -489,31 +490,37 @@ export default function OrdersPage() {
     <>
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+        <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1">
             <CardTitle>Your Orders</CardTitle>
-            <CardDescription>
-              A list of all the orders from your connected stores.
+            <CardDescription className="mt-1">
+              A list of all the orders from your connected stores. You can also process shipments from here.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
               {renderBulkActionButtons()}
-              <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId}>
-                  <Download className="mr-2" />
+              <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId} size="sm" variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
                   {isSyncing ? 'Syncing...' : 'Sync Orders'}
+              </Button>
+               <Button asChild size="sm">
+                  <Link href="/dashboard/orders/awb-processing">
+                    Go to AWB Processing
+                    <MoveRight className="ml-2 h-4 w-4" />
+                  </Link>
               </Button>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)}>
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto">
               <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
               <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
               <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
               <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
               <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
             </TabsList>
-            <TabsContent value={activeTab}>
+            <TabsContent value={activeTab} className="mt-4">
               <Table>
                 <TableHeader>
                   <TableRow>

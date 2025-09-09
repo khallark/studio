@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History } from 'lucide-react';
+import { Home, Package, Settings, History, ChevronDown } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -13,6 +13,8 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarTrigger,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +36,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ProcessingQueueToast } from '@/components/processing-queue-toast';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { doc, getDoc } from 'firebase/firestore';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 interface ProcessingOrder {
     id: string;
@@ -59,7 +63,6 @@ export default function DashboardLayout({
         return;
     }
     
-    // Get active shop ID from user's document
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists() || !userDoc.data()?.activeAccountId) {
@@ -75,13 +78,10 @@ export default function DashboardLayout({
     for (let i = 0; i < queue.length; i++) {
         const orderId = queue[i].id;
         try {
-            // Set current to 'processing'
             setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'processing' } : item));
             
-            // Simulate API call delay
             await new Promise(resolve => setTimeout(resolve, 1500)); 
 
-            // Actual API call to update status in Firestore
             const idToken = await user.getIdToken();
             const response = await fetch('/api/shopify/orders/update-status', {
                 method: 'POST',
@@ -98,7 +98,6 @@ export default function DashboardLayout({
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || 'Failed to update status');
 
-            // Set current to 'done'
             setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'done' } : item));
         } catch (error) {
             console.error(`Failed to process order ${orderId}:`, error);
@@ -106,7 +105,6 @@ export default function DashboardLayout({
         }
     }
     
-    // Wait a bit before clearing the queue display
     setTimeout(() => {
         setProcessingQueue([]);
         toast({
@@ -141,6 +139,7 @@ export default function DashboardLayout({
   }
 
   const getTitle = () => {
+    if (pathname === '/dashboard/orders/awb-processing') return 'AWB Processing';
     if (pathname.startsWith('/dashboard/orders')) return 'Orders';
     if (pathname.startsWith('/dashboard/logs')) return 'Logs';
 
@@ -179,13 +178,28 @@ export default function DashboardLayout({
                     </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/orders')}>
-                    <Link href="/dashboard/orders">
-                        <Package />
-                        Orders
-                    </Link>
-                    </SidebarMenuButton>
+                 <SidebarMenuItem>
+                    <Collapsible>
+                        <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith('/dashboard/orders')}>
+                                <div className="flex items-center gap-2">
+                                <Package />
+                                Orders
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                            </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/orders'} className={cn(pathname === '/dashboard/orders/awb-processing' && 'text-muted-foreground')}>
+                                    <Link href="/dashboard/orders">All Orders</Link>
+                                </SidebarMenuSubButton>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/orders/awb-processing'}>
+                                    <Link href="/dashboard/orders/awb-processing">AWB Processing</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/logs')}>

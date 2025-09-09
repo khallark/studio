@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History, User, Smartphone, MapPin } from 'lucide-react';
+import { Home, Package, Settings, History, User, Smartphone, MapPin, FileText } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -75,6 +75,7 @@ export default function SettingsLayout({
     { href: '/settings', label: 'Store Details', icon: User },
     { href: '/settings/apps', label: 'Apps & Integrations', icon: Smartphone },
     { href: '/settings/pickup-locations', label: 'Pickup Locations', icon: MapPin },
+    { href: '/settings/slip-designer', label: 'Slip Designer', icon: FileText },
   ];
 
   return (

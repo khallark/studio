@@ -100,7 +100,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       phone: c.phone ?? ctx.phone,
-      name: c.name ?? null,
+      first_name: c.first_name ?? null,
+      last_name: c.last_name ?? null,
       email: c.email ?? null,
       address: c.address ?? null,
     });
@@ -120,11 +121,17 @@ export async function POST(req: NextRequest) {
 
     // Allow partial updates; only accept known fields
     const updates: Record<string, any> = {};
-    if ("name" in body) {
-      if (body.name != null && typeof body.name !== "string") {
-        return NextResponse.json({ error: "invalid name" }, { status: 400 });
+    if ("first_name" in body) {
+      if (body.first_name != null && typeof body.first_name !== "string") {
+        return NextResponse.json({ error: "invalid first name" }, { status: 400 });
       }
-      updates.name = body.name ?? null;
+      updates.first_name = body.first_name ?? null;
+    }
+    if ("last_name" in body) {
+      if (body.last_name != null && typeof body.last_name !== "string") {
+        return NextResponse.json({ error: "invalid last name" }, { status: 400 });
+      }
+      updates.last_name = body.last_name ?? null;
     }
     if ("email" in body) {
       if (body.email != null && typeof body.email !== "string") {

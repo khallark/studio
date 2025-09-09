@@ -9,7 +9,7 @@ import { Download, FileText, PackagePlus } from 'lucide-react';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 
 export default function AwbProcessingPage() {
-  const [isGenerateAwbOpen, setIsGenerateAwbOpen] = useState(false);
+  const [isGenerateAwbOpen, setIsGenerateAwbOpen] = useState(false); 
 
   return (
     <>

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (count === 0) {
-      return NextResponse.json({ awbs: [] });
+      return NextResponse.json({ awbs: [], count: 0 });
     }
 
     const userId = await getUserIdFromToken(req);
@@ -71,30 +71,26 @@ export async function POST(req: NextRequest) {
     }
 
     const awbString = await response.text();
-    console.log(awbString);
     const awbs = awbString.substring(1, awbString.length - 2).split(',').filter(Boolean);
 
     // Write AWBs to the unused_awbs collection
     const awbsRef = accountRef.collection('unused_awbs');
     const batch = db.batch();
-    let addedCount = 0;
-
+    
+    // OPTIMIZED: Remove individual 'get' calls inside the loop.
+    // 'set' is idempotent; it will create a new doc or overwrite an existing one.
+    // This is safe and much faster as it avoids N read operations.
     for (const awb of awbs) {
-        // Use AWB as document ID to enforce uniqueness
         const docRef = awbsRef.doc(awb);
-        // The get is to check if it exists before adding, to avoid failing the batch.
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) {
-            batch.set(docRef, {
-                status: 'unused',
-                createdAt: FieldValue.serverTimestamp(),
-            });
-            addedCount++;
-        }
+        batch.set(docRef, {
+            status: 'unused',
+            createdAt: FieldValue.serverTimestamp(),
+        });
     }
+
     await batch.commit();
 
-    return NextResponse.json({ awbs, count: addedCount });
+    return NextResponse.json({ awbs, count: awbs.length });
 
   } catch (error) {
     console.error('Error fetching AWBs:', error);

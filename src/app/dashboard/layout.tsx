@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History, ChevronDown } from 'lucide-react';
+import { Home, Package, Settings, History, ChevronDown, MoveRight } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -31,9 +31,8 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { ProcessingQueueToast } from '@/components/processing-queue-toast';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { collection, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -49,7 +48,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-interface ProcessingOrder {
+export interface ProcessingOrder {
     id: string;
     name: string;
     status: 'pending' | 'processing' | 'done' | 'error';
@@ -84,6 +83,19 @@ export default function DashboardLayout({
 
     const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
     setProcessingQueue(queue);
+
+    toast({
+        title: `AWB Assignment Started`,
+        description: `Processing ${queue.length} order(s) in the background.`,
+        action: (
+            <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/orders/awb-processing">
+                    View Progress
+                    <MoveRight className="ml-2 h-4 w-4" />
+                </Link>
+            </Button>
+        )
+    });
     
     let processedCount = 0;
     for (let i = 0; i < queue.length; i++) {
@@ -152,12 +164,13 @@ export default function DashboardLayout({
     }
 
     setTimeout(() => {
-        setProcessingQueue([]);
         toast({
             title: "AWB Assignment Complete",
             description: `${processedCount} of ${ordersToProcess.length} order(s) are now Ready To Dispatch.`
         })
-    }, 5000);
+        // Do not clear the queue here, so the processing page can show the final state
+        // setProcessingQueue([]); 
+    }, 1000);
 
   }, [user, toast]);
 
@@ -208,7 +221,10 @@ export default function DashboardLayout({
   }
 
   return (
-     <ProcessingQueueProvider processAwbAssignments={processAwbAssignments}>
+     <ProcessingQueueProvider 
+        processAwbAssignments={processAwbAssignments}
+        processingQueue={processingQueue}
+     >
         <SidebarProvider>
             <Sidebar>
             <SidebarContent>
@@ -314,7 +330,6 @@ export default function DashboardLayout({
                 <main className="flex-1 overflow-y-auto">
                     {children}
                 </main>
-                {processingQueue.length > 0 && <ProcessingQueueToast queue={processingQueue} />}
             </div>
         </SidebarProvider>
     </ProcessingQueueProvider>

@@ -1,6 +1,7 @@
 
 'use client';
 
+import { ProcessingOrder } from '@/app/dashboard/layout';
 import React, { createContext, useContext, ReactNode } from 'react';
 
 interface OrderInfo {
@@ -10,6 +11,7 @@ interface OrderInfo {
 
 interface ProcessingQueueContextType {
   processAwbAssignments: (orders: OrderInfo[], pickupLocationId: string) => Promise<void>;
+  processingQueue: ProcessingOrder[];
 }
 
 const ProcessingQueueContext = createContext<ProcessingQueueContextType | undefined>(undefined);
@@ -25,11 +27,12 @@ export function useProcessingQueue() {
 interface ProcessingQueueProviderProps {
   children: ReactNode;
   processAwbAssignments: (orders: OrderInfo[], pickupLocationId: string) => Promise<void>;
+  processingQueue: ProcessingOrder[];
 }
 
-export function ProcessingQueueProvider({ children, processAwbAssignments }: ProcessingQueueProviderProps) {
+export function ProcessingQueueProvider({ children, processAwbAssignments, processingQueue }: ProcessingQueueProviderProps) {
   return (
-    <ProcessingQueueContext.Provider value={{ processAwbAssignments }}>
+    <ProcessingQueueContext.Provider value={{ processAwbAssignments, processingQueue }}>
       {children}
     </ProcessingQueueContext.Provider>
   );

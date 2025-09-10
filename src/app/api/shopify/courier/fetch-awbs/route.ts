@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
     }
 
     const awbString = await response.text();
+    console.log(awbString);
     const awbs = awbString.split(',').filter(Boolean);
 
     // Write AWBs to the unused_awbs collection

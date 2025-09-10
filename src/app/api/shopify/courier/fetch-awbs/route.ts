@@ -54,13 +54,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Delhivery API key not found. Please configure it in settings.' }, { status: 412 });
     }
 
-    const delhiveryApiUrl = `https://staging-express.delhivery.com/waybill/api/bulk/json/?count=${count}`;
+    const delhiveryApiUrl = `https://track.delhivery.com/waybill/api/bulk/json/?count=${count}`;
 
     const response = await fetch(delhiveryApiUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        "Authorization": `Token api-token-key Pass Token as 'Token ${delhiveryApiKey}'`
+        "Authorization": `Token ${delhiveryApiKey}`
       },
     });
 

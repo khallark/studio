@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const awbString = await response.text();
     console.log(awbString);
-    const awbs = awbString.split(',').filter(Boolean);
+    const awbs = awbString.substring(1, awbString.length - 2).split(',').filter(Boolean);
 
     // Write AWBs to the unused_awbs collection
     const awbsRef = accountRef.collection('unused_awbs');

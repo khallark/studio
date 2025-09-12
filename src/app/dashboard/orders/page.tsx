@@ -47,10 +47,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, History, Bot, User, MoveRight } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -115,8 +115,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [viewingLogsFor, setViewingLogsFor] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
 
   const [activeTab, setActiveTab] = useState<CustomStatus>('New');
@@ -451,7 +450,8 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <>
-            <DropdownMenuItem onClick={() => {
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
               setSelectedOrders([order.id]);
               handleAssignAwbClick();
             }}>
@@ -638,8 +638,13 @@ export default function OrdersPage() {
                     currentOrders.map((order) => {
                       const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
                       return (
-                        <TableRow key={order.id} data-state={selectedOrders.includes(order.id) && "selected"}>
-                          <TableCell>
+                        <TableRow 
+                          key={order.id} 
+                          data-state={selectedOrders.includes(order.id) && "selected"}
+                          onClick={() => setViewingOrder(order)}
+                          className="cursor-pointer"
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedOrders.includes(order.id)}
                               onCheckedChange={() => handleSelectOrder(order.id)}
@@ -666,7 +671,7 @@ export default function OrdersPage() {
                           <TableCell>
                             {order.raw?.line_items?.length || 0}
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button aria-haspopup="true" size="icon" variant="ghost">
@@ -676,14 +681,6 @@ export default function OrdersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                 <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
-                                  View Details
-                                </DropdownMenuItem>
-                                 <DropdownMenuItem onClick={() => setViewingLogsFor(order)}>
-                                  <History className="mr-2 h-4 w-4" />
-                                  View Logs
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
                                 {renderActionItems(order)}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -771,113 +768,112 @@ export default function OrdersPage() {
         onClose={() => setIsFetchAwbDialogOpen(false)}
       />
 
-    <Dialog open={!!selectedOrder} onOpenChange={(isOpen) => !isOpen && setSelectedOrder(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          {selectedOrder && (
+    <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
+        <DialogContent className="max-w-4xl">
+          {viewingOrder && (
             <>
               <DialogHeader>
-                <DialogTitle>Order {selectedOrder.name}</DialogTitle>
+                <DialogTitle>Order {viewingOrder.name}</DialogTitle>
                 <DialogDescription>
-                  Details for order placed on {new Date(selectedOrder.createdAt).toLocaleString()}.
+                  Details and history for order placed on {new Date(viewingOrder.createdAt).toLocaleString()}.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-6 py-4">
-                <div className="grid grid-cols-2 gap-8">
+              <div className="grid md:grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto p-1">
+                {/* Left side: Order Details */}
+                <div className="space-y-6">
+                  <h3 className="font-semibold text-lg">Order Details</h3>
+                  <div className="space-y-4">
+                     {viewingOrder.customStatus === 'Ready To Dispatch' && viewingOrder.awb && (
+                        <div>
+                            <h4 className="font-semibold">AWB Number</h4>
+                            <p className="text-sm text-muted-foreground font-mono">{viewingOrder.awb}</p>
+                        </div>
+                    )}
                     <div>
-                        <h3 className="font-semibold mb-2">Customer</h3>
-                        <p className="text-sm">{`${selectedOrder.raw.customer?.first_name || ''} ${selectedOrder.raw.customer?.last_name || ''}`.trim()}</p>
-                        <p className="text-sm text-muted-foreground">{selectedOrder.email}</p>
+                        <h4 className="font-semibold">Customer</h4>
+                        <p className="text-sm text-muted-foreground">{`${viewingOrder.raw.customer?.first_name || ''} ${viewingOrder.raw.customer?.last_name || ''}`.trim()}</p>
+                        <p className="text-sm text-muted-foreground">{viewingOrder.email}</p>
                     </div>
                     <div>
-                        <h3 className="font-semibold mb-2">Shipping Address</h3>
-                        {selectedOrder.raw.shipping_address ? (
-                            <div className="text-sm">
-                                <p>{selectedOrder.raw.shipping_address.address1}{selectedOrder.raw.shipping_address.address2}</p>
-                                <p>{selectedOrder.raw.shipping_address.city}, {selectedOrder.raw.shipping_address.province} {selectedOrder.raw.shipping_address.zip}</p>
-                                <p>{selectedOrder.raw.shipping_address.country}</p>
+                        <h4 className="font-semibold">Shipping Address</h4>
+                        {viewingOrder.raw.shipping_address ? (
+                            <div className="text-sm text-muted-foreground">
+                                <p>{viewingOrder.raw.shipping_address.address1}{viewingOrder.raw.shipping_address.address2}</p>
+                                <p>{viewingOrder.raw.shipping_address.city}, {viewingOrder.raw.shipping_address.province} {viewingOrder.raw.shipping_address.zip}</p>
+                                <p>{viewingOrder.raw.shipping_address.country}</p>
                             </div>
                         ): (
                             <p className="text-sm text-muted-foreground">No shipping address provided.</p>
                         )}
                     </div>
-                </div>
-                <Separator />
-                <div>
-                  <h3 className="font-semibold mb-2">Items</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>SKU</TableHead>
-                        <TableHead className="text-center">Quantity</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedOrder.raw.line_items.map((item: any, index: number) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{item.title}</TableCell>
-                          <TableCell>{item.sku || 'N/A'}</TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
-                           <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price)}</TableCell>                          <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(item.price * item.quantity)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                 <Separator />
-                 <div className="flex justify-end items-center gap-4 text-lg font-bold">
-                    <div>Total:</div>
-                    <div>{new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedOrder.currency }).format(selectedOrder.totalPrice)}</div>
-                 </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={!!viewingLogsFor} onOpenChange={(isOpen) => !isOpen && setViewingLogsFor(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          {viewingLogsFor && (
-            <>
-              <DialogHeader>
-                <DialogTitle>History for Order {viewingLogsFor.name}</DialogTitle>
-                <DialogDescription>
-                  A chronological list of all actions taken on this order.
-                </DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="max-h-[60vh] mt-4 rounded-md border">
-                <div className="p-6 space-y-6">
-                  {(viewingLogsFor.logs && viewingLogsFor.logs.length > 0) ? (
-                     [...viewingLogsFor.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
-                      <div key={index} className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                            {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm">
-                            {log.action.replace(/_/g, ' ')}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {log.type === 'USER_ACTION' ? 
-                              `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
-                              `Webhook received with topic: ${log.details.topic}`
-                            }
-                          </p>
-                           <p className="text-xs text-muted-foreground mt-1">
-                            {log.timestamp?.toDate().toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-12">
-                      <p>No history found for this order.</p>
+                  </div>
+                  <Separator />
+                   <div>
+                        <h4 className="font-semibold mb-2">Items</h4>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                <TableHead>Product</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead className="text-center">Qty</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {viewingOrder.raw.line_items.map((item: any, index: number) => (
+                                <TableRow key={index}>
+                                    <TableCell className="font-medium">{item.title}</TableCell>
+                                    <TableCell>{item.sku || 'N/A'}</TableCell>
+                                    <TableCell className="text-center">{item.quantity}</TableCell>
+                                    <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </div>
-                  )}
+                     <Separator />
+                     <div className="flex justify-end items-center gap-4 text-lg font-bold">
+                        <span>Total:</span>
+                        <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
+                     </div>
                 </div>
-              </ScrollArea>
+
+                {/* Right side: Logs */}
+                <div className="space-y-6">
+                    <h3 className="font-semibold text-lg">History</h3>
+                    <ScrollArea className="h-full">
+                        <div className="space-y-6 pr-4">
+                        {(viewingOrder.logs && viewingOrder.logs.length > 0) ? (
+                            [...viewingOrder.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
+                            <div key={index} className="flex items-start gap-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
+                                    {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                </div>
+                                <div className="flex-1">
+                                <p className="font-semibold text-sm">
+                                    {log.action.replace(/_/g, ' ')}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    {log.type === 'USER_ACTION' ? 
+                                    `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
+                                    `Webhook received with topic: ${log.details.topic}`
+                                    }
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {log.timestamp?.toDate().toLocaleString()}
+                                </p>
+                                </div>
+                            </div>
+                            ))
+                        ) : (
+                            <div className="text-center text-muted-foreground py-12">
+                            <p>No history found for this order.</p>
+                            </div>
+                        )}
+                        </div>
+                    </ScrollArea>
+                </div>
+              </div>
             </>
           )}
         </DialogContent>

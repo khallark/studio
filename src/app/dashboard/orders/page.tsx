@@ -524,9 +524,9 @@ export default function OrdersPage() {
 
   return (
     <>
-    <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <Card>
-        <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4">
+    <main className="flex flex-1 flex-col h-full">
+      <Card className="flex flex-1 flex-col overflow-hidden">
+        <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-6 border-b">
           <div className="flex-1">
             <CardTitle>Your Orders</CardTitle>
             <CardDescription className="mt-1">
@@ -547,16 +547,16 @@ export default function OrdersPage() {
               </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)}>
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto">
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)} className="flex flex-col h-full">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto rounded-none border-b p-2">
               <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
               <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
               <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
               <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
               <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
             </TabsList>
-            <TabsContent value={activeTab} className="mt-4">
+            <TabsContent value={activeTab} className="mt-0 flex-1 overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -665,7 +665,7 @@ export default function OrdersPage() {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="p-4 border-t">
           <div className="flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground">
                 {selectedOrders.length > 0

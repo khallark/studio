@@ -457,6 +457,7 @@ export default function OrdersPage() {
           shop: userData.activeAccountId,
           awbs,
           filename,
+          outsize: 'A4',
         }),
       });
 

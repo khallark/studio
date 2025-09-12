@@ -119,9 +119,6 @@ export async function POST(req: NextRequest) {
       return new NextResponse(null, { status: 200 });
     }
 
-    // Log the incoming webhook regardless of outcome
-    await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
-
     const accountRef = db.collection('accounts').doc(shopDomain);
     const orderRef   = accountRef.collection('orders').doc(orderId);
 
@@ -155,6 +152,7 @@ export async function POST(req: NextRequest) {
             lastWebhookTopic: topic,
           });
           console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
+          await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
         }
         return;
       }
@@ -174,6 +172,8 @@ export async function POST(req: NextRequest) {
           isDeleted: false,
           createdByTopic: topic,
         });
+        console.log(`Created order ${orderId} for ${shopDomain}`);
+        await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
         return;
       }
 
@@ -185,6 +185,7 @@ export async function POST(req: NextRequest) {
         }
         tx.update(orderRef, { ...dataToSave, updatedByTopic: topic });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
+        await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
 

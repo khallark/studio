@@ -29,13 +29,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Input -----
-    const { shop, orders } = (await req.json()) as {
+    const { shop, orders, pickupName, shippingMode } = (await req.json()) as {
       shop: string;
       orders: Array<{ orderId: string }>;
+      pickupName?: string;
+      shippingMode?: string
     };
 
-    if (!shop || !Array.isArray(orders) || orders.length === 0) {
-      return NextResponse.json({ error: "shop and orders[] required" }, { status: 400 });
+    if (!shop || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
+      return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
     }
 
     // 1) Create batch header
@@ -87,6 +89,8 @@ export async function POST(req: NextRequest) {
         shop,
         batchId: batchRef.id,
         jobIds: orders.map((o) => String(o.orderId)),
+        pickupName,
+        shippingMode
       }),
     });
 

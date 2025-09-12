@@ -35,7 +35,7 @@ interface AssignAwbDialogProps {
   isOpen: boolean;
   onClose: () => void;
   orders: Order[];
-  onConfirm: (pickupLocationId: string) => void;
+  onConfirm: (pickupName: string, shippingMode: string) => void;
   shopId: string;
 }
 
@@ -59,7 +59,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
         const fetchedLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PickupLocation));
         setPickupLocations(fetchedLocations);
-        if (fetchedLocations.length > 0) {
+        if (fetchedLocations.length > 0 && !selectedLocation) {
             setSelectedLocation(fetchedLocations[0].id);
         }
         setLoadingLocations(false);
@@ -70,17 +70,17 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       });
       return () => unsubscribe();
     }
-  }, [isOpen, shopId, toast]);
+  }, [isOpen, shopId, toast, selectedLocation]);
   
   useEffect(() => {
     // Reset state when dialog opens
     if (isOpen) {
       setStep(1);
       setSelectedCourier('Delhivery');
-      setSelectedLocation(null);
+      setSelectedLocation(pickupLocations.length > 0 ? pickupLocations[0].id : null);
       setSelectedMode(null);
     }
-  }, [isOpen]);
+  }, [isOpen, pickupLocations]);
 
   const handleNext = () => {
     if (step === 1 && !selectedCourier) {
@@ -107,7 +107,15 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
         return;
     }
-    onConfirm(selectedLocation);
+
+    const pickupName = pickupLocations.find(loc => loc.id === selectedLocation)?.name;
+
+    if (!pickupName) {
+        toast({ title: "Error", description: "Could not find selected pickup location name.", variant: "destructive" });
+        return;
+    }
+
+    onConfirm(pickupName, selectedMode);
     onClose();
   };
 
@@ -192,7 +200,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             </div>
             <div>
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              {step < 3 && <Button onClick={handleNext} className="ml-2">Next</Button>}
+              {step < 3 && <Button onClick={handleNext} className="ml-2" disabled={step === 2 && pickupLocations.length === 0}>Next</Button>}
               {step === 3 && <Button onClick={handleConfirm} className="ml-2">Assign AWBs & Create Shipments</Button>}
             </div>
         </DialogFooter>

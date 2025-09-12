@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     // ----- Input -----
     const { shop, orders, pickupName, shippingMode } = (await req.json()) as {
       shop: string;
-      orders: Array<{ orderId: string }>;
+      orders: Array<{ orderId: string, name: string }>;
       pickupName?: string;
       shippingMode?: string
     };
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
         batchRef.collection("jobs").doc(String(o.orderId)),
         {
           orderId: String(o.orderId),
+          orderName: o.name,
           status: "queued",
           attempts: 0,
         },

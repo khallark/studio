@@ -84,6 +84,7 @@ interface Order {
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
   raw: {
+    cancelled_at: string | null;
     customer?: {
       first_name?: string;
       last_name?: string;
@@ -338,17 +339,47 @@ export default function OrdersPage() {
   }, [userData, toast]);
   
   const statusCounts = useMemo(() => {
+    const initialCounts: Record<CustomStatus, number> = {
+      New: 0,
+      Confirmed: 0,
+      'Ready To Dispatch': 0,
+      Dispatched: 0,
+      Cancelled: 0,
+    };
     return orders.reduce((acc, order) => {
       if (order.isDeleted) return acc;
-      const status = order.customStatus || 'New';
-      acc[status] = (acc[status] || 0) + 1;
+      // If Shopify says it's cancelled, it's cancelled. This takes precedence.
+      if (order.raw?.cancelled_at) {
+        acc['Cancelled']++;
+      } else {
+        const status = order.customStatus || 'New';
+        if (acc[status] !== undefined) {
+          acc[status]++;
+        }
+      }
       return acc;
-    }, {} as Record<CustomStatus, number>);
+    }, initialCounts);
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => (order.customStatus || 'New') === activeTab && !order.isDeleted);
-  }, [orders, activeTab]);
+    return orders.filter(order => {
+        if (order.isDeleted) return false;
+        
+        const isShopifyCancelled = !!order.raw?.cancelled_at;
+
+        if (activeTab === 'Cancelled') {
+            return isShopifyCancelled;
+        }
+
+        // Exclude Shopify-cancelled orders from all other tabs
+        if (isShopifyCancelled) {
+            return false;
+        }
+        
+        return (order.customStatus || 'New') === activeTab;
+    });
+}, [orders, activeTab]);
+
 
   const indexOfLastOrder = currentPage * rowsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - rowsPerPage;
@@ -398,6 +429,13 @@ export default function OrdersPage() {
   }
 
   const renderActionItems = (order: Order) => {
+    const isShopifyCancelled = !!order.raw?.cancelled_at;
+    if (isShopifyCancelled) {
+        return (
+            <DropdownMenuItem disabled>Order Cancelled on Shopify</DropdownMenuItem>
+        );
+    }
+    
     switch (order.customStatus) {
       case 'New':
         return (
@@ -525,8 +563,8 @@ export default function OrdersPage() {
   return (
     <>
     <main className="flex flex-1 flex-col h-full">
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-6 border-b">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-6 border-b shrink-0">
           <div className="flex-1">
             <CardTitle>Your Orders</CardTitle>
             <CardDescription className="mt-1">
@@ -547,16 +585,16 @@ export default function OrdersPage() {
               </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+        <div className="flex-1 flex flex-col p-0 overflow-hidden">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)} className="flex flex-col h-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto rounded-none border-b p-2">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto rounded-none border-b p-2 shrink-0">
               <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
               <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
               <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
               <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
               <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
             </TabsList>
-            <TabsContent value={activeTab} className="mt-0 flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -662,38 +700,38 @@ export default function OrdersPage() {
                   )}
                 </TableBody>
               </Table>
-            </TabsContent>
+            </div>
+            <CardFooter className="p-4 border-t shrink-0">
+              <div className="flex items-center justify-between w-full">
+                <div className="text-xs text-muted-foreground">
+                    {selectedOrders.length > 0
+                    ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
+                    : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
+                  }
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </CardFooter>
           </Tabs>
-        </CardContent>
-        <CardFooter className="p-4 border-t">
-          <div className="flex items-center justify-between w-full">
-            <div className="text-xs text-muted-foreground">
-                {selectedOrders.length > 0
-                ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
-                : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
-              }
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages || totalPages === 0}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </main>
 
     <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>
@@ -723,6 +761,7 @@ export default function OrdersPage() {
         onConfirm={(pickupName, shippingMode) => {
             const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
             processAwbAssignments(ordersToProcess.map(o => ({id: o.id, name: o.name})), pickupName, shippingMode);
+            setSelectedOrders([]);
         }}
         shopId={userData?.activeAccountId || ''}
      />
@@ -846,3 +885,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

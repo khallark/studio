@@ -67,7 +67,11 @@ export default function DashboardLayout({
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
 
-  const processAwbAssignments = useCallback(async (ordersToProcess: {id: string, name: string}[], pickupLocationId: string) => {
+  const processAwbAssignments = useCallback(async (
+    ordersToProcess: {id: string, name: string}[], 
+    pickupName: string,
+    shippingMode: string
+  ) => {
     if (!user) {
         toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
         return;
@@ -81,96 +85,47 @@ export default function DashboardLayout({
     }
     const shopId = userDoc.data()?.activeAccountId;
 
-    const queue: ProcessingOrder[] = ordersToProcess.map(o => ({ id: o.id, name: o.name, status: 'pending' }));
-    setProcessingQueue(queue);
-
-    toast({
-        title: `AWB Assignment Started`,
-        description: `Processing ${queue.length} order(s) in the background.`,
-        action: (
-            <Button variant="outline" size="sm" asChild>
-                <Link href="/dashboard/orders/awb-processing">
-                    View Progress
-                    <MoveRight className="ml-2 h-4 w-4" />
-                </Link>
-            </Button>
-        )
-    });
-    
-    let processedCount = 0;
-    for (let i = 0; i < queue.length; i++) {
-        const orderId = queue[i].id;
-        try {
-            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'processing' } : item));
-            
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/courier/assign-awb', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ 
-                    shop: shopId,
-                    orderId: orderId,
-                    pickupLocationId,
-                }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.details || 'Failed to assign AWB');
-
-            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'done' } : item));
-            processedCount++;
-        } catch (error) {
-            console.error(`Failed to process order ${orderId}:`, error);
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            setProcessingQueue(prev => prev.map((item, index) => index === i ? { ...item, status: 'error', message } : item));
-        }
-    }
-    
-    const awbsRef = collection(db, 'accounts', shopId, 'unused_awbs');
-    const snapshot = await getCountFromServer(awbsRef);
-    const unusedAwbsCount = snapshot.data().count;
-
-    if (unusedAwbsCount < 100) {
-       toast({
-          title: "Low AWB Stock",
-          description: `You have ${unusedAwbsCount} AWBs remaining. Automatically fetching more...`,
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/shopify/courier/assign-awb', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ 
+                shop: shopId,
+                orders: ordersToProcess.map(o => ({ orderId: o.id, name: o.name })),
+                pickupName,
+                shippingMode,
+            }),
         });
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/courier/fetch-awbs', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ shop: shopId, count: 500 }),
-            });
-            const result = await response.json();
-             if (!response.ok) throw new Error(result.details || 'Failed to fetch new AWBs');
-             toast({
-                title: "AWBs Refilled",
-                description: `${result.count} new AWBs have been fetched.`
-            });
-        } catch (error) {
-            console.error("Auto AWB fetch failed:", error);
-            toast({
-                title: "Auto-Fetch Failed",
-                description: error instanceof Error ? error.message : 'Could not automatically fetch more AWBs.',
-                variant: 'destructive',
-            });
-        }
-    }
 
-    setTimeout(() => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.details || 'Failed to start AWB assignment');
+
         toast({
-            title: "AWB Assignment Complete",
-            description: `${processedCount} of ${ordersToProcess.length} order(s) are now Ready To Dispatch.`
-        })
-        // Do not clear the queue here, so the processing page can show the final state
-        // setProcessingQueue([]); 
-    }, 1000);
+            title: `AWB Assignment Started`,
+            description: `Processing ${ordersToProcess.length} order(s) in the background.`,
+            action: (
+                <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/orders/awb-processing">
+                        View Progress
+                        <MoveRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            )
+        });
+
+    } catch (error) {
+        console.error('Failed to start processing batch:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast({
+            title: 'Assignment Failed',
+            description: message,
+            variant: 'destructive',
+        });
+    }
 
   }, [user, toast]);
 

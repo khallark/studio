@@ -186,6 +186,10 @@ export default function OrdersPage() {
   
   const handleAssignAwbClick = () => {
       const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
+      if (ordersToProcess.length === 0) {
+        toast({ title: 'No orders selected', description: 'Please select orders from the "Confirmed" tab to assign AWBs.', variant: 'destructive'});
+        return;
+      }
       if (ordersToProcess.length > unusedAwbsCount) {
           setIsLowAwbAlertOpen(true);
       } else {
@@ -716,7 +720,10 @@ export default function OrdersPage() {
         isOpen={isAwbDialogOpen}
         onClose={() => setIsAwbDialogOpen(false)}
         orders={ordersForAwb}
-        onConfirm={(pickupLocationId) => processAwbAssignments(ordersForAwb, pickupLocationId)}
+        onConfirm={(pickupName, shippingMode) => {
+            const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
+            processAwbAssignments(ordersToProcess.map(o => ({id: o.id, name: o.name})), pickupName, shippingMode);
+        }}
         shopId={userData?.activeAccountId || ''}
      />
      

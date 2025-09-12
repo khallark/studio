@@ -40,6 +40,47 @@ async function logWebhook(db: FirebaseFirestore.Firestore, shopDomain: string, t
     }
 }
 
+async function captureShopifyCreditPayment(shopDomain: string, orderId: string) {
+  try {
+    const accountRef = db.collection('accounts').doc(shopDomain);
+    const accountDoc = await accountRef.get();
+
+    if (!accountDoc.exists) {
+      console.error(`Account document not found for shop: ${shopDomain}`);
+      return;
+    }
+
+    const accessToken = accountDoc.data()?.accessToken;
+    if (!accessToken) {
+      console.error(`Access token not found for shop: ${shopDomain}`);
+      return;
+    }
+
+    const captureUrl = `https://${shopDomain}/admin/api/2025-01/orders/${orderId}/transactions.json`;
+    const response = await fetch(captureUrl, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        transaction: {
+          kind: 'capture',
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`Failed to capture Shopify Credit for order ${orderId}. Status: ${response.status}. Body: ${errorBody}`);
+    } else {
+      console.log(`Successfully captured Shopify Credit payment for order ${orderId}.`);
+    }
+  } catch (error) {
+    console.error(`Error during Shopify Credit capture for order ${orderId}:`, error);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
@@ -106,6 +147,12 @@ export async function POST(req: NextRequest) {
     if (topic === 'orders/create') {
         dataToSave.customStatus = 'New';
         dataToSave.isDeleted = false;
+
+        // Auto-capture Shopify Credit payment
+        if (Array.isArray(orderData.payment_gateway_names) && orderData.payment_gateway_names.includes('shopify_credit')) {
+            console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
+            await captureShopifyCreditPayment(shopDomain, orderId);
+        }
     }
 
     await orderRef.set(dataToSave, { merge: true });
@@ -117,5 +164,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Webhook processing failed', details: errorMessage }, { status: 500 });
   }
 }
-
-    

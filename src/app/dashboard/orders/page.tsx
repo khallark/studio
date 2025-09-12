@@ -431,65 +431,80 @@ export default function OrdersPage() {
 
   const handleDownloadSlips = useCallback(async () => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
-    
+
     setIsDownloadingSlips(true);
-    toast({
-      title: "Generating Slips",
-      description: "Your download will begin automatically. Please wait.",
-    });
+    toast({ title: "Generating Slips", description: "Your download will begin automatically. Please wait." });
 
     try {
-        const ordersToDownload = orders.filter(o => selectedOrders.includes(o.id) && o.awb);
-        const awbs = ordersToDownload.map(o => o.awb!);
-        if (awbs.length === 0) {
-            toast({ title: 'No AWBs found', description: 'None of the selected orders have an AWB assigned.', variant: 'destructive'});
-            return;
+      const ordersToDownload = orders.filter(o => selectedOrders.includes(o.id) && o.awb);
+      // stringify + dedupe
+      const awbs = Array.from(new Set(ordersToDownload.map(o => String(o.awb))));
+      if (awbs.length === 0) {
+        toast({ title: "No AWBs found", description: "None of the selected orders have an AWB assigned.", variant: "destructive" });
+        return;
+      }
+
+      const idToken = await user.getIdToken();
+      const filename = `slips-${new Date().toISOString().split("T")[0]}.pdf`;
+
+      const response = await fetch("/api/shopify/courier/slips-merge", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          awbs,
+          filename,
+        }),
+      });
+
+      if (!response.ok) {
+        // try JSON, fall back to text
+        let msg = "Failed to download slips";
+        try {
+          const err = await response.json();
+          msg = err?.details || err?.error || msg;
+        } catch {
+          msg = await response.text().catch(() => msg);
         }
+        throw new Error(msg);
+      }
 
-        const idToken = await user.getIdToken();
-        const filename = `slips-${new Date().toISOString().split('T')[0]}.pdf`;
-
-        const response = await fetch('/api/shopify/courier/slips-merge', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-                shop: userData.activeAccountId,
-                awbs: awbs,
-                filename: filename
-            }),
-        });
-
-        if (!response.ok) {
-            const errorResult = await response.json();
-            throw new Error(errorResult.details || 'Failed to download slips');
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        
-        setSelectedOrders([]);
-
-    } catch (error) {
-        console.error('Download slips error:', error);
+      // Optional: read headers about skipped slips
+      const missing = response.headers.get("x-missing-awbs");
+      const invalid = response.headers.get("x-invalid-awbs");
+      if (missing || invalid) {
         toast({
-            title: 'Download Failed',
-            description: error instanceof Error ? error.message : 'An unknown error occurred.',
-            variant: 'destructive',
+          title: "Some slips were skipped",
+          description: `${missing ? `${missing} missing` : ""}${missing && invalid ? ", " : ""}${invalid ? `${invalid} invalid` : ""}`,
         });
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setSelectedOrders([]);
+    } catch (error) {
+      console.error("Download slips error:", error);
+      toast({
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive",
+      });
     } finally {
-        setIsDownloadingSlips(false);
+      setIsDownloadingSlips(false);
     }
-}, [userData, user, selectedOrders, orders, toast]);
+  }, [userData, user, selectedOrders, orders, toast]);
+
 
   const renderActionItems = (order: Order) => {
     const isShopifyCancelled = !!order.raw?.cancelled_at;

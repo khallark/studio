@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
@@ -16,7 +17,7 @@ function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string):
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
 }
 
-async function logWebhook(
+async function logWebhookToCentralCollection(
   db: FirebaseFirestore.Firestore,
   shopDomain: string,
   topic: string,
@@ -37,9 +38,25 @@ async function logWebhook(
   try {
     await db.collection('accounts').doc(shopDomain).collection('logs').add(logEntry);
   } catch (error) {
-    console.error('Failed to write webhook log:', error);
+    console.error('Failed to write webhook log to central collection:', error);
   }
 }
+
+function createOrderLogEntry(topic: string, orderData: any): any {
+    const now = new Date();
+    return {
+        type: 'WEBHOOK',
+        action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
+        timestamp: now, // Use JS Date object for arrayUnion
+        details: {
+            topic: topic,
+            orderId: String(orderData.id),
+            orderName: orderData.name,
+        },
+        user: { displayName: 'Shopify' } // System-generated action
+    };
+}
+
 
 async function captureShopifyCreditPayment(shopDomain: string, orderId: string) {
   try {
@@ -121,6 +138,7 @@ export async function POST(req: NextRequest) {
 
     const accountRef = db.collection('accounts').doc(shopDomain);
     const orderRef   = accountRef.collection('orders').doc(orderId);
+    const orderLogEntry = createOrderLogEntry(topic, orderData);
 
     const dataToSave: { [key: string]: any } = {
       orderId: orderData.id,
@@ -150,9 +168,10 @@ export async function POST(req: NextRequest) {
             isDeleted: true,
             deletedAt: FieldValue.serverTimestamp(),
             lastWebhookTopic: topic,
+            logs: FieldValue.arrayUnion(orderLogEntry),
           });
           console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
-          await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
+          await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
         }
         return;
       }
@@ -171,9 +190,10 @@ export async function POST(req: NextRequest) {
           customStatus: 'New',
           isDeleted: false,
           createdByTopic: topic,
+          logs: [orderLogEntry], // Initialize logs array
         });
         console.log(`Created order ${orderId} for ${shopDomain}`);
-        await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
+        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
         return;
       }
 
@@ -183,9 +203,13 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
-        tx.update(orderRef, { ...dataToSave, updatedByTopic: topic });
+        tx.update(orderRef, { 
+            ...dataToSave, 
+            updatedByTopic: topic,
+            logs: FieldValue.arrayUnion(orderLogEntry),
+        });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
-        await logWebhook(db, shopDomain, topic, orderId, orderData, hmacHeader);
+        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
 

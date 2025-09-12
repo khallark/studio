@@ -113,17 +113,23 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shopDomain);
     const orderRef   = accountRef.collection('orders').doc(orderId);
 
+    // --- Topic-Specific Logic ---
+    const existingOrderSnap = await orderRef.get();
+
+    // 1. Order Deletion (Tombstone)
     if (topic === 'orders/delete') {
-      await orderRef.update({
-        isDeleted: true,
-        deletedAt: FieldValue.serverTimestamp(),
-        lastWebhookTopic: topic
-      });
-      console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
+      if (existingOrderSnap.exists) {
+        await orderRef.update({
+          isDeleted: true,
+          deletedAt: FieldValue.serverTimestamp(),
+          lastWebhookTopic: topic
+        });
+        console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
+      }
       return new NextResponse(null, { status: 200 });
     }
 
-    const existingOrderSnap = await orderRef.get();
+    // 2. Ignore any updates for an already deleted order
     if (existingOrderSnap.exists && existingOrderSnap.data()?.isDeleted) {
         console.log(`Ignoring webhook topic ${topic} for already deleted order ${orderId}`);
         return new NextResponse(null, { status: 200 });
@@ -143,20 +149,37 @@ export async function POST(req: NextRequest) {
       lastWebhookTopic: topic,
       receivedAt: FieldValue.serverTimestamp(),
     };
-    
+
+    // 3. Order Creation
     if (topic === 'orders/create') {
         dataToSave.customStatus = 'New';
         dataToSave.isDeleted = false;
+
+        await orderRef.set(dataToSave);
+        console.log(`Created order ${orderId} for ${shopDomain}`);
 
         // Auto-capture Shopify Credit payment
         if (Array.isArray(orderData.payment_gateway_names) && orderData.payment_gateway_names.includes('shopify_credit')) {
             console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
             await captureShopifyCreditPayment(shopDomain, orderId);
         }
+    
+    // 4. Order Update
+    } else if (topic === 'orders/updated') {
+        if (!existingOrderSnap.exists) {
+            console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
+            // Acknowledge the webhook but do nothing to prevent creating an orphan document.
+            return new NextResponse(null, { status: 200 });
+        }
+        await orderRef.update(dataToSave);
+        console.log(`Updated order ${orderId} for ${shopDomain}`);
+    
+    // 5. Fallback for other order-related topics (e.g., fulfilled, paid)
+    } else {
+        await orderRef.set(dataToSave, { merge: true });
+        console.log(`Upserted order ${orderId} for ${shopDomain} via ${topic}`);
     }
 
-    await orderRef.set(dataToSave, { merge: true });
-    console.log(`Upserted order ${orderId} for ${shopDomain} via ${topic}`);
     return new NextResponse(null, { status: 200 });
   } catch (err) {
     console.error('Error processing Shopify webhook:', err);

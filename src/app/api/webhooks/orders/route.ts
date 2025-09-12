@@ -87,6 +87,8 @@ export async function POST(req: NextRequest) {
     const topic      = req.headers.get('x-shopify-topic') || '';
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
 
+    console.log('"'+topic+'" webhook received from shop:', shopDomain);
+
     if (!process.env.SHOPIFY_API_SECRET) {
       console.error('SHOPIFY_API_SECRET is missing');
       return new NextResponse('Server misconfigured', { status: 500 });

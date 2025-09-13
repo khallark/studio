@@ -115,6 +115,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
 
@@ -505,6 +506,55 @@ export default function OrdersPage() {
     }
   }, [userData, user, selectedOrders, orders, toast]);
 
+    const handleDownloadExcel = useCallback(async () => {
+    if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
+
+    setIsDownloadingExcel(true);
+    toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          orderIds: selectedOrders,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to generate Excel file.');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setSelectedOrders([]);
+
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloadingExcel(false);
+    }
+  }, [userData, user, selectedOrders, toast]);
+
 
   const renderActionItems = (order: Order) => {
     const isShopifyCancelled = !!order.raw?.cancelled_at;
@@ -594,6 +644,10 @@ export default function OrdersPage() {
       case 'New':
         return (
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+              <Download className="mr-2 h-4 w-4" />
+              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+            </Button>
             <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
                 {isBulkUpdating ? 'Confirming...' : 'Confirm'}
             </Button>

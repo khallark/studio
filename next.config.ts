@@ -60,6 +60,10 @@ const nextConfig: NextConfig = {
         source: '/api/integrations/courier/update',
         destination: '/api/integrations/courier/update/route',
       },
+      {
+        source: '/api/shopify/orders/export',
+        destination: '/api/shopify/orders/export/route',
+      },
     ]
   },
 };

@@ -22,7 +22,7 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 type OrderLite = {
   id: string;
-  order_number?: string | number;
+  name: string;
   // any other fields you want to pass through to the Cloud Function payload
 };
 

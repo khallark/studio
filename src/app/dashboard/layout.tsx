@@ -34,7 +34,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect, useState, useCallback, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
-import { collection, doc, getDoc, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, getDoc, getCountFromServer, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import {
@@ -135,6 +135,55 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [user, loading, router]);
+  
+  // Logic for automatic Shiprocket token refresh
+  useEffect(() => {
+    if (!user) return;
+
+    const checkAndRefreshToken = async (shopId: string) => {
+      const accountRef = doc(db, 'accounts', shopId);
+      const accountDoc = await getDoc(accountRef);
+      if (accountDoc.exists()) {
+        const data = accountDoc.data();
+        const shiprocketIntegration = data.integrations?.couriers?.shiprocket;
+
+        if (shiprocketIntegration?.apiKey && shiprocketIntegration.lastUpdatedAt) {
+          const lastUpdated = (shiprocketIntegration.lastUpdatedAt as Timestamp).toDate();
+          const eightDaysAgo = new Date();
+          eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+
+          if (lastUpdated < eightDaysAgo) {
+            console.log('Shiprocket token is older than 8 days. Refreshing...');
+            try {
+              const idToken = await user.getIdToken();
+              await fetch('/api/integrations/shiprocket/refresh-token', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ shop: shopId }),
+              });
+            } catch (error) {
+              console.error('Failed to auto-refresh Shiprocket token:', error);
+            }
+          }
+        }
+      }
+    };
+
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (userDoc) => {
+      if (userDoc.exists()) {
+        const activeAccountId = userDoc.data().activeAccountId;
+        if (activeAccountId) {
+          checkAndRefreshToken(activeAccountId);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
 
   const handleLogout = async () => {
@@ -150,21 +199,6 @@ export default function DashboardLayout({
       return email.charAt(0).toUpperCase();
     }
     return 'U';
-  }
-
-  const getTitle = () => {
-    if (pathname === '/dashboard/orders/awb-processing') return 'AWB Processing';
-    if (pathname.startsWith('/dashboard/orders')) return 'Orders';
-    if (pathname.startsWith('/dashboard/logs')) return 'Logs';
-
-    switch (pathname) {
-      case '/dashboard':
-        return 'Dashboard';
-      case '/dashboard/connect':
-        return 'Connect your store';
-      default:
-        return 'Dashboard';
-    }
   }
   
   if (loading || !user) {
@@ -245,7 +279,7 @@ export default function DashboardLayout({
                     <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="justify-start gap-3 w-full px-2 h-12">
                         <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.photoURL ?? "https://placehold.co/32x32.png"} alt={user.displayName ?? "User"} data-ai-hint="user avatar" />
+                        <AvatarImage src={user.photoURL ?? "https://picsum.photos/seed/user/32/32"} alt={user.displayName ?? "User"} data-ai-hint="user avatar" />
                         <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
                         </Avatar>
                         <div className="text-left">
@@ -286,3 +320,5 @@ export default function DashboardLayout({
     </ProcessingQueueProvider>
   );
 }
+
+    

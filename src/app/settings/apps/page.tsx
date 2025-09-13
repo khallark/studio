@@ -31,6 +31,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface UserData {
   activeAccountId: string | null;
@@ -41,6 +48,10 @@ interface AccountData {
     integrations?: {
         couriers?: {
             delhivery?: {
+                apiKey: string;
+            },
+            shiprocket?: {
+                email: string;
                 apiKey: string;
             }
         }
@@ -58,6 +69,12 @@ export default function AppsSettingsPage() {
   const [isEditingDelhivery, setIsEditingDelhivery] = useState(false);
   const [isSubmittingDelhivery, setIsSubmittingDelhivery] = useState(false);
   
+  const [shiprocketEmail, setShiprocketEmail] = useState('');
+  const [shiprocketPassword, setShiprocketPassword] = useState('');
+  const [isEditingShiprocket, setIsEditingShiprocket] = useState(false);
+  const [isSubmittingShiprocket, setIsSubmittingShiprocket] = useState(false);
+
+
   useEffect(() => {
     if (loading) return;
 
@@ -70,10 +87,13 @@ export default function AppsSettingsPage() {
                 setUserData(fetchedUserData);
                 
                 if (fetchedUserData.activeAccountId) {
+                    // Initial fetch before subscribing
                     const accountRef = doc(db, 'accounts', fetchedUserData.activeAccountId);
                     const accountDoc = await getDoc(accountRef);
                     if (accountDoc.exists()) {
-                        setAccountData(accountDoc.data() as AccountData);
+                        const accData = accountDoc.data() as AccountData;
+                        setAccountData(accData);
+                        setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
                     }
                 }
             }
@@ -87,7 +107,9 @@ export default function AppsSettingsPage() {
         const accountRef = doc(db, 'accounts', userData.activeAccountId);
         const unsubscribe = onSnapshot(accountRef, (doc) => {
             if (doc.exists()) {
-                setAccountData(doc.data() as AccountData);
+                const accData = doc.data() as AccountData;
+                setAccountData(accData);
+                setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
             }
         });
         return () => unsubscribe();
@@ -97,6 +119,7 @@ export default function AppsSettingsPage() {
 
   const hasConnectedStore = userData?.activeAccountId;
   const hasDelhiveryKey = !!accountData?.integrations?.couriers?.delhivery?.apiKey;
+  const hasShiprocketCreds = !!accountData?.integrations?.couriers?.shiprocket?.apiKey;
 
   const handleDisconnect = () => {
     toast({
@@ -134,16 +157,52 @@ export default function AppsSettingsPage() {
 
           toast({ title: 'API Key Saved', description: 'Delhivery integration has been updated.' });
           setIsEditingDelhivery(false);
-          setDelhiveryApiKey('');
-
       } catch (error) {
-          toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
+          toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
       } finally {
           setIsSubmittingDelhivery(false);
       }
   };
 
+  const handleSaveShiprocketCreds = async () => {
+    if (!userData?.activeAccountId || !user || !shiprocketEmail || !shiprocketPassword) {
+        toast({ title: "Email and Password are required", variant: "destructive"});
+        return;
+    };
+
+    setIsSubmittingShiprocket(true);
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/integrations/shiprocket/update', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                shop: userData.activeAccountId,
+                email: shiprocketEmail,
+                password: shiprocketPassword,
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.details || 'Failed to connect to Shiprocket');
+
+        toast({ title: 'Shiprocket Connected', description: 'Shiprocket integration has been successfully set up.' });
+        setIsEditingShiprocket(false);
+        setShiprocketEmail('');
+        setShiprocketPassword('');
+    } catch (error) {
+        toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
+    } finally {
+        setIsSubmittingShiprocket(false);
+    }
+  };
+
+
   return (
+    <TooltipProvider>
     <div className="flex justify-center items-start h-full p-4 md:p-6">
       <Card className="w-full max-w-4xl">
         <CardHeader>
@@ -172,7 +231,7 @@ export default function AppsSettingsPage() {
                     ) : (
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <Image src="https://picsum.photos/64/64" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
+                          <Image src="https://picsum.photos/seed/shopify/64/64" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
                         <div>
                             <h3 className="text-xl font-semibold">Shopify</h3>
                             <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>
@@ -222,26 +281,29 @@ export default function AppsSettingsPage() {
             <section>
                  <h2 className="text-lg font-semibold mb-4 text-primary">Courier Services</h2>
                  <div className="rounded-lg border">
+                    {/* Delhivery */}
                     <div className="p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <div>
                                 <h3 className="text-xl font-semibold">Delhivery</h3>
-                                <p className="text-sm text-muted-foreground">Integrate APIs from your Delhivery account.</p>
+                                <p className="text-sm text-muted-foreground">Integrate with your Delhivery account.</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
                             {hasDelhiveryKey && !isEditingDelhivery ? (
                                 <>
-                                    <Badge variant="default">Provided</Badge>
+                                    <Badge variant="default">Connected</Badge>
                                     <Button variant="outline" onClick={() => setIsEditingDelhivery(true)}>Change Key</Button>
                                 </>
                             ) : (
-                                <Badge variant="secondary">Not Integrated</Badge>
+                                 <Button variant="outline" onClick={() => setIsEditingDelhivery(true)} disabled={!hasConnectedStore}>
+                                    {hasConnectedStore ? 'Connect' : 'No Store'}
+                                </Button>
                             )}
                         </div>
                     </div>
 
-                    {(isEditingDelhivery || !hasDelhiveryKey) && hasConnectedStore && (
+                    {(isEditingDelhivery || (!hasDelhiveryKey && hasConnectedStore)) && (
                         <div className="border-t bg-muted/50 p-6">
                              <div className="flex items-end gap-4">
                                 <div className="grid gap-1.5 flex-1">
@@ -255,7 +317,7 @@ export default function AppsSettingsPage() {
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                     {isEditingDelhivery && <Button variant="secondary" onClick={() => setIsEditingDelhivery(false)} disabled={isSubmittingDelhivery}>Cancel</Button>}
+                                     <Button variant="secondary" onClick={() => setIsEditingDelhivery(false)} disabled={isSubmittingDelhivery}>Cancel</Button>
                                      <Button onClick={handleSaveDelhiveryKey} disabled={isSubmittingDelhivery}>
                                         {isSubmittingDelhivery ? 'Saving...' : 'Save Key'}
                                     </Button>
@@ -264,11 +326,83 @@ export default function AppsSettingsPage() {
                         </div>
                     )}
 
+                    {/* Shiprocket */}
+                    <div className="border-t p-6 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div>
+                                <h3 className="text-xl font-semibold">Shiprocket</h3>
+                                <p className="text-sm text-muted-foreground">Integrate with your Shiprocket account.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {hasShiprocketCreds && !isEditingShiprocket ? (
+                                <>
+                                    <Badge variant="default">Connected</Badge>
+                                    <Button variant="outline" onClick={() => setIsEditingShiprocket(true)}>Change Credentials</Button>
+                                </>
+                            ) : (
+                                <Button variant="outline" onClick={() => setIsEditingShiprocket(true)} disabled={!hasConnectedStore}>
+                                    {hasConnectedStore ? 'Connect' : 'No Store'}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    {(isEditingShiprocket || (!hasShiprocketCreds && hasConnectedStore)) && (
+                        <div className="border-t bg-muted/50 p-6">
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">Shiprocket Credentials</h4>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Read the <a href="https://shiprocket.freshdesk.com/support/solutions/articles/43000337456-api-document-helpsheet" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Shiprocket API docs</a> for help.</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="grid gap-1.5">
+                                        <label className="text-sm font-medium">Email</label>
+                                        <Input
+                                            type="email"
+                                            placeholder="Your Shiprocket email"
+                                            value={shiprocketEmail}
+                                            onChange={(e) => setShiprocketEmail(e.target.value)}
+                                            disabled={isSubmittingShiprocket}
+                                        />
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                        <label className="text-sm font-medium">Password</label>
+                                        <Input
+                                            type="password"
+                                            placeholder="Your Shiprocket password"
+                                            value={shiprocketPassword}
+                                            onChange={(e) => setShiprocketPassword(e.target.value)}
+                                            disabled={isSubmittingShiprocket}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="secondary" onClick={() => {setIsEditingShiprocket(false); setShiprocketEmail(''); setShiprocketPassword('');}} disabled={isSubmittingShiprocket}>
+                                        Cancel
+                                    </Button>
+                                    <Button onClick={handleSaveShiprocketCreds} disabled={isSubmittingShiprocket}>
+                                        {isSubmittingShiprocket ? 'Connecting...' : 'Save & Connect'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                  </div>
             </section>
 
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   )
 }
+
+    

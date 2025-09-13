@@ -64,8 +64,18 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/export',
         destination: '/api/shopify/orders/export/route',
       },
+      {
+        source: '/api/integrations/shiprocket/update',
+        destination: '/api/integrations/shiprocket/update/route',
+      },
+      {
+        source: '/api/integrations/shiprocket/refresh-token',
+        destination: '/api/integrations/shiprocket/refresh-token/route',
+      },
     ]
   },
 };
 
 export default nextConfig;
+
+    

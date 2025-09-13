@@ -37,7 +37,6 @@ import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { collection, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { v4 as uuidv4 } from "uuid";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,7 +98,6 @@ export default function DashboardLayout({
                 orders: ordersToProcess.map(o => ({ orderId: o.id, name: o.name })),
                 pickupName,
                 shippingMode,
-                requestId: uuidv4(), // idempotency key
             }),
         });
 

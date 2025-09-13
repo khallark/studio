@@ -39,7 +39,7 @@ interface AssignAwbDialogProps {
   shopId: string;
 }
 
-const courierServices = ['Delhivery', 'Shiprocket', 'Blue Dart'];
+const courierServices = ['Delhivery', 'Shiprocket'];
 const shippingModes = ['Surface', 'Express'];
 
 export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: AssignAwbDialogProps) {
@@ -91,7 +91,12 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
         return;
     }
-    setStep(s => s + 1);
+
+    if (step === 1 && selectedCourier === 'Shiprocket') {
+      setStep(2); // Go to location selection
+    } else {
+      setStep(s => s + 1);
+    }
   };
 
   const handleBack = () => {
@@ -99,7 +104,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
   };
 
   const handleConfirm = () => {
-    if (!selectedMode) {
+    if (selectedCourier === 'Delhivery' && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
@@ -115,7 +120,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return;
     }
 
-    onConfirm(pickupName, selectedMode);
+    onConfirm(pickupName, selectedMode || '');
     onClose();
   };
 
@@ -159,6 +164,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
           </div>
         );
       case 3:
+        if (selectedCourier === 'Shiprocket') return null; // Should not happen with current logic, but as a safeguard.
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 3: Choose Shipping Mode</h3>
@@ -176,6 +182,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return null;
     }
   };
+  
+  const isFinalStep = (selectedCourier === 'Delhivery' && step === 3) || (selectedCourier === 'Shiprocket' && step === 2);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -200,8 +208,14 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             </div>
             <div>
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              {step < 3 && <Button onClick={handleNext} className="ml-2" disabled={step === 2 && pickupLocations.length === 0}>Next</Button>}
-              {step === 3 && <Button onClick={handleConfirm} className="ml-2">Assign AWBs & Create Shipments</Button>}
+              {!isFinalStep && (
+                <Button onClick={handleNext} className="ml-2" disabled={step === 2 && pickupLocations.length === 0}>Next</Button>
+              )}
+              {isFinalStep && (
+                  <Button onClick={handleConfirm} className="ml-2">
+                      {selectedCourier === 'Shiprocket' ? 'Create Shipment' : 'Assign AWBs & Create Shipments'}
+                  </Button>
+              )}
             </div>
         </DialogFooter>
       </DialogContent>

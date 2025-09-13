@@ -4,6 +4,7 @@ import { db, auth as adminAuth } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /** Verify Firebase ID token from Authorization: Bearer <token> */
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
@@ -14,33 +15,37 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     if (!idToken) return null;
     const decoded = await adminAuth.verifyIdToken(idToken);
     return decoded.uid || null;
-  } catch (err) {
-    console.error("Error verifying auth token:", err);
+  } catch {
     return null;
   }
 }
 
+type OrderLite = {
+  id: string;
+  order_number?: string | number;
+  // any other fields you want to pass through to the Cloud Function payload
+};
+
 export async function POST(req: NextRequest) {
   try {
-    // ----- Auth -----
     const userId = await getUserIdFromToken(req);
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    // ----- Input -----
-    const { shop, orders, pickupName, shippingMode } = (await req.json()) as {
-      shop: string;
-      orders: Array<{ orderId: string, name: string }>;
+    const { shop, orders, pickupName, shippingMode, requestId } = (await req.json()) as {
+      shop?: string;
+      orders?: OrderLite[];
       pickupName?: string;
-      shippingMode?: string
+      shippingMode?: string;
+      requestId?: string; // optional idempotency key
     };
 
-    if (!shop || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
-      return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
+    if (!shop || !Array.isArray(orders) || orders.length === 0) {
+      return NextResponse.json({ error: "bad_payload" }, { status: 400 });
     }
 
-    // 1) Create batch header
+    // 1) Create a batch doc up-front so UI can subscribe to it
     const batchRef = db
       .collection("accounts")
       .doc(shop)
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
     await batchRef.set({
       shop,
       createdAt: FieldValue.serverTimestamp(),
-      createdBy: userId,                 // <-- stamp UID
+      createdBy: userId, // stamp UID
       total: orders.length,
       queued: orders.length,
       processing: 0,
@@ -58,49 +63,44 @@ export async function POST(req: NextRequest) {
       failed: 0,
       status: "running",
       carrier: "delhivery",
+      pickupName: pickupName || null,
+      shippingMode: shippingMode || null,
+      requestId: requestId || null,
     });
 
-    // 2) Create job docs
-    const writer = db.bulkWriter();
-    for (const o of orders) {
-      writer.set(
-        batchRef.collection("jobs").doc(String(o.orderId)),
-        {
-          orderId: String(o.orderId),
-          orderName: o.name,
-          status: "queued",
-          attempts: 0,
-        },
-        { merge: true }
-      );
-    }
-    await writer.close();
-
-    // 3) Ask Firebase Function to enqueue Cloud Tasks (one per job)
     const url = process.env.ENQUEUE_FUNCTION_URL!;
+    const apiKey = process.env.ENQUEUE_FUNCTION_SECRET!;
+    
+    if (!apiKey) {
+      return NextResponse.json({ error: "server_misconfigured:ENQUEUE_FUNCTION_SECRET" }, { status: 500 });
+    }
+
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": process.env.ENQUEUE_FUNCTION_SECRET!, // function-side shared secret
-        // (optional) forward user identity if your function wants it:
-        // "X-User-Id": userId,
-      },
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+      } as any,
       body: JSON.stringify({
         shop,
         batchId: batchRef.id,
-        jobIds: orders.map((o) => String(o.orderId)),
+        orders,
         pickupName,
-        shippingMode
+        shippingMode,
+        requestId: requestId || null,
+        // also pass who triggered this, for audit
+        triggeredBy: userId,
       }),
+      cache: "no-store",
     });
 
     if (!res.ok) {
       const t = await res.text();
-      return NextResponse.json({ error: "enqueue failed", details: t }, { status: 502 });
+      return NextResponse.json({ error: "enqueue_failed", details: t }, { status: 502 });
     }
 
-    return NextResponse.json({ batchId: batchRef.id, total: orders.length });
+    const json = await res.json().catch(() => ({}));
+    return NextResponse.json({ batchId: batchRef.id, ...json });
   } catch (e: any) {
     console.error("bulk-create error:", e);
     return NextResponse.json(

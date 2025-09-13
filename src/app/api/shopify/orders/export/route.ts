@@ -34,7 +34,7 @@ const formatAddress = (address: any): string => {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderIds } = await req.json();
+    const { shop, orderIds, exportType } = await req.json();
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     const ordersSnapshot = await ordersColRef.where('orderId', 'in', orderIds.map(id => Number(id))).get();
     
     const flattenedData: any[] = [];
+    let srNo = 1;
     
     ordersSnapshot.forEach(doc => {
       const order = doc.data();
@@ -58,39 +59,61 @@ export async function POST(req: NextRequest) {
 
       if (order.raw.line_items && order.raw.line_items.length > 0) {
         order.raw.line_items.forEach((item: any) => {
-          flattenedData.push({
-            'Order name': order.name,
-            'Order date': new Date(order.createdAt).toLocaleDateString(),
-            'Customer': customerName,
-            'Item title': item.title,
-            'Item SKU': item.sku || 'N/A',
-            'Item Quantity': item.quantity,
-            'Item Price': item.price,
-            'Total Order Price': order.totalPrice,
-            'Currency': order.currency,
-            'Payment Status': order.financialStatus,
-            'Status': order.customStatus,
-            'Billing Address': formatAddress(order.raw.billing_address),
-            'Shipping Adress': formatAddress(order.raw.shipping_address),
-          });
+          if (exportType === 'confirmed') {
+            flattenedData.push({
+              'Sr. No': srNo++,
+              'Order name': order.name,
+              'Item name': item.title,
+              'Item SKU': item.sku || 'N/A',
+              'Item quantity': item.quantity,
+              'Availability': '',
+            });
+          } else {
+             flattenedData.push({
+                'Order name': order.name,
+                'Order date': new Date(order.createdAt).toLocaleDateString(),
+                'Customer': customerName,
+                'Item title': item.title,
+                'Item SKU': item.sku || 'N/A',
+                'Item Quantity': item.quantity,
+                'Item Price': item.price,
+                'Total Order Price': order.totalPrice,
+                'Currency': order.currency,
+                'Payment Status': order.financialStatus,
+                'Status': order.customStatus,
+                'Billing Address': formatAddress(order.raw.billing_address),
+                'Shipping Adress': formatAddress(order.raw.shipping_address),
+              });
+          }
         });
       } else {
         // Handle orders with no line items
-        flattenedData.push({
-            'Order name': order.name,
-            'Order date': new Date(order.createdAt).toLocaleDateString(),
-            'Customer': customerName,
-            'Item title': 'N/A',
-            'Item SKU': 'N/A',
-            'Item Quantity': 0,
-            'Item Price': 0,
-            'Total Order Price': order.totalPrice,
-            'Currency': order.currency,
-            'Payment Status': order.financialStatus,
-            'Status': order.customStatus,
-            'Billing Address': formatAddress(order.raw.billing_address),
-            'Shipping Adress': formatAddress(order.raw.shipping_address),
-        });
+         if (exportType === 'confirmed') {
+            flattenedData.push({
+              'Sr. No': srNo++,
+              'Order name': order.name,
+              'Item name': 'N/A',
+              'Item SKU': 'N/A',
+              'Item quantity': 0,
+              'Availability': '',
+            });
+          } else {
+            flattenedData.push({
+                'Order name': order.name,
+                'Order date': new Date(order.createdAt).toLocaleDateString(),
+                'Customer': customerName,
+                'Item title': 'N/A',
+                'Item SKU': 'N/A',
+                'Item Quantity': 0,
+                'Item Price': 0,
+                'Total Order Price': order.totalPrice,
+                'Currency': order.currency,
+                'Payment Status': order.financialStatus,
+                'Status': order.customStatus,
+                'Billing Address': formatAddress(order.raw.billing_address),
+                'Shipping Adress': formatAddress(order.raw.shipping_address),
+            });
+        }
       }
     });
 

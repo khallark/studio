@@ -544,54 +544,55 @@ export default function OrdersPage() {
     }
   }, [userData, user, selectedOrders, orders, toast]);
 
-    const handleDownloadExcel = useCallback(async () => {
-    if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
+    const handleDownloadExcel = useCallback(async (exportType?: 'confirmed') => {
+        if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
 
-    setIsDownloadingExcel(true);
-    toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
+        setIsDownloadingExcel(true);
+        toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
 
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/shopify/orders/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          shop: userData.activeAccountId,
-          orderIds: selectedOrders,
-        }),
-      });
+        try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/shopify/orders/export', {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+            shop: userData.activeAccountId,
+            orderIds: selectedOrders,
+            exportType: exportType
+            }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to generate Excel file.');
-      }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.details || 'Failed to generate Excel file.');
+        }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
 
-      setSelectedOrders([]);
+        setSelectedOrders([]);
 
-    } catch (error) {
-      console.error('Excel export error:', error);
-      toast({
-        title: 'Export Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDownloadingExcel(false);
-    }
-  }, [userData, user, selectedOrders, toast]);
+        } catch (error) {
+        console.error('Excel export error:', error);
+        toast({
+            title: 'Export Failed',
+            description: error instanceof Error ? error.message : 'An unknown error occurred.',
+            variant: 'destructive',
+        });
+        } finally {
+        setIsDownloadingExcel(false);
+        }
+    }, [userData, user, selectedOrders, toast]);
 
 
   const renderActionItems = (order: Order) => {
@@ -682,7 +683,7 @@ export default function OrdersPage() {
       case 'New':
         return (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={() => handleDownloadExcel()}>
               <Download className="mr-2 h-4 w-4" />
               {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
             </Button>
@@ -697,6 +698,10 @@ export default function OrdersPage() {
       case 'Confirmed':
         return (
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={() => handleDownloadExcel('confirmed')}>
+              <Download className="mr-2 h-4 w-4" />
+              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+            </Button>
             <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                 Assign AWBs
             </Button>
@@ -1107,10 +1112,7 @@ export default function OrdersPage() {
                                     `Webhook received with topic: ${log.details.topic}`
                                     }
                                 </p>
--                                <p className="text-xs text-muted-foreground mt-1">
--                                    {log.timestamp?.toDate().toLocaleString()}
--                                </p>
-+                                <p className="text-xs text-muted-foreground mt-1">{log.timestamp?.toDate().toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{log.timestamp?.toDate().toLocaleString()}</p>
                                 </div>
                             </div>
                             ))

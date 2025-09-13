@@ -87,6 +87,7 @@ interface Order {
   fulfillmentStatus: string;
   customStatus: CustomStatus;
   awb?: string;
+  courier?: 'Delhivery' | 'Shiprocket';
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
   raw: {
@@ -138,6 +139,7 @@ export default function OrdersPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [courierFilter, setCourierFilter] = useState<string>('all');
 
 
   useEffect(() => {
@@ -406,7 +408,7 @@ export default function OrdersPage() {
         });
     }
     
-    // Finally, filter by date range
+    // Then, filter by date range
     if (dateRange?.from && dateRange?.to) {
         filtered = filtered.filter(order => {
             const orderDate = new Date(order.createdAt);
@@ -415,9 +417,14 @@ export default function OrdersPage() {
         });
     }
 
+    // Finally, filter by courier if on the 'Ready To Dispatch' tab
+    if (activeTab === 'Ready To Dispatch' && courierFilter !== 'all') {
+        filtered = filtered.filter(order => order.courier === courierFilter);
+    }
+
 
     return filtered;
-}, [orders, activeTab, searchQuery, dateRange]);
+}, [orders, activeTab, searchQuery, dateRange, courierFilter]);
 
 
   const indexOfLastOrder = currentPage * rowsPerPage;
@@ -428,7 +435,7 @@ export default function OrdersPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedOrders([]);
-  }, [activeTab, searchQuery, dateRange, rowsPerPage]);
+  }, [activeTab, searchQuery, dateRange, rowsPerPage, courierFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -812,6 +819,18 @@ export default function OrdersPage() {
                         />
                         </PopoverContent>
                     </Popover>
+                    {activeTab === 'Ready To Dispatch' && (
+                        <Select value={courierFilter} onValueChange={setCourierFilter}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectValue placeholder="Filter by courier..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Couriers</SelectItem>
+                                <SelectItem value="Delhivery">Delhivery</SelectItem>
+                                <SelectItem value="Shiprocket">Shiprocket</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
                 </div>
             </CardHeader>
             <div className="flex-1 flex flex-col p-0 overflow-hidden">
@@ -1132,3 +1151,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

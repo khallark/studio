@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const accountDoc = await accountRef.get();
 
-    if (!accountDoc.exists()) {
+    if (!accountDoc.exists) {
         return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
@@ -69,5 +69,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to refresh token', details: errorMessage }, { status: 500 });
   }
 }
-
     

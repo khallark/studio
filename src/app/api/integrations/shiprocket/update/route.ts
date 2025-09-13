@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
     
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists() || !userDoc.data()?.accounts.includes(shop)) {
+    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
         return NextResponse.json({ error: 'Forbidden: User is not authorized to edit this shop.' }, { status: 403 });
     }
 
@@ -78,5 +78,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update integration', details: errorMessage }, { status: 500 });
   }
 }
-
     

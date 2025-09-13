@@ -739,7 +739,7 @@ export default function OrdersPage() {
     <>
     <main className="flex flex-1 flex-col h-full">
       <div className="flex-1 flex flex-col overflow-hidden">
-         <Card className="flex flex-col h-full">
+         <Card className="flex flex-col h-full border-0 rounded-none">
             <CardHeader className="border-b p-4 md:p-6 shrink-0">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
@@ -922,59 +922,59 @@ export default function OrdersPage() {
                     </TableBody>
                 </Table>
                 </div>
-                <CardFooter className="p-4 border-t shrink-0">
-                    <div className="flex items-center justify-between w-full">
-                        <div className="text-xs text-muted-foreground">
-                            {selectedOrders.length > 0
-                            ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
-                            : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
-                        }
-                        </div>
-                         <div className="flex items-center gap-4">
-                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Rows per page</span>
-                                <Select
-                                    value={`${rowsPerPage}`}
-                                    onValueChange={(value) => {
-                                        setRowsPerPage(Number(value));
-                                        setCurrentPage(1);
-                                    }}
-                                    >
-                                    <SelectTrigger className="h-8 w-[70px]">
-                                        <SelectValue placeholder={rowsPerPage} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[10, 20, 30, 40, 50].map((pageSize) => (
-                                        <SelectItem key={pageSize} value={`${pageSize}`}>
-                                            {pageSize}
-                                        </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handlePreviousPage}
-                                disabled={currentPage === 1}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleNextPage}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                            >
-                                Next
-                            </Button>
-                            </div>
-                        </div>
-                    </div>
-                </CardFooter>
             </Tabs>
             </div>
+            <CardFooter className="p-4 border-t shrink-0">
+                <div className="flex items-center justify-between w-full">
+                    <div className="text-xs text-muted-foreground">
+                        {selectedOrders.length > 0
+                        ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
+                        : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
+                    }
+                    </div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Rows per page</span>
+                            <Select
+                                value={`${rowsPerPage}`}
+                                onValueChange={(value) => {
+                                    setRowsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                                >
+                                <SelectTrigger className="h-8 w-[70px]">
+                                    <SelectValue placeholder={rowsPerPage} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[10, 20, 30, 40, 50, 100, 200].map((pageSize) => (
+                                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                                        {pageSize}
+                                    </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handlePreviousPage}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                        >
+                            Next
+                        </Button>
+                        </div>
+                    </div>
+                </div>
+            </CardFooter>
         </Card>
       </div>
     </main>

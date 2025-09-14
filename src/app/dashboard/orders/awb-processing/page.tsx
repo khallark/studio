@@ -105,7 +105,7 @@ export default function AwbProcessingPage() {
   return (
     <>
       <main className="flex flex-1 flex-col p-4 md:p-6 h-full">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
             <div>
                 <h1 className="text-2xl font-bold font-headline">AWB Processing</h1>
                 <p className="text-muted-foreground">Manage bulk AWB assignments and generate shipping slips.</p>
@@ -116,10 +116,8 @@ export default function AwbProcessingPage() {
           </Button>
         </div>
         
-        <Separator className="my-6" />
-
         <div className="grid gap-8 lg:grid-cols-3 flex-1">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 h-full">
             <Card className="h-full flex flex-col">
               <CardHeader>
                 <CardTitle>Bulk Assignment History</CardTitle>
@@ -176,7 +174,7 @@ export default function AwbProcessingPage() {
             </Card>
           </div>
 
-          <div>
+          <div className="h-full">
              <Card className="h-full flex flex-col">
                 <CardHeader>
                   <CardTitle>AWB Slip Generation</CardTitle>
@@ -286,3 +284,5 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
     </div>
   );
 }
+
+    

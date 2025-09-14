@@ -35,7 +35,7 @@ interface AssignAwbDialogProps {
   isOpen: boolean;
   onClose: () => void;
   orders: Order[];
-  onConfirm: (pickupName: string, shippingMode: string) => void;
+  onConfirm: (courier: string, pickupName: string, shippingMode: string) => void;
   shopId: string;
 }
 
@@ -104,6 +104,10 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
   };
 
   const handleConfirm = () => {
+    if(!selectedCourier) {
+      toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
+      return;
+    }
     if (selectedCourier === 'Delhivery' && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
@@ -120,7 +124,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return;
     }
 
-    onConfirm(pickupName, selectedMode || '');
+    onConfirm(selectedCourier, pickupName, selectedMode || '');
     onClose();
   };
 

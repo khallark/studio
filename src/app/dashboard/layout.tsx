@@ -69,6 +69,7 @@ export default function DashboardLayout({
 
   const processAwbAssignments = useCallback(async (
     ordersToProcess: {id: string, name: string}[], 
+    courier: string,
     pickupName: string,
     shippingMode: string
   ) => {
@@ -96,6 +97,7 @@ export default function DashboardLayout({
             body: JSON.stringify({ 
                 shop: shopId,
                 orders: ordersToProcess.map(o => ({ orderId: o.id, name: o.name })),
+                courier,
                 pickupName,
                 shippingMode,
             }),

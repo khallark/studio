@@ -237,7 +237,7 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
               Batch {batch.id}
             </Link>
             <span className="text-xs text-muted-foreground">
-              ({batch.carrier || 'delhivery'})
+              ({batch.carrier || 'unknown carrier'})
             </span>
           </div>
 

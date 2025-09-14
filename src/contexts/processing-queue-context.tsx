@@ -10,7 +10,7 @@ interface OrderInfo {
 }
 
 interface ProcessingQueueContextType {
-  processAwbAssignments: (orders: OrderInfo[], pickupName: string, shippingMode: string) => Promise<void>;
+  processAwbAssignments: (orders: OrderInfo[], courier: string, pickupName: string, shippingMode: string) => Promise<void>;
   processingQueue: ProcessingOrder[];
 }
 
@@ -26,7 +26,7 @@ export function useProcessingQueue() {
 
 interface ProcessingQueueProviderProps {
   children: ReactNode;
-  processAwbAssignments: (orders: OrderInfo[], pickupName: string, shippingMode: string) => Promise<void>;
+  processAwbAssignments: (orders: OrderInfo[], courier: string, pickupName: string, shippingMode: string) => Promise<void>;
   processingQueue: ProcessingOrder[];
 }
 

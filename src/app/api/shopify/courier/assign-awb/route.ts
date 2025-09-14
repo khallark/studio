@@ -29,14 +29,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Input -----
-    const { shop, orders, pickupName, shippingMode } = (await req.json()) as {
+    const { shop, orders, courier, pickupName, shippingMode } = (await req.json()) as {
       shop: string;
       orders: Array<{ orderId: string, name: string }>;
+      courier?: string;
       pickupName?: string;
       shippingMode?: string
     };
 
-    if (!shop || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
+    if (!shop || !courier || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
     }
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       success: 0,
       failed: 0,
       status: "running",
-      carrier: "delhivery",
+      carrier: courier,
     });
 
     // 2) Create job docs
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
         shop,
         batchId: batchRef.id,
         jobIds: orders.map((o) => String(o.orderId)),
+        courier,
         pickupName,
         shippingMode
       }),

@@ -421,7 +421,11 @@ export default function OrdersPage() {
 
     // Finally, filter by courier if on the 'Ready To Dispatch' tab
     if (activeTab === 'Ready To Dispatch' && courierFilter !== 'all') {
+      if (courierFilter === 'Delhivery') { 
         filtered = filtered.filter(order => order.courier === courierFilter);
+      } else if (courierFilter === 'Shiprocket') {
+        filtered = filtered.filter(order => order.courier?.includes('Shiprocket'));
+      }
     }
 
 
@@ -1083,9 +1087,9 @@ export default function OrdersPage() {
         isOpen={isAwbDialogOpen}
         onClose={() => setIsAwbDialogOpen(false)}
         orders={ordersForAwb}
-        onConfirm={(pickupName, shippingMode) => {
+        onConfirm={(courier, pickupName, shippingMode) => {
             const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-            processAwbAssignments(ordersToProcess.map(o => ({id: o.id, name: o.name})), pickupName, shippingMode);
+            processAwbAssignments(ordersToProcess.map(o => ({id: o.id, name: o.name})), courier, pickupName, shippingMode);
             setSelectedOrders([]);
         }}
         shopId={userData?.activeAccountId || ''}

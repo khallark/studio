@@ -67,7 +67,7 @@ import { format, addDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
+type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled' | 'All Orders';
 
 interface OrderLog {
   type: 'USER_ACTION' | 'WEBHOOK';
@@ -128,7 +128,7 @@ export default function OrdersPage() {
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
 
-  const [activeTab, setActiveTab] = useState<CustomStatus>('New');
+  const [activeTab, setActiveTab] = useState<CustomStatus>('All Orders');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -353,51 +353,41 @@ export default function OrdersPage() {
     }
   }, [userData, toast]);
   
-  const statusCounts = useMemo(() => {
+    const statusCounts = useMemo(() => {
     const initialCounts: Record<CustomStatus, number> = {
+      'All Orders': 0,
       New: 0,
       Confirmed: 0,
       'Ready To Dispatch': 0,
       Dispatched: 0,
       Cancelled: 0,
     };
-    return orders.reduce((acc, order) => {
-      if (order.isDeleted) return acc;
-      // If Shopify says it's cancelled, it's cancelled. This takes precedence.
-      if (order.raw?.cancelled_at) {
-        acc['Cancelled']++;
-      } else {
-        const status = order.customStatus || 'New';
-        if (acc[status] !== undefined) {
-          acc[status]++;
-        }
+    const allNonCancelled = orders.filter(o => !o.isDeleted && !o.raw?.cancelled_at);
+    initialCounts['All Orders'] = allNonCancelled.length;
+
+    return allNonCancelled.reduce((acc, order) => {
+      const status = order.customStatus || 'New';
+      if (acc[status] !== undefined) {
+        acc[status]++;
       }
       return acc;
-    }, initialCounts);
+    }, {
+      ...initialCounts,
+      Cancelled: orders.filter(o => !o.isDeleted && !!o.raw?.cancelled_at).length
+    });
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
-    let filtered = orders;
+    let filtered = orders.filter(o => !o.isDeleted);
 
-    // Filter by status tab first
-    filtered = filtered.filter(order => {
-        if (order.isDeleted) return false;
-        
-        const isShopifyCancelled = !!order.raw?.cancelled_at;
+    if (activeTab === 'All Orders') {
+      filtered = filtered.filter(order => !order.raw?.cancelled_at);
+    } else if (activeTab === 'Cancelled') {
+      filtered = filtered.filter(order => !!order.raw?.cancelled_at);
+    } else {
+      filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab && !order.raw?.cancelled_at);
+    }
 
-        if (activeTab === 'Cancelled') {
-            return isShopifyCancelled;
-        }
-
-        // Exclude Shopify-cancelled orders from all other tabs
-        if (isShopifyCancelled) {
-            return false;
-        }
-        
-        return (order.customStatus || 'New') === activeTab;
-    });
-
-    // Then, filter by search query
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         filtered = filtered.filter(order => {
@@ -410,16 +400,15 @@ export default function OrdersPage() {
         });
     }
     
-    // Then, filter by date range
-    if (dateRange?.from && dateRange?.to) {
+    if (dateRange?.from) {
         filtered = filtered.filter(order => {
             const orderDate = new Date(order.createdAt);
-            // Add a day to the 'to' date to make the range inclusive
-            return orderDate >= dateRange.from! && orderDate < addDays(dateRange.to!, 1);
+            const fromDate = dateRange.from!;
+            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(fromDate, 1);
+            return orderDate >= fromDate && orderDate < toDate;
         });
     }
 
-    // Finally, filter by courier if on the 'Ready To Dispatch' tab
     if (activeTab === 'Ready To Dispatch' && courierFilter !== 'all') {
       if (courierFilter === 'Delhivery') { 
         filtered = filtered.filter(order => order.courier === courierFilter);
@@ -895,7 +884,8 @@ export default function OrdersPage() {
             </CardHeader>
             <div className="flex-1 flex flex-col p-0 overflow-hidden">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus)} className="flex flex-col h-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto rounded-none border-b p-2 shrink-0">
+                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-6 h-auto rounded-none border-b p-2 shrink-0">
+                <TabsTrigger value="All Orders">All Orders ({statusCounts['All Orders'] || 0})</TabsTrigger>
                 <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
                 <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
                 <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
@@ -904,7 +894,7 @@ export default function OrdersPage() {
                 </TabsList>
                 <div className="flex-1 overflow-y-auto">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                         <TableHead className="w-[50px]">
                         <Checkbox
@@ -913,14 +903,14 @@ export default function OrdersPage() {
                             aria-label="Select all"
                         />
                         </TableHead>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>AWB</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Fulfillment Status</TableHead>
-                        <TableHead>Items</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
+                        <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
+                        <TableHead className="font-medium text-muted-foreground">Items</TableHead>
                         <TableHead>
                         <span className="sr-only">Actions</span>
                         </TableHead>
@@ -952,34 +942,34 @@ export default function OrdersPage() {
                             onClick={() => setViewingOrder(order)}
                             className="cursor-pointer"
                             >
-                            <TableCell onClick={(e) => e.stopPropagation()}>
+                            <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
                                 <Checkbox
                                 checked={selectedOrders.includes(order.id)}
                                 onCheckedChange={() => handleSelectOrder(order.id)}
                                 aria-label={`Select order ${order.name}`}
                                 />
                             </TableCell>
-                            <TableCell className="font-medium">{order.name}</TableCell>
-                            <TableCell>{order.awb || 'N/A'}</TableCell>
-                            <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                            <TableCell>{customerName || order.email}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="font-medium py-2">{order.name}</TableCell>
+                            <TableCell className="py-2">{order.awb || 'N/A'}</TableCell>
+                            <TableCell className="py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell className="py-2">{customerName || order.email}</TableCell>
+                            <TableCell className="text-right py-2">
                                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-2">
                                 <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
                                 {order.financialStatus?.replace('_', ' ') || 'N/A'}
                                 </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-2">
                                 <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
                                 {order.fulfillmentStatus || 'unfulfilled'}
                                 </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-2">
                                 {order.raw?.line_items?.length || 0}
                             </TableCell>
-                            <TableCell onClick={(e) => e.stopPropagation()}>
+                            <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
                                 <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button aria-haspopup="true" size="icon" variant="ghost">

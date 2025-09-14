@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
@@ -17,14 +17,13 @@ import {
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { PackagePlus, Loader2, CheckCircle, XCircle, RotateCcw, FileText, ChevronRight } from 'lucide-react';
+import { PackagePlus, Loader2, CheckCircle, XCircle, RotateCcw, ChevronRight, Download } from 'lucide-react';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
@@ -104,8 +103,8 @@ export default function AwbProcessingPage() {
 
   return (
     <>
-      <main className="flex h-screen flex-col overflow-hidden p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
+      <main className="flex h-full flex-col">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b">
             <div>
                 <h1 className="text-2xl font-bold font-headline">AWB Processing</h1>
                 <p className="text-muted-foreground">Manage bulk AWB assignments and generate shipping slips.</p>
@@ -116,8 +115,8 @@ export default function AwbProcessingPage() {
           </Button>
         </div>
         
-        <div className="grid flex-1 min-h-0 gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2 h-full min-h-0">
+        <div className="grid flex-1 min-h-0 gap-8 lg:grid-cols-3 p-4 md:p-6">
+          <div className="lg:col-span-3 h-full min-h-0">
             <Card className="flex h-full min-h-0 flex-col">
               <CardHeader>
                 <CardTitle>Bulk Assignment History</CardTitle>
@@ -163,7 +162,7 @@ export default function AwbProcessingPage() {
                         <div className="space-y-4 mt-6">
                           <h4 className="font-semibold">Completed</h4>
                           {completed.map((b) => (
-                            <BatchRow key={b.id} shopId={b.id} batch={b} />
+                            <BatchRow key={b.id} shopId={shopId} batch={b} />
                           ))}
                         </div>
                       )}
@@ -171,26 +170,6 @@ export default function AwbProcessingPage() {
                   )}
                 </ScrollArea>
               </CardContent>
-            </Card>
-          </div>
-
-          <div className="h-full min-h-0">
-            <Card className="flex h-full min-h-0 flex-col">
-                <CardHeader>
-                  <CardTitle>AWB Slip Generation</CardTitle>
-                  <CardDescription>
-                    Generate and download printable PDF slips.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-                        <FileText className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold">Generate Slips</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Functionality to generate and merge slips for your dispatched orders will be available here soon.
-                    </p>
-                </CardContent>
             </Card>
           </div>
         </div>
@@ -205,6 +184,9 @@ export default function AwbProcessingPage() {
 }
 
 function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
+  const [user] = useAuthState(auth);
+  const { toast } = useToast();
+  const [isDownloadingFailed, setIsDownloadingFailed] = useState(false);
   const done = (batch?.success || 0) + (batch?.failed || 0);
   const pct = batch?.total > 0 ? Math.round((done / batch.total) * 100) : 0;
   const running = batch?.status === 'running' || done < (batch?.total || 0);
@@ -214,6 +196,49 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
     // Retry logic would go here
     console.log(`Retrying failed jobs for batch ${batch.id}`);
   };
+
+  const handleDownloadFailed = useCallback(async (batchId: string) => {
+    if (!shopId || !user) return;
+    setIsDownloadingFailed(true);
+    toast({ title: 'Generating Report', description: 'Your download will begin shortly.' });
+
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/shopify/courier/download-failed-jobs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ shop: shopId, batchId }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.details || 'Failed to generate report');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `failed-jobs-${batchId}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Failed to download failed jobs report:', error);
+        toast({
+            title: 'Download Failed',
+            description: error instanceof Error ? error.message : 'An unknown error occurred',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsDownloadingFailed(false);
+    }
+  }, [shopId, user, toast]);
 
   return (
     <div className="border rounded-lg p-4 transition-colors hover:bg-muted/50">
@@ -248,14 +273,20 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
             <div className="flex items-center gap-4 mt-3 sm:mt-0">
                  {batch.failed > 0 && (
                     <TooltipProvider>
-                        <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button size="sm" variant="outline" onClick={handleRetryFailed}>
-                            <RotateCcw className="mr-2 h-4 w-4" /> Retry Failed
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadFailed(batch.id)} disabled={isDownloadingFailed}>
+                                <Download className="mr-2 h-4 w-4" />
+                                {isDownloadingFailed ? 'Downloading...' : 'Failed Report'}
                             </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
-                        </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button size="sm" variant="outline" onClick={handleRetryFailed}>
+                                    <RotateCcw className="mr-2 h-4 w-4" /> Retry Failed
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
+                            </Tooltip>
+                        </div>
                     </TooltipProvider>
                 )}
                  <Button asChild variant="ghost" size="sm">
@@ -285,4 +316,3 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
   );
 }
 
-    

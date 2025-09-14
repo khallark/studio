@@ -72,6 +72,10 @@ const nextConfig: NextConfig = {
         source: '/api/integrations/shiprocket/refresh-token',
         destination: '/api/integrations/shiprocket/refresh-token/route',
       },
+      {
+        source: '/api/shopify/courier/download-failed-jobs',
+        destination: '/api/shopify/courier/download-failed-jobs/route',
+      },
     ]
   },
 };

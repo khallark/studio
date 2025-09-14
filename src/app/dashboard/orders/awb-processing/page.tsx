@@ -315,4 +315,3 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
     </div>
   );
 }
-

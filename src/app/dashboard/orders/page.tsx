@@ -890,111 +890,110 @@ export default function OrdersPage() {
             <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
             <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
           </TabsList>
-          <div className="flex-1 relative">
-            <ScrollArea className="absolute inset-0">
-              <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="w-[50px]">
-                      <Checkbox
-                        checked={areAllOnPageSelected}
-                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Date</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
-                    <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
-                    <TableHead className="font-medium text-muted-foreground">Items</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-5 w-5" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-10" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : currentOrders.length > 0 ? (
-                    currentOrders.map((order) => {
-                      const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
-                      return (
-                        <TableRow
-                          key={order.id}
-                          data-state={selectedOrders.includes(order.id) && "selected"}
-                          onClick={() => setViewingOrder(order)}
-                          className="cursor-pointer"
-                        >
-                          <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
-                            <Checkbox
-                              checked={selectedOrders.includes(order.id)}
-                              onCheckedChange={() => handleSelectOrder(order.id)}
-                              aria-label={`Select order ${order.name}`}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium py-2">{order.name}</TableCell>
-                          <TableCell className="py-2">{order.awb || 'N/A'}</TableCell>
-                          <TableCell className="py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell className="py-2">{customerName || order.email}</TableCell>
-                          <TableCell className="text-right py-2">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
-                              {order.financialStatus?.replace('_', ' ') || 'N/A'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
-                              {order.fulfillmentStatus || 'unfulfilled'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {order.raw?.line_items?.length || 0}
-                          </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button aria-haspopup="true" size="icon" variant="ghost">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                  <span className="sr-only">Toggle menu</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                {renderActionItems(order)}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center h-24">
-                        {userData?.activeAccountId ? `No ${activeTab.toLowerCase()} orders found.` : 'Please connect a store to see your orders.'}
-                      </TableCell>
+          
+          <div className="flex-1 overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={areAllOnPageSelected}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
+                  <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Items</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-5 w-5" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                  ))
+                ) : currentOrders.length > 0 ? (
+                  currentOrders.map((order) => {
+                    const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
+                    return (
+                      <TableRow
+                        key={order.id}
+                        data-state={selectedOrders.includes(order.id) && "selected"}
+                        onClick={() => setViewingOrder(order)}
+                        className="cursor-pointer"
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
+                          <Checkbox
+                            checked={selectedOrders.includes(order.id)}
+                            onCheckedChange={() => handleSelectOrder(order.id)}
+                            aria-label={`Select order ${order.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium py-2">{order.name}</TableCell>
+                        <TableCell className="py-2">{order.awb || 'N/A'}</TableCell>
+                        <TableCell className="py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="py-2">{customerName || order.email}</TableCell>
+                        <TableCell className="text-right py-2">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize">
+                            {order.financialStatus?.replace('_', ' ') || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize">
+                            {order.fulfillmentStatus || 'unfulfilled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {order.raw?.line_items?.length || 0}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              {renderActionItems(order)}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center h-24">
+                      {userData?.activeAccountId ? `No ${activeTab.toLowerCase()} orders found.` : 'Please connect a store to see your orders.'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </Tabs>
         <CardFooter className="p-4 border-t shrink-0">

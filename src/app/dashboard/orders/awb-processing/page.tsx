@@ -28,6 +28,7 @@ import { PackagePlus, Loader2, CheckCircle, XCircle, RotateCcw, FileText, Chevro
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ShipmentBatch = {
   id: string;
@@ -103,7 +104,7 @@ export default function AwbProcessingPage() {
 
   return (
     <>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
+      <main className="flex flex-1 flex-col p-4 md:p-6 h-full">
         <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-2xl font-bold font-headline">AWB Processing</h1>
@@ -115,11 +116,11 @@ export default function AwbProcessingPage() {
           </Button>
         </div>
         
-        <Separator />
+        <Separator className="my-6" />
 
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-8 lg:grid-cols-3 flex-1">
           <div className="lg:col-span-2">
-            <Card>
+            <Card className="h-full flex flex-col">
               <CardHeader>
                 <CardTitle>Bulk Assignment History</CardTitle>
                 <CardDescription>
@@ -127,48 +128,50 @@ export default function AwbProcessingPage() {
                   <span className="font-medium">{shopId}</span>.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                {!shopId || shopId === '—' ? (
-                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No active store selected.</p>
-                    <p className="text-sm text-muted-foreground">
-                      Select a store (or sign in) to view batches.
-                    </p>
-                  </div>
-                ) : loading ? (
-                  <div className="space-y-4">
-                    <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
-                    <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
-                    <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
-                  </div>
-                ) : batches.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No records yet.</p>
-                    <p className="text-sm text-muted-foreground">
-                      Start an assignment from the Orders page to see it here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {ongoing.length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-semibold">Ongoing</h4>
-                        {ongoing.map((b) => (
-                          <BatchRow key={b.id} shopId={shopId} batch={b} />
-                        ))}
-                      </div>
-                    )}
+              <CardContent className="flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  {!shopId || shopId === '—' ? (
+                    <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg">
+                      <p className="text-muted-foreground">No active store selected.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Select a store (or sign in) to view batches.
+                      </p>
+                    </div>
+                  ) : loading ? (
+                    <div className="space-y-4 pr-6">
+                      <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
+                      <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
+                      <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
+                    </div>
+                  ) : batches.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg">
+                      <p className="text-muted-foreground">No records yet.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Start an assignment from the Orders page to see it here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 pr-6">
+                      {ongoing.length > 0 && (
+                        <div className="space-y-4">
+                          <h4 className="font-semibold">Ongoing</h4>
+                          {ongoing.map((b) => (
+                            <BatchRow key={b.id} shopId={shopId} batch={b} />
+                          ))}
+                        </div>
+                      )}
 
-                    {completed.length > 0 && (
-                      <div className="space-y-4 mt-6">
-                        <h4 className="font-semibold">Completed</h4>
-                        {completed.map((b) => (
-                          <BatchRow key={b.id} shopId={shopId} batch={b} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                      {completed.length > 0 && (
+                        <div className="space-y-4 mt-6">
+                          <h4 className="font-semibold">Completed</h4>
+                          {completed.map((b) => (
+                            <BatchRow key={b.id} shopId={b.id} batch={b} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>
@@ -283,5 +286,3 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
     </div>
   );
 }
-
-    

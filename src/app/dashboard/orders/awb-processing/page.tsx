@@ -104,7 +104,7 @@ export default function AwbProcessingPage() {
 
   return (
     <>
-      <main className="flex flex-1 flex-col p-4 md:p-6 h-full">
+      <main className="flex h-screen flex-col overflow-hidden p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
             <div>
                 <h1 className="text-2xl font-bold font-headline">AWB Processing</h1>
@@ -116,9 +116,9 @@ export default function AwbProcessingPage() {
           </Button>
         </div>
         
-        <div className="grid gap-8 lg:grid-cols-3 flex-1">
-          <div className="lg:col-span-2 h-full">
-            <Card className="h-full flex flex-col">
+        <div className="grid flex-1 min-h-0 gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2 h-full min-h-0">
+            <Card className="flex h-full min-h-0 flex-col">
               <CardHeader>
                 <CardTitle>Bulk Assignment History</CardTitle>
                 <CardDescription>
@@ -126,7 +126,7 @@ export default function AwbProcessingPage() {
                   <span className="font-medium">{shopId}</span>.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
+              <CardContent className="flex-1 min-h-0 overflow-hidden">
                 <ScrollArea className="h-full">
                   {!shopId || shopId === '—' ? (
                     <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg">
@@ -174,8 +174,8 @@ export default function AwbProcessingPage() {
             </Card>
           </div>
 
-          <div className="h-full">
-             <Card className="h-full flex flex-col">
+          <div className="h-full min-h-0">
+            <Card className="flex h-full min-h-0 flex-col">
                 <CardHeader>
                   <CardTitle>AWB Slip Generation</CardTitle>
                   <CardDescription>

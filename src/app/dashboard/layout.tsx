@@ -66,6 +66,7 @@ export default function DashboardLayout({
   const { toast } = useToast();
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
+  const courriers = ['shiprocket', 'delhivery'];
 
   const processAwbAssignments = useCallback(async (
     ordersToProcess: {id: string, name: string}[], 
@@ -99,7 +100,7 @@ export default function DashboardLayout({
                 orders: ordersToProcess.map(o => ({ orderId: o.id, name: o.name })),
                 courier,
                 pickupName,
-                shippingMode,
+                shippingMode: courriers.includes(courier) ? shippingMode : 'Express'
             }),
         });
 

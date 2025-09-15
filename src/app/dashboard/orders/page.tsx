@@ -950,7 +950,7 @@ export default function OrdersPage() {
                                         <TableCell className="py-2">{order.awb || 'N/A'}</TableCell>
                                         <TableCell className="py-2 text-sm">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-sm">{customerName || order.email}</TableCell>
-                                        <TableCell className="text-right text-sm">
+                                        <TableCell className="text-right text-sm font-mono">
                                             {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                                         </TableCell>
                                         <TableCell className="py-2">
@@ -1143,7 +1143,7 @@ export default function OrdersPage() {
                                     <TableCell className="font-medium">{item.title}</TableCell>
                                     <TableCell>{item.sku || 'N/A'}</TableCell>
                                     <TableCell className="text-center">{item.quantity}</TableCell>
-                                    <TableCell className="text-right">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>
+                                    <TableCell className="text-right font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
@@ -1152,7 +1152,7 @@ export default function OrdersPage() {
                      <Separator />
                      <div className="flex justify-end items-center gap-4 text-lg font-bold">
                         <span>Total:</span>
-                        <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
+                        <span className="font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
                      </div>
                 </div>
 

@@ -76,6 +76,10 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/courier/download-failed-jobs',
         destination: '/api/shopify/courier/download-failed-jobs/route',
       },
+      {
+        source: '/api/shopify/orders/download-slips',
+        destination: '/api/shopify/orders/download-slips/route',
+      },
     ]
   },
 };

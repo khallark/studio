@@ -46,14 +46,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import Link from 'next/link';
@@ -78,6 +77,7 @@ interface OrderLog {
 
 interface Order {
   id: string; // Firestore document ID
+  orderId: number;
   name: string;
   createdAt: string;
   email: string;
@@ -362,22 +362,26 @@ export default function OrdersPage() {
       Cancelled: 0,
     };
 
-    return orders.reduce((acc, order) => {
+    let allOrdersCount = 0;
+    const counts = orders.reduce((acc, order) => {
       if (order.isDeleted) return acc;
-      
+
       const isShopifyCancelled = !!order.raw?.cancelled_at;
 
       if (isShopifyCancelled) {
-        acc['Cancelled']++;
+        acc['Cancelled'] = (acc['Cancelled'] || 0) + 1;
       } else {
-        acc['All Orders']++;
+        allOrdersCount++;
         const status = order.customStatus || 'New';
         if (acc[status] !== undefined) {
-          acc[status]++;
+          acc[status] = (acc[status] || 0) + 1;
         }
       }
       return acc;
-    }, initialCounts);
+    }, initialCounts as Record<string, number>);
+
+    counts['All Orders'] = allOrdersCount;
+    return counts as Record<CustomStatus | 'All Orders', number>;
   }, [orders]);
   
   const filteredOrders = useMemo(() => {
@@ -482,36 +486,31 @@ export default function OrdersPage() {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
 
     setIsDownloadingSlips(true);
-    toast({ title: "Generating Slips", description: "Your download will begin automatically. Please wait." });
+    toast({ title: "Generating Slips", description: "Your PDF will begin downloading shortly. This may take a moment." });
 
     try {
       const ordersToDownload = orders.filter(o => selectedOrders.includes(o.id) && o.awb);
-      // stringify + dedupe
-      const awbs = Array.from(new Set(ordersToDownload.map(o => String(o.awb))));
-      if (awbs.length === 0) {
+      const orderIdsToDownload = ordersToDownload.map(o => o.orderId);
+
+      if (orderIdsToDownload.length === 0) {
         toast({ title: "No AWBs found", description: "None of the selected orders have an AWB assigned.", variant: "destructive" });
         return;
       }
 
       const idToken = await user.getIdToken();
-      const filename = `slips-${new Date().toISOString().split("T")[0]}.pdf`;
-
-      const response = await fetch("/api/shopify/courier/slips-merge", {
-        method: "POST",
+      const response = await fetch('/api/shopify/orders/download-slips', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           shop: userData.activeAccountId,
-          awbs,
-          filename,
-          outsize: 'A4',
+          orderIds: orderIdsToDownload,
         }),
       });
 
       if (!response.ok) {
-        // try JSON, fall back to text
         let msg = "Failed to download slips";
         try {
           const err = await response.json();
@@ -522,21 +521,11 @@ export default function OrdersPage() {
         throw new Error(msg);
       }
 
-      // Optional: read headers about skipped slips
-      const missing = response.headers.get("x-missing-awbs");
-      const invalid = response.headers.get("x-invalid-awbs");
-      if (missing || invalid) {
-        toast({
-          title: "Some slips were skipped",
-          description: `${missing ? `${missing} missing` : ""}${missing && invalid ? ", " : ""}${invalid ? `${invalid} invalid` : ""}`,
-        });
-      }
-
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = `shipping-slips-${Date.now()}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -749,7 +738,7 @@ export default function OrdersPage() {
         return (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-              <Download className="mr-2 h-4 w-4" />
+              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
             </Button>
             <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
@@ -764,7 +753,7 @@ export default function OrdersPage() {
         return (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingConfirmedExcel} onClick={handleDownloadConfirmedExcel}>
-              <Download className="mr-2 h-4 w-4" />
+              {isDownloadingConfirmedExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isDownloadingConfirmedExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
             </Button>
             <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
@@ -779,8 +768,8 @@ export default function OrdersPage() {
          return (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
-              <Download className="mr-2 h-4 w-4" />
-              {isDownloadingSlips ? 'Downloading...' : `Download Slips for ${selectedOrders.length} Order(s)`}
+              {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isDownloadingSlips ? 'Downloading...' : `Download Slips (${selectedOrders.length})`}
             </Button>
             <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
                 {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
@@ -807,7 +796,7 @@ export default function OrdersPage() {
 
   return (
     <>
-    <main className="flex flex-1 flex-col h-full">
+    <main className="flex flex-col h-full">
         <Card className="flex flex-col h-full border-0 rounded-none">
             <CardHeader className="border-b p-4 md:p-6 shrink-0">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -817,7 +806,7 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         {renderBulkActionButtons()}
                         <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId} size="sm" variant="outline">
-                            <Download className="mr-2 h-4 w-4" />
+                            {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             {isSyncing ? 'Syncing...' : 'Sync Orders'}
                         </Button>
                         <Button asChild size="sm">
@@ -902,7 +891,7 @@ export default function OrdersPage() {
                 <div className="flex-1 relative">
                     <div className="absolute inset-0 overflow-y-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-card z-10">
+                            <thead className="sticky top-0 bg-card z-10">
                                 <TableRow>
                                     <TableHead className="w-[50px]">
                                     <Checkbox
@@ -923,7 +912,7 @@ export default function OrdersPage() {
                                     <span className="sr-only">Actions</span>
                                     </TableHead>
                                 </TableRow>
-                            </TableHeader>
+                            </thead>
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: rowsPerPage }).map((_, i) => (
@@ -1170,35 +1159,37 @@ export default function OrdersPage() {
                 {/* Right side: Logs */}
                 <div className="space-y-6">
                     <h3 className="font-semibold text-lg">History</h3>
-                    <ScrollArea className="h-full">
-                        <div className="space-y-6 pr-4">
-                        {(viewingOrder.logs && viewingOrder.logs.length > 0) ? (
-                            [...viewingOrder.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
-                            <div key={index} className="flex items-start gap-4">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
-                                    {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                    <div className="relative h-full">
+                        <div className="absolute inset-0 overflow-y-auto pr-4">
+                            <div className="space-y-6">
+                            {(viewingOrder.logs && viewingOrder.logs.length > 0) ? (
+                                [...viewingOrder.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
+                                <div key={index} className="flex items-start gap-4">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
+                                        {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                    </div>
+                                    <div className="flex-1">
+                                    <p className="font-semibold text-sm">
+                                        {log.action.replace(/_/g, ' ')}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {log.type === 'USER_ACTION' ? 
+                                        `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
+                                        `Webhook received with topic: ${log.details.topic}`
+                                        }
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">{log.timestamp?.toDate().toLocaleString()}</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                <p className="font-semibold text-sm">
-                                    {log.action.replace(/_/g, ' ')}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {log.type === 'USER_ACTION' ? 
-                                    `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
-                                    `Webhook received with topic: ${log.details.topic}`
-                                    }
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">{log.timestamp?.toDate().toLocaleString()}</p>
+                                ))
+                            ) : (
+                                <div className="text-center text-muted-foreground py-12">
+                                <p>No history found for this order.</p>
                                 </div>
+                            )}
                             </div>
-                            ))
-                        ) : (
-                            <div className="text-center text-muted-foreground py-12">
-                            <p>No history found for this order.</p>
-                            </div>
-                        )}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </div>
               </div>
             </>
@@ -1208,7 +1199,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    
-
-    

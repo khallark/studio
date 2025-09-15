@@ -66,6 +66,7 @@ export default function DashboardLayout({
   const { toast } = useToast();
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
+  const courriers = ['shiprocket', 'delhivery'];
 
   const processAwbAssignments = useCallback(async (
     ordersToProcess: {id: string, name: string}[], 
@@ -99,12 +100,12 @@ export default function DashboardLayout({
                 orders: ordersToProcess.map(o => ({ orderId: o.id, name: o.name })),
                 courier,
                 pickupName,
-                shippingMode,
+                shippingMode: courriers.includes(courier) ? shippingMode : 'Express'
             }),
         });
 
         const result = await response.json();
-        if (!response.ok) throw new Error(result.details || `Failed to start AWB assignment-${courier}`);
+        if (!response.ok) throw new Error(result.details || 'Failed to start AWB assignment');
 
         toast({
             title: `AWB Assignment Started`,

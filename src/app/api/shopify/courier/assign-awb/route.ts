@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
     };
 
     if (!shop || !courier || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
-      console.log(shop, Array.isArray(orders), orders?.length, courier, pickupName, shippingMode);
       return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
     }
 

@@ -30,7 +30,7 @@ const formatAddress = (address: any): string => {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderIds, exportType } = await req.json();
+    const { shop, orderIds } = await req.json();
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
     const ordersSnapshot = await ordersColRef.where('orderId', 'in', orderIds.map(id => Number(id))).get();
     
     const flattenedData: any[] = [];
-    let srNo = 1;
     
     ordersSnapshot.forEach(doc => {
       const order = doc.data();
@@ -55,18 +54,8 @@ export async function POST(req: NextRequest) {
 
       if (order.raw.line_items && order.raw.line_items.length > 0) {
         order.raw.line_items.forEach((item: any) => {
-          if (exportType === 'confirmed') {
-            flattenedData.push({
-              'Sr. No': srNo++,
-              'Order name': order.name,
-              'Item name': item.title,
-              'Item SKU': item.sku || 'N/A',
-              'Item quantity': item.quantity,
-              'Availability': '',
-            });
-          } else {
-             const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
-             flattenedData.push({
+           const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
+           flattenedData.push({
                 'Order name': order.name,
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
@@ -92,48 +81,36 @@ export async function POST(req: NextRequest) {
                 'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
                 'Shipping Country': order.raw.shipping_address?.country || 'N/A',
               });
-          }
         });
       } else {
         // Handle orders with no line items
-         if (exportType === 'confirmed') {
-            flattenedData.push({
-              'Sr. No': srNo++,
-              'Order name': order.name,
-              'Item name': 'N/A',
-              'Item SKU': 'N/A',
-              'Item quantity': 0,
-              'Availability': '',
-            });
-          } else {
-            const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
-            flattenedData.push({
-                'Order name': order.name,
-                'Order date': new Date(order.createdAt).toLocaleDateString(),
-                'Customer': customerName,
-                'Email': order.raw.customer?.email || 'N/A',
-                'Phone': order.raw.customer?.phone || 'N/A',
-                'Item title': 'N/A',
-                'Item SKU': 'N/A',
-                'Item Quantity': 0,
-                'Item Price': 0,
-                'Discount': order.raw.total_discounts || 0,
-                'Total Order Price': order.totalPrice,
-                'Currency': order.currency,
-                'Payment Status': paymentStatus,
-                'Status': order.customStatus,
-                'Billing Address': formatAddress(order.raw.billing_address),
-                'Billing City': order.raw.billing_address?.city || 'N/A',
-                'Billing State': order.raw.billing_address?.province || 'N/A',
-                'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
-                'Billing Country': order.raw.billing_address?.country || 'N/A',
-                'Shipping Adress': formatAddress(order.raw.shipping_address),
-                'Shipping City': order.raw.shipping_address?.city || 'N/A',
-                'Shipping State': order.raw.shipping_address?.province || 'N/A',
-                'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
-                'Shipping Country': order.raw.shipping_address?.country || 'N/A',
-            });
-        }
+        const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
+        flattenedData.push({
+            'Order name': order.name,
+            'Order date': new Date(order.createdAt).toLocaleDateString(),
+            'Customer': customerName,
+            'Email': order.raw.customer?.email || 'N/A',
+            'Phone': order.raw.customer?.phone || 'N/A',
+            'Item title': 'N/A',
+            'Item SKU': 'N/A',
+            'Item Quantity': 0,
+            'Item Price': 0,
+            'Discount': order.raw.total_discounts || 0,
+            'Total Order Price': order.totalPrice,
+            'Currency': order.currency,
+            'Payment Status': paymentStatus,
+            'Status': order.customStatus,
+            'Billing Address': formatAddress(order.raw.billing_address),
+            'Billing City': order.raw.billing_address?.city || 'N/A',
+            'Billing State': order.raw.billing_address?.province || 'N/A',
+            'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
+            'Billing Country': order.raw.billing_address?.country || 'N/A',
+            'Shipping Adress': formatAddress(order.raw.shipping_address),
+            'Shipping City': order.raw.shipping_address?.city || 'N/A',
+            'Shipping State': order.raw.shipping_address?.province || 'N/A',
+            'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
+            'Shipping Country': order.raw.shipping_address?.country || 'N/A',
+        });
       }
     });
 

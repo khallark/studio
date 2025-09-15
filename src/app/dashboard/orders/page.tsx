@@ -123,7 +123,6 @@ export default function OrdersPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
-  const [isDownloadingConfirmedExcel, setIsDownloadingConfirmedExcel] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
 
@@ -559,8 +558,8 @@ export default function OrdersPage() {
             'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-            shop: userData.activeAccountId,
-            orderIds: selectedOrders,
+                shop: userData.activeAccountId,
+                orderIds: selectedOrders,
             }),
         });
 
@@ -590,56 +589,6 @@ export default function OrdersPage() {
         });
         } finally {
         setIsDownloadingExcel(false);
-        }
-    }, [userData, user, selectedOrders, toast]);
-
-    const handleDownloadConfirmedExcel = useCallback(async () => {
-        if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
-
-        setIsDownloadingConfirmedExcel(true);
-        toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
-
-        try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/shopify/orders/export', {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-            shop: userData.activeAccountId,
-            orderIds: selectedOrders,
-            exportType: 'confirmed',
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || 'Failed to generate Excel file.');
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `confirmed-orders-${new Date().toISOString().split('T')[0]}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-
-        setSelectedOrders([]);
-
-        } catch (error) {
-        console.error('Excel export error:', error);
-        toast({
-            title: 'Export Failed',
-            description: error instanceof Error ? error.message : 'An unknown error occurred.',
-            variant: 'destructive',
-        });
-        } finally {
-        setIsDownloadingConfirmedExcel(false);
         }
     }, [userData, user, selectedOrders, toast]);
 
@@ -735,30 +684,23 @@ export default function OrdersPage() {
   
     switch (activeTab) {
       case 'New':
+      case 'Confirmed':
         return (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
               {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
             </Button>
-            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                {isBulkUpdating ? 'Confirming...' : 'Confirm'}
-            </Button>
-            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-            </Button>
-          </div>
-        );
-      case 'Confirmed':
-        return (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingConfirmedExcel} onClick={handleDownloadConfirmedExcel}>
-              {isDownloadingConfirmedExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingConfirmedExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-            </Button>
-            <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
-                Assign AWBs
-            </Button>
+            {activeTab === 'New' && 
+                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                    {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+                </Button>
+            }
+            {activeTab === 'Confirmed' &&
+                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
+                    Assign AWBs
+                </Button>
+            }
             <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
                 {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
             </Button>

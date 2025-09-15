@@ -104,7 +104,7 @@ export default function DashboardLayout({
         });
 
         const result = await response.json();
-        if (!response.ok) throw new Error(result.details || 'Failed to start AWB assignment');
+        if (!response.ok) throw new Error(result.details || `Failed to start AWB assignment-${courier}`);
 
         toast({
             title: `AWB Assignment Started`,

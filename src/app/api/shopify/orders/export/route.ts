@@ -23,10 +23,6 @@ const formatAddress = (address: any): string => {
     const parts = [
         address.address1,
         address.address2,
-        address.city,
-        address.province,
-        address.zip,
-        address.country,
     ];
     return parts.filter(Boolean).join(', ');
 };
@@ -69,20 +65,32 @@ export async function POST(req: NextRequest) {
               'Availability': '',
             });
           } else {
+             const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
              flattenedData.push({
                 'Order name': order.name,
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
+                'Email': order.raw.customer?.email || 'N/A',
+                'Phone': order.raw.customer?.phone || 'N/A',
                 'Item title': item.title,
                 'Item SKU': item.sku || 'N/A',
                 'Item Quantity': item.quantity,
                 'Item Price': item.price,
+                'Discount': order.raw.total_discounts || 0,
                 'Total Order Price': order.totalPrice,
                 'Currency': order.currency,
-                'Payment Status': order.financialStatus,
+                'Payment Status': paymentStatus,
                 'Status': order.customStatus,
                 'Billing Address': formatAddress(order.raw.billing_address),
+                'Billing City': order.raw.billing_address?.city || 'N/A',
+                'Billing State': order.raw.billing_address?.province || 'N/A',
+                'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
+                'Billing Country': order.raw.billing_address?.country || 'N/A',
                 'Shipping Adress': formatAddress(order.raw.shipping_address),
+                'Shipping City': order.raw.shipping_address?.city || 'N/A',
+                'Shipping State': order.raw.shipping_address?.province || 'N/A',
+                'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
+                'Shipping Country': order.raw.shipping_address?.country || 'N/A',
               });
           }
         });
@@ -98,20 +106,32 @@ export async function POST(req: NextRequest) {
               'Availability': '',
             });
           } else {
+            const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
             flattenedData.push({
                 'Order name': order.name,
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
+                'Email': order.raw.customer?.email || 'N/A',
+                'Phone': order.raw.customer?.phone || 'N/A',
                 'Item title': 'N/A',
                 'Item SKU': 'N/A',
                 'Item Quantity': 0,
                 'Item Price': 0,
+                'Discount': order.raw.total_discounts || 0,
                 'Total Order Price': order.totalPrice,
                 'Currency': order.currency,
-                'Payment Status': order.financialStatus,
+                'Payment Status': paymentStatus,
                 'Status': order.customStatus,
                 'Billing Address': formatAddress(order.raw.billing_address),
+                'Billing City': order.raw.billing_address?.city || 'N/A',
+                'Billing State': order.raw.billing_address?.province || 'N/A',
+                'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
+                'Billing Country': order.raw.billing_address?.country || 'N/A',
                 'Shipping Adress': formatAddress(order.raw.shipping_address),
+                'Shipping City': order.raw.shipping_address?.city || 'N/A',
+                'Shipping State': order.raw.shipping_address?.province || 'N/A',
+                'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
+                'Shipping Country': order.raw.shipping_address?.country || 'N/A',
             });
         }
       }

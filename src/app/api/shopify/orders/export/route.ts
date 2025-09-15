@@ -59,8 +59,13 @@ export async function POST(req: NextRequest) {
                 'Order name': order.name,
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
-                'Email': order.raw.customer?.email || 'N/A',
-                'Phone': order.raw.customer?.phone || 'N/A',
+                'Email': order.raw.customer?.email ||
+                         order.raw?.contact_email ||
+                         'N/A',
+                'Phone': order.raw.customer?.phone || 
+                         order.raw.billing_address?.phone || 
+                         order.raw.shipping_address?.phone ||
+                         'N/A',
                 'Item title': item.title,
                 'Item SKU': item.sku || 'N/A',
                 'Item Quantity': item.quantity,
@@ -87,10 +92,15 @@ export async function POST(req: NextRequest) {
         const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
         flattenedData.push({
             'Order name': order.name,
-            'Order date': new Date(order.createdAt).toLocaleDateString(),
-            'Customer': customerName,
-            'Email': order.raw.customer?.email || 'N/A',
-            'Phone': order.raw.customer?.phone || 'N/A',
+                'Order date': new Date(order.createdAt).toLocaleDateString(),
+                'Customer': customerName,
+                'Email': order.raw.customer?.email ||
+                         order.raw?.contact_email ||
+                         'N/A',
+                'Phone': order.raw.customer?.phone || 
+                         order.raw.billing_address?.phone || 
+                         order.raw.shipping_address?.phone ||
+                         'N/A',
             'Item title': 'N/A',
             'Item SKU': 'N/A',
             'Item Quantity': 0,

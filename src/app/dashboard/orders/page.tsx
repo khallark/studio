@@ -863,26 +863,26 @@ export default function OrdersPage() {
                     <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
                     <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                 </TabsList>
-                <div className="flex-1 overflow-y-auto">
+                <div className="relative flex-1 overflow-y-auto">
                     <Table>
-                        <TableHeader className="sticky top-0 bg-card z-10">
+                        <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[50px] px-2">
+                                <TableHead className="sticky top-0 bg-card z-20 w-[50px] px-2">
                                 <Checkbox
                                     checked={areAllOnPageSelected}
                                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                                     aria-label="Select all"
                                 />
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Date</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
-                                <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Items</TableHead>
-                                <TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Order ID</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">AWB</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Date</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Customer</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 text-right font-medium text-muted-foreground">Total</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Payment Status</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Fulfillment Status</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 font-medium text-muted-foreground">Items</TableHead>
+                                <TableHead className="sticky top-0 bg-card z-20 ">
                                 <span className="sr-only">Actions</span>
                                 </TableHead>
                             </TableRow>
@@ -920,7 +920,7 @@ export default function OrdersPage() {
                                         aria-label={`Select order ${order.name}`}
                                         />
                                     </TableCell>
-                                    <TableCell className="font-medium py-2">{order.name}</TableCell>
+                                    <TableCell className="font-bold py-2 text-xs">{order.name}</TableCell>
                                     <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
                                     <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                     <TableCell className="text-xs">{customerName || order.email}</TableCell>

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import * as xlsx from 'xlsx';
+import { DocumentSnapshot } from 'firebase-admin/firestore';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -44,12 +45,25 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
     
-    const ordersSnapshot = await ordersColRef.where('orderId', 'in', orderIds.map(id => Number(id))).get();
+    // Firestore 'in' query has a limit of 30 values. We need to chunk the orderIds.
+    const numericOrderIds = orderIds.map(id => Number(id));
+    const chunks: number[][] = [];
+    for (let i = 0; i < numericOrderIds.length; i += 30) {
+        chunks.push(numericOrderIds.slice(i, i + 30));
+    }
+
+    const allDocs: DocumentSnapshot[] = [];
+    for (const chunk of chunks) {
+        const snapshot = await ordersColRef.where('orderId', 'in', chunk).get();
+        snapshot.forEach(doc => allDocs.push(doc));
+    }
     
     const flattenedData: any[] = [];
     
-    ordersSnapshot.forEach(doc => {
+    allDocs.forEach(doc => {
       const order = doc.data();
+       if (!order) return;
+       
       const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() || order.email;
 
       if (order.raw.line_items && order.raw.line_items.length > 0) {

@@ -50,7 +50,7 @@ import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -65,6 +65,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, addDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { DocumentSnapshot } from 'firebase/firestore';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -96,16 +97,29 @@ interface Order {
     customer?: {
       first_name?: string;
       last_name?: string;
+      phone?: string;
+    };
+    contact_email?: string;
+    billing_address?: {
+        phone?: string;
+        address1: string;
+        address2: string;
+        city: string;
+        province: string;
+        zip: string;
+        country: string;
     };
     line_items: any[];
     shipping_address?: {
+        phone?: string;
         address1: string;
         address2: string;
         city: string;
         zip: string;
         province: string;
         country: string;
-    }
+    },
+    total_discounts?: number;
   }
 }
 
@@ -551,45 +565,46 @@ export default function OrdersPage() {
         toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
 
         try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/shopify/orders/export', {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-                shop: userData.activeAccountId,
-                orderIds: selectedOrders,
-            }),
-        });
+            const idToken = await user.getIdToken();
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || 'Failed to generate Excel file.');
-        }
+            const response = await fetch('/api/shopify/orders/export', {
+                method: 'POST',
+                headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    shop: userData.activeAccountId,
+                    orderIds: selectedOrders,
+                }),
+            });
 
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.details || 'Failed to generate Excel file.');
+            }
 
-        setSelectedOrders([]);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+
+            setSelectedOrders([]);
 
         } catch (error) {
-        console.error('Excel export error:', error);
-        toast({
-            title: 'Export Failed',
-            description: error instanceof Error ? error.message : 'An unknown error occurred.',
-            variant: 'destructive',
-        });
+            console.error('Excel export error:', error);
+            toast({
+                title: 'Export Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: 'destructive',
+            });
         } finally {
-        setIsDownloadingExcel(false);
+            setIsDownloadingExcel(false);
         }
     }, [userData, user, selectedOrders, toast]);
 
@@ -839,7 +854,7 @@ export default function OrdersPage() {
                     )}
                 </div>
             </CardHeader>
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 overflow-hidden">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
                 <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-6 h-auto rounded-none border-b p-2 shrink-0">
                     <TabsTrigger value="All Orders">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
                     <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
@@ -848,111 +863,109 @@ export default function OrdersPage() {
                     <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
                     <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                 </TabsList>
-                <div className="flex-1 relative">
-                    <div className="absolute inset-0 overflow-y-auto">
-                        <Table>
-                            <thead className="sticky top-0 bg-card z-10">
-                                <TableRow>
-                                    <TableHead className="w-[50px]">
-                                    <Checkbox
-                                        checked={areAllOnPageSelected}
-                                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                                        aria-label="Select all"
-                                    />
-                                    </TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Date</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
-                                    <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
-                                    <TableHead className="font-medium text-muted-foreground">Items</TableHead>
-                                    <TableHead>
-                                    <span className="sr-only">Actions</span>
-                                    </TableHead>
+                <div className="flex-1 overflow-y-auto">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-card z-10">
+                            <TableRow>
+                                <TableHead className="w-[50px] px-2">
+                                <Checkbox
+                                    checked={areAllOnPageSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                    aria-label="Select all"
+                                />
+                                </TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Items</TableHead>
+                                <TableHead>
+                                <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loading ? (
+                                Array.from({ length: rowsPerPage }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="py-2 px-2"><Skeleton className="h-5 w-5" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-10" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                 </TableRow>
-                            </thead>
-                            <TableBody>
-                                {loading ? (
-                                    Array.from({ length: rowsPerPage }).map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-5" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
-                                        <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-5 w-10" /></TableCell>
-                                        <TableCell className="py-2"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                                    </TableRow>
-                                    ))
-                                ) : currentOrders.length > 0 ? (
-                                    currentOrders.map((order) => {
-                                    const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
-                                    return (
-                                        <TableRow 
-                                        key={order.id} 
-                                        data-state={selectedOrders.includes(order.id) && "selected"}
-                                        onClick={() => setViewingOrder(order)}
-                                        className="cursor-pointer"
-                                        >
-                                        <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
-                                            <Checkbox
-                                            checked={selectedOrders.includes(order.id)}
-                                            onCheckedChange={() => handleSelectOrder(order.id)}
-                                            aria-label={`Select order ${order.name}`}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                        <TableCell className="py-2">{order.awb || 'N/A'}</TableCell>
-                                        <TableCell className="py-2 text-sm">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-sm">{customerName || order.email}</TableCell>
-                                        <TableCell className="text-right text-sm font-mono">
-                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
-                                        </TableCell>
-                                        <TableCell className="py-2">
-                                            <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize text-xs">
-                                            {order.financialStatus?.replace('_', ' ') || 'N/A'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="py-2">
-                                            <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize text-xs">
-                                            {order.fulfillmentStatus || 'unfulfilled'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {order.raw?.line_items?.length || 0}
-                                        </TableCell>
-                                        <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
-                                            <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                                <span className="sr-only">Toggle menu</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                {renderActionItems(order)}
-                                            </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                        </TableRow>
-                                    )
-                                    })
-                                ) : (
-                                    <TableRow>
-                                    <TableCell colSpan={10} className="text-center h-24">
-                                        {userData?.activeAccountId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
+                                ))
+                            ) : currentOrders.length > 0 ? (
+                                currentOrders.map((order) => {
+                                const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
+                                return (
+                                    <TableRow 
+                                    key={order.id} 
+                                    data-state={selectedOrders.includes(order.id) && "selected"}
+                                    onClick={() => setViewingOrder(order)}
+                                    className="cursor-pointer"
+                                    >
+                                    <TableCell onClick={(e) => e.stopPropagation()} className="py-2 px-2">
+                                        <Checkbox
+                                        checked={selectedOrders.includes(order.id)}
+                                        onCheckedChange={() => handleSelectOrder(order.id)}
+                                        aria-label={`Select order ${order.name}`}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="font-medium py-2">{order.name}</TableCell>
+                                    <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
+                                    <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-xs">{customerName || order.email}</TableCell>
+                                    <TableCell className="text-right text-xs font-mono">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                        <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize text-xs">
+                                        {order.financialStatus?.replace('_', ' ') || 'N/A'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                        <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize text-xs">
+                                        {order.fulfillmentStatus || 'unfulfilled'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                        {order.raw?.line_items?.length || 0}
+                                    </TableCell>
+                                    <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
+                                        <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                            <span className="sr-only">Toggle menu</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                            {renderActionItems(order)}
+                                        </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                )
+                                })
+                            ) : (
+                                <TableRow>
+                                <TableCell colSpan={10} className="text-center h-24">
+                                    {userData?.activeAccountId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
+                                </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
             </Tabs>
             <CardFooter className="p-4 border-t shrink-0">

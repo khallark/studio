@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -709,6 +710,10 @@ export default function OrdersPage() {
       case 'Ready To Dispatch':
          return (
           <div className="flex gap-2">
+             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+            </Button>
             <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
               {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isDownloadingSlips ? 'Downloading...' : `Download Slips (${selectedOrders.length})`}
@@ -724,6 +729,10 @@ export default function OrdersPage() {
       case 'Dispatched':
         return (
           <div className="flex gap-2">
+             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+            </Button>
              <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
                 {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
             </Button>

@@ -54,7 +54,7 @@ async function createSlipPage(pdfDoc: PDFDocument, order: any, sellerDetails: an
 
     // Header
     drawText(page, 'Shipowr', margin, height - 40, boldFont, 16);
-    drawText(page, (order.courier || 'DELHIVERY').toUpperCase(), width - margin - 80, height - 40, boldFont, 16);
+    drawText(page, (order.courier).toUpperCase(), width - margin - 80, height - 40, boldFont, 16);
     drawLine(page, margin, height - 55, width - margin, height - 55, 1.5);
 
     // AWB & Barcode
@@ -94,7 +94,7 @@ async function createSlipPage(pdfDoc: PDFDocument, order: any, sellerDetails: an
         currentY -= 15;
     });
 
-    drawText(page, 'COD - Express', width / 2 + 50, height - 160, font, 12);
+    drawText(page, `${order.financialStatus === 'paid' ? 'Prepaid' : 'COD'} - ${order.courier === 'Delhivery' ? 'Express' : String(order.courier).split(':')[1].trim()}`, width / 2 + 50, height - 160, font, 12);
     drawText(page, `${order.currency} ${order.totalPrice.toFixed(2)}`, width / 2 + 50, height - 180, boldFont, 16);
     drawText(page, `Date`, width / 2 + 50, height - 200, font, 11);
     drawText(page, new Date(order.createdAt).toLocaleDateString('en-GB'), width / 2 + 50, height - 215, font, 11);
@@ -104,7 +104,7 @@ async function createSlipPage(pdfDoc: PDFDocument, order: any, sellerDetails: an
     // Seller Info
     drawText(page, `Seller: ${sellerDetails.name || 'N/A'}`, margin, height - 270, font, 11);
     drawText(page, `GST: ${sellerDetails.gst || 'N/A'}`, margin, height - 285, font, 11);
-    drawText(page, `#${order.name}`, width - margin - 100, height - 270, boldFont, 14);
+    drawText(page, `${order.name}`, width - margin - 100, height - 270, boldFont, 14);
 
     drawLine(page, margin, height - 305, width - margin, height - 305);
 
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
     const accountData = accountDoc.data();
     const sellerDetails = {
-        name: accountData?.shopName,
+        name: accountData?.primaryContact?.name || 'You have your name in setting > Store Details > Primary Contact',
         gst: 'NOT_CONFIGURED', // Placeholder
         returnAddress: `${accountData?.companyAddress?.address}, ${accountData?.companyAddress?.city}, ${accountData?.companyAddress?.state}, ${accountData?.companyAddress?.pincode}`,
     };

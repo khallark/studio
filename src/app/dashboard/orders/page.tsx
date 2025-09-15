@@ -867,7 +867,7 @@ export default function OrdersPage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-card z-10">
                             <TableRow>
-                                <TableHead className="w-[50px] px-2">
+                                <TableHead className="w-[50px] px-5">
                                 <Checkbox
                                     checked={areAllOnPageSelected}
                                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
@@ -891,7 +891,7 @@ export default function OrdersPage() {
                             {loading ? (
                                 Array.from({ length: rowsPerPage }).map((_, i) => (
                                 <TableRow key={i}>
-                                    <TableCell className="py-2 px-2"><Skeleton className="h-5 w-5" /></TableCell>
+                                    <TableCell className="py-2 px-5"><Skeleton className="h-5 w-5" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
@@ -913,7 +913,7 @@ export default function OrdersPage() {
                                     onClick={() => setViewingOrder(order)}
                                     className="cursor-pointer"
                                     >
-                                    <TableCell onClick={(e) => e.stopPropagation()} className="py-2 px-2">
+                                    <TableCell onClick={(e) => e.stopPropagation()} className="py-2 px-5">
                                         <Checkbox
                                         checked={selectedOrders.includes(order.id)}
                                         onCheckedChange={() => handleSelectOrder(order.id)}

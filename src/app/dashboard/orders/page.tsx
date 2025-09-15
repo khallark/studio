@@ -684,6 +684,15 @@ export default function OrdersPage() {
     const isDisabled = !isAnyOrderSelected || isBulkUpdating;
   
     switch (activeTab) {
+      case 'All Orders':
+        return (
+           <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+            </Button>
+          </div>
+        )
       case 'New':
       case 'Confirmed':
         return (

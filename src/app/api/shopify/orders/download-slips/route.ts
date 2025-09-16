@@ -143,17 +143,15 @@ async function createSlipPage(
   const font = fonts.regular;
   const boldFont = fonts.bold;
 
-  // -------------------- Outer border (Code-2 style) --------------------  
-  // crisp half-pixel alignment for 1pt strokes
-  const leftX   = Math.round(margin) + 0.5;
-  const rightX  = Math.round(width - margin) - 0.5;
-  const topY    = Math.round(height - margin) - 0.5;
-  const bottomY = Math.round(margin) + 0.5;
-
-  drawLine(page, leftX,  topY,    rightX, topY,    1); // top
-  drawLine(page, leftX,  bottomY, rightX, bottomY, 1); // bottom
-  drawLine(page, leftX,  bottomY, leftX,  topY,    1); // left
-  drawLine(page, rightX, bottomY, rightX, topY,    1); // right
+  // -------------------- Outer border (Code-2 style) --------------------
+  page.drawRectangle({
+    x: margin,
+    y: margin,
+    width: contentWidth,
+    height: height - 2 * margin,
+    borderWidth: 1,
+    opacity: 0,
+  });
 
   // -------------------- Header band (Code-2 style) --------------------
   // Header box height ≈ 25mm feel (a bit compact to save space)
@@ -166,6 +164,7 @@ async function createSlipPage(
     width: contentWidth,
     height: headerH,
     borderWidth: 0.5,
+    opacity: 0,
   });
 
   // “Shipowr” (left) + Courier (right, uppercase)
@@ -203,7 +202,7 @@ async function createSlipPage(
         bcid: 'code128',
         text: awb,
         scale: 3,        // crisp
-        height: 18,      // taller than before
+        height: 15,      // taller than before
         includetext: true,
         textxalign: 'center',
       });
@@ -285,6 +284,7 @@ async function createSlipPage(
     width: contentWidth,
     height: sellerBoxH,
     borderWidth: 0.5,
+    opacity: 0,
   });
 
   const sellerName = sellerDetails?.name || 'N/A';
@@ -325,6 +325,7 @@ async function createSlipPage(
     height: headerRowH,
     color: rgb(240 / 255, 240 / 255, 240 / 255),
     borderWidth: 1,
+    opacity: 0,
   });
 
   // column vertical lines
@@ -372,6 +373,7 @@ async function createSlipPage(
       width: contentWidth,
       height: rowHt,
       borderWidth: 0.6,
+      opacity: 0,
     });
 
     // column separators

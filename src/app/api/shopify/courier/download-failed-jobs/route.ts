@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         const data = doc.data();
         return {
             'Order Id': data.orderName || doc.id,
-            'Error Reason': data.errorCode || 'No error code provided',
+            'Error Reason': data.errorMessage || 'No error message provided',
         };
     });
 

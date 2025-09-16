@@ -414,20 +414,10 @@ async function createSlipPage(
     y -= 20;
   });
 
-  // // Return address at bottom
-  // y = margin + 80;
-  // page.drawText(`Return Address: ${sellerDetails.returnAddress}`, {
-  //   x: margin + 10,
-  //   y,
-  //   font: regular,
-  //   size: 9,
-  //   color: rgb(0, 0, 0),
-  // });
-
   // Return address at bottom (wrap to fit inside the outer border)
   y = margin + 80;
 
-  const padX = 10;                         // left/right padding inside the border
+  const padX = 10; // left/right padding inside the border
   const xText = margin + padX;
   const maxTextWidth = contentWidth - padX * 2; // outer box width minus padding
 
@@ -440,8 +430,6 @@ async function createSlipPage(
     regular,
     9
   );
-
-  // Note: Page numbering is handled in the main function after all pages are created
 
   return page;
 }
@@ -551,7 +539,7 @@ export async function POST(req: NextRequest) {
       const size = 9;
       const w = regular.widthOfTextAtSize(text, size);
       page.drawText(text, {
-        x: page.getWidth() - 30 - w,
+        x: page.getWidth() - 50 - w,
         y: 40,
         font: regular,
         size,

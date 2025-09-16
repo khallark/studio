@@ -136,26 +136,25 @@ async function createSlipPage(
   const page = pdfDoc.addPage([595, 842]);
   const { width, height } = page.getSize();
 
-  // Match “10mm margin” feel from Code-2 (≈ 28.35pt)
-  const margin = 28;
+  // ~10mm margins like Code-2
+  const margin = 28; // ≈10mm
   const contentWidth = width - 2 * margin;
 
   const font = fonts.regular;
   const boldFont = fonts.bold;
 
-  // -------------------- Outer border (Code-2 style) --------------------
+  /* -------------------- Outer border (Code-2 style) -------------------- */
   page.drawRectangle({
     x: margin,
     y: margin,
     width: contentWidth,
     height: height - 2 * margin,
     borderWidth: 1,
-    opacity: 0,
+    borderColor: rgb(0, 0, 0), // show the border
   });
 
-  // -------------------- Header band (Code-2 style) --------------------
-  // Header box height ≈ 25mm feel (a bit compact to save space)
-  const headerH = 64; // ~ 22–25mm look
+  /* -------------------- Header band (bordered like Code-2) -------------------- */
+  const headerH = 64; // ~25mm feel
   const headerY = height - margin - headerH;
 
   page.drawRectangle({
@@ -164,36 +163,25 @@ async function createSlipPage(
     width: contentWidth,
     height: headerH,
     borderWidth: 0.5,
-    opacity: 0,
+    borderColor: rgb(0, 0, 0),
   });
 
-  // “Shipowr” (left) + Courier (right, uppercase)
+  // Left: brand, Right: courier (uppercase)
   const shipowrSize = 18;
   const courierSize = 20;
+  const courierTitle = (order?.courier || '').toString().toUpperCase() || 'DELHIVERY';
 
-  const courierTitle = (order?.courier || '').toString().toUpperCase() || 'DELIVERY';
-
-  // Baselines inside the header band
   const headerBaseline = headerY + headerH - 16;
   drawText(page, 'Shipowr', margin + 6, headerBaseline, boldFont, shipowrSize);
 
   const courierW = boldFont.widthOfTextAtSize(courierTitle, courierSize);
-  drawText(
-    page,
-    courierTitle,
-    margin + contentWidth - courierW - 6,
-    headerBaseline,
-    boldFont,
-    courierSize
-  );
+  drawText(page, courierTitle, margin + contentWidth - courierW - 6, headerBaseline, boldFont, courierSize);
 
-  // -------------------- AWB label + centered barcode (Code-2 style) --------------------
+  /* -------------------- AWB label + centered barcode (Code-2) -------------------- */
   const awb = order?.awb || 'N/A';
-
   let yPos = headerY - 12;
-  drawText(page, `AWB# ${awb}`, margin + 6, yPos, boldFont, 14);
 
-  // barcode below, centered
+  drawText(page, `AWB# ${awb}`, margin + 6, yPos, boldFont, 14);
   yPos -= 12;
 
   if (order?.awb) {
@@ -201,15 +189,16 @@ async function createSlipPage(
       const png = await bwip.toBuffer({
         bcid: 'code128',
         text: awb,
-        scale: 3,        // crisp
-        height: 15,      // taller than before
-        includetext: true,
+        scale: 3,    // crisp
+        height: 15,  // a bit taller
+        includetext: true, // keep human-readable inside the barcode too
         textxalign: 'center',
       });
       const barcodeImage = await pdfDoc.embedPng(png);
 
-      // Keep within content box and center (Code-2 uses ~120mm wide visual; we fit)
-      const desiredW = Math.min(contentWidth - 40, 360);
+      // Code-2 aims ~120mm width; cap by content width
+      const approx120mmInPt = 340; // 120mm ≈ 340.16pt
+      const desiredW = Math.min(contentWidth - 20, approx120mmInPt);
       const intrinsicW = barcodeImage.width;
       const intrinsicH = barcodeImage.height;
       const scale = desiredW / intrinsicW;
@@ -220,7 +209,15 @@ async function createSlipPage(
       const barcodeY = yPos - drawH - 4;
 
       page.drawImage(barcodeImage, { x: barcodeX, y: barcodeY, width: drawW, height: drawH });
-      yPos = barcodeY - 12; // space below barcode
+
+      // AWB number BELOW barcode, centered (explicit like Code-2)
+      const awbTxtSize = 12;
+      const awbTxtW = font.widthOfTextAtSize(awb, awbTxtSize);
+      const awbTxtX = margin + (contentWidth - awbTxtW) / 2;
+      const awbTxtY = barcodeY - 12;
+      drawText(page, awb, awbTxtX, awbTxtY, font, awbTxtSize);
+
+      yPos = awbTxtY - 12; // continue below the barcode area
     } catch (e) {
       console.error('Barcode generation failed:', e);
       drawText(page, 'Barcode failed to generate', margin + 6, yPos, font, 10, rgb(1, 0, 0));
@@ -230,8 +227,7 @@ async function createSlipPage(
     yPos -= 10;
   }
 
-  // -------------------- Ship-to (left) + Payment/Amount/Date (right) --------------------
-  // Title
+  /* -------------------- Ship-to (left) + Payment/Amount/Date (right) -------------------- */
   const customerName = `${order?.raw?.customer?.first_name || ''} ${order?.raw?.customer?.last_name || ''}`.trim();
   drawText(page, `Ship to - ${customerName || 'Customer'}`, margin + 6, yPos, boldFont, 17);
   yPos -= 14;
@@ -240,22 +236,22 @@ async function createSlipPage(
   const leftColW = contentWidth * 0.6;
   const rightColX = margin + leftColW + 10;
 
-  // Left column: address (wrapped like your helpers)
+  // Left column: address
   const shipAddrLines = addressLinesLikeSample(order?.raw?.shipping_address as Address);
   let addrY = yPos;
   for (const line of shipAddrLines) {
-    drawText(page, line, margin + 6, addrY, font, 13);
+    drawText(page, line, margin + 6, addrY, font, 14); // a touch larger like Code-2
     addrY -= 12;
   }
 
-  // Right column: payment/speed/amount/date (Code-2 wording kept)
+  // Right column: payment/speed/amount/date (Code-2 phrasing)
   const paymentMode = order?.financialStatus === 'paid' ? 'Prepaid' : 'COD';
   const speed =
     order?.courier === 'Delhivery'
       ? 'Express'
       : (String(order?.courier || '').split(':')[1] || 'Express').trim();
 
-  let rightY = yPos + 2; // align near top of address block
+  let rightY = yPos + 2;
   drawText(page, `${paymentMode} - ${speed}`, rightColX, rightY, font, 14);
   rightY -= 10;
 
@@ -274,8 +270,8 @@ async function createSlipPage(
   // Move main cursor below address block
   yPos = Math.min(addrY, rightY) - 10;
 
-  // -------------------- Seller + GST boxed row (Code-2 style) --------------------
-  const sellerBoxH = 28; // compact  (Code-2 had 25 ~mm; we keep proportionate but practical)
+  /* -------------------- Seller + GST boxed row (Code-2 box) -------------------- */
+  const sellerBoxH = 28;
   const sellerBoxY = yPos - sellerBoxH;
 
   page.drawRectangle({
@@ -284,7 +280,7 @@ async function createSlipPage(
     width: contentWidth,
     height: sellerBoxH,
     borderWidth: 0.5,
-    opacity: 0,
+    borderColor: rgb(0, 0, 0),
   });
 
   const sellerName = sellerDetails?.name || 'N/A';
@@ -307,14 +303,13 @@ async function createSlipPage(
 
   yPos = sellerBoxY - 10;
 
-  // -------------------- Products table (Code-2 look) --------------------
-  // column width ratios from Code-2: [70,22,18,30,25,25] total = 190
+  /* -------------------- Products table (Code-2 look) -------------------- */
   const ratios = [70, 22, 18, 30, 25, 25].map((n) => n / 190);
   const colW = ratios.map((r) => r * contentWidth);
   const colX: number[] = [margin + 6];
   for (let i = 0; i < colW.length - 1; i++) colX.push(colX[colX.length - 1] + colW[i]);
 
-  // header band with light fill
+  // Header band with light fill (visible like Code-2)
   const headerRowH = 16;
   const tableHeaderY = yPos - headerRowH;
 
@@ -323,30 +318,30 @@ async function createSlipPage(
     y: tableHeaderY,
     width: contentWidth,
     height: headerRowH,
-    color: rgb(240 / 255, 240 / 255, 240 / 255),
+    color: rgb(240 / 255, 240 / 255, 240 / 255), // fill
     borderWidth: 1,
-    opacity: 0,
+    borderColor: rgb(0, 0, 0),
   });
 
-  // column vertical lines
+  // Column vertical lines
   for (let i = 1; i < colX.length; i++) {
     drawLine(page, colX[i] - 3, tableHeaderY, colX[i] - 3, tableHeaderY + headerRowH, 0.6);
   }
 
-  // table header text
-  drawText(page, 'Product Name', colX[0], tableHeaderY + headerRowH - 5, boldFont, 12);
-  drawText(page, 'HSN', colX[1], tableHeaderY + headerRowH - 5, boldFont, 12);
-  drawText(page, 'Qty.', colX[2], tableHeaderY + headerRowH - 5, boldFont, 12);
-  drawText(page, 'Taxable Price', colX[3], tableHeaderY + headerRowH - 5, boldFont, 11);
-  drawText(page, 'Taxes', colX[4], tableHeaderY + headerRowH - 5, boldFont, 12);
-  drawText(page, 'Total', colX[5], tableHeaderY + headerRowH - 5, boldFont, 12);
+  // Table header text (sizes aligned to Code-2)
+  drawText(page, 'Product Name', colX[0], tableHeaderY + headerRowH - 5, boldFont, 13);
+  drawText(page, 'HSN', colX[1], tableHeaderY + headerRowH - 5, boldFont, 13);
+  drawText(page, 'Qty.', colX[2], tableHeaderY + headerRowH - 5, boldFont, 13);
+  drawText(page, 'Taxable Price', colX[3], tableHeaderY + headerRowH - 5, boldFont, 12);
+  drawText(page, 'Taxes', colX[4], tableHeaderY + headerRowH - 5, boldFont, 13);
+  drawText(page, 'Total', colX[5], tableHeaderY + headerRowH - 5, boldFont, 13);
 
-  // rows
+  // Rows
   let rowY = tableHeaderY - 3;
   const lineItems: any[] = Array.isArray(order?.raw?.line_items) ? order.raw.line_items : [];
 
   for (const item of lineItems) {
-    // compute values (keep Code-1 logic)
+    // compute values (same logic as your Code-1)
     const qty = toNumber(item?.quantity, 1);
     const unit = toNumber(item?.price, 0);
     const taxable = unit * qty;
@@ -355,82 +350,81 @@ async function createSlipPage(
       : 0;
     const total = taxable + tax;
 
-    // name wrapping in first col
+    // name wrapping in first col (keep your wrap logic, but match Code-2 size)
     const nameMaxW = colW[0] - 8;
     const nameLines = wrapTextByWidth(
       `${item?.title || ''}${item?.variant_title ? ` - ${item.variant_title}` : ''}`,
       nameMaxW,
       font,
-      11
+      13
     );
     const lineHt = 12;
     const rowHt = Math.max(lineHt, nameLines.length * lineHt) + 4;
 
-    // row border box
+    // Row border box (visible)
     page.drawRectangle({
       x: margin,
       y: rowY - rowHt,
       width: contentWidth,
       height: rowHt,
       borderWidth: 0.6,
-      opacity: 0,
+      borderColor: rgb(0, 0, 0),
     });
 
-    // column separators
+    // Column separators
     for (let i = 1; i < colX.length; i++) {
       drawLine(page, colX[i] - 3, rowY - rowHt, colX[i] - 3, rowY, 0.6);
     }
 
-    // text baselines
-    let textBase = rowY - 6; // bottom padding
-    // draw product name multi-line (top-down)
-    let nameTop = rowY - 6 + (rowHt - nameLines.length * lineHt) / 2; // vertically reasonable
+    // Product name multi-line, vertically centered-ish
+    let nameTop = rowY - 6 + (rowHt - nameLines.length * lineHt) / 2;
     for (let i = 0; i < nameLines.length; i++) {
-      drawText(page, nameLines[i], colX[0], nameTop + (nameLines.length - 1 - i) * lineHt, font, 11);
+      drawText(page, nameLines[i], colX[0], nameTop + (nameLines.length - 1 - i) * lineHt, font, 13);
     }
 
-    // other columns (vertically center-ish)
+    // Other columns (vertically centered-ish)
     const midBase = rowY - rowHt / 2 + 4;
-
-    drawText(page, getHSN(item), colX[1], midBase, font, 11);
-    drawText(page, String(qty), colX[2], midBase, font, 11);
-    drawText(page, formatINRNoTrailing(taxable), colX[3], midBase, font, 11);
-    drawText(page, formatINRNoTrailing(tax), colX[4], midBase, font, 11);
-    drawText(page, formatINRNoTrailing(total), colX[5], midBase, font, 11);
+    drawText(page, getHSN(item), colX[1], midBase, font, 13);
+    drawText(page, String(qty), colX[2], midBase, font, 13);
+    drawText(page, formatINRNoTrailing(taxable), colX[3], midBase, font, 12);
+    drawText(page, formatINRNoTrailing(tax), colX[4], midBase, font, 13);
+    drawText(page, formatINRNoTrailing(total), colX[5], midBase, font, 13);
 
     rowY -= rowHt;
 
-    // basic overflow guard (leave space for return address)
-    if (rowY < margin + 90) break;
+    // Overflow guard: keep room for bottom return address block
+    const bottomReserve = margin + 40; // ~space for return address
+    if (rowY < bottomReserve) break;
   }
 
-  // -------------------- Bottom: Return Address (Code-2 phrasing) --------------------
-  const returnBlockY = margin + 36;
+  /* -------------------- Bottom: Return Address (Code-2 position/padding) -------------------- */
+  const returnBlockY = margin + 28; // near bottom, with comfortable padding
   const returnLabel = 'Return Address: ';
-  const labelW = font.widthOfTextAtSize(returnLabel, 12);
+  const labelW = font.widthOfTextAtSize(returnLabel, 13);
 
   const raText =
     sellerDetails?.returnAddress ||
     'Udyog vihar, Street no.1, Bhattian, Bahadarke, near Indian Oil petrol pump, Ludhiana, Punjab, India, 141008';
 
-  // first line continues after label, subsequent lines full width
   const raMaxW = contentWidth - 10 - labelW;
-  const raLines = wrapTextByWidth(raText, raMaxW, font, 12);
+  const raLines = wrapTextByWidth(raText, raMaxW, font, 13);
 
-  drawText(page, returnLabel, margin + 6, returnBlockY, font, 12);
+  // First line continues after label
+  drawText(page, returnLabel, margin + 6, returnBlockY, font, 13);
   if (raLines.length > 0) {
-    drawText(page, raLines[0], margin + 6 + labelW + 2, returnBlockY, font, 12);
+    drawText(page, raLines[0], margin + 6 + labelW + 2, returnBlockY, font, 13);
     let bodyY = returnBlockY - 14;
     for (let i = 1; i < raLines.length; i++) {
-      drawText(page, raLines[i], margin + 6, bodyY, font, 12);
+      drawText(page, raLines[i], margin + 6, bodyY, font, 13);
       bodyY -= 14;
     }
   }
 
-  // NOTE: Keep page numbering to your existing second pass (“Page i of N”)
+  // Page indicator: keep to your existing second pass (“Page i of N”)
 
   return page;
 }
+
 
 
 /* -------------------- Handler -------------------- */

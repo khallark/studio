@@ -472,23 +472,25 @@ export async function POST(req: NextRequest) {
     };
 
     const ordersColRef = accountRef.collection('orders');
-    // Shopify order IDs are numeric (long); we stored denormalized orderId in docs
-    const numericIds = orderIds.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
-    if (numericIds.length === 0) {
-      return NextResponse.json({ error: 'No valid numeric orderIds provided' }, { status: 400 });
-    }
+    // The request sends Firestore document IDs, which are strings.
+    // The previous implementation was mistakenly converting them to numbers.
+    const stringIds = orderIds.map(String);
 
     // Chunking logic to handle Firestore's 30-item limit for 'in' queries
-    const chunks: number[][] = [];
-    for (let i = 0; i < numericIds.length; i += 30) {
-      chunks.push(numericIds.slice(i, i + 30));
+    const chunks: string[][] = [];
+    for (let i = 0; i < stringIds.length; i += 30) {
+      chunks.push(stringIds.slice(i, i + 30));
     }
 
     const allDocs: DocumentSnapshot[] = [];
     for (const chunk of chunks) {
-      const snapshot = await ordersColRef.where('orderId', 'in', chunk).get();
+      // Use where clause with documentId() to query by ID
+      const snapshot = await ordersColRef.where(db.app.firestore.FieldPath.documentId(), 'in', chunk).get();
       snapshot.forEach(doc => allDocs.push(doc));
     }
+
+    // Re-sort the documents to match the original orderIds array from the frontend
+    allDocs.sort((a, b) => stringIds.indexOf(a.id) - stringIds.indexOf(b.id));
 
     if (allDocs.length === 0) {
       return NextResponse.json({ error: 'No matching orders found' }, { status: 404 });
@@ -535,3 +537,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate slips', details: errorMessage }, { status: 500 });
   }
 }
+
+    

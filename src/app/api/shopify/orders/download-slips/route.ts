@@ -260,7 +260,7 @@ async function createSlipPage(
   });
   
   y -= 20;
-  page.drawText(`INR ${order.total_price || '0'}`, {
+  page.drawText(`INR ${order.raw.total_price || '0'}`, {
     x: width - margin - 150,
     y,
     font: bold,

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import * as xlsx from 'xlsx';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
     
-    // Firestore 'in' query has a limit of 30 values for document IDs. We need to chunk them.
+    // Firestore 'in' query has a limit of 30 values. We need to chunk them.
     const chunks: string[][] = [];
     for (let i = 0; i < orderIds.length; i += 30) {
         chunks.push(orderIds.slice(i, i + 30));
@@ -88,8 +89,8 @@ export async function POST(req: NextRequest) {
                 'Item Quantity': item.quantity,
                 'Item Price': item.price,
                 'Total Order Price': order.totalPrice,
-                'Vendor': item.vendor || 'N/A',
                 'Discount': order.raw.total_discounts || 0,
+                'Vendor': item.vendor || 'N/A',
                 'Currency': order.currency,
                 'Payment Status': paymentStatus,
                 'Status': order.customStatus,
@@ -124,8 +125,8 @@ export async function POST(req: NextRequest) {
             'Item Quantity': 0,
             'Item Price': 0,
             'Total Order Price': order.totalPrice,
-            'Vendor': 'N/A',
             'Discount': order.raw.total_discounts || 0,
+            'Vendor': 'N/A',
             'Currency': order.currency,
             'Payment Status': paymentStatus,
             'Status': order.customStatus,

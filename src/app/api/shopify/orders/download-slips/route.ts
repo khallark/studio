@@ -490,7 +490,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Re-sort the documents to match the original orderIds array from the frontend
-    allDocs.sort((a, b) => stringIds.indexOf(a.id) - stringIds.indexOf(b.id));
+    allDocs.sort((a, b) => stringIds.indexOf(b.id) - stringIds.indexOf(a.id));
 
     if (allDocs.length === 0) {
       return NextResponse.json({ error: 'No matching orders found' }, { status: 404 });

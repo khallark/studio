@@ -171,7 +171,7 @@ async function createSlipPage(
     color: rgb(0, 0, 0),
   });
 
-  page.drawText('DELHIVERY', {
+  page.drawText(order.courier, {
     x: width - margin - 120,
     y,
     font: bold,
@@ -260,7 +260,7 @@ async function createSlipPage(
   });
   
   y -= 20;
-  page.drawText(`INR ${order.total_outstanding || '0'}`, {
+  page.drawText(`INR ${order.total_price || '0'}`, {
     x: width - margin - 150,
     y,
     font: bold,
@@ -343,7 +343,7 @@ async function createSlipPage(
 
   // GST number
   y -= 20;
-  page.drawText(`GST: ${sellerDetails.gst}`, {
+  page.drawText(`GST: 03AAQCM9385B1Z8`, {
     x: margin + 10,
     y,
     font: regular,
@@ -385,11 +385,11 @@ async function createSlipPage(
     xPos = margin + 10;
     
     const productName = item.name || item.title || 'Product';
-    const hsn = item.hsn || '6109';
     const quantity = item.quantity || 1;
-    const price = item.price || '0.00';
-    const taxAmount = item.taxLines?.reduce((sum: number, tax: any) => sum + (parseFloat(tax.price) || 0), 0) || 0;
-    const total = (parseFloat(price) * quantity + taxAmount).toFixed(2);
+    const hsn = item.hsn || '6109';
+    const total = (parseFloat(item.price) * quantity).toFixed(2);
+    const price = (Number(total) * (100/105)).toFixed(); // assuming 5% tax inclusive
+    const taxAmount = Number(total) - Number(price);
 
     const rowData = [
       productName.length > 30 ? productName.substring(0, 30) + '...' : productName,

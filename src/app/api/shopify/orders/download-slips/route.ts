@@ -1,7 +1,9 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
 import bwip from 'bwip-js';
+import { DocumentSnapshot } from 'firebase-admin/firestore';
 
 /* -------------------- Auth -------------------- */
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
@@ -516,8 +518,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No valid numeric orderIds provided' }, { status: 400 });
     }
 
-    const orderDocs = await ordersColRef.where('orderId', 'in', numericIds).get();
-    if (orderDocs.empty) {
+    // Chunking logic to handle Firestore's 30-item limit for 'in' queries
+    const chunks: number[][] = [];
+    for (let i = 0; i < numericIds.length; i += 30) {
+      chunks.push(numericIds.slice(i, i + 30));
+    }
+
+    const allDocs: DocumentSnapshot[] = [];
+    for (const chunk of chunks) {
+      const snapshot = await ordersColRef.where('orderId', 'in', chunk).get();
+      snapshot.forEach(doc => allDocs.push(doc));
+    }
+
+    if (allDocs.length === 0) {
       return NextResponse.json({ error: 'No matching orders found' }, { status: 404 });
     }
 
@@ -526,7 +539,7 @@ export async function POST(req: NextRequest) {
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     const pages: PDFPage[] = [];
-    for (const d of orderDocs.docs) {
+    for (const d of allDocs) {
       const order = d.data();
       const page = await createSlipPage(pdfDoc, { regular, bold }, order, sellerDetails);
       pages.push(page);
@@ -562,3 +575,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate slips', details: errorMessage }, { status: 500 });
   }
 }
+
+    

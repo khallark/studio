@@ -150,7 +150,7 @@ async function createSlipPage(
 
   // Ship to section
   y -= 40;
-  const shipTo = order.shipping_address || {};
+  const shipTo = order.raw.shipping_address || {};
   const customerName = shipTo.name || 'Customer';
   const addressLine1 = shipTo.address1 || '';
   const addressLine2 = shipTo.address2 || '';
@@ -167,28 +167,27 @@ async function createSlipPage(
     color: rgb(0, 0, 0),
   });
 
-  // COD and amount on the right
-  const isCOD = order.paymentMethod === 'COD' || order.financialStatus === 'pending';
-  const totalAmount = order.totalPrice || order.total || '0';
+
+  // COD/PREPAID INR
+  page.drawText(`${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
+      ? 'Express'
+      : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`, {
+    x: width - margin - 150,
+    y,
+    font: regular,
+    size: 11,
+    color: rgb(0, 0, 0),
+  });
   
-  if (isCOD) {
-    page.drawText('COD - Express', {
-      x: width - margin - 150,
-      y,
-      font: regular,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
-    
-    y -= 20;
-    page.drawText(`INR ${totalAmount}`, {
-      x: width - margin - 150,
-      y,
-      font: bold,
-      size: 13,
-      color: rgb(0, 0, 0),
-    });
-  }
+  y -= 20;
+  page.drawText(`INR ${order.total_outstanding || '0'}`, {
+    x: width - margin - 150,
+    y,
+    font: bold,
+    size: 13,
+    color: rgb(0, 0, 0),
+  });
+
 
   // Address details
   y -= 20;

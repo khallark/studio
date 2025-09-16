@@ -143,14 +143,17 @@ async function createSlipPage(
   const font = fonts.regular;
   const boldFont = fonts.bold;
 
-  // -------------------- Outer border (Code-2 style) --------------------
-  page.drawRectangle({
-    x: margin,
-    y: margin,
-    width: contentWidth,
-    height: height - 2 * margin,
-    borderWidth: 1,
-  });
+  // -------------------- Outer border (Code-2 style) --------------------  
+  // crisp half-pixel alignment for 1pt strokes
+  const leftX   = Math.round(margin) + 0.5;
+  const rightX  = Math.round(width - margin) - 0.5;
+  const topY    = Math.round(height - margin) - 0.5;
+  const bottomY = Math.round(margin) + 0.5;
+
+  drawLine(page, leftX,  topY,    rightX, topY,    1); // top
+  drawLine(page, leftX,  bottomY, rightX, bottomY, 1); // bottom
+  drawLine(page, leftX,  bottomY, leftX,  topY,    1); // left
+  drawLine(page, rightX, bottomY, rightX, topY,    1); // right
 
   // -------------------- Header band (Code-2 style) --------------------
   // Header box height ≈ 25mm feel (a bit compact to save space)

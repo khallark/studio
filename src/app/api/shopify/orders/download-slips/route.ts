@@ -150,7 +150,7 @@ async function createSlipPage(
 
   // Ship to section
   y -= 40;
-  const shipTo = order.shippingAddress || {};
+  const shipTo = order.shipping_address || {};
   const customerName = shipTo.name || 'Customer';
   const addressLine1 = shipTo.address1 || '';
   const addressLine2 = shipTo.address2 || '';

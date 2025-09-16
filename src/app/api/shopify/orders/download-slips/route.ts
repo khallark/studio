@@ -4,6 +4,7 @@ import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
 import bwip from 'bwip-js';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 
 /* -------------------- Auth -------------------- */
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
@@ -473,7 +474,6 @@ export async function POST(req: NextRequest) {
 
     const ordersColRef = accountRef.collection('orders');
     // The request sends Firestore document IDs, which are strings.
-    // The previous implementation was mistakenly converting them to numbers.
     const stringIds = orderIds.map(String);
 
     // Chunking logic to handle Firestore's 30-item limit for 'in' queries
@@ -485,12 +485,12 @@ export async function POST(req: NextRequest) {
     const allDocs: DocumentSnapshot[] = [];
     for (const chunk of chunks) {
       // Use where clause with documentId() to query by ID
-      const snapshot = await ordersColRef.where(db.app.firestore.FieldPath.documentId(), 'in', chunk).get();
+      const snapshot = await ordersColRef.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
       snapshot.forEach(doc => allDocs.push(doc));
     }
 
     // Re-sort the documents to match the original orderIds array from the frontend
-    allDocs.sort((a, b) => stringIds.indexOf(b.id) - stringIds.indexOf(a.id));
+    allDocs.sort((a, b) => stringIds.indexOf(a.id) - stringIds.indexOf(b.id));
 
     if (allDocs.length === 0) {
       return NextResponse.json({ error: 'No matching orders found' }, { status: 404 });
@@ -537,5 +537,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate slips', details: errorMessage }, { status: 500 });
   }
 }
-
-    

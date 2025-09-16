@@ -21,24 +21,15 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   return null;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Helper to sanitize text for WinAnsi encoding
+function sanitizeText(text: string): string {
+    if (!text) return '';
+    // This regex matches characters outside the WinAnsi character set.
+    // It's a simplified approach. A more accurate one would be to check character codes.
+    // For pdf-lib's standard fonts, we need to ensure characters are within the subset it supports.
+    // Let's replace any character that is not a standard ASCII character.
+    return text.replace(/[^\x00-\x7F]/g, "?");
+}
 
 
 function ddmmyyyy(dateish: any): string {
@@ -114,7 +105,8 @@ function drawWrappedText(
   lineHeight = size * 1.25,
   color = rgb(0, 0, 0)
 ): number {
-  const lines = wrapTextByWidth(text, maxWidth, font, size);
+  const sanitizedText = sanitizeText(text);
+  const lines = wrapTextByWidth(sanitizedText, maxWidth, font, size);
   for (const ln of lines) {
     page.drawText(ln, { x, y, font, size, color });
     y -= lineHeight;
@@ -137,6 +129,10 @@ async function createSlipPage(
   const margin = 30;
   const contentWidth = width - 2 * margin;
   let y = height - margin;
+  
+  const drawSanitizedText = (text: string, options: any) => {
+      page.drawText(sanitizeText(text), options);
+  };
 
   // Helper function to draw a horizontal line
   const drawLine = (y: number, thickness = 1) => {
@@ -165,7 +161,7 @@ async function createSlipPage(
 
   // Header section with Shipowr and DELHIVERY
   y -= 40;
-  page.drawText('Shipowr', {
+  drawSanitizedText('Shipowr', {
     x: margin + 10,
     y,
     font: bold,
@@ -173,7 +169,7 @@ async function createSlipPage(
     color: rgb(0, 0, 0),
   });
 
-  page.drawText(order.courier, {
+  drawSanitizedText(order.courier, {
     x: width - margin - 120,
     y,
     font: bold,
@@ -188,7 +184,7 @@ async function createSlipPage(
   // AWB Number
   y -= 30;
   const awbNumber = order.awb || `276468${Date.now().toString().slice(-10)}`;
-  page.drawText(`AWB# ${awbNumber}`, {
+  drawSanitizedText(`AWB# ${awbNumber}`, {
     x: margin + 10,
     y,
     font: bold,
@@ -221,7 +217,7 @@ async function createSlipPage(
   } catch (error) {
     console.error('Barcode generation failed:', error);
     // Fallback: draw AWB number as text
-    page.drawText(awbNumber, {
+    drawSanitizedText(awbNumber, {
       x: (width - regular.widthOfTextAtSize(awbNumber, 14)) / 2,
       y: y + 30,
       font: bold,
@@ -241,7 +237,7 @@ async function createSlipPage(
   const country = shipTo.country || 'India';
   const pincode = shipTo.zip || '';
 
-  page.drawText(`Ship to - ${customerName}`, {
+  drawSanitizedText(`Ship to - ${customerName}`, {
     x: margin + 10,
     y,
     font: bold,
@@ -251,7 +247,7 @@ async function createSlipPage(
 
 
   // COD/PREPAID INR
-  page.drawText(`${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
+  drawSanitizedText(`${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
       ? 'Express'
       : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`, {
     x: width - margin - 150,
@@ -262,7 +258,7 @@ async function createSlipPage(
   });
   
   y -= 20;
-  page.drawText(`INR ${order.raw.total_price || '0'}`, {
+  drawSanitizedText(`INR ${order.raw.total_price || '0'}`, {
     x: width - margin - 150,
     y,
     font: bold,
@@ -281,7 +277,7 @@ async function createSlipPage(
   ].filter(Boolean);
 
   addressParts.forEach((line) => {
-    page.drawText(line, {
+    drawSanitizedText(line, {
       x: margin + 10,
       y,
       font: regular,
@@ -293,7 +289,7 @@ async function createSlipPage(
 
   // PIN code
   if (pincode) {
-    page.drawText(`PIN - ${pincode}`, {
+    drawSanitizedText(`PIN - ${pincode}`, {
       x: margin + 10,
       y,
       font: regular,
@@ -304,14 +300,14 @@ async function createSlipPage(
 
   // Date on the right
   const orderDate = order.createdAt;
-  page.drawText('Date', {
+  drawSanitizedText('Date', {
     x: width - margin - 150,
     y: y + 30,
     font: regular,
     size: 10,
     color: rgb(0, 0, 0),
   });
-  page.drawText(ddmmyyyy(orderDate), {
+  drawSanitizedText(ddmmyyyy(orderDate), {
     x: width - margin - 150,
     y: y + 15,
     font: regular,
@@ -325,7 +321,7 @@ async function createSlipPage(
 
   // Seller details section
   y -= 25;
-  page.drawText(`Seller: ${sellerDetails.name}`, {
+  drawSanitizedText(`Seller: ${sellerDetails.name}`, {
     x: margin + 10,
     y,
     font: regular,
@@ -335,7 +331,7 @@ async function createSlipPage(
 
   // Order number on the right
   const orderNumber = order.name || `#${order.orderId || 'N/A'}`;
-  page.drawText(orderNumber, {
+  drawSanitizedText(orderNumber, {
     x: width - margin - 150,
     y,
     font: bold,
@@ -345,7 +341,7 @@ async function createSlipPage(
 
   // GST number
   y -= 20;
-  page.drawText(`GST: 03AAQCM9385B1Z8`, {
+  drawSanitizedText(`GST: 03AAQCM9385B1Z8`, {
     x: margin + 10,
     y,
     font: regular,
@@ -365,7 +361,7 @@ async function createSlipPage(
 
   // Draw table header
   tableHeaders.forEach((header, i) => {
-    page.drawText(header, {
+    drawSanitizedText(header, {
       x: xPos,
       y,
       font: bold,
@@ -403,7 +399,7 @@ async function createSlipPage(
     ];
 
     rowData.forEach((data, i) => {
-      page.drawText(data, {
+      drawSanitizedText(data, {
         x: xPos,
         y,
         font: regular,
@@ -435,42 +431,6 @@ async function createSlipPage(
 
   return page;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* -------------------- Handler -------------------- */
 export async function POST(req: NextRequest) {
@@ -575,5 +535,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate slips', details: errorMessage }, { status: 500 });
   }
 }
-
-    

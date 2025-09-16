@@ -125,113 +125,224 @@ function getHSN(item: any): string {
   return (item?.hsn_code || propHSN || item?.sku || 'N/A').toString();
 }
 
-/* -------------------- Page Renderer -------------------- */
+/* -------------------- Page Renderer (Code-1 with Code-2 layout) -------------------- */
 async function createSlipPage(
   pdfDoc: PDFDocument,
   fonts: { regular: PDFFont; bold: PDFFont },
   order: any,
   sellerDetails: { name: string; gst: string; returnAddress: string }
 ) {
-  const page = pdfDoc.addPage([595, 842]); // A4 portrait
+  // A4 portrait
+  const page = pdfDoc.addPage([595, 842]);
   const { width, height } = page.getSize();
-  const margin = 30;
+
+  // Match “10mm margin” feel from Code-2 (≈ 28.35pt)
+  const margin = 28;
+  const contentWidth = width - 2 * margin;
 
   const font = fonts.regular;
   const boldFont = fonts.bold;
 
-  // Header row: "Shipowr" (left)  +  Courier (right, uppercase)
-  let headerY = height - 40;
-  drawText(page, 'Shipowr', margin, headerY, boldFont, 16);
+  // -------------------- Outer border (Code-2 style) --------------------
+  page.drawRectangle({
+    x: margin,
+    y: margin,
+    width: contentWidth,
+    height: height - 2 * margin,
+    borderWidth: 1,
+  });
+
+  // -------------------- Header band (Code-2 style) --------------------
+  // Header box height ≈ 25mm feel (a bit compact to save space)
+  const headerH = 64; // ~ 22–25mm look
+  const headerY = height - margin - headerH;
+
+  page.drawRectangle({
+    x: margin,
+    y: headerY,
+    width: contentWidth,
+    height: headerH,
+    borderWidth: 0.5,
+  });
+
+  // “Shipowr” (left) + Courier (right, uppercase)
+  const shipowrSize = 18;
+  const courierSize = 20;
 
   const courierTitle = (order?.courier || '').toString().toUpperCase() || 'DELIVERY';
-  const courierW = boldFont.widthOfTextAtSize(courierTitle, 16);
-  drawText(page, courierTitle, width - margin - courierW, headerY, boldFont, 16);
 
-  drawLine(page, margin, headerY - 15, width - margin, headerY - 15, 1.5);
+  // Baselines inside the header band
+  const headerBaseline = headerY + headerH - 16;
+  drawText(page, 'Shipowr', margin + 6, headerBaseline, boldFont, shipowrSize);
 
-  // AWB label + barcode (big, with human-readable text)
+  const courierW = boldFont.widthOfTextAtSize(courierTitle, courierSize);
+  drawText(
+    page,
+    courierTitle,
+    margin + contentWidth - courierW - 6,
+    headerBaseline,
+    boldFont,
+    courierSize
+  );
+
+  // -------------------- AWB label + centered barcode (Code-2 style) --------------------
   const awb = order?.awb || 'N/A';
-  drawText(page, `AWB# ${awb}`, margin, headerY - 35, font, 12);
+
+  let yPos = headerY - 12;
+  drawText(page, `AWB# ${awb}`, margin + 6, yPos, boldFont, 14);
+
+  // barcode below, centered
+  yPos -= 12;
 
   if (order?.awb) {
     try {
       const png = await bwip.toBuffer({
         bcid: 'code128',
         text: awb,
-        scale: 3, // fine resolution
-        height: 15,
+        scale: 3,        // crisp
+        height: 18,      // taller than before
         includetext: true,
         textxalign: 'center',
       });
       const barcodeImage = await pdfDoc.embedPng(png);
-      // Bigger to match sample feel
-      page.drawImage(barcodeImage, {
-        x: margin,
-        y: headerY - 110,
-        width: 320,
-        height: 70,
-      });
+
+      // Keep within content box and center (Code-2 uses ~120mm wide visual; we fit)
+      const desiredW = Math.min(contentWidth - 40, 360);
+      const intrinsicW = barcodeImage.width;
+      const intrinsicH = barcodeImage.height;
+      const scale = desiredW / intrinsicW;
+      const drawW = desiredW;
+      const drawH = intrinsicH * scale;
+
+      const barcodeX = margin + (contentWidth - drawW) / 2;
+      const barcodeY = yPos - drawH - 4;
+
+      page.drawImage(barcodeImage, { x: barcodeX, y: barcodeY, width: drawW, height: drawH });
+      yPos = barcodeY - 12; // space below barcode
     } catch (e) {
       console.error('Barcode generation failed:', e);
-      drawText(page, 'Barcode failed to generate', margin, headerY - 70, font, 10, rgb(1, 0, 0));
+      drawText(page, 'Barcode failed to generate', margin + 6, yPos, font, 10, rgb(1, 0, 0));
+      yPos -= 16;
     }
+  } else {
+    yPos -= 10;
   }
 
-  // Ship-to block (bold name + address, with state in parentheses, then PIN)
+  // -------------------- Ship-to (left) + Payment/Amount/Date (right) --------------------
+  // Title
   const customerName = `${order?.raw?.customer?.first_name || ''} ${order?.raw?.customer?.last_name || ''}`.trim();
-  drawText(page, `Ship to - ${customerName || 'Customer'}`, margin, height - 160, boldFont, 14);
+  drawText(page, `Ship to - ${customerName || 'Customer'}`, margin + 6, yPos, boldFont, 17);
+  yPos -= 14;
 
+  // two columns like Code-2: left ~60%, right ~40%
+  const leftColW = contentWidth * 0.6;
+  const rightColX = margin + leftColW + 10;
+
+  // Left column: address (wrapped like your helpers)
   const shipAddrLines = addressLinesLikeSample(order?.raw?.shipping_address as Address);
-  let y = height - 180;
+  let addrY = yPos;
   for (const line of shipAddrLines) {
-    drawText(page, line, margin, y, font, 11);
-    y -= 15;
+    drawText(page, line, margin + 6, addrY, font, 13);
+    addrY -= 12;
   }
 
-  // Payment mode + shipping speed + big amount + date
+  // Right column: payment/speed/amount/date (Code-2 wording kept)
   const paymentMode = order?.financialStatus === 'paid' ? 'Prepaid' : 'COD';
-  const speed = order?.courier === 'Delhivery' ? 'Express' : (String(order?.courier || '').split(':')[1] || 'Express').trim();
+  const speed =
+    order?.courier === 'Delhivery'
+      ? 'Express'
+      : (String(order?.courier || '').split(':')[1] || 'Express').trim();
 
-  const rightBlockX = width / 2 + 50;
-  drawText(page, `${paymentMode} - ${speed}`, rightBlockX, height - 160, font, 12);
+  let rightY = yPos + 2; // align near top of address block
+  drawText(page, `${paymentMode} - ${speed}`, rightColX, rightY, font, 14);
+  rightY -= 10;
 
-  const grandTotal =
-    toNumber(order?.totalPrice, NaN) ?? NaN; // prefer your denormalized field
+  const grandTotal = toNumber(order?.totalPrice, NaN) ?? NaN;
   const grandTotalFallback = toNumber(order?.raw?.total_price, 0);
   const totalToShow = Number.isFinite(grandTotal) ? grandTotal : grandTotalFallback;
 
-  drawText(page, `INR ${formatINRNoTrailing(totalToShow)}`, rightBlockX, height - 180, boldFont, 18);
+  drawText(page, `INR ${formatINRNoTrailing(totalToShow)}`, rightColX, rightY, boldFont, 16);
+  rightY -= 14;
 
-  drawText(page, `Date`, rightBlockX, height - 200, font, 11);
+  drawText(page, `Date`, rightColX, rightY, font, 14);
+  rightY -= 10;
   const created = order?.createdAt || order?.raw?.created_at || Date.now();
-  drawText(page, ddmmyyyy(created), rightBlockX, height - 215, font, 11);
+  drawText(page, ddmmyyyy(created), rightColX, rightY, font, 14);
 
-  drawLine(page, margin, height - 250, width - margin, height - 250);
+  // Move main cursor below address block
+  yPos = Math.min(addrY, rightY) - 10;
 
-  // Seller info (left) + order name (right)
+  // -------------------- Seller + GST boxed row (Code-2 style) --------------------
+  const sellerBoxH = 28; // compact  (Code-2 had 25 ~mm; we keep proportionate but practical)
+  const sellerBoxY = yPos - sellerBoxH;
+
+  page.drawRectangle({
+    x: margin,
+    y: sellerBoxY,
+    width: contentWidth,
+    height: sellerBoxH,
+    borderWidth: 0.5,
+  });
+
   const sellerName = sellerDetails?.name || 'N/A';
   const gstIn = sellerDetails?.gst || 'N/A';
-  drawText(page, `Seller: ${sellerName}`, margin, height - 270, font, 11);
-  drawText(page, `GST: ${gstIn}`, margin, height - 285, font, 11);
 
-  const orderName = (order?.name || '').toString();
-  const orderNameW = boldFont.widthOfTextAtSize(orderName, 14);
-  drawText(page, orderName, Math.max(margin, width - margin - orderNameW), height - 270, boldFont, 14);
+  drawText(page, `Seller: ${sellerName}`, margin + 6, sellerBoxY + sellerBoxH - 10, font, 12);
+  drawText(page, `GST: ${gstIn}`, margin + 6, sellerBoxY + 8, font, 12);
 
-  drawLine(page, margin, height - 305, width - margin, height - 305);
+  const orderName = (order?.name || '').toString().replace(/^#+/, '');
+  const orderIdText = `#${orderName}`;
+  const orderIdW = boldFont.widthOfTextAtSize(orderIdText, 18);
+  drawText(
+    page,
+    orderIdText,
+    margin + contentWidth - orderIdW - 6,
+    sellerBoxY + sellerBoxH / 2 - 6,
+    boldFont,
+    18
+  );
 
-  // Products table — columns aligned like sample
-  const headers = ['Product Name', 'HSN', 'Qty.', 'Taxable Price', 'Taxes', 'Total'];
-  const colX = [margin, 300, 350, 420, 485, 540]; // tuned for A4 and sample’s spacing
+  yPos = sellerBoxY - 10;
 
-  headerY = height - 325;
-  headers.forEach((h, i) => drawText(page, h, colX[i], headerY, boldFont, 10));
-  drawLine(page, margin, headerY - 8, width - margin, headerY - 8);
+  // -------------------- Products table (Code-2 look) --------------------
+  // column width ratios from Code-2: [70,22,18,30,25,25] total = 190
+  const ratios = [70, 22, 18, 30, 25, 25].map((n) => n / 190);
+  const colW = ratios.map((r) => r * contentWidth);
+  const colX: number[] = [margin + 6];
+  for (let i = 0; i < colW.length - 1; i++) colX.push(colX[colX.length - 1] + colW[i]);
 
-  let rowY = headerY - 25;
+  // header band with light fill
+  const headerRowH = 16;
+  const tableHeaderY = yPos - headerRowH;
 
+  page.drawRectangle({
+    x: margin,
+    y: tableHeaderY,
+    width: contentWidth,
+    height: headerRowH,
+    color: rgb(240 / 255, 240 / 255, 240 / 255),
+    borderWidth: 1,
+  });
+
+  // column vertical lines
+  for (let i = 1; i < colX.length; i++) {
+    drawLine(page, colX[i] - 3, tableHeaderY, colX[i] - 3, tableHeaderY + headerRowH, 0.6);
+  }
+
+  // table header text
+  drawText(page, 'Product Name', colX[0], tableHeaderY + headerRowH - 5, boldFont, 12);
+  drawText(page, 'HSN', colX[1], tableHeaderY + headerRowH - 5, boldFont, 12);
+  drawText(page, 'Qty.', colX[2], tableHeaderY + headerRowH - 5, boldFont, 12);
+  drawText(page, 'Taxable Price', colX[3], tableHeaderY + headerRowH - 5, boldFont, 11);
+  drawText(page, 'Taxes', colX[4], tableHeaderY + headerRowH - 5, boldFont, 12);
+  drawText(page, 'Total', colX[5], tableHeaderY + headerRowH - 5, boldFont, 12);
+
+  // rows
+  let rowY = tableHeaderY - 3;
   const lineItems: any[] = Array.isArray(order?.raw?.line_items) ? order.raw.line_items : [];
+
   for (const item of lineItems) {
+    // compute values (keep Code-1 logic)
     const qty = toNumber(item?.quantity, 1);
     const unit = toNumber(item?.price, 0);
     const taxable = unit * qty;
@@ -240,54 +351,82 @@ async function createSlipPage(
       : 0;
     const total = taxable + tax;
 
-    // Product title may be long: wrap within (colX[1] - colX[0] - 8)
-    const nameWidth = colX[1] - colX[0] - 10;
-    const nameLines = wrapTextByWidth(item?.title || '', nameWidth, font, 10);
-    const lineHeight = 14;
+    // name wrapping in first col
+    const nameMaxW = colW[0] - 8;
+    const nameLines = wrapTextByWidth(
+      `${item?.title || ''}${item?.variant_title ? ` - ${item.variant_title}` : ''}`,
+      nameMaxW,
+      font,
+      11
+    );
+    const lineHt = 12;
+    const rowHt = Math.max(lineHt, nameLines.length * lineHt) + 4;
 
-    // Draw first line with columns; subsequent name lines span only first column
-    drawText(page, nameLines[0] || '', colX[0], rowY, font, 10);
-    drawText(page, getHSN(item), colX[1], rowY, font, 10);
-    // Slight nudge to center-ish qty like sample
-    drawText(page, String(qty), colX[2] + 8, rowY, font, 10);
-    drawText(page, formatINRNoTrailing(taxable), colX[3], rowY, font, 10);
-    drawText(page, formatINRNoTrailing(tax), colX[4], rowY, font, 10);
-    drawText(page, formatINRNoTrailing(total), colX[5], rowY, font, 10);
+    // row border box
+    page.drawRectangle({
+      x: margin,
+      y: rowY - rowHt,
+      width: contentWidth,
+      height: rowHt,
+      borderWidth: 0.6,
+    });
 
-    // Additional wrapped lines for product name only
-    for (let i = 1; i < nameLines.length; i++) {
-      rowY -= lineHeight;
-      drawText(page, nameLines[i], colX[0], rowY, font, 10);
+    // column separators
+    for (let i = 1; i < colX.length; i++) {
+      drawLine(page, colX[i] - 3, rowY - rowHt, colX[i] - 3, rowY, 0.6);
     }
 
-    rowY -= 20;
-    // (basic overflow guard)
-    if (rowY < 100) break;
+    // text baselines
+    let textBase = rowY - 6; // bottom padding
+    // draw product name multi-line (top-down)
+    let nameTop = rowY - 6 + (rowHt - nameLines.length * lineHt) / 2; // vertically reasonable
+    for (let i = 0; i < nameLines.length; i++) {
+      drawText(page, nameLines[i], colX[0], nameTop + (nameLines.length - 1 - i) * lineHt, font, 11);
+    }
+
+    // other columns (vertically center-ish)
+    const midBase = rowY - rowHt / 2 + 4;
+
+    drawText(page, getHSN(item), colX[1], midBase, font, 11);
+    drawText(page, String(qty), colX[2], midBase, font, 11);
+    drawText(page, formatINRNoTrailing(taxable), colX[3], midBase, font, 11);
+    drawText(page, formatINRNoTrailing(tax), colX[4], midBase, font, 11);
+    drawText(page, formatINRNoTrailing(total), colX[5], midBase, font, 11);
+
+    rowY -= rowHt;
+
+    // basic overflow guard (leave space for return address)
+    if (rowY < margin + 90) break;
   }
 
-  // Return address (wrapped)
+  // -------------------- Bottom: Return Address (Code-2 phrasing) --------------------
+  const returnBlockY = margin + 36;
   const returnLabel = 'Return Address: ';
-  const raX = margin;
-  const raY = 60;
-  const maxRAWidth = width - margin - raX;
+  const labelW = font.widthOfTextAtSize(returnLabel, 12);
 
-  const raText = sellerDetails?.returnAddress || 'Return address not configured.';
-  const raLines = wrapTextByWidth(raText, maxRAWidth - font.widthOfTextAtSize(returnLabel, 9), font, 9);
+  const raText =
+    sellerDetails?.returnAddress ||
+    'Udyog vihar, Street no.1, Bhattian, Bahadarke, near Indian Oil petrol pump, Ludhiana, Punjab, India, 141008';
 
-  drawText(page, returnLabel, raX, raY, font, 9);
-  // print wrapped body right after label, then subsequent lines starting at raX
+  // first line continues after label, subsequent lines full width
+  const raMaxW = contentWidth - 10 - labelW;
+  const raLines = wrapTextByWidth(raText, raMaxW, font, 12);
+
+  drawText(page, returnLabel, margin + 6, returnBlockY, font, 12);
   if (raLines.length > 0) {
-    drawText(page, raLines[0], raX + font.widthOfTextAtSize(returnLabel, 9) + 2, raY, font, 9);
-    let bodyY = raY - 12;
+    drawText(page, raLines[0], margin + 6 + labelW + 2, returnBlockY, font, 12);
+    let bodyY = returnBlockY - 14;
     for (let i = 1; i < raLines.length; i++) {
-      drawText(page, raLines[i], raX, bodyY, font, 9);
-      bodyY -= 12;
+      drawText(page, raLines[i], margin + 6, bodyY, font, 12);
+      bodyY -= 14;
     }
   }
 
-  // NOTE: page numbering will be drawn in a second pass so it reads “Page i of N”
+  // NOTE: Keep page numbering to your existing second pass (“Page i of N”)
+
   return page;
 }
+
 
 /* -------------------- Handler -------------------- */
 export async function POST(req: NextRequest) {

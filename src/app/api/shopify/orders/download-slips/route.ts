@@ -299,7 +299,7 @@ async function createSlipPage(
   drawLine(y, 0.5);
 
   // Product items
-  const lineItems = order.raw.lineItems || [];
+  const lineItems = order.raw.line_items || [];
   y -= 20;
   
   lineItems.forEach((item: any) => {

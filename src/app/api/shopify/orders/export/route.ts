@@ -45,19 +45,22 @@ export async function POST(req: NextRequest) {
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
     
-    // Firestore 'in' query has a limit of 30 values. We need to chunk the orderIds.
-    const numericOrderIds = orderIds.map(id => Number(id));
-    const chunks: number[][] = [];
-    for (let i = 0; i < numericOrderIds.length; i += 30) {
-        chunks.push(numericOrderIds.slice(i, i + 30));
+    // Firestore 'in' query has a limit of 30 values for document IDs. We need to chunk them.
+    const chunks: string[][] = [];
+    for (let i = 0; i < orderIds.length; i += 30) {
+        chunks.push(orderIds.slice(i, i + 30));
     }
 
-    const allDocs: DocumentSnapshot[] = [];
+    let allDocs: DocumentSnapshot[] = [];
     for (const chunk of chunks) {
-        const snapshot = await ordersColRef.where('orderId', 'in', chunk).get();
+        // Use where clause with documentId() to query by ID
+        const snapshot = await ordersColRef.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
         snapshot.forEach(doc => allDocs.push(doc));
     }
     
+    // Re-sort the documents to match the original orderIds array from the frontend
+    allDocs.sort((a, b) => orderIds.indexOf(a.id) - orderIds.indexOf(b.id));
+
     const flattenedData: any[] = [];
     
     allDocs.forEach(doc => {
@@ -84,9 +87,9 @@ export async function POST(req: NextRequest) {
                 'Item SKU': item.sku || 'N/A',
                 'Item Quantity': item.quantity,
                 'Item Price': item.price,
-                'Discount': order.raw.total_discounts || 0,
                 'Total Order Price': order.totalPrice,
                 'Vendor': item.vendor || 'N/A',
+                'Discount': order.raw.total_discounts || 0,
                 'Currency': order.currency,
                 'Payment Status': paymentStatus,
                 'Status': order.customStatus,
@@ -120,9 +123,9 @@ export async function POST(req: NextRequest) {
             'Item SKU': 'N/A',
             'Item Quantity': 0,
             'Item Price': 0,
-            'Discount': order.raw.total_discounts || 0,
             'Total Order Price': order.totalPrice,
             'Vendor': 'N/A',
+            'Discount': order.raw.total_discounts || 0,
             'Currency': order.currency,
             'Payment Status': paymentStatus,
             'Status': order.customStatus,

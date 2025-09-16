@@ -39,6 +39,86 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 
 
+function ddmmyyyy(dateish: any): string {
+  // Match sample: 11/9/2025 (no leading zero on month/day)
+  const d = new Date(dateish || Date.now());
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// If you want strict typing for `page`, also:
+// import type { PDFPage } from 'pdf-lib';
+
+/** Split text into lines that fit within maxWidth for a given font+size. */
+function wrapTextByWidth(
+  text: string,
+  maxWidth: number,
+  font: PDFFont,
+  size: number
+): string[] {
+  const out: string[] = [];
+  const paras = String(text ?? '').split(/\r?\n/);
+
+  const fits = (s: string) => font.widthOfTextAtSize(s, size) <= maxWidth;
+
+  for (const para of paras) {
+    if (!para) { out.push(''); continue; }
+
+    const words = para.split(/\s+/);
+    let line = '';
+
+    for (let w of words) {
+      // If a single word is too wide, hard-wrap it on characters
+      if (!fits(w)) {
+        let chunk = '';
+        for (const ch of w) {
+          if (fits(chunk + ch)) chunk += ch;
+          else {
+            if (line) { out.push(line); line = ''; }
+            if (chunk) { out.push(chunk); chunk = ''; }
+            // start new chunk with current char
+            chunk = ch;
+          }
+        }
+        if (chunk) {
+          if (!line) line = chunk;
+          else if (fits(line + ' ' + chunk)) line += ' ' + chunk;
+          else { out.push(line); line = chunk; }
+        }
+        continue;
+      }
+
+      // Normal word flow
+      if (!line) line = w;
+      else if (fits(line + ' ' + w)) line += ' ' + w;
+      else { out.push(line); line = w; }
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+/** Draw wrapped text line-by-line; returns the new y after drawing. */
+function drawWrappedText(
+  page: any,                // or PDFPage
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  font: PDFFont,
+  size: number,
+  lineHeight = size * 1.25,
+  color = rgb(0, 0, 0)
+): number {
+  const lines = wrapTextByWidth(text, maxWidth, font, size);
+  for (const ln of lines) {
+    page.drawText(ln, { x, y, font, size, color });
+    y -= lineHeight;
+  }
+  return y;
+}
 
 
 
@@ -221,7 +301,7 @@ async function createSlipPage(
   }
 
   // Date on the right
-  const orderDate = order.createdAt || new Date().toLocaleDateString('en-GB');
+  const orderDate = order.createdAt;
   page.drawText('Date', {
     x: width - margin - 150,
     y: y + 30,
@@ -229,7 +309,7 @@ async function createSlipPage(
     size: 10,
     color: rgb(0, 0, 0),
   });
-  page.drawText(orderDate, {
+  page.drawText(ddmmyyyy(orderDate), {
     x: width - margin - 150,
     y: y + 15,
     font: regular,
@@ -334,15 +414,32 @@ async function createSlipPage(
     y -= 20;
   });
 
-  // Return address at bottom
+  // // Return address at bottom
+  // y = margin + 80;
+  // page.drawText(`Return Address: ${sellerDetails.returnAddress}`, {
+  //   x: margin + 10,
+  //   y,
+  //   font: regular,
+  //   size: 9,
+  //   color: rgb(0, 0, 0),
+  // });
+
+  // Return address at bottom (wrap to fit inside the outer border)
   y = margin + 80;
-  page.drawText(`Return Address: ${sellerDetails.returnAddress}`, {
-    x: margin + 10,
+
+  const padX = 10;                         // left/right padding inside the border
+  const xText = margin + padX;
+  const maxTextWidth = contentWidth - padX * 2; // outer box width minus padding
+
+  y = drawWrappedText(
+    page,
+    `Return Address: ${sellerDetails.returnAddress || 'N/A'}`,
+    xText,
     y,
-    font: regular,
-    size: 9,
-    color: rgb(0, 0, 0),
-  });
+    maxTextWidth,
+    regular,
+    9
+  );
 
   // Note: Page numbering is handled in the main function after all pages are created
 

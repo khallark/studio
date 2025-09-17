@@ -402,8 +402,30 @@ async function createSlipPage(
     const price = (Number(total) * (100/105)).toFixed(); // assuming 5% tax inclusive
     const taxAmount = Number(total) - Number(price);
 
+    function truncateKeepTailAfterHyphen(name: string, max = 30): string {
+      const s = String(name ?? '');
+      if (s.length <= max) return s;
+
+      const hyphen = s.lastIndexOf('-');
+      if (hyphen === -1) {
+        // No hyphen → regular ellipsis trim
+        return s.slice(0, Math.max(0, max - 3)) + '...';
+      }
+
+      const tail = s.slice(hyphen); // includes the hyphen itself
+      const headRoom = max - 3 - tail.length;
+
+      if (headRoom > 0) {
+        // Enough room for some head + "..." + full tail
+        return s.slice(0, headRoom) + '...' + tail;
+      }
+
+      // Tail alone is too long → show as much of the tail (starting at the hyphen) as fits
+      return '...' + tail.slice(0, max - 3);
+    }
+
     const rowData = [
-      productName.length > 30 ? productName.substring(0, 30) + '...' : productName,
+      truncateKeepTailAfterHyphen(productName, 25),
       hsn,
       quantity.toString(),
       price,

@@ -218,8 +218,8 @@ async function createSlipPage(
     });
     
     const barcodeImage = await pdfDoc.embedPng(barcodeBuffer);
-    const barcodeWidth = 200;
-    const barcodeHeight = 60;
+    const barcodeWidth = 200 + 40;
+    const barcodeHeight = 60 + 10;
     
     page.drawImage(barcodeImage, {
       x: (width - barcodeWidth) / 2,
@@ -378,7 +378,7 @@ async function createSlipPage(
       x: xPos,
       y,
       font: bold,
-      size: 10,
+      size: 10 * 0.75,
       color: rgb(0, 0, 0),
     });
     xPos += colWidths[i];

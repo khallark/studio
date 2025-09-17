@@ -112,19 +112,14 @@ function drawWrappedText(
   maxWidth: number,
   font: PDFFont,
   size: number,
-  lineHeight = size,
+  lineHeight = size * 1.25,
   color = rgb(0, 0, 0)
 ): number {
   const sanitizedText = sanitizeText(text);
-  
-  // Scale size + line height
-  const scaledSize = S(size);
-  const scaledLineHeight = (lineHeight != null ? lineHeight : size);
-
-  const lines = wrapTextByWidth(sanitizedText, maxWidth, font, scaledSize);
+  const lines = wrapTextByWidth(sanitizedText, maxWidth, font, size);
   for (const ln of lines) {
-    page.drawText(ln, { x, y, font, scaledSize, color });
-    y -= scaledLineHeight;
+    page.drawText(ln, { x, y, font, size, color });
+    y -= lineHeight;
   }
   return y;
 }

@@ -33,17 +33,17 @@ export async function POST(req: NextRequest) {
     if (!accountSnap.exists) return NextResponse.json({ error: 'Shop not found' }, { status: 404 });
 
     // Call the Firebase HTTPS function that enqueues the work and returns immediately
-    const base = process.env.ENQUEUE_FUNCTION_URL_2; // e.g. "https://us-central1<YOUR-PROJECT>.cloudfunctions.net"
-    const secret = process.env.ENQUEUE_FUNCTION_SECRET; // shared secret
-    if (!base || !secret) {
+    const url = process.env.ENQUEUE_FUNCTION_URL_2!;
+    const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
+    if (!url || !secret) {
       return NextResponse.json({ error: 'Server not configured (FIREBASE_FUNCTIONS_BASE/TASKS_SECRET)' }, { status: 500 });
     }
 
-    const resp = await fetch(`${base}/startOrdersFulfillmentBatch`, {
+    const resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Tasks-Secret': secret,
+        'X-Api-Key': secret,
       },
       body: JSON.stringify({ shop, orderIds, requestedBy: userId }),
     });

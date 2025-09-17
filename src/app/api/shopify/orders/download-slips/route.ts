@@ -119,7 +119,7 @@ function drawWrappedText(
   
   // Scale size + line height
   const scaledSize = S(size);
-  const scaledLineHeight = (lineHeight != null ? lineHeight : size * 1.25) * FONT_SCALE;
+  const scaledLineHeight = (lineHeight != null ? lineHeight : size * 1.25);
 
   const lines = wrapTextByWidth(sanitizedText, maxWidth, font, scaledSize);
   for (const ln of lines) {

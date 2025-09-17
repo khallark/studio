@@ -181,7 +181,7 @@ async function createSlipPage(
     color: rgb(0, 0, 0),
   });
 
-  drawSanitizedText(order.courier, {
+  drawSanitizedText(String(order.courier).split(':')[0].toUpperCase(), {
     x: width - margin - 120,
     y,
     font: bold,
@@ -210,7 +210,8 @@ async function createSlipPage(
     const barcodeBuffer = await bwip.toBuffer({
       bcid: 'code128',
       text: awbNumber,
-      scale: 3,
+      scaleX: 4,
+      scaleY: 4,
       height: 15,
       includetext: true,
       textxalign: 'center',
@@ -962,20 +963,20 @@ export async function POST(req: NextRequest) {
       pages.push(page);
     }
 
-    // Second pass: page numbering “Page i of N” bottom-right to match sample
-    const totalPages = pages.length;
-    pages.forEach((page, idx) => {
-      const text = `Page ${idx + 1} of ${totalPages}`;
-      const size = 9;
-      const w = regular.widthOfTextAtSize(text, size);
-      page.drawText(text, {
-        x: page.getWidth() - 50 - w,
-        y: 40,
-        font: regular,
-        size,
-        color: rgb(0, 0, 0),
-      });
-    });
+    // // Second pass: page numbering “Page i of N” bottom-right to match sample
+    // const totalPages = pages.length;
+    // pages.forEach((page, idx) => {
+    //   const text = `Page ${idx + 1} of ${totalPages}`;
+    //   const size = 9;
+    //   const w = regular.widthOfTextAtSize(text, size);
+    //   page.drawText(text, {
+    //     x: page.getWidth() - 50 - w,
+    //     y: 40,
+    //     font: regular,
+    //     size,
+    //     color: rgb(0, 0, 0),
+    //   });
+    // });
 
     const pdfBytes = await pdfDoc.save();
 

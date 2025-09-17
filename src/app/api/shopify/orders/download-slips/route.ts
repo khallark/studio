@@ -268,8 +268,21 @@ async function createSlipPage(
   });
 
 
-  // Address details
+  // Address details (wrapped)
   y -= 20;
+
+  // Right column (COD/Date) starts at this X in your layout:
+  const rightColX = width - margin - 150;
+
+  // We'll wrap address text so it never crosses into the right column.
+  // Leave a small gutter between columns.
+  const addrX = margin + 10;
+  const addrMaxWidth = rightColX - addrX - 8;
+
+  // Keep where the address block starts so we can place the Date
+  // consistently on the right, regardless of address height.
+  const addrStartY = y;
+
   const addressParts = [
     addressLine1,
     addressLine2,
@@ -277,44 +290,32 @@ async function createSlipPage(
     state && country ? `${state}, ${country}` : state || country,
   ].filter(Boolean);
 
-  addressParts.forEach((line) => {
-    drawSanitizedText(line, {
-      x: margin + 10,
-      y,
-      font: regular,
-      size: 10,
-      color: rgb(0, 0, 0),
-    });
-    y -= 15;
-  });
-
-  // PIN code
-  if (pincode) {
-    drawSanitizedText(`PIN - ${pincode}`, {
-      x: margin + 10,
-      y,
-      font: regular,
-      size: 10,
-      color: rgb(0, 0, 0),
-    });
+  for (const line of addressParts) {
+    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, regular, 10, 12.5);
   }
 
-  // Date on the right
-  const orderDate = order.createdAt;
-  drawSanitizedText('Date', {
-    x: width - margin - 150,
-    y: y + 30,
+  // PIN code (wrapped too, for consistency)
+  if (pincode) {
+    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10, 12.5);
+  }
+
+  // Date on the right — anchor to the top of the address block
+  const orderDate = order.created_at;
+  page.drawText('Date', {
+    x: rightColX,
+    y: addrStartY + 30,
     font: regular,
     size: 10,
     color: rgb(0, 0, 0),
   });
-  drawSanitizedText(ddmmyyyy(orderDate), {
-    x: width - margin - 150,
-    y: y + 15,
+  page.drawText(ddmmyyyy(orderDate), {
+    x: rightColX,
+    y: addrStartY + 15,
     font: regular,
     size: 10,
     color: rgb(0, 0, 0),
   });
+
 
   // Horizontal line before seller section
   y -= 30;

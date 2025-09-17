@@ -50,7 +50,7 @@ import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs, admin } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -300,9 +300,68 @@ export default function OrdersPage() {
       });
     }
   }, [userData, toast, user]);
+  
+  const handleDispatch = useCallback(async (orderIds: string[]) => {
+    if (!userData?.activeAccountId || !user || orderIds.length === 0) return;
+
+    setIsBulkUpdating(true);
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/dispatch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          orderIds: orderIds,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok && response.status !== 207) {
+        throw new Error(result.details || 'Failed to dispatch orders.');
+      }
+      
+      toast({
+        title: 'Dispatch Process Complete',
+        description: result.message,
+      });
+      
+      if (result.errors && result.errors.length > 0) {
+        // Optionally show another toast for errors
+        toast({
+          title: 'Some Dispatches Failed',
+          description: `Check the console for details on ${result.errors.length} failed orders.`,
+          variant: 'destructive',
+        });
+        console.error('Dispatch failures:', result.errors);
+      }
+
+      setSelectedOrders(prev => prev.filter(id => !orderIds.includes(id)));
+
+    } catch (error) {
+      console.error('Dispatch error:', error);
+      toast({
+        title: 'Dispatch Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }, [userData, user, toast]);
+
 
   const handleBulkUpdateStatus = useCallback(async (status: CustomStatus) => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
+    
+    // Intercept dispatch action to use the correct endpoint
+    if (status === 'Dispatched') {
+      await handleDispatch(selectedOrders);
+      return;
+    }
     
     setIsBulkUpdating(true);
     try {
@@ -342,7 +401,7 @@ export default function OrdersPage() {
     } finally {
         setIsBulkUpdating(false);
     }
-}, [userData, user, selectedOrders, toast]);
+}, [userData, user, selectedOrders, toast, handleDispatch]);
 
 
   const handleDeleteOrder = useCallback(async (orderId: string) => {
@@ -504,7 +563,7 @@ export default function OrdersPage() {
 
     try {
       const ordersToDownload = orders.filter(o => selectedOrders.includes(o.id) && o.awb);
-      const orderIdsToDownload = ordersToDownload.map(o => o.orderId);
+      const orderIdsToDownload = ordersToDownload.map(o => o.id);
 
       if (orderIdsToDownload.length === 0) {
         toast({ title: "No AWBs found", description: "None of the selected orders have an AWB assigned.", variant: "destructive" });
@@ -647,7 +706,7 @@ export default function OrdersPage() {
       case 'Ready To Dispatch':
         return (
           <>
-             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Dispatched')}>
+             <DropdownMenuItem onClick={() => handleDispatch([order.id])}>
               Dispatch
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
@@ -772,7 +831,7 @@ export default function OrdersPage() {
   return (
     <>
     <main className="flex flex-col h-full">
-        <Card className="flex flex-col h-full border-0 rounded-none">
+        <div className="flex flex-col flex-1 min-h-0">
             <CardHeader className="border-b p-4 md:p-6 shrink-0">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
@@ -863,7 +922,7 @@ export default function OrdersPage() {
                     <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
                     <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                 </TabsList>
-                <div className="realtive flex-1 overflow-y-auto">
+                <div className="relative flex-1 overflow-y-auto">
                     <Table>
                         <TableHeader className="sticky top-0 bg-card z-10">
                             <TableRow>
@@ -1019,7 +1078,7 @@ export default function OrdersPage() {
                     </div>
                 </div>
             </CardFooter>
-        </Card>
+        </div>
     </main>
 
     <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>

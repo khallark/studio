@@ -268,6 +268,36 @@ async function createSlipPage(
   });
 
 
+  // // Address details
+  // y -= 20;
+  // const addressParts = [
+  //   addressLine1,
+  //   addressLine2,
+  //   city,
+  //   state && country ? `${state}, ${country}` : state || country,
+  // ].filter(Boolean);
+
+  // addressParts.forEach((line) => {
+  //   drawSanitizedText(line, {
+  //     x: margin + 10,
+  //     y,
+  //     font: regular,
+  //     size: 10,
+  //     color: rgb(0, 0, 0),
+  //   });
+  //   y -= 15;
+  // });
+
+  // // PIN code
+  // if (pincode) {
+  //   drawSanitizedText(`PIN - ${pincode}`, {
+  //     x: margin + 10,
+  //     y,
+  //     font: regular,
+  //     size: 10,
+  //     color: rgb(0, 0, 0),
+  //   });
+  // }
   // Address details (wrapped)
   y -= 20;
 
@@ -299,23 +329,22 @@ async function createSlipPage(
     y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10, 12.5);
   }
 
-  // Date on the right — anchor to the top of the address block
-  const orderDate = order.created_at;
-  page.drawText('Date', {
-    x: rightColX,
-    y: addrStartY + 30,
+  // Date on the right
+  const orderDate = order.createdAt;
+  drawSanitizedText('Date', {
+    x: width - margin - 150,
+    y: y + 30,
     font: regular,
     size: 10,
     color: rgb(0, 0, 0),
   });
-  page.drawText(ddmmyyyy(orderDate), {
-    x: rightColX,
-    y: addrStartY + 15,
+  drawSanitizedText(ddmmyyyy(orderDate), {
+    x: width - margin - 150,
+    y: y + 15,
     font: regular,
     size: 10,
     color: rgb(0, 0, 0),
   });
-
 
   // Horizontal line before seller section
   y -= 30;

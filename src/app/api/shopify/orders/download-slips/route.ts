@@ -28,7 +28,7 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 // --- Typography scale ---
 // 1.00 = no change; 1.25 = +25% bigger everywhere
-const FONT_SCALE = 1.35;
+const FONT_SCALE = 1.32;
 const S = (n: number) => Math.round(n * FONT_SCALE);
 
 
@@ -303,12 +303,12 @@ async function createSlipPage(
   ].filter(Boolean);
 
   for (const line of addressParts) {
-    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, regular, 10 * 1.45, 16);
+    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, bold, 10 * 1.5, 17);
   }
 
   // PIN code (wrapped too, for consistency)
   if (pincode) {
-    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10 * 1.45, 16);
+    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, bold, 10 * 1.5, 17);
   }
 
   // Date on the right
@@ -323,7 +323,7 @@ async function createSlipPage(
   drawSanitizedText(ddmmyyyy(orderDate), {
     x: width - margin - 150,
     y: y + 15,
-    font: regular,
+    font: bold,
     size: 10,
     color: rgb(0, 0, 0),
   });

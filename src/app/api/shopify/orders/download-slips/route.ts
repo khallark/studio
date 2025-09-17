@@ -112,7 +112,7 @@ function drawWrappedText(
   maxWidth: number,
   font: PDFFont,
   size: number,
-  lineHeight = size * 1.25,
+  lineHeight = size * 1.5,
   color = rgb(0, 0, 0)
 ): number {
   const sanitizedText = sanitizeText(text);
@@ -218,8 +218,8 @@ async function createSlipPage(
     });
     
     const barcodeImage = await pdfDoc.embedPng(barcodeBuffer);
-    const barcodeWidth = 200 + 40;
-    const barcodeHeight = 60 + 10;
+    const barcodeWidth = 260;
+    const barcodeHeight = 60 + 20;
     
     page.drawImage(barcodeImage, {
       x: (width - barcodeWidth) / 2,
@@ -378,7 +378,7 @@ async function createSlipPage(
       x: xPos,
       y,
       font: bold,
-      size: 10 * 0.75,
+      size: 10 * 0.85,
       color: rgb(0, 0, 0),
     });
     xPos += colWidths[i];

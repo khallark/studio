@@ -26,22 +26,9 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 // --- Typography scale ---
 // 1.00 = no change; 1.25 = +25% bigger everywhere
-const FONT_SCALE = 1.25;
+const FONT_SCALE = 1.32;
 const S = (n: number) => Math.round(n * FONT_SCALE);
 
 
@@ -316,12 +303,12 @@ async function createSlipPage(
   ].filter(Boolean);
 
   for (const line of addressParts) {
-    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, regular, 10, 12.5);
+    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, bold, 10 * 1.5, 17);
   }
 
   // PIN code (wrapped too, for consistency)
   if (pincode) {
-    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10, 12.5);
+    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, bold, 10 * 1.5, 17);
   }
 
   // Date on the right
@@ -336,7 +323,7 @@ async function createSlipPage(
   drawSanitizedText(ddmmyyyy(orderDate), {
     x: width - margin - 150,
     y: y + 15,
-    font: regular,
+    font: bold,
     size: 10,
     color: rgb(0, 0, 0),
   });
@@ -415,8 +402,30 @@ async function createSlipPage(
     const price = (Number(total) * (100/105)).toFixed(); // assuming 5% tax inclusive
     const taxAmount = Number(total) - Number(price);
 
+    function truncateKeepTailAfterHyphen(name: string, max = 30): string {
+      const s = String(name ?? '');
+      if (s.length <= max) return s;
+
+      const hyphen = s.lastIndexOf('-');
+      if (hyphen === -1) {
+        // No hyphen → regular ellipsis trim
+        return s.slice(0, Math.max(0, max - 3)) + '...';
+      }
+
+      const tail = s.slice(hyphen); // includes the hyphen itself
+      const headRoom = max - 3 - tail.length;
+
+      if (headRoom > 0) {
+        // Enough room for some head + "..." + full tail
+        return s.slice(0, headRoom) + '...' + tail;
+      }
+
+      // Tail alone is too long → show as much of the tail (starting at the hyphen) as fits
+      return '...' + tail.slice(0, max - 3);
+    }
+
     const rowData = [
-      productName.length > 30 ? productName.substring(0, 30) + '...' : productName,
+      truncateKeepTailAfterHyphen(productName, 25),
       hsn,
       quantity.toString(),
       price,
@@ -457,9 +466,6 @@ async function createSlipPage(
 
   return page;
 }
-
-
-
 
 
 
@@ -545,7 +551,6 @@ export async function POST(req: NextRequest) {
     const pdfDoc = await PDFDocument.create();
     const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
     const pages: PDFPage[] = [];
     for (const d of allDocs) {
       const order = d.data();
@@ -553,20 +558,6 @@ export async function POST(req: NextRequest) {
       pages.push(page);
     }
 
-    // // Second pass: page numbering “Page i of N” bottom-right to match sample
-    // const totalPages = pages.length;
-    // pages.forEach((page, idx) => {
-    //   const text = `Page ${idx + 1} of ${totalPages}`;
-    //   const size = 9;
-    //   const w = regular.widthOfTextAtSize(text, size);
-    //   page.drawText(text, {
-    //     x: page.getWidth() - 50 - w,
-    //     y: 40,
-    //     font: regular,
-    //     size,
-    //     color: rgb(0, 0, 0),
-    //   });
-    // });
 
     const pdfBytes = await pdfDoc.save();
 

@@ -182,7 +182,7 @@ async function createSlipPage(
   });
 
   drawSanitizedText(String(order.courier).split(':')[0].toUpperCase(), {
-    x: width - margin - 120,
+    x: width - margin - 135,
     y,
     font: bold,
     size: 16,

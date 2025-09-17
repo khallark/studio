@@ -303,12 +303,12 @@ async function createSlipPage(
   ].filter(Boolean);
 
   for (const line of addressParts) {
-    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, regular, 10 * 1.3, 13.5);
+    y = drawWrappedText(page, line, addrX, y, addrMaxWidth, regular, 10 * 1.4, 15);
   }
 
   // PIN code (wrapped too, for consistency)
   if (pincode) {
-    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10 * 1.3, 13.5);
+    y = drawWrappedText(page, `PIN - ${pincode}`, addrX, y, addrMaxWidth, regular, 10 * 1.4, 15);
   }
 
   // Date on the right

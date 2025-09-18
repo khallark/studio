@@ -267,7 +267,7 @@ async function createSlipPage(
     y,
     _rightColMaxWidth,
     regular,
-    13,
+    15,
     16 // line height
   );
 
@@ -280,7 +280,7 @@ async function createSlipPage(
     y,
     _rightColMaxWidth,
     bold,
-    14,
+    15.5,
     18 // line height
   );
 
@@ -452,7 +452,7 @@ async function createSlipPage(
   });
 
   // Return address at bottom (wrap to fit inside the outer border)
-  y = margin + 80;
+  y = margin + 100;
 
   const padX = 10; // left/right padding inside the border
   const xText = margin + padX;

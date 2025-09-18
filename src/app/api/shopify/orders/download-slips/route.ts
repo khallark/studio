@@ -461,7 +461,7 @@ async function createSlipPage(
     y,
     maxTextWidth,
     regular,
-    9
+    11
   );
 
   return page;

@@ -515,8 +515,12 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
+  }, [searchQuery, dateRange, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
     setSelectedOrders([]);
-  }, [activeTab, searchQuery, dateRange, rowsPerPage, courierFilter]);
+  }, [activeTab, dateRange, courierFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -1231,5 +1235,7 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    
 
     

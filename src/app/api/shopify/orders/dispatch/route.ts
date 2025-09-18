@@ -18,21 +18,21 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { shop, orderIds } = body ?? {};
+    // ----- Auth -----
+    const userId = await getUserIdFromToken(req);
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    
+    // ----- Input -----
+    const { shop, orderIds } = (await req.json()) as {
+      shop: string;
+      orderIds: string;
+    }
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
     }
 
-    const userId = await getUserIdFromToken(req);
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    // OPTIONAL: verify the shop exists & has an accessToken (early fail fast)
-    const accountSnap = await db.collection('accounts').doc(shop).get();
-    if (!accountSnap.exists) return NextResponse.json({ error: 'Shop not found' }, { status: 404 });
-
-    // Call the Firebase HTTPS function that enqueues the work and returns immediately
+    // // Ask Firebase Function to enqueue Cloud Tasks (one per job)
     const url = process.env.ENQUEUE_FUNCTION_URL_2!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
     if (!url || !secret) {
@@ -50,13 +50,14 @@ export async function POST(req: NextRequest) {
 
     const json = await resp.json();
     if (!resp.ok) {
-      return NextResponse.json({ error: 'Failed to start batch', details: json }, { status: 500 });
+      return NextResponse.json({ ...json }, { status: 500 });
     }
 
-    // Respond quickly with the batch/summary id for UI polling
-    return NextResponse.json({ summaryId: json.summaryId, total: json.total }, { status: 202 });
-  } catch (error) {
-    console.error('Error starting fulfillment batch:', error);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ ...json }, { status: 202 });
+  } catch (e: any) {
+    console.error('bulk-create error:', e);
+    return NextResponse.json(
+      { error: "start_batch_failed", details: String(e?.message ?? e) },
+      { status: 500 });
   }
 }

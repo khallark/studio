@@ -523,7 +523,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    // Don't clear selection on search query change
+    setSelectedOrders([]);
   }, [activeTab, dateRange, courierFilter]);
 
 
@@ -866,7 +866,7 @@ export default function OrdersPage() {
                             placeholder="Search by order, customer, AWB..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="max-w-xs"
+                            className="w-full md:w-80"
                         />
                         <div className="flex items-center space-x-2">
                             <Switch id="invert-search" checked={invertSearch} onCheckedChange={setInvertSearch} />
@@ -1233,7 +1233,7 @@ export default function OrdersPage() {
                                 ))
                             ) : (
                                 <div className="text-center text-muted-foreground py-12">
-                                <p>No history found for this order.</p>
+                                <p>No history for this order.</p>
                                 </div>
                             )}
                             </div>
@@ -1248,3 +1248,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

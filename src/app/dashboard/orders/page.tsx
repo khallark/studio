@@ -1049,7 +1049,7 @@ export default function OrdersPage() {
                                     <SelectValue placeholder={rowsPerPage} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {[10, 20, 30, 40, 50, 100, 200].map((pageSize) => (
+                                    {[10, 20, 30, 40, 50, 100, 200, 500, 1000].map((pageSize) => (
                                     <SelectItem key={pageSize} value={`${pageSize}`}>
                                         {pageSize}
                                     </SelectItem>
@@ -1231,3 +1231,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

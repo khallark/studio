@@ -91,7 +91,7 @@ interface Order {
   fulfillmentStatus: string;
   customStatus: CustomStatus;
   awb?: string;
-  courier?: 'Delhivery' | 'Shiprocket';
+  courier?: string;
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
   raw: {
@@ -485,8 +485,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    // When the filters change, we reset the selection.
-    // We intentionally leave out `searchQuery` so selection persists while searching.
+    setSelectedOrders([]);
   }, [rowsPerPage, activeTab, dateRange, courierFilter]);
 
   const handleNextPage = () => {

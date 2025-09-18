@@ -173,16 +173,8 @@ async function createSlipPage(
 
   // Header section with Shipowr and DELHIVERY
   y -= 40;
-  drawSanitizedText('Shipowr', {
+  drawSanitizedText(String(order?.courier).toUpperCase(), {
     x: margin + 10,
-    y,
-    font: bold,
-    size: 16,
-    color: rgb(0, 0, 0),
-  });
-
-  drawSanitizedText(String(order.courier).split(':')[0].toUpperCase(), {
-    x: width - margin - 135,
     y,
     font: bold,
     size: 16,
@@ -260,25 +252,37 @@ async function createSlipPage(
   });
 
 
-  // COD/PREPAID INR
-  drawSanitizedText(`${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
+  // COD/PREPAID INR - using drawWrappedText to prevent overflow
+  const _rightColX = width - margin - 150;
+  const _rightColMaxWidth = 140; // slightly less than 150 to ensure padding from border
+
+  const paymentText = `${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
       ? 'Express'
-      : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`, {
-    x: width - margin - 150,
+      : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`;
+
+  y = drawWrappedText(
+    page,
+    paymentText,
+    _rightColX,
     y,
-    font: regular,
-    size: 11,
-    color: rgb(0, 0, 0),
-  });
-  
-  y -= 20;
-  drawSanitizedText(`INR ${order.raw.total_price || '0'}`, {
-    x: width - margin - 150,
+    _rightColMaxWidth,
+    regular,
+    11,
+    16 // line height
+  );
+
+  y -= 5; // small gap between payment type and amount
+
+  y = drawWrappedText(
+    page,
+    `INR ${order.raw.total_price || '0'}`,
+    _rightColX,
     y,
-    font: bold,
-    size: 13,
-    color: rgb(0, 0, 0),
-  });
+    _rightColMaxWidth,
+    bold,
+    13,
+    18 // line height
+  );
 
   // Address details (wrapped)
   y -= 20;

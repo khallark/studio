@@ -467,14 +467,27 @@ export default function OrdersPage() {
   const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
+  // Initialize rowsPerPage from localStorage
+  useEffect(() => {
+    const savedRowsPerPage = localStorage.getItem('rowsPerPage');
+    if (savedRowsPerPage) {
+      setRowsPerPage(Number(savedRowsPerPage));
+    }
+  }, []);
+
+  const handleSetRowsPerPage = (value: string) => {
+    const numValue = Number(value);
+    setRowsPerPage(numValue);
+    setCurrentPage(1);
+    localStorage.setItem('rowsPerPage', value);
+  };
+
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [rowsPerPage]);
-
-  useEffect(() => {
-    setSelectedOrders([]);
-  }, [activeTab, dateRange, courierFilter]);
-
+    // When the filters change, we reset the selection.
+    // We intentionally leave out `searchQuery` so selection persists while searching.
+  }, [rowsPerPage, activeTab, dateRange, courierFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -1002,10 +1015,7 @@ export default function OrdersPage() {
                             <span className="text-xs text-muted-foreground">Rows per page</span>
                             <Select
                                 value={`${rowsPerPage}`}
-                                onValueChange={(value) => {
-                                    setRowsPerPage(Number(value));
-                                    setCurrentPage(1);
-                                }}
+                                onValueChange={handleSetRowsPerPage}
                                 >
                                 <SelectTrigger className="h-8 w-[70px]">
                                     <SelectValue placeholder={rowsPerPage} />

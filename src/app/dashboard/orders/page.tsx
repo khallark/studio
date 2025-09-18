@@ -66,6 +66,8 @@ import { format, addDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { DocumentSnapshot } from 'firebase/firestore';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -153,6 +155,7 @@ export default function OrdersPage() {
   const [isDownloadingSlips, setIsDownloadingSlips] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [invertSearch, setInvertSearch] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [courierFilter, setCourierFilter] = useState<string>('all');
 
@@ -477,11 +480,12 @@ export default function OrdersPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         filtered = filtered.filter(order => {
             const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim().toLowerCase();
-            return (
+            const match = (
                 order.name.toLowerCase().includes(lowercasedQuery) ||
                 customerName.includes(lowercasedQuery) ||
                 (order.awb && order.awb.toLowerCase().includes(lowercasedQuery))
             );
+            return invertSearch ? !match : match;
         });
     }
     
@@ -505,7 +509,7 @@ export default function OrdersPage() {
 
 
     return filtered;
-}, [orders, activeTab, searchQuery, dateRange, courierFilter]);
+}, [orders, activeTab, searchQuery, dateRange, courierFilter, invertSearch]);
 
 
   const indexOfLastOrder = currentPage * rowsPerPage;
@@ -515,12 +519,13 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, dateRange, rowsPerPage]);
+  }, [rowsPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedOrders([]);
+    // Don't clear selection on search query change
   }, [activeTab, dateRange, courierFilter]);
+
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -855,20 +860,27 @@ export default function OrdersPage() {
                         </Button>
                     </div>
                 </div>
-                 <div className="mt-4 flex flex-col md:flex-row items-center gap-2">
-                    <Input
-                        placeholder="Search by order, customer, AWB..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="max-w-xs"
-                    />
+                 <div className="mt-4 flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex items-center gap-2 flex-1 md:flex-none">
+                        <Input
+                            placeholder="Search by order, customer, AWB..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="max-w-xs"
+                        />
+                        <div className="flex items-center space-x-2">
+                            <Switch id="invert-search" checked={invertSearch} onCheckedChange={setInvertSearch} />
+                            <Label htmlFor="invert-search">Invert</Label>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
                     <Popover>
                         <PopoverTrigger asChild>
                              <Button
                                 id="date"
                                 variant={"outline"}
                                 className={cn(
-                                "w-full md:w-[260px] justify-start text-left font-normal",
+                                "w-[240px] justify-start text-left font-normal",
                                 !dateRange && "text-muted-foreground"
                                 )}
                             >
@@ -883,12 +895,12 @@ export default function OrdersPage() {
                                     format(dateRange.from, "LLL dd, y")
                                 )
                                 ) : (
-                                <span>Pick a date</span>
+                                <span>Pick a date range</span>
                                 )}
                             </Button>
                         </PopoverTrigger>
                         {dateRange && (
-                           <Button variant="ghost" size="icon" onClick={() => setDateRange(undefined)} className="ml-0 md:ml-2 h-9 w-9">
+                           <Button variant="ghost" size="icon" onClick={() => setDateRange(undefined)} className="h-9 w-9">
                                <X className="h-4 w-4" />
                            </Button>
                         )}
@@ -903,6 +915,7 @@ export default function OrdersPage() {
                         />
                         </PopoverContent>
                     </Popover>
+                    </div>
                     {activeTab === 'Ready To Dispatch' && (
                         <Select value={courierFilter} onValueChange={setCourierFilter}>
                             <SelectTrigger className="w-full md:w-[180px]">
@@ -1235,7 +1248,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    
-
-    

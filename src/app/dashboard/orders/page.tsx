@@ -526,6 +526,10 @@ export default function OrdersPage() {
     setSelectedOrders([]);
   }, [activeTab, dateRange, courierFilter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -848,10 +852,6 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         {renderBulkActionButtons()}
-                        <Button onClick={handleBackfill} disabled={isSyncing || !userData?.activeAccountId} size="sm" variant="outline">
-                            {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                            {isSyncing ? 'Syncing...' : 'Sync Orders'}
-                        </Button>
                         <Button asChild size="sm">
                             <Link href="/dashboard/orders/awb-processing">
                                 Go to AWB Processing
@@ -1248,5 +1248,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    

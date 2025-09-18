@@ -137,7 +137,6 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -229,55 +228,6 @@ export default function OrdersPage() {
           setIsAwbDialogOpen(true);
       }
   };
-
-  const handleBackfill = useCallback(async () => {
-    if (!userData?.activeAccountId || !user) {
-      toast({
-        title: "No active store",
-        description: "Please connect a Shopify store first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsSyncing(true);
-    toast({
-      title: "Starting Order Sync",
-      description: "Fetching all your orders from Shopify. This might take a few minutes...",
-    });
-
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/shopify/backfill', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({ shop: userData.activeAccountId }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.details || 'Failed to start backfill');
-      }
-
-      toast({
-        title: "Sync Complete",
-        description: result.message,
-      });
-
-    } catch (error) {
-      console.error('Backfill error:', error);
-      toast({
-        title: 'Sync Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [userData, toast, user]);
 
   const handleUpdateStatus = useCallback(async (orderId: string, status: CustomStatus) => {
     if (!userData?.activeAccountId || !user) return;
@@ -522,13 +472,8 @@ export default function OrdersPage() {
   }, [rowsPerPage]);
 
   useEffect(() => {
-    setCurrentPage(1);
     setSelectedOrders([]);
   }, [activeTab, dateRange, courierFilter]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
 
 
   const handleNextPage = () => {
@@ -1150,10 +1095,15 @@ export default function OrdersPage() {
                 <div className="space-y-6">
                   <h3 className="font-semibold text-lg">Order Details</h3>
                   <div className="space-y-4">
-                     {viewingOrder.customStatus === 'Ready To Dispatch' && viewingOrder.awb && (
+                     {(viewingOrder.awb || viewingOrder.courier) && (
                         <div>
-                            <h4 className="font-semibold">AWB Number</h4>
-                            <p className="text-sm text-muted-foreground font-mono">{viewingOrder.awb}</p>
+                            <h4 className="font-semibold">Shipment Details</h4>
+                             <p className="text-sm text-muted-foreground">
+                                {viewingOrder.courier && `Courier: ${viewingOrder.courier}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground font-mono">
+                                {viewingOrder.awb && `AWB: ${viewingOrder.awb}`}
+                            </p>
                         </div>
                     )}
                     <div>

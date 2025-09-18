@@ -267,7 +267,7 @@ async function createSlipPage(
     y,
     _rightColMaxWidth,
     regular,
-    11,
+    13,
     16 // line height
   );
 
@@ -280,7 +280,7 @@ async function createSlipPage(
     y,
     _rightColMaxWidth,
     bold,
-    13,
+    14,
     18 // line height
   );
 

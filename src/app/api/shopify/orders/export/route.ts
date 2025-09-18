@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
            const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
            flattenedData.push({
                 'Order name': order.name,
+                'AWB': order.awb ?? 'N/A',
+                'Courier': order.courier ?? 'N/A',
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
                 'Email': order.raw.customer?.email ||
@@ -111,6 +113,8 @@ export async function POST(req: NextRequest) {
         const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
         flattenedData.push({
             'Order name': order.name,
+            'AWB': order.awb ?? 'N/A',
+            'Courier': order.courier ?? 'N/A',
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
                 'Email': order.raw.customer?.email ||

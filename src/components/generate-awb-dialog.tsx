@@ -99,7 +99,7 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
       
       toast({
         title: 'AWBs Fetched Successfully',
-        description: `${result.count} new Air Waybill numbers have been fetched and stored.`,
+        description: `${result.added} new Air Waybill numbers have been added. ${result.duplicates} duplicates were ignored.`,
       });
 
       onClose();
@@ -111,8 +111,6 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
       setIsSubmitting(false);
     }
   }, [user, count, toast, onClose]);
-  
-  const canFetch = unusedAwbsCount === 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -120,7 +118,7 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
         <DialogHeader>
           <DialogTitle>Generate Air Waybills (AWBs)</DialogTitle>
           <DialogDescription>
-            Fetch new AWB numbers from your integrated courier service. You can only fetch more when your stock is empty.
+            Fetch new AWB numbers from your integrated courier service.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -132,7 +130,7 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
                 }
             </div>
             <div className="space-y-2">
-                <Label htmlFor="awb-count" className={!canFetch ? 'text-muted-foreground' : ''}>Number of AWBs to fetch</Label>
+                <Label htmlFor="awb-count">Number of AWBs to fetch</Label>
                 <Input
                     id="awb-count"
                     type="number"
@@ -141,7 +139,7 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
                     placeholder="Enter a number between 1 and 500"
                     min="1"
                     max="500"
-                    disabled={isSubmitting || !canFetch}
+                    disabled={isSubmitting}
                 />
                  <p className="text-xs text-muted-foreground">
                     Specify how many new AWB numbers you need (max 500).
@@ -150,7 +148,7 @@ export function GenerateAwbDialog({ isOpen, onClose }: GenerateAwbDialogProps) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-          <Button onClick={handleFetchAwbs} disabled={isSubmitting || !canFetch}>
+          <Button onClick={handleFetchAwbs} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Fetching...' : 'Fetch Now'}
           </Button>

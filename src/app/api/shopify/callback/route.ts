@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   // 1. State Validation for CSRF protection
   if (!state || !savedState || state !== savedState) {
       console.error('State validation failed');
-      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_state', req.url));
+      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_state', req.url)); 
   }
 
   // Clear the state cookie after validation

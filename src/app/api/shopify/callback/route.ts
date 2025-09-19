@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
       accessToken: accessToken, // IMPORTANT: In a real app, encrypt this token!
       installedAt: FieldValue.serverTimestamp(),
       installedBy: userId,
-    });
+    }, {merge: true});
 
     // 2. Update the user's document
     const userRef = db.collection('users').doc(userId);

@@ -84,8 +84,14 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/dispatch',
         destination: '/api/shopify/orders/dispatch/route',
       },
+      {
+        source: '/api/integrations/interakt/update',
+        destination: '/api/integrations/interakt/update/route',
+      },
     ]
   },
 };
 
 export default nextConfig;
+
+    

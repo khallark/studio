@@ -31,7 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Info } from 'lucide-react';
+import { Info, Copy } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -54,6 +54,12 @@ interface AccountData {
                 email: string;
                 apiKey: string;
             }
+        },
+        communication?: {
+          interakt?: {
+            apiKey?: string;
+            webhookKey?: string;
+          }
         }
     }
 }
@@ -74,6 +80,20 @@ export default function AppsSettingsPage() {
   const [isEditingShiprocket, setIsEditingShiprocket] = useState(false);
   const [isSubmittingShiprocket, setIsSubmittingShiprocket] = useState(false);
 
+  const [interaktApiKey, setInteraktApiKey] = useState('');
+  const [isEditingInteraktApi, setIsEditingInteraktApi] = useState(false);
+  const [isSubmittingInteraktApi, setIsSubmittingInteraktApi] = useState(false);
+
+  const [interaktWebhookKey, setInteraktWebhookKey] = useState('');
+  const [isEditingInteraktWebhook, setIsEditingInteraktWebhook] = useState(false);
+  const [isSubmittingInteraktWebhook, setIsSubmittingInteraktWebhook] = useState(false);
+
+  const [appUrl, setAppUrl] = useState('');
+
+  useEffect(() => {
+    // This will only run on the client side
+    setAppUrl(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -87,13 +107,14 @@ export default function AppsSettingsPage() {
                 setUserData(fetchedUserData);
                 
                 if (fetchedUserData.activeAccountId) {
-                    // Initial fetch before subscribing
                     const accountRef = doc(db, 'accounts', fetchedUserData.activeAccountId);
                     const accountDoc = await getDoc(accountRef);
                     if (accountDoc.exists()) {
                         const accData = accountDoc.data() as AccountData;
                         setAccountData(accData);
                         setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
+                        setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
+                        setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
                     }
                 }
             }
@@ -109,17 +130,21 @@ export default function AppsSettingsPage() {
             if (doc.exists()) {
                 const accData = doc.data() as AccountData;
                 setAccountData(accData);
-                setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
+                if (!isEditingDelhivery) setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
+                if (!isEditingInteraktApi) setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
+                if (!isEditingInteraktWebhook) setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
             }
         });
         return () => unsubscribe();
     }
 
-  }, [user, loading, userData?.activeAccountId]);
+  }, [user, loading, userData?.activeAccountId, isEditingDelhivery, isEditingInteraktApi, isEditingInteraktWebhook]);
 
   const hasConnectedStore = userData?.activeAccountId;
   const hasDelhiveryKey = !!accountData?.integrations?.couriers?.delhivery?.apiKey;
   const hasShiprocketCreds = !!accountData?.integrations?.couriers?.shiprocket?.apiKey;
+  const hasInteraktApiKey = !!accountData?.integrations?.communication?.interakt?.apiKey;
+  const hasInteraktWebhookKey = !!accountData?.integrations?.communication?.interakt?.webhookKey;
 
   const handleDisconnect = () => {
     toast({
@@ -200,6 +225,67 @@ export default function AppsSettingsPage() {
     }
   };
 
+  const handleSaveInterakt = async (type: 'apiKey' | 'webhookKey') => {
+    if (!userData?.activeAccountId || !user) return;
+
+    let keyToSave: string, valueToSave: string;
+    if (type === 'apiKey') {
+      if (!interaktApiKey) {
+        toast({ title: 'API Key is required', variant: 'destructive' });
+        return;
+      }
+      setIsSubmittingInteraktApi(true);
+      keyToSave = 'apiKey';
+      valueToSave = interaktApiKey;
+    } else {
+      if (!interaktWebhookKey) {
+        toast({ title: 'Webhook Key is required', variant: 'destructive' });
+        return;
+      }
+      setIsSubmittingInteraktWebhook(true);
+      keyToSave = 'webhookKey';
+      valueToSave = interaktWebhookKey;
+    }
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/integrations/interakt/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          key: keyToSave,
+          value: valueToSave,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.details || 'Failed to save Interakt key');
+
+      toast({ title: 'Interakt Key Saved', description: `Interakt ${type === 'apiKey' ? 'API Key' : 'Webhook Key'} has been updated.` });
+      
+      if (type === 'apiKey') setIsEditingInteraktApi(false);
+      else setIsEditingInteraktWebhook(false);
+
+    } catch (error) {
+      toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
+    } finally {
+      if (type === 'apiKey') setIsSubmittingInteraktApi(false);
+      else setIsSubmittingInteraktWebhook(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: 'Copied to clipboard!' });
+    }, (err) => {
+      toast({ title: 'Failed to copy', description: 'Could not copy text to clipboard.', variant: 'destructive' });
+    });
+  };
+
 
   return (
     <TooltipProvider>
@@ -207,7 +293,7 @@ export default function AppsSettingsPage() {
       <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Apps & Integrations</CardTitle>
-          <CardDescription>Manage your connected applications and courier service integrations.</CardDescription>
+          <CardDescription>Manage your connected applications, courier services, and communication channels.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
             {/* Apps Section */}
@@ -303,7 +389,7 @@ export default function AppsSettingsPage() {
                         </div>
                     </div>
 
-                    {(isEditingDelhivery || (!hasDelhiveryKey && hasConnectedStore)) && (
+                    {isEditingDelhivery && (
                         <div className="border-t bg-muted/50 p-6">
                              <div className="flex items-end gap-4">
                                 <div className="grid gap-1.5 flex-1">
@@ -348,7 +434,7 @@ export default function AppsSettingsPage() {
                         </div>
                     </div>
 
-                    {(isEditingShiprocket || (!hasShiprocketCreds && hasConnectedStore)) && (
+                    {isEditingShiprocket && (
                         <div className="border-t bg-muted/50 p-6">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
@@ -398,6 +484,123 @@ export default function AppsSettingsPage() {
                  </div>
             </section>
 
+             <Separator />
+
+            {/* Communication Channels Section */}
+            <section>
+                 <h2 className="text-lg font-semibold mb-4 text-primary">Communication Channels</h2>
+                 <div className="rounded-lg border">
+                    {/* Interakt */}
+                    <div className="p-6 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div>
+                                <h3 className="text-xl font-semibold">Interakt</h3>
+                                <p className="text-sm text-muted-foreground">Connect with Interakt for WhatsApp communication.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant={hasInteraktApiKey && hasInteraktWebhookKey ? 'default' : 'secondary'}>
+                            {hasInteraktApiKey && hasInteraktWebhookKey ? 'Connected' : 'Incomplete'}
+                          </Badge>
+                        </div>
+                    </div>
+                    {/* Interakt API Key */}
+                    <div className="border-t p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-semibold">API Secret Key</h4>
+                                <p className="text-sm text-muted-foreground">Used for sending messages and using Interakt APIs.</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {hasInteraktApiKey && !isEditingInteraktApi ? (
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)}>Change Key</Button>
+                                ) : (
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)} disabled={!hasConnectedStore}>
+                                        {hasConnectedStore ? 'Set Key' : 'No Store'}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                         {isEditingInteraktApi && (
+                            <div className="mt-4 flex items-end gap-4">
+                                <div className="grid gap-1.5 flex-1">
+                                    <Input 
+                                        type="password"
+                                        placeholder="Enter your Interakt API Secret Key"
+                                        value={interaktApiKey}
+                                        onChange={(e) => setInteraktApiKey(e.target.value)}
+                                        disabled={isSubmittingInteraktApi}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                     <Button variant="secondary" onClick={() => setIsEditingInteraktApi(false)} disabled={isSubmittingInteraktApi}>Cancel</Button>
+                                     <Button onClick={() => handleSaveInterakt('apiKey')} disabled={isSubmittingInteraktApi}>
+                                        {isSubmittingInteraktApi ? 'Saving...' : 'Save Key'}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                     {/* Interakt Webhook Key */}
+                    <div className="border-t p-6">
+                         <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-semibold">Webhook Secret Key</h4>
+                                <p className="text-sm text-muted-foreground">Used for receiving incoming message events.</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {hasInteraktWebhookKey && !isEditingInteraktWebhook ? (
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)}>Change Key</Button>
+                                ) : (
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)} disabled={!hasConnectedStore}>
+                                        {hasConnectedStore ? 'Set Key' : 'No Store'}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                        {isEditingInteraktWebhook && (
+                          <div className="mt-4 space-y-6">
+                            <div>
+                              <h5 className="font-medium text-sm mb-2">Setup Instructions:</h5>
+                              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                                <li>Go to Interakt Dashboard &gt; Settings &gt; Developer Settings &gt; Configure &gt; Webhook.</li>
+                                <li>
+                                  <div className="flex items-center gap-2">
+                                    <span>Paste this URL in the "Webhook url" box:</span>
+                                    <div className="flex items-center gap-1 rounded-md bg-background border px-2 py-1">
+                                      <code className="text-xs">{appUrl}/api/webhooks/interakt</code>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(`${appUrl}/api/webhooks/interakt`)}>
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </li>
+                                <li>Copy the "Secret Key" provided by Interakt.</li>
+                                <li>Paste the Secret Key below and click Save.</li>
+                              </ol>
+                            </div>
+                            <div className="flex items-end gap-4">
+                                <div className="grid gap-1.5 flex-1">
+                                    <Input 
+                                        type="password"
+                                        placeholder="Paste your Interakt Webhook Secret Key"
+                                        value={interaktWebhookKey}
+                                        onChange={(e) => setInteraktWebhookKey(e.target.value)}
+                                        disabled={isSubmittingInteraktWebhook}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                     <Button variant="secondary" onClick={() => setIsEditingInteraktWebhook(false)} disabled={isSubmittingInteraktWebhook}>Cancel</Button>
+                                     <Button onClick={() => handleSaveInterakt('webhookKey')} disabled={isSubmittingInteraktWebhook}>
+                                        {isSubmittingInteraktWebhook ? 'Saving...' : 'Save Key'}
+                                    </Button>
+                                </div>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                 </div>
+            </section>
         </CardContent>
       </Card>
     </div>

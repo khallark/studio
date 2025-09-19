@@ -485,8 +485,10 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedOrders([]);
-  }, [rowsPerPage, activeTab, dateRange, courierFilter]);
+    if (!searchQuery) {
+      setSelectedOrders([]);
+    }
+  }, [rowsPerPage, activeTab, dateRange, courierFilter, searchQuery]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -908,8 +910,8 @@ export default function OrdersPage() {
                                 />
                                 </TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
                                 <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
@@ -954,8 +956,8 @@ export default function OrdersPage() {
                                         />
                                     </TableCell>
                                     <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                    <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
                                     <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
                                     <TableCell className="text-xs">{customerName || order.email}</TableCell>
                                     <TableCell className="text-right text-xs font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}

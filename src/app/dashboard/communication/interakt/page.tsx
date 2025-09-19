@@ -20,6 +20,7 @@ interface AccountData {
         communication?: {
           interakt?: {
             apiKey?: string;
+            webhookKey?: string;
           }
         }
     }
@@ -71,7 +72,7 @@ export default function InteraktPage() {
     return () => unsubscribe();
   }, [activeAccountId, userLoading]);
 
-  const hasInteraktApiKey = !!accountData?.integrations?.communication?.interakt?.apiKey;
+  const isInteraktConnected = !!accountData?.integrations?.communication?.interakt?.apiKey && !!accountData?.integrations?.communication?.interakt?.webhookKey;
 
   const renderContent = () => {
     if (loading || userLoading) {
@@ -103,7 +104,7 @@ export default function InteraktPage() {
         )
     }
 
-    if (!hasInteraktApiKey) {
+    if (!isInteraktConnected) {
       return (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[400px]">
             <div className="flex flex-col items-center gap-2 text-center p-4">
@@ -114,7 +115,7 @@ export default function InteraktPage() {
                     Connect Interakt
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
-                    To get started, you need to add your Interakt API Secret Key in the settings.
+                    To get started, you need to add your Interakt API and Webhook Secret Keys in the settings.
                 </p>
                 <Button className="mt-4" asChild>
                     <Link href="/settings/apps">

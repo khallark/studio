@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -47,7 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs, admin } from 'firebase/firestore';
@@ -129,6 +128,10 @@ interface UserData {
   activeAccountId: string | null;
 }
 
+type SortKey = 'name' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
+
 export default function OrdersPage() {
   const [user, userLoading] = useAuthState(auth);
   const { toast } = useToast();
@@ -157,6 +160,9 @@ export default function OrdersPage() {
   const [invertSearch, setInvertSearch] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [courierFilter, setCourierFilter] = useState<string>('all');
+  
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
 
   useEffect(() => {
@@ -180,7 +186,9 @@ export default function OrdersPage() {
     if (userData?.activeAccountId) {
       setLoading(true);
       const ordersRef = collection(db, 'accounts', userData.activeAccountId, 'orders');
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+      
+      // The base query doesn't need ordering here, as we'll sort client-side
+      const q = query(ordersRef);
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedOrders = snapshot.docs
@@ -410,7 +418,7 @@ export default function OrdersPage() {
     return counts as Record<CustomStatus | 'All Orders', number>;
   }, [orders]);
   
-  const filteredOrders = useMemo(() => {
+    const filteredOrders = useMemo(() => {
     let filtered = orders.filter(order => !order.isDeleted);
 
     // Filter by status tab first
@@ -448,7 +456,7 @@ export default function OrdersPage() {
         });
     }
 
-    // Finally, filter by courier if on the 'Ready To Dispatch' tab
+    // Then, filter by courier if on the 'Ready To Dispatch' tab
     if (activeTab === 'Ready To Dispatch' && courierFilter !== 'all') {
       if (courierFilter === 'Delhivery') { 
         filtered = filtered.filter(order => order.courier === courierFilter);
@@ -456,10 +464,31 @@ export default function OrdersPage() {
         filtered = filtered.filter(order => order.courier?.includes('Shiprocket'));
       }
     }
+    
+    // Finally, apply sorting
+    filtered.sort((a, b) => {
+        let valA, valB;
+        
+        if (sortKey === 'createdAt') {
+            valA = new Date(a.createdAt).getTime();
+            valB = new Date(b.createdAt).getTime();
+        } else { // 'name'
+            valA = a.name;
+            valB = b.name;
+        }
+
+        if (valA < valB) {
+            return sortDirection === 'asc' ? -1 : 1;
+        }
+        if (valA > valB) {
+            return sortDirection === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
 
 
     return filtered;
-}, [orders, activeTab, searchQuery, dateRange, courierFilter, invertSearch]);
+}, [orders, activeTab, searchQuery, dateRange, courierFilter, invertSearch, sortKey, sortDirection]);
 
 
   const indexOfLastOrder = currentPage * rowsPerPage;
@@ -485,10 +514,14 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    if (!searchQuery) {
-      setSelectedOrders([]);
-    }
-  }, [rowsPerPage, activeTab, dateRange, courierFilter, searchQuery]);
+    // Do not clear selections on search query change
+    // setSelectedOrders([]);
+  }, [rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedOrders([]);
+  }, [activeTab, dateRange, courierFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -638,6 +671,16 @@ export default function OrdersPage() {
             setIsDownloadingExcel(false);
         }
     }, [userData, user, selectedOrders, toast]);
+
+    
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+        setSortKey(key);
+        setSortDirection('asc');
+    }
+  };
 
 
   const renderActionItems = (order: Order) => {
@@ -909,8 +952,18 @@ export default function OrdersPage() {
                                     aria-label="Select all"
                                 />
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Order ID</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Date</TableHead>
+                                <TableHead>
+                                    <Button variant="ghost" onClick={() => handleSort('name')} className="px-1">
+                                        Order ID
+                                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </TableHead>
+                                <TableHead>
+                                    <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
+                                        Date
+                                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </TableHead>
                                 <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
                                 <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
@@ -1209,3 +1262,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

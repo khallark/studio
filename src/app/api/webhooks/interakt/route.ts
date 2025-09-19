@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
@@ -7,18 +6,39 @@ import { FieldValue } from 'firebase-admin/firestore';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
+function verifyInteraktSignature(rawBody: string, signature: string, secret: string): boolean {
   if (!signature || !secret) {
     return false;
   }
-  const computedSignature = crypto.createHmac('sha1', secret).update(rawBody).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(computedSignature));
+
+  // Remove 'sha256=' prefix if present
+  const actualSignature = signature.startsWith('sha256=') 
+    ? signature.slice(7) 
+    : signature;
+
+  // Compute expected signature using SHA256 (not SHA1)
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody, 'utf8')
+    .digest('hex');
+
+  // Use timing-safe comparison
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(actualSignature, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    );
+  } catch (error) {
+    console.error('Signature comparison failed:', error);
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.nextUrl.searchParams.get('shop');
-    const signature = req.headers.get('x-interakt-signature') || '';
+    // Correct header name for Interakt
+    const signature = req.headers.get('interakt-signature') || '';
 
     if (!shopDomain) {
       console.error('Interakt Webhook: Missing shop query parameter.');
@@ -40,10 +60,11 @@ export async function POST(req: NextRequest) {
     }
 
     const rawBody = await req.text();
-    const isVerified = verifyWebhookSignature(rawBody, signature, webhookKey);
+    const isVerified = verifyInteraktSignature(rawBody, signature, webhookKey);
 
     if (!isVerified) {
       console.warn(`Interakt Webhook: Invalid signature for shop: ${shopDomain}`);
+      console.warn(`Expected signature computation from body: ${rawBody.substring(0, 100)}...`);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 

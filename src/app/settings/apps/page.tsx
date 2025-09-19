@@ -568,7 +568,7 @@ export default function AppsSettingsPage() {
                                   <div className="flex items-center gap-2">
                                     <span>Paste this URL in the "Webhook url" box:</span>
                                     <div className="flex items-center gap-1 rounded-md bg-background border px-2 py-1">
-                                      <code className="text-xs">{appUrl}/api/webhooks/interakt</code>
+                                      <code className="text-xs">{appUrl}/api/webhooks/interakt?shop={userData?.activeAccountId}</code>
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(`${appUrl}/api/webhooks/interakt`)}>
                                         <Copy className="h-3 w-3" />
                                       </Button>

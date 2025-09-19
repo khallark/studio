@@ -121,6 +121,7 @@ interface Order {
         country: string;
     },
     total_discounts?: number;
+    total_outstanding?: string;
   }
 }
 
@@ -958,15 +959,16 @@ export default function OrdersPage() {
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
+                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                 <TableHead>
                                     <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
                                         Date
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
                                 <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Outstanding</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
                                 <TableHead className="font-medium text-muted-foreground">Items</TableHead>
@@ -984,6 +986,7 @@ export default function OrdersPage() {
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                                     <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-6 w-24" /></TableCell>
@@ -1009,11 +1012,14 @@ export default function OrdersPage() {
                                         />
                                     </TableCell>
                                     <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                    <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                     <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
+                                    <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                     <TableCell className="text-xs">{customerName || order.email}</TableCell>
                                     <TableCell className="text-right text-xs font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs font-mono">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
                                     </TableCell>
                                     <TableCell className="py-2">
                                         <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize text-xs">
@@ -1047,7 +1053,7 @@ export default function OrdersPage() {
                                 })
                             ) : (
                                 <TableRow>
-                                <TableCell colSpan={10} className="text-center h-24">
+                                <TableCell colSpan={11} className="text-center h-24">
                                     {userData?.activeAccountId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
                                 </TableCell>
                                 </TableRow>
@@ -1262,5 +1268,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-    

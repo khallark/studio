@@ -88,6 +88,10 @@ const nextConfig: NextConfig = {
         source: '/api/integrations/interakt/update',
         destination: '/api/integrations/interakt/update/route',
       },
+      {
+        source: '/api/webhooks/interakt',
+        destination: '/api/webhooks/interakt/route',
+      },
     ]
   },
 };

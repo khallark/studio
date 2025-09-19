@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History, ChevronDown, MoveRight } from 'lucide-react';
+import { Home, Package, Settings, History, ChevronDown, MoveRight, MessageCircle } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -256,6 +256,26 @@ export default function DashboardLayout({
                     </Collapsible>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
+                    <Collapsible>
+                        <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith('/dashboard/communication')}>
+                                <div className="flex items-center gap-2">
+                                <MessageCircle />
+                                Communication
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                            </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/communication/interakt'}>
+                                    <Link href="/dashboard/communication/interakt">Interakt</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </Collapsible>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard/logs')}>
                     <Link href="/dashboard/logs">
                         <History />
@@ -323,5 +343,3 @@ export default function DashboardLayout({
     </ProcessingQueueProvider>
   );
 }
-
-    

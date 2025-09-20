@@ -91,12 +91,14 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
         return;
     }
-
-    if (step === 1 && selectedCourier === 'Shiprocket') {
-      setStep(2); // Go to location selection
-    } else {
-      setStep(s => s + 1);
+    
+    // No "next" from step 2 if Shiprocket is chosen, it's the final step.
+    if (step === 2 && selectedCourier === 'Shiprocket') {
+      handleConfirm();
+      return;
     }
+
+    setStep(s => s + 1);
   };
 
   const handleBack = () => {
@@ -124,7 +126,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return;
     }
 
-    onConfirm(selectedCourier, pickupName, selectedMode || '');
+    onConfirm(selectedCourier, pickupName, selectedMode || 'Express'); // Pass 'Express' for shiprocket
     onClose();
   };
 

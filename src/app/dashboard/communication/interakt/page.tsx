@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 // --- Types ---
 interface UserData {
@@ -330,12 +332,28 @@ export default function InteraktPage() {
                                                         <RadioGroupItem value="none" id={`${category}-none`} />
                                                         <Label htmlFor={`${category}-none`}>None</Label>
                                                     </div>
-                                                    {templatesByCategory[category].map(template => (
-                                                        <div key={template.id} className="flex items-center space-x-2">
-                                                            <RadioGroupItem value={template.id} id={`${category}-${template.id}`} />
-                                                            <Label htmlFor={`${category}-${template.id}`} onClick={() => setViewingTemplate(template)} className="cursor-pointer hover:underline">{template.data.name}</Label>
-                                                        </div>
-                                                    ))}
+                                                    {templatesByCategory[category].map(template => {
+                                                        const isApproved = template.data.approval_status === 'APPROVED';
+                                                        return (
+                                                            <div key={template.id} className="flex items-center space-x-2">
+                                                                <RadioGroupItem 
+                                                                    value={template.id} 
+                                                                    id={`${category}-${template.id}`} 
+                                                                    disabled={!isApproved}
+                                                                />
+                                                                <Label 
+                                                                    htmlFor={`${category}-${template.id}`} 
+                                                                    onClick={() => setViewingTemplate(template)} 
+                                                                    className={cn(
+                                                                        "cursor-pointer hover:underline",
+                                                                        !isApproved && "text-muted-foreground cursor-not-allowed hover:no-underline"
+                                                                    )}
+                                                                >
+                                                                    {template.data.name}
+                                                                </Label>
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </RadioGroup>
                                             ) : (
                                                 <p className="text-sm text-muted-foreground text-center py-4">No templates assigned to this category.</p>
@@ -498,3 +516,5 @@ function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: Templ
         </Dialog>
     );
 }
+
+    

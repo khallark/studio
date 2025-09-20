@@ -257,7 +257,7 @@ async function createSlipPage(
   const _rightColMaxWidth = 140; // slightly less than 150 to ensure padding from border
 
   const paymentText = `${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
-      ? 'Express'
+      ? order?.shippingMode || "Surface/Express"
       : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`;
 
   y = drawWrappedText(

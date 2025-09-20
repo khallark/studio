@@ -126,8 +126,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Error", description: "Could not find selected pickup location name.", variant: "destructive" });
         return;
     }
-    console.log(selectedMode);
-    onConfirm(selectedCourier, pickupName, selectedMode || 'Express'); // Pass 'Express' for shiprocket
+    
+    onConfirm(selectedCourier, pickupName, selectedMode || '');
     onClose();
   };
 

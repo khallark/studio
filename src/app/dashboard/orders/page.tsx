@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -46,7 +47,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown, ScanBarcode } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs, admin } from 'firebase/firestore';
@@ -67,6 +68,7 @@ import { cn } from '@/lib/utils';
 import { DocumentSnapshot } from 'firebase/firestore';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 
 type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
 
@@ -164,6 +166,8 @@ export default function OrdersPage() {
   
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  
+  const [isAwbBulkSelectOpen, setIsAwbBulkSelectOpen] = useState(false);
 
 
   useEffect(() => {
@@ -766,6 +770,35 @@ export default function OrdersPage() {
             setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
         }
     };
+    
+    const handleBulkSelectByAwb = (awbs: string[]) => {
+        const readyToDispatchAwbs = new Map(
+            filteredOrders
+                .filter(o => o.customStatus === 'Ready To Dispatch' && o.awb)
+                .map(o => [o.awb!, o.id])
+        );
+
+        const foundOrderIds = awbs.reduce((acc, awb) => {
+            if (readyToDispatchAwbs.has(awb)) {
+                acc.add(readyToDispatchAwbs.get(awb)!);
+            }
+            return acc;
+        }, new Set<string>());
+
+        if (foundOrderIds.size > 0) {
+            setSelectedOrders(prev => Array.from(new Set([...prev, ...Array.from(foundOrderIds)])));
+            toast({
+                title: 'Orders Selected',
+                description: `${foundOrderIds.size} order(s) have been selected based on the scanned AWBs.`
+            });
+        } else {
+            toast({
+                title: 'No Orders Found',
+                description: 'None of the scanned AWBs matched orders in the "Ready to Dispatch" list.',
+                variant: 'destructive'
+            });
+        }
+    };
 
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
@@ -808,7 +841,11 @@ export default function OrdersPage() {
         );
       case 'Ready To Dispatch':
          return (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
+             <Button variant="outline" size="sm" onClick={() => setIsAwbBulkSelectOpen(true)}>
+                <ScanBarcode className="mr-2 h-4 w-4" />
+                AWB Bulk Selection
+            </Button>
              <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
               {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
@@ -855,12 +892,14 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         {renderBulkActionButtons()}
-                        <Button asChild size="sm">
-                            <Link href="/dashboard/orders/awb-processing">
-                                Go to AWB Processing
-                                <MoveRight className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
+                        {activeTab !== 'Ready To Dispatch' && (
+                            <Button asChild size="sm">
+                                <Link href="/dashboard/orders/awb-processing">
+                                    Go to AWB Processing
+                                    <MoveRight className="ml-2 h-4 w-4" />
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
                  <div className="mt-4 flex flex-col md:flex-row items-center gap-4">
@@ -1132,6 +1171,12 @@ export default function OrdersPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+    
+    <AwbBulkSelectionDialog 
+        isOpen={isAwbBulkSelectOpen}
+        onClose={() => setIsAwbBulkSelectOpen(false)}
+        onConfirm={handleBulkSelectByAwb}
+    />
 
     <AssignAwbDialog
         isOpen={isAwbDialogOpen}

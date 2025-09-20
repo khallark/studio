@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Forbidden: User is not authorized for this shop.' }, { status: 403 });
     }
 
-    const settingsRef = db.collection('accounts').doc(shop).collection('communications').doc('interakt_config').collection('settings').doc('category_settings');
+    const settingsRef = db.collection('accounts').doc(shop).collection('communications').doc('interakt').collection('settings').doc('category_settings');
     
     const fieldToUpdate = `activeTemplateFor${category.replace(/\s/g, '')}`;
 

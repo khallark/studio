@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot, collection, Timestamp } from 'firebase/firestore';
@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { MessageCircle, Settings, Trash2, CheckCircle, Clock, XCircle, AlertTriangle, ChevronDown } from 'lucide-react';
+import { MessageCircle, Settings, Trash2, CheckCircle, Clock, XCircle, AlertTriangle, ChevronDown, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -103,6 +103,8 @@ export default function InteraktPage() {
   const [categorySettings, setCategorySettings] = useState<CategorySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewingTemplate, setViewingTemplate] = useState<TemplateData | null>(null);
+  const [isUpdatingActive, setIsUpdatingActive] = useState<string | null>(null);
+
 
   // 1. Fetch User's Active Account ID and check for keys
   useEffect(() => {
@@ -150,7 +152,7 @@ export default function InteraktPage() {
     });
 
     // Snapshot listener for category settings
-    const settingsRef = doc(db, 'accounts', activeAccountId, 'communications', 'interakt_config', 'category_settings');
+    const settingsRef = doc(db, 'accounts', activeAccountId, 'communications', 'interakt', 'settings', 'category_settings');
     const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
         if (docSnap.exists()) {
             setCategorySettings(docSnap.data() as CategorySettings);
@@ -188,6 +190,38 @@ export default function InteraktPage() {
     };
   }, [categorySettings])
 
+    const handleSetActiveTemplate = useCallback(async (category: OrderStatusCategory, templateId: string | null) => {
+        if (!activeAccountId || !user) return;
+        
+        setIsUpdatingActive(category);
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/integrations/interakt/templates/set-active', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ shop: activeAccountId, category, templateId }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to set active template');
+            
+            toast({
+                title: 'Active Template Updated',
+                description: `Successfully updated the active template for ${category}.`
+            });
+        } catch (error) {
+            console.error('Set active template error:', error);
+            toast({
+                title: 'Update Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUpdatingActive(null);
+        }
+    }, [activeAccountId, user, toast]);
 
   const renderContent = () => {
     if (loading || userLoading) {
@@ -280,19 +314,26 @@ export default function InteraktPage() {
                         <Accordion type="multiple" className="w-full">
                             {CATEGORIES.map(category => (
                                 <AccordionItem key={category} value={category}>
-                                    <AccordionTrigger className="text-lg font-medium">{category}</AccordionTrigger>
+                                    <AccordionTrigger className="text-lg font-medium flex items-center gap-2">
+                                        {category}
+                                        {isUpdatingActive === category && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    </AccordionTrigger>
                                     <AccordionContent>
                                         <div className="space-y-4 pt-2">
                                             {templatesByCategory[category].length > 0 ? (
-                                                <RadioGroup value={activeTemplatesMap[category] || 'none'} onValueChange={(templateId) => console.log('not implemented')}>
+                                                <RadioGroup 
+                                                    value={activeTemplatesMap[category] || 'none'} 
+                                                    onValueChange={(templateId) => handleSetActiveTemplate(category, templateId === 'none' ? null : templateId)}
+                                                    disabled={isUpdatingActive === category}
+                                                >
                                                     <div className="flex items-center space-x-2">
                                                         <RadioGroupItem value="none" id={`${category}-none`} />
                                                         <Label htmlFor={`${category}-none`}>None</Label>
                                                     </div>
                                                     {templatesByCategory[category].map(template => (
                                                         <div key={template.id} className="flex items-center space-x-2">
-                                                            <RadioGroupItem value={template.id} id={template.id} />
-                                                            <Label htmlFor={template.id} onClick={() => setViewingTemplate(template)} className="cursor-pointer hover:underline">{template.data.name}</Label>
+                                                            <RadioGroupItem value={template.id} id={`${category}-${template.id}`} />
+                                                            <Label htmlFor={`${category}-${template.id}`} onClick={() => setViewingTemplate(template)} className="cursor-pointer hover:underline">{template.data.name}</Label>
                                                         </div>
                                                     ))}
                                                 </RadioGroup>
@@ -339,16 +380,51 @@ interface TemplateDetailDialogProps {
 function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: TemplateDetailDialogProps) {
     const { toast } = useToast();
     const [selectedCategory, setSelectedCategory] = useState<OrderStatusCategory | 'null'>(template.linkedCategory || 'null');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         setSelectedCategory(template.linkedCategory || 'null');
     }, [template]);
 
-    const handleCategoryChange = async () => {
-        // API call to update category
-        console.log("Updating category to", selectedCategory);
-        toast({ title: "Category Updated", description: `Template moved to ${selectedCategory === 'null' ? 'Uncategorized' : selectedCategory}.`});
-    };
+    const handleCategoryChange = useCallback(async () => {
+        if (!shopId || !user) return;
+        
+        setIsUpdating(true);
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/integrations/interakt/templates/update-category', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    shop: shopId,
+                    templateId: template.id,
+                    category: selectedCategory === 'null' ? null : selectedCategory,
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to update category');
+
+            toast({
+                title: "Category Updated",
+                description: `Template moved to ${selectedCategory === 'null' ? 'Uncategorized' : selectedCategory}.`
+            });
+            onClose();
+
+        } catch (error) {
+            console.error('Update category error:', error);
+            toast({
+                title: 'Update Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUpdating(false);
+        }
+    }, [shopId, user, template.id, selectedCategory, toast, onClose]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -395,7 +471,7 @@ function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: Templ
                         <h3 className="font-semibold text-lg">Configuration</h3>
                         <div className="space-y-2">
                              <Label>Assign to Category</Label>
-                             <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value as OrderStatusCategory | 'null')}>
+                             <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value as OrderStatusCategory | 'null')} disabled={isUpdating}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a category..." />
                                 </SelectTrigger>
@@ -406,8 +482,9 @@ function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: Templ
                                 </SelectContent>
                             </Select>
                         </div>
-                         <Button onClick={handleCategoryChange} disabled={selectedCategory === (template.linkedCategory || 'null')}>
-                            Save Category Change
+                         <Button onClick={handleCategoryChange} disabled={selectedCategory === (template.linkedCategory || 'null') || isUpdating}>
+                            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isUpdating ? 'Saving...' : 'Save Category Change'}
                          </Button>
                      </div>
                 </div>
@@ -421,4 +498,3 @@ function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: Templ
         </Dialog>
     );
 }
-

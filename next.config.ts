@@ -92,6 +92,14 @@ const nextConfig: NextConfig = {
         source: '/api/webhooks/interakt',
         destination: '/api/webhooks/interakt/route',
       },
+      {
+        source: '/api/integrations/interakt/templates/update-category',
+        destination: '/api/integrations/interakt/templates/update-category/route',
+      },
+      {
+        source: '/api/integrations/interakt/templates/set-active',
+        destination: '/api/integrations/interakt/templates/set-active/route',
+      },
     ]
   },
 };

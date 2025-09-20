@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -59,6 +58,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
         const fetchedLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PickupLocation));
         setPickupLocations(fetchedLocations);
+        
+        // Only set default location if no location is currently selected
         if (fetchedLocations.length > 0 && !selectedLocation) {
             setSelectedLocation(fetchedLocations[0].id);
         }
@@ -73,14 +74,14 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
   }, [isOpen, shopId, toast, selectedLocation]);
   
   useEffect(() => {
-    // Reset state when dialog opens
+    // Reset state when dialog opens - ONLY depend on isOpen
     if (isOpen) {
       setStep(1);
       setSelectedCourier('Delhivery');
-      setSelectedLocation(pickupLocations.length > 0 ? pickupLocations[0].id : null);
+      setSelectedLocation(null); // Will be set by the locations effect
       setSelectedMode(null);
     }
-  }, [isOpen, pickupLocations]);
+  }, [isOpen]); // Removed pickupLocations from dependency array
 
   const handleNext = () => {
     if (step === 1 && !selectedCourier) {
@@ -125,7 +126,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Error", description: "Could not find selected pickup location name.", variant: "destructive" });
         return;
     }
-
+    console.log(selectedMode);
     onConfirm(selectedCourier, pickupName, selectedMode || 'Express'); // Pass 'Express' for shiprocket
     onClose();
   };

@@ -96,7 +96,7 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
             {/* Right Side: Scanned List */}
             <div className="space-y-4 flex flex-col">
                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-lg">Scanned List ({scannedAwbs.size})</h3>
+                    <h3 className="font-semibold text-lg">Scanned List ({scannedAwbs.size}) </h3>
                     {scannedAwbs.size > 0 && (
                         <Button variant="outline" size="sm" onClick={() => setScannedAwbs(new Set())}>Clear All</Button>
                     )}

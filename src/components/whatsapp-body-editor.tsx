@@ -141,7 +141,7 @@ export function WhatsAppBodyEditor({
          <Lightbulb className="h-4 w-4" />
          <AlertTitle>What are variables?</AlertTitle>
          <AlertDescription>
-           Variables (like `{{1}}`) are placeholders that will be replaced with dynamic information when the message is sent. They must start from `{{1}}` and be sequential.
+           Variables (like <code>{'{{1}}'}</code>) are placeholders that will be replaced with dynamic information when the message is sent. They must start from <code>{'{{1}}'}</code> and be sequential.
          </AlertDescription>
        </Alert>
     </div>

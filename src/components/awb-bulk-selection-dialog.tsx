@@ -110,7 +110,7 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
                         className="pl-8"
                     />
                  </div>
-                 <ScrollArea className="flex-1 border rounded-md p-2">
+                <ScrollArea className="h-64 border rounded-md p-2 overflow-auto">
                     {filteredAwbs.length > 0 ? (
                         <div className="space-y-2">
                             {filteredAwbs.map(awb => (
@@ -123,11 +123,11 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
                             ))}
                         </div>
                     ) : (
-                         <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                        <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                             {scannedAwbs.size > 0 ? 'No results for your search.' : 'Scan an AWB to begin.'}
                         </div>
                     )}
-                 </ScrollArea>
+                </ScrollArea>
             </div>
         </div>
         <DialogFooter>

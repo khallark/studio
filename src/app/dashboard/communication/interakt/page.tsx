@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -10,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { MessageCircle, Settings, Trash2, CheckCircle, Clock, XCircle, AlertTriangle, ChevronDown, Loader2 } from 'lucide-react';
+import { MessageCircle, Settings, Trash2, CheckCircle, Clock, XCircle, AlertTriangle, ChevronDown, Loader2, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -21,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import CreateTemplateDialog from '@/components/CreateTemplateDialog'; // Import the dialog component
 
 // --- Types ---
 interface UserData {
@@ -106,7 +105,9 @@ export default function InteraktPage() {
   const [loading, setLoading] = useState(true);
   const [viewingTemplate, setViewingTemplate] = useState<TemplateData | null>(null);
   const [isUpdatingActive, setIsUpdatingActive] = useState<string | null>(null);
-
+  
+  // New state for Create Template Dialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // 1. Fetch User's Active Account ID and check for keys
   useEffect(() => {
@@ -173,7 +174,6 @@ export default function InteraktPage() {
         unsubscribeSettings();
     };
   }, [activeAccountId, hasKeys, toast]);
-
 
   const templatesByCategory = useMemo(() => {
     return CATEGORIES.reduce((acc, category) => {
@@ -270,9 +270,18 @@ export default function InteraktPage() {
             {/* Left side: All Templates */}
             <div className="lg:col-span-3">
                 <Card>
-                    <CardHeader>
-                        <CardTitle>All Message Templates</CardTitle>
-                        <CardDescription>View and manage all your synced Interakt templates.</CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+                        <div>
+                            <CardTitle>All Message Templates</CardTitle>
+                            <CardDescription>View and manage all your synced Interakt templates.</CardDescription>
+                        </div>
+                        <Button 
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create New Template
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-[60vh]">
@@ -296,7 +305,7 @@ export default function InteraktPage() {
                                     </div>
                                 )) : (
                                     <div className="text-center py-10 text-muted-foreground">
-                                        No templates found. They will appear here once created in Interakt.
+                                        No templates found. Create your first template or sync existing ones from Interakt.
                                     </div>
                                 )}
                             </div>
@@ -366,12 +375,24 @@ export default function InteraktPage() {
                     </CardContent>
                 </Card>
             </div>
-             {viewingTemplate && (
+            
+            {/* Template Detail Dialog */}
+            {viewingTemplate && (
                 <TemplateDetailDialog
                     template={viewingTemplate}
                     isOpen={!!viewingTemplate}
                     onClose={() => setViewingTemplate(null)}
                     shopId={activeAccountId}
+                    user={user}
+                />
+            )}
+            
+            {/* Create Template Dialog */}
+            {activeAccountId && user && (
+                <CreateTemplateDialog
+                    isOpen={isCreateDialogOpen}
+                    onClose={() => setIsCreateDialogOpen(false)}
+                    activeAccountId={activeAccountId}
                     user={user}
                 />
             )}
@@ -516,5 +537,3 @@ function TemplateDetailDialog({ template, isOpen, onClose, shopId, user }: Templ
         </Dialog>
     );
 }
-
-    

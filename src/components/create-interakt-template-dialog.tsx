@@ -19,14 +19,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { WhatsAppBodyEditor } from '@/components/whatsapp-body-editor';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
 
 const templateCategories = ["UTILITY", "MARKETING", "AUTHENTICATION"];
 const languages = ["en"]; // For now, only English
@@ -56,20 +53,7 @@ const formSchema = z.object({
 
   callToActionPhoneText: z.string().optional(),
   callToActionPhone: z.string().optional(),
-})
-.refine(data => data.headerType !== 'TEXT' || (data.headerText && data.headerText.trim().length > 0), {
-    message: "Header text cannot be empty when header type is 'Text'.",
-    path: ["headerText"],
-})
-.refine(data => {
-    if (data.buttonType !== 'COPY_CODE') return true;
-    return data.copyCodeText && data.copyCodeText.trim().length > 0;
-}, { message: "Button text is required for 'Copy Code' button.", path: ["copyCodeText"] })
-.refine(data => {
-    if (data.buttonType !== 'URL_QUICK_REPLIES') return true;
-    if (!data.callToActionUrl && !data.callToActionPhone && (!data.quickReplies || data.quickReplies.length === 0)) return false;
-    return true;
-}, { message: "At least one button (Quick Reply, Call to Action) is required for this button type.", path: ["buttonType"] });
+});
 
 
 type FormData = z.infer<typeof formSchema>;

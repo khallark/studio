@@ -73,10 +73,17 @@ const formSchema = z.object({
 }, { message: 'Header text is required when header type is Text.', path: ['headerText'] })
 .refine(data => {
     if (data.buttonType === 'WITH_BUTTONS') {
-        return data.hasCopyCode || data.hasUrl || data.hasQuickReply || data.hasCall;
+        const anyButtonConfigured = data.hasCopyCode || data.hasUrl || data.hasQuickReply || data.hasCall;
+        if (!anyButtonConfigured) return false;
     }
     return true;
-}, { message: 'At least one button type must be configured.', path: ['buttonType'] });
+}, { message: 'At least one button type must be configured.', path: ['buttonType'] })
+.refine(data => !data.hasCopyCode || (data.copyCodeText && data.copyCodeText.trim().length > 0), { message: 'Copy code text is required.', path: ['copyCodeText']})
+.refine(data => !data.hasUrl || (data.urlText && data.urlText.trim().length > 0), { message: 'URL text is required.', path: ['urlText']})
+.refine(data => !data.hasUrl || (data.urlLink && data.urlLink.trim().length > 0), { message: 'URL link is required.', path: ['urlLink']})
+.refine(data => !data.hasQuickReply || (data.quickReplyText && data.quickReplyText.trim().length > 0), { message: 'Quick reply text is required.', path: ['quickReplyText']})
+.refine(data => !data.hasCall || (data.callPhoneNumber && data.callPhoneNumber.trim().length > 0), { message: 'Phone number is required.', path: ['callPhoneNumber']});
+
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -325,6 +332,8 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 )}
                             </div>
                         </div>
+                        {errors.copyCodeText && <p className="text-sm text-destructive mt-1 pl-8">{errors.copyCodeText.message}</p>}
+                        
                         {/* URL */}
                         <div className="flex items-start space-x-2">
                             <Checkbox id="hasUrl" {...register('hasUrl')} />
@@ -333,7 +342,9 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 {watch('hasUrl') && (
                                     <div className="space-y-2 mt-2">
                                         <Input placeholder="Button text" {...register('urlText')} />
+                                        {errors.urlText && <p className="text-sm text-destructive">{errors.urlText.message}</p>}
                                         <Input placeholder="https://example.com/your-url" {...register('urlLink')} />
+                                        {errors.urlLink && <p className="text-sm text-destructive">{errors.urlLink.message}</p>}
                                     </div>
                                 )}
                             </div>
@@ -348,22 +359,25 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 )}
                             </div>
                         </div>
+                        {errors.quickReplyText && <p className="text-sm text-destructive mt-1 pl-8">{errors.quickReplyText.message}</p>}
+
                          {/* Call */}
                         <div className="flex items-start space-x-2">
                             <Checkbox id="hasCall" {...register('hasCall')} />
                             <div className="grid gap-1.5 leading-none w-full">
                                 <label htmlFor="hasCall" className="text-sm font-medium">Call Button</label>
                                 {watch('hasCall') && (
-                                    <Input placeholder="Your phone number" {...register('callPhoneNumber')} className="mt-2" />
+                                    <Input placeholder="Your phone number with country code" {...register('callPhoneNumber')} className="mt-2" />
                                 )}
                             </div>
                         </div>
+                        {errors.callPhoneNumber && <p className="text-sm text-destructive mt-1 pl-8">{errors.callPhoneNumber.message}</p>}
                     </div>
                 )}
             </div>
           </ScrollArea>
           
-          <DialogFooter className="mt-6 pt-4 border-t -mx-6 px-6">
+          <DialogFooter className="mt-6 pt-4 border-t shrink-0">
             <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>

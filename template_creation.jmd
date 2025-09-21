@@ -1,0 +1,338 @@
+# Interakt Template Creation Dialog - Complete Implementation Guide
+
+Create a dialog for creating templates on Interakt platform. The "Create a new Template" button should be positioned at the top-right of the "All Message Templates" section.
+
+## FRONTEND IMPLEMENTATION
+
+### Dialog Structure and Inputs
+
+**1. Template Name (Image 1)**
+- **Field Type**: Text input (required)
+- **Validation**: Non-empty, trimmed
+- **Placeholder**: "Enter template name"
+
+**2. Template Category (Image 2)**
+- **Field Type**: Dropdown/Select (required)
+- **Options**: As shown in the provided image
+- **Validation**: Must select a category
+
+**3. Button Type**
+- **Field Type**: Radio buttons with three options:
+  - `None` - Show no additional inputs
+  - `Copy Code` - Show copy code configuration
+  - `URL, Quick Replies etc` - Show the inputs/checkboxes from Image 12
+- **Conditional Rendering**: 
+  - If "URL, Quick Replies etc" is selected, display the button configuration section at the end of the dialog
+  - Each checkbox from Images 13-16 should expand to show respective input fields when ticked
+
+**4. Template Language (Image 4)**
+- **Field Type**: Dropdown (required)
+- **Options**: English only (for now)
+- **Default**: English
+
+**5. Template Header (Images 5-9)**
+- **Field Type**: Radio buttons (single choice only)
+- **Options**:
+  - `None` - No header content
+  - `Text` - Single line text input with character limit as shown in Image 6
+  - `Image` - File upload input (accepts image files)
+  - `Video` - File upload input (accepts video files)
+  - `Document` - File upload input (accepts document files)
+- **File Upload Handling**: Store file temporarily for API upload when "Create Template" is clicked
+
+**6. Template Body (Image 10)**
+- **Field Type**: Complex textarea with variable management (REQUIRED)
+- **Implementation**: Use the provided WhatsAppBodyEditor component logic exactly as given
+- **Key Features**:
+  - Real-time variable validation
+  - Auto-fix functionality for sequential variables
+  - Add Variable button with cursor positioning
+  - Character count (max 1024)
+  - Variable highlighting in preview
+- **Validation**: Must be non-empty and have valid variable sequence
+
+**7. Template Footer (Image 11)**
+- **Field Type**: Single line text input (optional)
+- **Validation**: Trim whitespace
+
+### Form Validation and Submit Button
+
+**Create Template Button**:
+- **State Management**: Disabled by default, enabled only when all required fields are valid
+- **Validation Rules**:
+  - Template Name: Required, non-empty after trim
+  - Template Category: Required selection
+  - Template Language: Required (auto-selected as English)
+  - Template Body: Required, non-empty, valid variable sequence
+  - File uploads: Valid file types if selected
+- **Loading State**: Show loading spinner when API calls are in progress
+- **Error Handling**: Display API errors appropriately
+
+## API IMPLEMENTATION
+
+### API Configuration
+```javascript
+const INTERAKT_API_BASE = 'https://api.interakt.ai/v1/public/track';
+const API_HEADERS = {
+  'Authorization': 'Basic YOUR_API_KEY', // Replace with actual API key
+  'Content-Type': 'application/json'
+};
+```
+
+### File Upload Process (If Header Media Selected)
+
+**Step 1: Upload Media File**
+```javascript
+const uploadMediaFile = async (file, fileCategory = 'message_template_media') => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(
+      `${INTERAKT_API_BASE}/files/upload_to_fb/?fileCategory=${fileCategory}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic YOUR_API_KEY'
+          // Don't set Content-Type for FormData - browser sets it automatically
+        },
+        body: formData
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.handle || result.media_id; // Return the media handle/ID
+  } catch (error) {
+    console.error('Media upload failed:', error);
+    throw error;
+  }
+};
+```
+
+### Template Creation Process
+
+**Step 2: Create Template**
+```javascript
+const createTemplate = async (templateData) => {
+  try {
+    // Step 1: Upload media file if header type is Image/Video/Document
+    let headerMediaHandle = null;
+    if (templateData.headerType !== 'NONE' && templateData.headerType !== 'TEXT' && templateData.headerFile) {
+      headerMediaHandle = await uploadMediaFile(templateData.headerFile);
+    }
+    
+    // Step 2: Prepare template payload
+    const payload = {
+      name: templateData.name.trim(),
+      category: templateData.category,
+      language: templateData.language.toLowerCase(), // e.g., 'en'
+      components: []
+    };
+    
+    // Add header component if not None
+    if (templateData.headerType !== 'NONE') {
+      const headerComponent = {
+        type: 'HEADER',
+        format: templateData.headerType // 'TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'
+      };
+      
+      if (templateData.headerType === 'TEXT') {
+        headerComponent.text = templateData.headerText.trim();
+      } else if (headerMediaHandle) {
+        headerComponent.example = {
+          header_handle: [headerMediaHandle]
+        };
+      }
+      
+      payload.components.push(headerComponent);
+    }
+    
+    // Add body component (always required)
+    const bodyComponent = {
+      type: 'BODY',
+      text: templateData.bodyText.trim()
+    };
+    
+    // Add parameter examples if variables exist
+    const variables = parseExistingVariables(templateData.bodyText);
+    if (variables.length > 0) {
+      bodyComponent.example = {
+        body_text: variables.map((_, index) => `{{${index + 1}}}`)
+      };
+    }
+    
+    payload.components.push(bodyComponent);
+    
+    // Add footer component if provided
+    if (templateData.footerText && templateData.footerText.trim()) {
+      payload.components.push({
+        type: 'FOOTER',
+        text: templateData.footerText.trim()
+      });
+    }
+    
+    // Add buttons component if button type is selected
+    if (templateData.buttonType !== 'NONE' && templateData.buttons && templateData.buttons.length > 0) {
+      payload.components.push({
+        type: 'BUTTONS',
+        buttons: templateData.buttons
+      });
+    }
+    
+    // Step 3: Make API call to create template
+    const response = await fetch(`${INTERAKT_API_BASE}/templates`, {
+      method: 'POST',
+      headers: API_HEADERS,
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Template creation failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+    
+  } catch (error) {
+    console.error('Template creation failed:', error);
+    throw error;
+  }
+};
+```
+
+### Button Configuration Handling
+
+**Button Types Processing** (based on Images 12-16):
+```javascript
+const processButtonConfiguration = (buttonConfig) => {
+  const buttons = [];
+  
+  // Quick Replies
+  if (buttonConfig.quickReplies && buttonConfig.quickReplies.enabled) {
+    buttonConfig.quickReplies.replies.forEach(reply => {
+      buttons.push({
+        type: 'QUICK_REPLY',
+        text: reply.text.trim()
+      });
+    });
+  }
+  
+  // Call to Action - Phone
+  if (buttonConfig.callAction && buttonConfig.callAction.enabled) {
+    buttons.push({
+      type: 'PHONE_NUMBER',
+      text: buttonConfig.callAction.text.trim(),
+      phone_number: buttonConfig.callAction.phoneNumber.trim()
+    });
+  }
+  
+  // Call to Action - URL
+  if (buttonConfig.urlAction && buttonConfig.urlAction.enabled) {
+    buttons.push({
+      type: 'URL',
+      text: buttonConfig.urlAction.text.trim(),
+      url: buttonConfig.urlAction.url.trim()
+    });
+  }
+  
+  // Copy Code
+  if (buttonConfig.copyCode && buttonConfig.copyCode.enabled) {
+    buttons.push({
+      type: 'COPY_CODE',
+      text: buttonConfig.copyCode.text.trim(),
+      example: [buttonConfig.copyCode.code.trim()]
+    });
+  }
+  
+  return buttons;
+};
+```
+
+### Complete Form Submission Handler
+
+```javascript
+const handleCreateTemplate = async (formData) => {
+  try {
+    // Set loading state
+    setIsCreating(true);
+    
+    // Validate all required fields
+    if (!validateForm(formData)) {
+      throw new Error('Please fill in all required fields correctly');
+    }
+    
+    // Process button configuration
+    const buttons = formData.buttonType !== 'NONE' ? 
+      processButtonConfiguration(formData.buttonConfig) : [];
+    
+    // Prepare template data
+    const templateData = {
+      name: formData.templateName,
+      category: formData.templateCategory,
+      language: 'en', // English only for now
+      headerType: formData.headerType || 'NONE',
+      headerText: formData.headerText || '',
+      headerFile: formData.headerFile || null,
+      bodyText: formData.bodyText,
+      footerText: formData.footerText || '',
+      buttonType: formData.buttonType,
+      buttons: buttons
+    };
+    
+    // Create template
+    const result = await createTemplate(templateData);
+    
+    // Success handling
+    console.log('Template created successfully:', result);
+    // Show success message
+    // Close dialog
+    // Refresh templates list
+    
+  } catch (error) {
+    console.error('Failed to create template:', error);
+    // Show error message to user
+  } finally {
+    setIsCreating(false);
+  }
+};
+```
+
+### Error Handling and User Feedback
+
+**Error States to Handle**:
+- Network connectivity issues
+- File upload failures
+- API validation errors
+- Authentication errors
+- File size/type restrictions
+
+**Success Flow**:
+1. Show loading state during creation
+2. Display success message
+3. Close dialog
+4. Refresh the templates list
+5. Optionally redirect to template details
+
+### Additional Implementation Notes
+
+**File Validation**:
+- Image: Max 5MB, formats: JPG, PNG, GIF
+- Video: Max 16MB, formats: MP4, 3GPP
+- Document: Max 100MB, formats: PDF
+
+**Security Considerations**:
+- Sanitize all text inputs before API calls
+- Validate file types and sizes
+- Handle API key securely (use environment variables)
+- Implement proper error boundaries
+
+**UX Enhancements**:
+- Real-time validation feedback
+- Progress indicators for file uploads
+- Autosave draft functionality (optional)
+- Template preview before creation

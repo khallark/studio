@@ -100,12 +100,10 @@ const nextConfig: NextConfig = {
         source: '/api/integrations/interakt/templates/set-active',
         destination: '/api/integrations/interakt/templates/set-active/route',
       },
-      {
-        source: '/api/integrations/interakt/templates/create',
-        destination: '/api/integrations/interakt/templates/create/route',
-      },
     ]
   },
 };
 
 export default nextConfig;
+
+    

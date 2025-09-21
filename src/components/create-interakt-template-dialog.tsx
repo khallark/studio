@@ -49,7 +49,7 @@ const formSchema = z.object({
   quickReplies: z.array(z.string().trim().min(1)).max(3).optional(),
   
   callToActionUrlText: z.string().optional(),
-  callToActionUrl: z.string().url().optional(),
+  callToActionUrl: z.string().url("Please enter a valid URL (e.g., https://example.com)").optional().or(z.literal('')),
 
   callToActionPhoneText: z.string().optional(),
   callToActionPhone: z.string().optional(),
@@ -86,6 +86,10 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
   const buttonType = watch('buttonType');
   const quickReplies = watch('quickReplies') || [''];
 
+  const handleValidationChange = useCallback((isValid: boolean) => {
+    setIsBodyValid(isValid);
+  }, []);
+
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     
@@ -107,7 +111,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
     formData.append('buttonType', data.buttonType);
     if(data.copyCodeText) formData.append('copyCodeText', data.copyCodeText);
     if(data.quickReplies) {
-        data.quickReplies.filter(qr => qr.trim()).forEach(qr => formData.append('quickReplies[]', qr));
+        data.quickReplies.filter(qr => qr && qr.trim()).forEach(qr => formData.append('quickReplies[]', qr));
     }
     if(data.callToActionUrlText) formData.append('callToActionUrlText', data.callToActionUrlText);
     if(data.callToActionUrl) formData.append('callToActionUrl', data.callToActionUrl);
@@ -149,14 +153,14 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl flex flex-col h-full max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Create a new Message Template</DialogTitle>
           <DialogDescription>Design and submit a new template for WhatsApp messaging.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <ScrollArea className="max-h-[70vh] p-1 pr-6">
-            <div className="space-y-6 p-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1 pr-6 -mr-6">
+            <div className="space-y-6 pr-6">
               {/* Template Name & Category */}
               <div className="grid md:grid-cols-2 gap-4">
                  <div>
@@ -231,7 +235,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
                          <WhatsAppBodyEditor 
                             value={field.value || ''}
                             onChange={field.onChange}
-                            onValidationChange={setIsBodyValid}
+                            onValidationChange={handleValidationChange}
                          />
                     )}
                 />
@@ -288,7 +292,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
                                      <Button type="button" variant="ghost" size="icon" onClick={() => {
                                          const newQRs = [...quickReplies];
                                          newQRs.splice(index, 1);
-                                         setValue('quickReplies', newQRs);
+                                         setValue('quickReplies', newQRs.length > 0 ? newQRs : ['']);
                                      }}>
                                          <Trash2 className="h-4 w-4" />
                                      </Button>
@@ -337,3 +341,5 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
     </Dialog>
   );
 }
+
+    

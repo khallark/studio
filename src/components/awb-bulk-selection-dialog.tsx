@@ -94,7 +94,7 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
             </div>
 
             {/* Right Side: Scanned List */}
-            <div className="space-y-4 flex flex-col">
+            <div className="space-y-4 flex flex-col h-96 md:h-auto">
                  <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-lg">Scanned List ({scannedAwbs.size}) </h3>
                     {scannedAwbs.size > 0 && (
@@ -110,7 +110,7 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
                         className="pl-8"
                     />
                  </div>
-                 <ScrollArea className="flex-1 h-64 border rounded-md p-2">
+                 <ScrollArea className="flex-1 border rounded-md p-2">
                     {filteredAwbs.length > 0 ? (
                         <div className="space-y-2">
                             {filteredAwbs.map(awb => (

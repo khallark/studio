@@ -39,25 +39,24 @@ export function WhatsAppBodyEditor({
       if (missing.length > 0) {
         setError(`Missing variables: ${missing.join(', ')}. Variables must be sequential.`);
         onValidationChange(false);
-        return false;
+        return;
       }
 
       if (new Set(variables).size !== variables.length) {
         setError('Duplicate variables found. Each variable number must be unique.');
         onValidationChange(false);
-        return false;
+        return;
       }
     }
 
     if (text.length > characterLimit) {
         setError(`Character limit of ${characterLimit} exceeded.`);
         onValidationChange(false);
-        return false;
+        return;
     }
     
     setError(null);
     onValidationChange(true);
-    return true;
   }, [characterLimit, onValidationChange]);
 
   useEffect(() => {

@@ -43,7 +43,6 @@ const formSchema = z.object({
   headerFile: z.any().optional(),
 
   bodyText: z.string().trim().min(1, 'Template body cannot be empty.'),
-  isBodyValid: z.boolean().refine(val => val === true, { message: 'Template body has validation errors.' }),
   
   footerText: z.string().max(60, 'Footer text cannot exceed 60 characters.').optional(),
 
@@ -84,6 +83,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
   const [user] = useAuthState(auth);
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBodyValid, setIsBodyValid] = useState(false);
 
   const {
     register, handleSubmit, control, watch, setValue, formState: { errors, isValid }, reset,
@@ -94,7 +94,6 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
       language: 'en',
       headerType: 'NONE',
       buttonType: 'NONE',
-      isBodyValid: false,
       quickReplies: ['']
     },
   });
@@ -160,12 +159,9 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
   useEffect(() => {
     if (!isOpen) {
         reset();
+        setIsBodyValid(false);
     }
   }, [isOpen, reset]);
-  
-  const handleValidationChange = useCallback((isValid: boolean) => {
-    setValue('isBodyValid', isValid, { shouldValidate: true });
-  }, [setValue]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -251,12 +247,11 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
                          <WhatsAppBodyEditor 
                             value={field.value || ''}
                             onChange={field.onChange}
-                            onValidationChange={handleValidationChange}
+                            onValidationChange={setIsBodyValid}
                          />
                     )}
                 />
                 {errors.bodyText && <p className="text-destructive text-xs mt-1">{errors.bodyText.message}</p>}
-                {errors.isBodyValid && <p className="text-destructive text-xs mt-1">{errors.isBodyValid.message}</p>}
               </div>
 
                <Separator />
@@ -348,7 +343,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
           </ScrollArea>
           <DialogFooter className="mt-6 border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" disabled={!isValid || isSubmitting}>
+            <Button type="submit" disabled={!isValid || !isBodyValid || isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Creating...' : 'Create Template'}
             </Button>

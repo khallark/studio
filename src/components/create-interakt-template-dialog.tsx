@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -113,7 +113,6 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
     }
 
     const formData = new FormData();
-    formData.append('shop', 'your-shop-id'); // This will be replaced by API
     formData.append('templateName', data.templateName);
     formData.append('templateCategory', data.templateCategory);
     formData.append('language', data.language);
@@ -163,6 +162,10 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
         reset();
     }
   }, [isOpen, reset]);
+  
+  const handleValidationChange = useCallback((isValid: boolean) => {
+    setValue('isBodyValid', isValid, { shouldValidate: true });
+  }, [setValue]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -248,7 +251,7 @@ export function CreateTemplateDialog({ isOpen, onClose }: CreateTemplateDialogPr
                          <WhatsAppBodyEditor 
                             value={field.value || ''}
                             onChange={field.onChange}
-                            onValidationChange={(isValid) => setValue('isBodyValid', isValid, { shouldValidate: true })}
+                            onValidationChange={handleValidationChange}
                          />
                     )}
                 />

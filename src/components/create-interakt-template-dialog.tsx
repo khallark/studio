@@ -191,7 +191,7 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onDialogClose()}>
-      <DialogContent className="max-w-4xl h-full md:h-auto flex flex-col">
+      <DialogContent className="max-w-4xl flex flex-col h-full md:h-auto">
         <DialogHeader>
           <DialogTitle>Create a new WhatsApp Template</DialogTitle>
           <DialogDescription>Design and submit a new template for approval by WhatsApp.</DialogDescription>
@@ -330,9 +330,9 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 {watch('hasCopyCode') && (
                                     <Input placeholder="Text for the copy code button" {...register('copyCodeText')} className="mt-2" />
                                 )}
+                                {errors.copyCodeText && watch('hasCopyCode') && <p className="text-sm text-destructive mt-1">{errors.copyCodeText.message}</p>}
                             </div>
                         </div>
-                        {errors.copyCodeText && <p className="text-sm text-destructive mt-1 pl-8">{errors.copyCodeText.message}</p>}
                         
                         {/* URL */}
                         <div className="flex items-start space-x-2">
@@ -349,6 +349,7 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 )}
                             </div>
                         </div>
+
                          {/* Quick Reply */}
                         <div className="flex items-start space-x-2">
                             <Checkbox id="hasQuickReply" {...register('hasQuickReply')} />
@@ -357,9 +358,9 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 {watch('hasQuickReply') && (
                                     <Input placeholder="Button text for quick reply" {...register('quickReplyText')} className="mt-2" />
                                 )}
+                                {errors.quickReplyText && watch('hasQuickReply') && <p className="text-sm text-destructive mt-1">{errors.quickReplyText.message}</p>}
                             </div>
                         </div>
-                        {errors.quickReplyText && <p className="text-sm text-destructive mt-1 pl-8">{errors.quickReplyText.message}</p>}
 
                          {/* Call */}
                         <div className="flex items-start space-x-2">
@@ -369,15 +370,15 @@ export function CreateTemplateDialog({ isOpen, onClose, shopId }: CreateTemplate
                                 {watch('hasCall') && (
                                     <Input placeholder="Your phone number with country code" {...register('callPhoneNumber')} className="mt-2" />
                                 )}
+                                {errors.callPhoneNumber && watch('hasCall') && <p className="text-sm text-destructive mt-1">{errors.callPhoneNumber.message}</p>}
                             </div>
                         </div>
-                        {errors.callPhoneNumber && <p className="text-sm text-destructive mt-1 pl-8">{errors.callPhoneNumber.message}</p>}
                     </div>
                 )}
             </div>
           </ScrollArea>
           
-          <DialogFooter className="mt-6 pt-4 border-t shrink-0">
+          <DialogFooter className="mt-auto pt-4 border-t shrink-0">
             <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>

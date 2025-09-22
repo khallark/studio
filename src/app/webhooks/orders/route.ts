@@ -132,23 +132,48 @@ function buildDynamicMessagePayload(templateData: any, orderData: any, customerP
 
   // Handle buttons dynamically
   if (template.buttons) {
-    const buttons = JSON.parse(template.buttons);
-    const buttonValues: any = {};
-
-    buttons.forEach((button: any, index: number) => {
-      if (button.type === 'URL' && button.url) {
-        // Extract variables from URL if any
-        const urlVariables = extractVariablesFromText(button.url);
-        if (urlVariables.length > 0) {
-          buttonValues[`${index}_url`] = urlVariables.map(varIndex => {
-            return getOrderValueForVariable(varIndex, orderData);
-          });
-        }
+    console.log('Raw buttons data:', template.buttons);
+    
+    let buttons;
+    try {
+      // First parse to get the JSON string
+      let buttonsString = template.buttons;
+      if (typeof buttonsString === 'string') {
+        buttonsString = JSON.parse(buttonsString); // First parse: removes outer quotes
       }
-    });
-
-    if (Object.keys(buttonValues).length > 0) {
-      messagePayload.template.buttonValues = buttonValues;
+      
+      // Second parse to get the actual array
+      if (typeof buttonsString === 'string') {
+        buttons = JSON.parse(buttonsString); // Second parse: gets the array
+      } else {
+        buttons = buttonsString; // Already parsed
+      }
+      
+      console.log('Final parsed buttons:', buttons);
+      
+      // Only proceed if buttons is actually an array
+      if (Array.isArray(buttons)) {
+        const buttonValues: any = {};
+        
+        buttons.forEach((button: any, index: number) => {
+          if (button.type === 'URL' && button.url) {
+            const urlVariables = extractVariablesFromText(button.url);
+            if (urlVariables.length > 0) {
+              buttonValues[`${index}_url`] = urlVariables.map(varIndex => {
+                return getOrderValueForVariable(varIndex, orderData);
+              });
+            }
+          }
+        });
+        
+        if (Object.keys(buttonValues).length > 0) {
+          messagePayload.template.buttonValues = buttonValues;
+        }
+      } else {
+        console.log('Buttons is not an array after parsing, skipping button processing');
+      }
+    } catch (parseError) {
+      console.log('Failed to parse buttons:', parseError);
     }
   }
 

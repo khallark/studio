@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
         progress: 'Submitting to Interakt...',
       });
 
-      const templateResponse = await fetch('https://api.interakt.ai/v1/public/track/templates', {
+      const templateResponse = await fetch('https://api.interakt.ai/v1/public/track/templates/', {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${interaktKeys.apiKey}`,

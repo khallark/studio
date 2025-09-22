@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = JSON.parse(rawBody);
-    const topic = payload.topic;
+    const topic = payload.type;
 
     switch (topic) {
       case 'message_template_status_update':

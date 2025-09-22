@@ -57,6 +57,19 @@ function createOrderLogEntry(topic: string, orderData: any): any {
     };
 }
 
+function normalizePhoneNumber(phoneNumber: string): string {
+  // Remove all whitespace characters from the phone number
+  const cleanedNumber = phoneNumber.replace(/\s/g, "");
+  // Check if the cleaned number length is >= 10
+  if (cleanedNumber.length >= 10) {
+    // Extract the last 10 digits
+    return cleanedNumber.slice(-10);
+  } else {
+    // Return the whole string if length is less than 10
+    return cleanedNumber;
+  }
+}
+
 function getOrderValueForVariable(variableIndex: number, orderData: any): string {
   // Map variable indices to order data
   // This mapping should match what you used when creating the template
@@ -96,7 +109,7 @@ function buildDynamicMessagePayload(templateData: any, orderData: any, customerP
   // Base payload
   const messagePayload: any = {
     countryCode: '+91',
-    phoneNumber: customerPhone.replace(/^\+/, ''),
+    phoneNumber: normalizePhoneNumber(customerPhone),
     callbackData: `order_${orderData.id}`,
     type: 'Template',
     template: {
@@ -444,18 +457,6 @@ export async function POST(req: NextRequest) {
       console.log('Trying to send whatspass message');
       const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
       const testPhoneNumber = '9779752241';
-      function normalizePhoneNumber(phoneNumber: string): string {
-        // Remove all whitespace characters from the phone number
-        const cleanedNumber = phoneNumber.replace(/\s/g, "");
-        // Check if the cleaned number length is >= 10
-        if (cleanedNumber.length >= 10) {
-          // Extract the last 10 digits
-          return cleanedNumber.slice(-10);
-        } else {
-          // Return the whole string if length is less than 10
-          return cleanedNumber;
-        }
-      }
       console.log(customerPhone);
 
       if (customerPhone) {

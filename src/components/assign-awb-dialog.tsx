@@ -127,7 +127,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return;
     }
     
-    onConfirm(selectedCourier, pickupName, selectedMode || '');
+    onConfirm(selectedCourier, pickupName, selectedMode || 'Surface');
     onClose();
   };
 

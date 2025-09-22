@@ -973,14 +973,18 @@ export default function OrdersPage() {
                 </div>
             </CardHeader>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
-                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-6 h-auto rounded-none border-b p-2 shrink-0">
-                    <TabsTrigger value="All Orders">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
-                    <TabsTrigger value="New">New ({statusCounts['New'] || 0})</TabsTrigger>
-                    <TabsTrigger value="Confirmed">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
-                    <TabsTrigger value="Ready To Dispatch">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
-                    <TabsTrigger value="Dispatched">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
-                    <TabsTrigger value="Cancelled">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
-                </TabsList>
+                <div className="border-b px-2 shrink-0">
+                  <div className="overflow-x-auto">
+                      <TabsList className="w-full justify-start h-auto rounded-none bg-transparent p-0">
+                          <TabsTrigger value="All Orders" className="px-3 py-2.5">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
+                          <TabsTrigger value="New" className="px-3 py-2.5">New ({statusCounts['New'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Confirmed" className="px-3 py-2.5">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Ready To Dispatch" className="px-3 py-2.5">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Dispatched" className="px-3 py-2.5">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Cancelled" className="px-3 py-2.5">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
+                      </TabsList>
+                  </div>
+                </div>
                 <div className="relative flex-1 overflow-y-auto">
                     <Table>
                         <TableHeader className="sticky top-0 bg-card z-10">

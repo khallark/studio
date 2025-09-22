@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
       await trackingDoc.update({
         status: 'submitted',
         progress: 'Template submitted for WhatsApp approval',
-        templateId: templateResult.template_id || templateResult.id,
+        templateId: templateResult.data.id,
         interaktResponse: sanitizeObject(templateResult),
         completedAt: Timestamp.now(),
       });

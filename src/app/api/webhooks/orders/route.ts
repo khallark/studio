@@ -415,6 +415,7 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    console.log(created);
     // if(created) {
     //   console.log('Trying to send whatspass message');
     //   const customerPhone = orderData.raw.shipping_address.phone || orderData.raw.shipping_address.phone || orderData.raw.customer.phone;

@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
         progress: 'Submitting to Interakt...',
       });
 
+      console.log('Sending payload to Interakt:', JSON.stringify(templatePayload, null, 2));
       const templateResponse = await fetch('https://api.interakt.ai/v1/public/track/templates/', {
         method: 'POST',
         headers: {

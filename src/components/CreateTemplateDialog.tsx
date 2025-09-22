@@ -391,9 +391,9 @@ export default function CreateTemplateDialog({ isOpen, onClose, activeAccountId,
                   <SelectValue placeholder="Choose Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MARKETING">Marketing</SelectItem>
-                  <SelectItem value="UTILITY">Utility</SelectItem>
-                  <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="utility">Utility</SelectItem>
+                  <SelectItem value="authentication">Authentication</SelectItem>
                 </SelectContent>
               </Select>
             </div>

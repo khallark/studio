@@ -80,9 +80,9 @@ function getOrderValueForVariable(variableIndex: number, orderData: any): string
         orderData?.billing_address?.first_name ||
         'Customer';
     case 2:
-      return orderData.name || String(orderData.id);
+      return String(orderData.name).substring(1) || String(orderData.id);
     case 3:
-      return `${orderData.currency || ''} ${orderData?.totalPrice || '0'}`;
+      return `${orderData.currency || ''} ${orderData?.total_price || '0'}`;
     case 4:
       return orderData?.customer?.email || '';
     case 5:

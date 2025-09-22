@@ -32,6 +32,20 @@ const parseExistingVariables = (text: string): number[] => {
     return matches.map(match => parseInt(match[1])).sort((a, b) => a - b);
 };
 
+// Convert undefined values to null
+const sanitizeObject = (obj: any): any => {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value === undefined)
+            sanitized[key] = null;
+        else if (typeof value === 'object' && value !== null)
+            sanitized[key] = sanitizeObject(value);
+        else
+            sanitized[key] = value;
+    }
+    return sanitized;
+};
+
 // Build template payload for Interakt API
 function buildTemplatePayload(templateData: TemplateData) {
   const payload: any = {
@@ -275,7 +289,7 @@ export async function POST(request: NextRequest) {
         status: 'submitted',
         progress: 'Template submitted for WhatsApp approval',
         templateId: templateResult.template_id || templateResult.id,
-        interaktResponse: templateResult,
+        interaktResponse: sanitizeObject(templateResult),
         completedAt: Timestamp.now(),
       });
 
@@ -286,21 +300,6 @@ export async function POST(request: NextRequest) {
         .collection('communications')
         .doc('interakt')
         .collection('templates');
-
-      // Convert undefined values to null
-      const sanitizeObject = (obj: any): any => {
-        const sanitized: any = {};
-        for (const [key, value] of Object.entries(obj)) {
-            if (value === undefined) {
-            sanitized[key] = null;
-            } else if (typeof value === 'object' && value !== null) {
-            sanitized[key] = sanitizeObject(value);
-            } else {
-            sanitized[key] = value;
-            }
-        }
-        return sanitized;
-      };
 
       await templatesRef.add({
         ...sanitizeObject(templateResult),

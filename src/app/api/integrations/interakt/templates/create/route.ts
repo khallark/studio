@@ -19,10 +19,18 @@ interface TemplateData {
   headerType: 'none' | 'text' | 'image' | 'video' | 'document';
   headerText: string;
   headerMediaHandle?: string; // Pre-uploaded media handle from dialog
+  headerMediaFileUrl?: string;
+  headerMediaFileName?: string;
   body: string;
   footer: string;
   buttons: ButtonConfig[];
 }
+
+const parseExistingVariables = (text: string): number[] => {
+    const variableRegex = /\{\{(\d+)\}\}/g;
+    const matches = [...text.matchAll(variableRegex)];
+    return matches.map(match => parseInt(match[1])).sort((a, b) => a - b);
+};
 
 // Build template payload for Interakt API
 function buildTemplatePayload(templateData: TemplateData) {
@@ -32,6 +40,19 @@ function buildTemplatePayload(templateData: TemplateData) {
     category: templateData.category,
     body: templateData.body.trim(),
   };
+
+  const variables = parseExistingVariables(templateData.body);
+  if (variables.length > 0) {
+    // Generate sample values based on variable count
+    payload.body_text = variables.map((varNum, index) => {
+        switch (index) {
+        case 0: return "John Doe";        // First variable - typically name
+        case 1: return "12345";           // Second variable - typically order/ID
+        case 2: return "999.50";          // Third variable - typically amount
+        default: return `Sample ${varNum}`; // Generic sample for additional variables
+        }
+    });
+  }
 
   // Add header if specified
   if (templateData.headerType && templateData.headerType !== 'none') {
@@ -43,10 +64,12 @@ function buildTemplatePayload(templateData: TemplateData) {
       if (templateData.headerMediaHandle) {
         payload.header_format = templateData.headerType.toUpperCase();
         payload.header_handle = [templateData.headerMediaHandle]; // Array format as per schema
+        payload.header_handle_file_url = templateData.headerMediaFileUrl;      // Add this
+        payload.header_handle_file_name = templateData.headerMediaFileName;
       }
     }
   } else {
-    payload.header_format = 'NONE';
+    payload.header_format = null;
   }
 
   // Add footer if specified
@@ -66,7 +89,7 @@ function buildTemplatePayload(templateData: TemplateData) {
       
       if (hasQuickReply && !hasUrl && !hasPhone) {
         // Pure quick reply buttons
-        payload.button_type = 'QUICK_REPLY';
+        payload.button_type = 'Quick Replies';
         payload.buttons = buttons
           .filter(btn => btn.type === 'quick_reply')
           .slice(0, 3) // Max 3 quick reply buttons
@@ -76,7 +99,7 @@ function buildTemplatePayload(templateData: TemplateData) {
           }));
       } else if (hasUrl || hasPhone) {
         // Call to action buttons
-        payload.button_type = 'CALL_TO_ACTION';
+        payload.button_type = 'Call to Action';
         const actionButtons = [];
         
         // Add URL button (max 1)
@@ -102,8 +125,6 @@ function buildTemplatePayload(templateData: TemplateData) {
         payload.buttons = actionButtons.slice(0, 2); // Max 2 call to action buttons
       }
     }
-  } else {
-    payload.button_type = 'NONE';
   }
 
   return payload;

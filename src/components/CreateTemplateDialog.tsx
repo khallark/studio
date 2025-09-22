@@ -36,6 +36,8 @@ interface FormData {
   headerText: string;
   headerFile: File | null;
   headerMediaHandle?: string;
+  headerMediaFileUrl?: string;
+  headerMediaFileName?: string;
   body: string;
   footer: string;
   buttons: ButtonConfig[];
@@ -286,7 +288,9 @@ export default function CreateTemplateDialog({ isOpen, onClose, activeAccountId,
         const uploadResult = await uploadResponse.json();
         templateData = {
           ...templateData,
-          headerMediaHandle: uploadResult.data.file_handle
+          headerMediaHandle: uploadResult.data.file_handle,
+          headerMediaFileUrl: uploadResult.data.file_url,
+          headerMediaFileName: uploadResult.data.file_name
         };
       }
       
@@ -391,9 +395,9 @@ export default function CreateTemplateDialog({ isOpen, onClose, activeAccountId,
                   <SelectValue placeholder="Choose Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="utility">Utility</SelectItem>
-                  <SelectItem value="authentication">Authentication</SelectItem>
+                  <SelectItem value="Marketing">Marketing</SelectItem>
+                  <SelectItem value="Utility">Utility</SelectItem>
+                  <SelectItem value="Authentication">Authentication</SelectItem>
                 </SelectContent>
               </Select>
             </div>

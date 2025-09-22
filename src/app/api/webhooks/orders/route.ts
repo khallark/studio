@@ -416,6 +416,7 @@ export async function POST(req: NextRequest) {
     });
 
     if(created) {
+      console.log('Trying to send whatspass message');
       const customerPhone = orderData.raw.shipping_address.phone || orderData.raw.shipping_address.phone || orderData.raw.customer.phone;
       const testPhoneNumber = '9779752241';
       function normalizePhoneNumber(phoneNumber: string): string {
@@ -430,10 +431,11 @@ export async function POST(req: NextRequest) {
           return cleanedNumber;
         }
       }
+      console.log(customerPhone);
 
       if (customerPhone) {
         const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
-
+        console.log(cleanPhone);
         if (cleanPhone === testPhoneNumber) {
           console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
           // Fire and forget - don't await, don't handle errors

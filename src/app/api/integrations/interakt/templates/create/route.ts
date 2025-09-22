@@ -287,11 +287,26 @@ export async function POST(request: NextRequest) {
         .doc('interakt')
         .collection('templates');
 
+      // Convert undefined values to null
+      const sanitizeObject = (obj: any): any => {
+        const sanitized: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            if (value === undefined) {
+            sanitized[key] = null;
+            } else if (typeof value === 'object' && value !== null) {
+            sanitized[key] = sanitizeObject(value);
+            } else {
+            sanitized[key] = value;
+            }
+        }
+        return sanitized;
+      };
+
       await templatesRef.add({
-        ...templateResult,
+        ...sanitizeObject(templateResult),
         createdAt: Timestamp.now(),
         createdBy: userId,
-        linkedCategory: null, // Will be set later by user
+        linkedCategory: null,
       });
 
       return NextResponse.json({

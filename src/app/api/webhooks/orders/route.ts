@@ -415,40 +415,40 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    if(created) {
-      console.log('Trying to send whatspass message');
-      const customerPhone = orderData.raw.shipping_address.phone || orderData.raw.shipping_address.phone || orderData.raw.customer.phone;
-      const testPhoneNumber = '9779752241';
-      function normalizePhoneNumber(phoneNumber: string): string {
-        // Remove all whitespace characters from the phone number
-        const cleanedNumber = phoneNumber.replace(/\s/g, "");
-        // Check if the cleaned number length is >= 10
-        if (cleanedNumber.length >= 10) {
-          // Extract the last 10 digits
-          return cleanedNumber.slice(-10);
-        } else {
-          // Return the whole string if length is less than 10
-          return cleanedNumber;
-        }
-      }
-      console.log(customerPhone);
+    // if(created) {
+    //   console.log('Trying to send whatspass message');
+    //   const customerPhone = orderData.raw.shipping_address.phone || orderData.raw.shipping_address.phone || orderData.raw.customer.phone;
+    //   const testPhoneNumber = '9779752241';
+    //   function normalizePhoneNumber(phoneNumber: string): string {
+    //     // Remove all whitespace characters from the phone number
+    //     const cleanedNumber = phoneNumber.replace(/\s/g, "");
+    //     // Check if the cleaned number length is >= 10
+    //     if (cleanedNumber.length >= 10) {
+    //       // Extract the last 10 digits
+    //       return cleanedNumber.slice(-10);
+    //     } else {
+    //       // Return the whole string if length is less than 10
+    //       return cleanedNumber;
+    //     }
+    //   }
+    //   console.log(customerPhone);
 
-      if (customerPhone) {
-        const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
-        console.log(cleanPhone);
-        if (cleanPhone === testPhoneNumber) {
-          console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
-          // Fire and forget - don't await, don't handle errors
-          sendNewOrderWhatsAppMessage(shopDomain, orderData).catch(error => {
-            console.log(`WhatsApp message failed for order ${orderId}, but continuing:`, error.message);
-          });
-        } else {
-          console.log(`Customer phone ${customerPhone} doesn't match test number ${testPhoneNumber}, skipping WhatsApp message`);
-        }
-      } else {
-        console.log(`No customer phone found in order ${orderId}, skipping WhatsApp message`);
-      }
-    }
+    //   if (customerPhone) {
+    //     const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
+    //     console.log(cleanPhone);
+    //     if (cleanPhone === testPhoneNumber) {
+    //       console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
+    //       // Fire and forget - don't await, don't handle errors
+    //       sendNewOrderWhatsAppMessage(shopDomain, orderData).catch(error => {
+    //         console.log(`WhatsApp message failed for order ${orderId}, but continuing:`, error.message);
+    //       });
+    //     } else {
+    //       console.log(`Customer phone ${customerPhone} doesn't match test number ${testPhoneNumber}, skipping WhatsApp message`);
+    //     }
+    //   } else {
+    //     console.log(`No customer phone found in order ${orderId}, skipping WhatsApp message`);
+    //   }
+    // }
 
     // Post-commit side effect: capture Shopify Credit (only for creates)
     if (

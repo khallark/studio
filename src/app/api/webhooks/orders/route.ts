@@ -43,20 +43,19 @@ async function logWebhookToCentralCollection(
 }
 
 function createOrderLogEntry(topic: string, orderData: any): any {
-    const now = new Date();
-    return {
-        type: 'WEBHOOK',
-        action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
-        timestamp: now, // Use JS Date object for arrayUnion
-        details: {
-            topic: topic,
-            orderId: String(orderData.id),
-            orderName: orderData.name,
-        },
-        user: { displayName: 'Shopify' } // System-generated action
-    };
+  const now = new Date();
+  return {
+    type: 'WEBHOOK',
+    action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
+    timestamp: now, // Use JS Date object for arrayUnion
+    details: {
+      topic: topic,
+      orderId: String(orderData.id),
+      orderName: orderData.name,
+    },
+    user: { displayName: 'Shopify' } // System-generated action
+  };
 }
-
 
 async function captureShopifyCreditPayment(shopDomain: string, orderId: string) {
   try {
@@ -100,8 +99,8 @@ async function captureShopifyCreditPayment(shopDomain: string, orderId: string) 
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
-    const rawTopic   = req.headers.get('x-shopify-topic') || '';
-    const topic      = rawTopic.trim().toLowerCase(); // normalize once
+    const rawTopic = req.headers.get('x-shopify-topic') || '';
+    const topic = rawTopic.trim().toLowerCase(); // normalize once
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
 
     if (!process.env.SHOPIFY_API_SECRET) {
@@ -137,7 +136,7 @@ export async function POST(req: NextRequest) {
     }
 
     const accountRef = db.collection('accounts').doc(shopDomain);
-    const orderRef   = accountRef.collection('orders').doc(orderId);
+    const orderRef = accountRef.collection('orders').doc(orderId);
     const orderLogEntry = createOrderLogEntry(topic, orderData);
 
     const dataToSave: { [key: string]: any } = {
@@ -203,15 +202,51 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
-        tx.update(orderRef, { 
-            ...dataToSave, 
-            updatedByTopic: topic,
-            logs: FieldValue.arrayUnion(orderLogEntry),
+        tx.update(orderRef, {
+          ...dataToSave,
+          updatedByTopic: topic,
+          logs: FieldValue.arrayUnion(orderLogEntry),
         });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
+
+    console.log(created);
+    // if(created) {
+    //   console.log('Trying to send whatspass message');
+    //   const customerPhone = orderData.raw.shipping_address.phone || orderData.raw.shipping_address.phone || orderData.raw.customer.phone;
+    //   const testPhoneNumber = '9779752241';
+    //   function normalizePhoneNumber(phoneNumber: string): string {
+    //     // Remove all whitespace characters from the phone number
+    //     const cleanedNumber = phoneNumber.replace(/\s/g, "");
+    //     // Check if the cleaned number length is >= 10
+    //     if (cleanedNumber.length >= 10) {
+    //       // Extract the last 10 digits
+    //       return cleanedNumber.slice(-10);
+    //     } else {
+    //       // Return the whole string if length is less than 10
+    //       return cleanedNumber;
+    //     }
+    //   }
+    //   console.log(customerPhone);
+
+    //   if (customerPhone) {
+    //     const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
+    //     console.log(cleanPhone);
+    //     if (cleanPhone === testPhoneNumber) {
+    //       console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
+    //       // Fire and forget - don't await, don't handle errors
+    //       sendNewOrderWhatsAppMessage(shopDomain, orderData).catch(error => {
+    //         console.log(`WhatsApp message failed for order ${orderId}, but continuing:`, error.message);
+    //       });
+    //     } else {
+    //       console.log(`Customer phone ${customerPhone} doesn't match test number ${testPhoneNumber}, skipping WhatsApp message`);
+    //     }
+    //   } else {
+    //     console.log(`No customer phone found in order ${orderId}, skipping WhatsApp message`);
+    //   }
+    // }
 
     // Post-commit side effect: capture Shopify Credit (only for creates)
     if (

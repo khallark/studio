@@ -712,11 +712,12 @@ export default function OrdersPage() {
   };
   
     const handleUpdateShippedStatuses = useCallback(async () => {
-    if (!userData?.activeAccountId || !user) return;
+    if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
+
     setIsUpdatingShippedStatuses(true);
     const { dismiss } = toast({
       title: 'Updating...',
-      description: 'Requesting latest statuses for shipped orders.',
+      description: `Requesting latest statuses for ${selectedOrders.length} selected order(s).`,
     });
 
     try {
@@ -727,7 +728,10 @@ export default function OrdersPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: userData.activeAccountId }),
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          orderIds: selectedOrders,
+        }),
       });
 
       const result = await response.json();
@@ -737,9 +741,10 @@ export default function OrdersPage() {
 
       dismiss();
       toast({
-        title: 'Status Updation has Started',
+        title: 'Status Update Started',
         description: 'The system will now fetch the latest tracking statuses in the background.',
       });
+      setSelectedOrders([]);
     } catch (error) {
       console.error('Update Shipped Statuses error:', error);
       dismiss();
@@ -751,7 +756,7 @@ export default function OrdersPage() {
     } finally {
       setIsUpdatingShippedStatuses(false);
     }
-  }, [userData, user, toast]);
+  }, [userData, user, toast, selectedOrders]);
 
 
   const renderActionItems = (order: Order) => {
@@ -893,8 +898,7 @@ export default function OrdersPage() {
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
   const shippedStatuses: (CustomStatus | 'All Orders')[] = [
-    'Dispatched', 'In Transit', 'Out For Delivery', 'Delivered',
-    'RTO Intransit', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'
+    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO Intransit'
   ];
 
   const renderBulkActionButtons = () => {
@@ -909,12 +913,12 @@ export default function OrdersPage() {
             variant="outline"
             size="sm"
             onClick={handleUpdateShippedStatuses}
-            disabled={isUpdatingShippedStatuses}
+            disabled={isDisabled || isUpdatingShippedStatuses}
           >
             {isUpdatingShippedStatuses ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Update Shipped Orders Statuses
+            Update {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Shipped Statuses
           </Button>
         )}
 

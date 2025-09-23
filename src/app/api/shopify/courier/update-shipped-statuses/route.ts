@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("update-status error:", error);
     return NextResponse.json(
-      { error: "updating status failed", details: String(error?.message ?? error) },
+      { error: "updating status failed", details: String("error within the function") },
       { status: 500 });
   }
 }

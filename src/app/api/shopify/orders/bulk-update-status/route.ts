@@ -1,4 +1,5 @@
 
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -26,7 +27,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop, a non-empty array of orderIds, and status are required' }, { status: 400 });
     }
 
-    const validStatuses = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'Cancelled'];
+    const validStatuses = [
+        'New', 
+        'Confirmed', 
+        'Ready To Dispatch', 
+        'Dispatched', 
+        'In Transit',
+        'Out For Delivery',
+        'Delivered',
+        'RTO Intransit',
+        'RTO Delivered',
+        'Lost',
+        'Closed',
+        'RTO Closed',
+        'Cancelled'
+    ];
     if (!validStatuses.includes(status)) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
     }

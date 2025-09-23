@@ -70,7 +70,21 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 
-type CustomStatus = 'New' | 'Confirmed' | 'Ready To Dispatch' | 'Dispatched' | 'Cancelled';
+type CustomStatus = 
+  | 'New' 
+  | 'Confirmed' 
+  | 'Ready To Dispatch' 
+  | 'Dispatched' 
+  | 'In Transit'
+  | 'Out For Delivery'
+  | 'Delivered'
+  | 'RTO Intransit'
+  | 'RTO Delivered'
+  | 'Lost'
+  | 'Closed'
+  | 'RTO Closed'
+  | 'Cancelled';
+
 
 interface OrderLog {
   type: 'USER_ACTION' | 'WEBHOOK';
@@ -394,11 +408,19 @@ export default function OrdersPage() {
   const statusCounts = useMemo(() => {
     const initialCounts: Record<CustomStatus | 'All Orders', number> = {
       'All Orders': 0,
-      New: 0,
-      Confirmed: 0,
+      'New': 0,
+      'Confirmed': 0,
       'Ready To Dispatch': 0,
-      Dispatched: 0,
-      Cancelled: 0,
+      'Dispatched': 0,
+      'In Transit': 0,
+      'Out For Delivery': 0,
+      'Delivered': 0,
+      'RTO Intransit': 0,
+      'RTO Delivered': 0,
+      'Lost': 0,
+      'Closed': 0,
+      'RTO Closed': 0,
+      'Cancelled': 0,
     };
 
     let allOrdersCount = 0;
@@ -740,6 +762,30 @@ export default function OrdersPage() {
               Cancel
             </DropdownMenuItem>
         );
+      case 'In Transit':
+      case 'RTO Intransit':
+      case 'Out For Delivery':
+        return (
+          <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+            Cancel Order
+          </DropdownMenuItem>
+        );
+      case 'Delivered':
+        return (
+          <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
+            Close Order
+          </DropdownMenuItem>
+        );
+      case 'RTO Delivered':
+        return (
+          <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>
+            RTO Close Order
+          </DropdownMenuItem>
+        );
+      case 'Lost':
+        return null;
+      case 'Closed':
+      case 'RTO Closed':
       case 'Cancelled':
         return (
           <>
@@ -981,6 +1027,14 @@ export default function OrdersPage() {
                           <TabsTrigger value="Confirmed" className="px-3 py-2.5">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
                           <TabsTrigger value="Ready To Dispatch" className="px-3 py-2.5">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
                           <TabsTrigger value="Dispatched" className="px-3 py-2.5">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
+                          <TabsTrigger value="In Transit" className="px-3 py-2.5">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Out For Delivery" className="px-3 py-2.5">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Delivered" className="px-3 py-2.5">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Intransit" className="px-3 py-2.5">RTO Intransit ({statusCounts['RTO Intransit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Delivered" className="px-3 py-2.5">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Lost" className="px-3 py-2.5">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Closed" className="px-3 py-2.5">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Closed" className="px-3 py-2.5">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>
                           <TabsTrigger value="Cancelled" className="px-3 py-2.5">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                       </TabsList>
                   </div>

@@ -182,6 +182,8 @@ export default function OrdersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
   const [isAwbBulkSelectOpen, setIsAwbBulkSelectOpen] = useState(false);
+  
+  const [isUpdatingShippedStatuses, setIsUpdatingShippedStatuses] = useState(false);
 
 
   useEffect(() => {
@@ -708,6 +710,48 @@ export default function OrdersPage() {
         setSortDirection('asc');
     }
   };
+  
+    const handleUpdateShippedStatuses = useCallback(async () => {
+    if (!userData?.activeAccountId || !user) return;
+    setIsUpdatingShippedStatuses(true);
+    const { dismiss } = toast({
+      title: 'Updating...',
+      description: 'Requesting latest statuses for shipped orders.',
+    });
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/courier/update-shipped-statuses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ shop: userData.activeAccountId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.details || 'Failed to start status update process.');
+      }
+
+      dismiss();
+      toast({
+        title: 'Status Updation has Started',
+        description: 'The system will now fetch the latest tracking statuses in the background.',
+      });
+    } catch (error) {
+      console.error('Update Shipped Statuses error:', error);
+      dismiss();
+      toast({
+        title: 'Update Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingShippedStatuses(false);
+    }
+  }, [userData, user, toast]);
 
 
   const renderActionItems = (order: Order) => {
@@ -848,82 +892,113 @@ export default function OrdersPage() {
 
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
+  const shippedStatuses: (CustomStatus | 'All Orders')[] = [
+    'Dispatched', 'In Transit', 'Out For Delivery', 'Delivered',
+    'RTO Intransit', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'
+  ];
+
   const renderBulkActionButtons = () => {
     const isAnyOrderSelected = selectedOrders.length > 0;
     const isDisabled = !isAnyOrderSelected || isBulkUpdating;
-  
-    switch (activeTab) {
-      case 'All Orders':
-        return (
-           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-            </Button>
-          </div>
-        )
-      case 'New':
-      case 'Confirmed':
-        return (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-            </Button>
-            {activeTab === 'New' && 
-                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                    {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+    const showUpdateShippedButton = shippedStatuses.includes(activeTab);
+
+    return (
+      <div className="flex items-center gap-2 flex-wrap justify-end">
+        {showUpdateShippedButton && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUpdateShippedStatuses}
+            disabled={isUpdatingShippedStatuses}
+          >
+            {isUpdatingShippedStatuses ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            Update Shipped Orders Statuses
+          </Button>
+        )}
+
+        {(() => {
+          switch (activeTab) {
+            case 'All Orders':
+              return (
+                <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                  {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
                 </Button>
-            }
-            {activeTab === 'Confirmed' &&
-                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
-                    Assign AWBs
+              );
+            case 'New':
+            case 'Confirmed':
+              return (
+                <>
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                  </Button>
+                  {activeTab === 'New' && 
+                      <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                          {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+                      </Button>
+                  }
+                  {activeTab === 'Confirmed' &&
+                      <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
+                          Assign AWBs
+                      </Button>
+                  }
+                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                </>
+              );
+            case 'Ready To Dispatch':
+              return (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setIsAwbBulkSelectOpen(true)}>
+                      <ScanBarcode className="mr-2 h-4 w-4" />
+                      AWB Bulk Selection
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
+                    {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingSlips ? 'Downloading...' : `Download Slips (${selectedOrders.length})`}
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                      {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
+                  </Button>
+                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                </>
+              );
+            case 'Dispatched':
+              return (
+                <>
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                  </Button>
+                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                </>
+              );
+            case 'Cancelled':
+            default:
+              return (
+                <Button asChild size="sm">
+                  <Link href="/dashboard/orders/awb-processing">
+                      Go to AWB Processing
+                      <MoveRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
-            }
-            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-            </Button>
-          </div>
-        );
-      case 'Ready To Dispatch':
-         return (
-          <div className="flex gap-2 flex-wrap justify-end">
-             <Button variant="outline" size="sm" onClick={() => setIsAwbBulkSelectOpen(true)}>
-                <ScanBarcode className="mr-2 h-4 w-4" />
-                AWB Bulk Selection
-            </Button>
-             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-            </Button>
-            <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
-              {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingSlips ? 'Downloading...' : `Download Slips (${selectedOrders.length})`}
-            </Button>
-            <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
-            </Button>
-            <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-            </Button>
-          </div>
-        );
-      case 'Dispatched':
-        return (
-          <div className="flex gap-2">
-             <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-              {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-            </Button>
-             <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-            </Button>
-          </div>
-        );
-      case 'Cancelled':
-      default:
-        return null;
-    }
+              );
+          }
+        })()}
+      </div>
+    );
   };
 
 
@@ -938,14 +1013,6 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         {renderBulkActionButtons()}
-                        {activeTab !== 'Ready To Dispatch' && (
-                            <Button asChild size="sm">
-                                <Link href="/dashboard/orders/awb-processing">
-                                    Go to AWB Processing
-                                    <MoveRight className="ml-2 h-4 w-4" />
-                                </Link>
-                            </Button>
-                        )}
                     </div>
                 </div>
                  <div className="mt-4 flex flex-col md:flex-row items-center gap-4">

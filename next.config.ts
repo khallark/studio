@@ -107,6 +107,10 @@ const nextConfig: NextConfig = {
         source: '/api/integrations/interakt/media/upload',
         destination: '/api/integrations/interakt/media/upload/route',
       },
+       {
+        source: '/api/shopify/courier/update-shipped-statuses',
+        destination: '/api/shopify/courier/update-shipped-statuses/route',
+      },
     ]
   },
 };

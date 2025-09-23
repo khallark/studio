@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Ask Firebase Function to enqueue Cloud Tasks (one per job)
-    const url = process.env.UPDATE_STATUS_TASK_TARGET_URL!;
+    const url = process.env.UPDATE_STATUS_TASK_MANUAL_TARGET_URL!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
     if (!url || !secret) {
       return NextResponse.json({ error: 'Server not configured (FIREBASE_FUNCTIONS_BASE/TASKS_SECRET)' }, { status: 500 });

@@ -78,7 +78,7 @@ type CustomStatus =
   | 'In Transit'
   | 'Out For Delivery'
   | 'Delivered'
-  | 'RTO Intransit'
+  | 'RTO In Transit'
   | 'RTO Delivered'
   | 'Lost'
   | 'Closed'
@@ -417,7 +417,7 @@ export default function OrdersPage() {
       'In Transit': 0,
       'Out For Delivery': 0,
       'Delivered': 0,
-      'RTO Intransit': 0,
+      'RTO In Transit': 0,
       'RTO Delivered': 0,
       'Lost': 0,
       'Closed': 0,
@@ -812,7 +812,7 @@ export default function OrdersPage() {
             </DropdownMenuItem>
         );
       case 'In Transit':
-      case 'RTO Intransit':
+      case 'RTO In Transit':
       case 'Out For Delivery':
         return (
           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
@@ -898,7 +898,7 @@ export default function OrdersPage() {
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
   const shippedStatuses: (CustomStatus | 'All Orders')[] = [
-    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO Intransit'
+    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit'
   ];
 
   const renderBulkActionButtons = () => {
@@ -1101,7 +1101,7 @@ export default function OrdersPage() {
                           <TabsTrigger value="In Transit" className="px-3 py-2.5">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
                           <TabsTrigger value="Out For Delivery" className="px-3 py-2.5">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
                           <TabsTrigger value="Delivered" className="px-3 py-2.5">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO Intransit" className="px-3 py-2.5">RTO Intransit ({statusCounts['RTO Intransit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO In Transit" className="px-3 py-2.5">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO Delivered" className="px-3 py-2.5">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
                           <TabsTrigger value="Lost" className="px-3 py-2.5">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
                           <TabsTrigger value="Closed" className="px-3 py-2.5">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>

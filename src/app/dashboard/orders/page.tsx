@@ -978,15 +978,25 @@ export default function OrdersPage() {
                 </>
               );
             case 'Dispatched':
+            case 'In Transit':
+            case 'Out For Delivery':
+            case 'Delivered':
+            case 'RTO In Transit':
+            case 'RTO Delivered':
+            case 'Lost':
+            case 'Closed':
+            case 'RTO Closed':
               return (
                 <>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
                   </Button>
-                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                  {activeTab !== 'Delivered' && activeTab !== 'RTO Delivered' && activeTab !== 'Lost' && activeTab !== 'Closed' && activeTab !== 'RTO Closed' && (
+                    <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
                       {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-                  </Button>
+                    </Button>
+                  )}
                 </>
               );
             case 'Cancelled':
@@ -1442,3 +1452,4 @@ export default function OrdersPage() {
     </>
   );
 }
+

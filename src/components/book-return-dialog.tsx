@@ -86,7 +86,7 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
     if (isOpen) {
       setStep(1);
       setSelectedSkus(new Set());
-      setSelectedLocation(pickupLocations.length > 0 ? pickupLocations[0].id : null);
+      // setSelectedLocation(pickupLocations.length > 0 ? pickupLocations[0].id : null);
       setSelectedMode(null);
       setIsSubmitting(false);
     }

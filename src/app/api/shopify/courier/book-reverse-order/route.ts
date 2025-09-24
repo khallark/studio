@@ -271,20 +271,21 @@ export async function POST(req: NextRequest) {
 
     // Call Delhivery
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
+    const respBody = await dlvResp.json()
     if(!dlvResp.ok) {
         await releaseAwb(shop, awb)
-        console.error(JSON.stringify(await dlvResp.json()))
+        console.error(JSON.stringify(await respBody))
         return NextResponse.json(
         {
             ok: false,
-            reason: JSON.stringify(await dlvResp.json()),
+            reason: JSON.stringify(await respBody),
             response: dlvResp
         },
         { status: 502 }
         )
     }
     
-    const verdict = evalDelhiveryResp(await dlvResp.json())
+    const verdict = evalDelhiveryResp(await respBody)
 
     if(!verdict.ok) {
         await releaseAwb(shop, awb)
@@ -303,7 +304,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
     {
         ok: true,
-        response: await dlvResp.json(),
+        response: respBody
     },
     { status: 200 }
     );

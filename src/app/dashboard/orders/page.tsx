@@ -69,6 +69,7 @@ import { DocumentSnapshot } from 'firebase/firestore';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
+import { BookReturnDialog } from '@/components/book-return-dialog';
 
 type CustomStatus = 
   | 'New' 
@@ -185,6 +186,9 @@ export default function OrdersPage() {
   const [isAwbBulkSelectOpen, setIsAwbBulkSelectOpen] = useState(false);
   
   const [isUpdatingShippedStatuses, setIsUpdatingShippedStatuses] = useState(false);
+
+  const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
+  const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
 
 
   useEffect(() => {
@@ -823,12 +827,20 @@ export default function OrdersPage() {
         );
       case 'Delivered':
         return (
-          <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
+          <DropdownMenuItem onClick={() => {
+            setOrderForReturn(order);
+            setIsReturnDialogOpen(true);
+          }}>
+            Book Return
+          </DropdownMenuItem>
+        );
+      case 'DTO Booked':
+        return (
+           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
             Close Order
           </DropdownMenuItem>
         );
       case 'RTO Delivered':
-      case 'DTO Booked':
         return (
           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>
             RTO Close Order
@@ -1338,6 +1350,16 @@ export default function OrdersPage() {
         isOpen={isFetchAwbDialogOpen}
         onClose={() => setIsFetchAwbDialogOpen(false)}
       />
+    
+    {orderForReturn && userData?.activeAccountId && user && (
+        <BookReturnDialog
+            isOpen={isReturnDialogOpen}
+            onClose={() => setIsReturnDialogOpen(false)}
+            order={orderForReturn}
+            shopId={userData.activeAccountId}
+            user={user}
+        />
+    )}
 
     <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
         <DialogContent className="max-w-4xl">

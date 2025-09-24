@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -111,8 +112,13 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/courier/update-shipped-statuses',
         destination: '/api/shopify/courier/update-shipped-statuses/route',
       },
+      {
+        source: '/api/shopify/courier/book-reverse-order',
+        destination: '/api/shopify/courier/book-reverse-order/route',
+      },
     ]
   },
 };
 
 export default nextConfig;
+

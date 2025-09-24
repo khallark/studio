@@ -80,9 +80,9 @@ function getOrderValueForVariable(variableIndex: number, orderData: any): string
         orderData?.billing_address?.first_name ||
         'Customer';
     case 2:
-      return String(orderData.name).substring(1) || String(orderData.id);
+      return String(orderData?.name).substring(1) || String(orderData?.id);
     case 3:
-      return `${orderData.currency || ''} ${orderData?.total_price || '0'}`;
+      return `${orderData?.currency || ''} ${orderData?.total_price || '0'}`;
     case 4:
       return orderData?.customer?.email || '';
     case 5:
@@ -90,7 +90,7 @@ function getOrderValueForVariable(variableIndex: number, orderData: any): string
     case 6:
       return orderData?.customer?.phone || '';
     case 7:
-      return new Date(orderData.created_at).toLocaleDateString();
+      return orderData?.created_at ? new Date(orderData.created_at).toLocaleDateString() : '';
     default:
       return `Variable ${variableIndex}`;
   }
@@ -127,6 +127,22 @@ function buildDynamicMessagePayload(templateData: any, orderData: any, customerP
   }
 
   // Handle header dynamically
+  // if (template.header_format && template.header_format !== 'NONE') {
+  //   if (template.header_format === 'TEXT' && template.header) {
+  //     const headerVariables = extractVariablesFromText(template.header);
+  //     if (headerVariables.length > 0) {
+  //       messagePayload.template.headerValues = headerVariables.map(varIndex => {
+  //         return getOrderValueForVariable(varIndex, orderData);
+  //       });
+  //     }
+  //   } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
+  //     // For media headers, use the file URL from template
+  //     if (template.header_handle_file_url) {
+  //       messagePayload.template.headerValues = [template.header_handle_file_url];
+  //     }
+  //   }
+  // }
+  // Handle header dynamically
   if (template.header_format && template.header_format !== 'NONE') {
     if (template.header_format === 'TEXT' && template.header) {
       const headerVariables = extractVariablesFromText(template.header);
@@ -134,9 +150,11 @@ function buildDynamicMessagePayload(templateData: any, orderData: any, customerP
         messagePayload.template.headerValues = headerVariables.map(varIndex => {
           return getOrderValueForVariable(varIndex, orderData);
         });
+      } else {
+        // Include static header text
+        messagePayload.template.headerValues = [template.header];
       }
     } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
-      // For media headers, use the file URL from template
       if (template.header_handle_file_url) {
         messagePayload.template.headerValues = [template.header_handle_file_url];
       }
@@ -252,7 +270,10 @@ async function sendNewOrderWhatsAppMessage(shopDomain: string, orderData: any) {
     }
 
     // Check if customer has phone number
-    const customerPhone = orderData?.shipping_address.phone || orderData?.billing_address.phone || orderData?.customer.phone || '';
+    const customerPhone = orderData?.shipping_address?.phone ||
+                          orderData?.billing_address?.phone ||
+                          orderData?.customer.phone || '';
+    
     if (!customerPhone) {
       console.log(`No phone number found for customer in order ${orderData.id}`);
       return;
@@ -453,28 +474,28 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    if(created) {
-      console.log('Trying to send whatspass message');
-      const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
-      const testPhoneNumber = '9779752241';
-      console.log(customerPhone);
+    // if(created) {
+    //   console.log('Trying to send whatspass message');
+    //   const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
+    //   const testPhoneNumber = '9779752241';
+    //   console.log(customerPhone);
 
-      if (customerPhone) {
-        const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
-        console.log(cleanPhone);
-        if (cleanPhone === testPhoneNumber) {
-          console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
-          // Fire and forget - don't await, don't handle errors
-          sendNewOrderWhatsAppMessage(shopDomain, orderData).catch(error => {
-            console.log(`WhatsApp message failed for order ${orderId}, but continuing:`, error.message);
-          });
-        } else {
-          console.log(`Customer phone ${customerPhone} doesn't match test number ${testPhoneNumber}, skipping WhatsApp message`);
-        }
-      } else {
-        console.log(`No customer phone found in order ${orderId}, skipping WhatsApp message`);
-      }
-    }
+    //   if (customerPhone) {
+    //     const cleanPhone = normalizePhoneNumber(customerPhone); // Remove + and non-digits
+    //     console.log(cleanPhone);
+    //     if (cleanPhone === testPhoneNumber) {
+    //       console.log(`Customer phone matches test number, sending WhatsApp message for order ${orderId}`);
+    //       // Fire and forget - don't await, don't handle errors
+    //       sendNewOrderWhatsAppMessage(shopDomain, orderData).catch(error => {
+    //         console.log(`WhatsApp message failed for order ${orderId}, but continuing:`, error.message);
+    //       });
+    //     } else {
+    //       console.log(`Customer phone ${customerPhone} doesn't match test number ${testPhoneNumber}, skipping WhatsApp message`);
+    //     }
+    //   } else {
+    //     console.log(`No customer phone found in order ${orderId}, skipping WhatsApp message`);
+    //   }
+    // }
 
     // Post-commit side effect: capture Shopify Credit (only for creates)
     if (

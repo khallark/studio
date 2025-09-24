@@ -301,6 +301,7 @@ export async function POST(req: NextRequest) {
 
     await orderRef.set({ awb_reverse: String(awb), customStatus: 'DTO Booked' }, { merge: true });
 
+    console.log(payload)
     return NextResponse.json(
     {
         ok: true,

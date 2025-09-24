@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         'Delivered',
         'RTO Intransit',
         'RTO Delivered',
+        'DTO Booked',
         'Lost',
         'Closed',
         'RTO Closed',

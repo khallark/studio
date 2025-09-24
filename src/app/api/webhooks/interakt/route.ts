@@ -124,3 +124,15 @@ async function handleTemplateStatusUpdate(shop: string, payload: any) {
   await templateRef.update(updateData);
   console.log(`Updated template ${templateId} for shop ${shop} to status ${newStatus}.`);
 }
+
+async function handleOrderEvent(shop: string, payload: any) {
+  const orderId = payload.order.id;
+  const newStatus = payload.new_status;
+  
+  const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
+  
+  await orderRef.update({
+    customStatus: newStatus,
+    lastUpdatedAt: FieldValue.serverTimestamp(),
+  });
+}

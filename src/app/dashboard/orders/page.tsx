@@ -80,6 +80,7 @@ type CustomStatus =
   | 'Delivered'
   | 'RTO In Transit'
   | 'RTO Delivered'
+  | 'DTO Booked'
   | 'Lost'
   | 'Closed'
   | 'RTO Closed'
@@ -419,6 +420,7 @@ export default function OrdersPage() {
       'Delivered': 0,
       'RTO In Transit': 0,
       'RTO Delivered': 0,
+      'DTO Booked': 0,
       'Lost': 0,
       'Closed': 0,
       'RTO Closed': 0,
@@ -826,6 +828,7 @@ export default function OrdersPage() {
           </DropdownMenuItem>
         );
       case 'RTO Delivered':
+      case 'DTO Booked':
         return (
           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>
             RTO Close Order
@@ -898,7 +901,7 @@ export default function OrdersPage() {
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
   const shippedStatuses: (CustomStatus | 'All Orders')[] = [
-    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit'
+    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO Intransit'
   ];
 
   const renderBulkActionButtons = () => {
@@ -983,6 +986,7 @@ export default function OrdersPage() {
             case 'Delivered':
             case 'RTO In Transit':
             case 'RTO Delivered':
+            case 'DTO Booked':
             case 'Lost':
             case 'Closed':
             case 'RTO Closed':
@@ -992,7 +996,7 @@ export default function OrdersPage() {
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
                   </Button>
-                  {activeTab !== 'Delivered' && activeTab !== 'RTO Delivered' && activeTab !== 'Lost' && activeTab !== 'Closed' && activeTab !== 'RTO Closed' && (
+                  {activeTab !== 'Delivered' && activeTab !== 'RTO Delivered' && activeTab !== 'DTO Booked' && activeTab !== 'Lost' && activeTab !== 'Closed' && activeTab !== 'RTO Closed' && (
                     <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
                       {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
                     </Button>
@@ -1113,6 +1117,7 @@ export default function OrdersPage() {
                           <TabsTrigger value="Delivered" className="px-3 py-2.5">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO In Transit" className="px-3 py-2.5">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO Delivered" className="px-3 py-2.5">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Booked" className="px-3 py-2.5">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
                           <TabsTrigger value="Lost" className="px-3 py-2.5">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
                           <TabsTrigger value="Closed" className="px-3 py-2.5">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO Closed" className="px-3 py-2.5">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>

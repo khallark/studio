@@ -83,18 +83,40 @@ async function postToDelhivery(apiKey: string, payload: any) {
   return resp.json();
 }
 
+/** Pops one AWB from accounts/{shop}/unused_awbs by deleting the first doc. */
+export async function allocateAwb(shop: string): Promise<string> {
+  const coll = db.collection("accounts").doc(shop).collection("unused_awbs").limit(1);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(coll);
+    if (snap.empty) throw new Error("NO_AWB_AVAILABLE");
+    const doc = snap.docs[0];
+    const awb = doc.id;
+    tx.delete(doc.ref); // or tx.update(doc.ref, { status: "used" })
+    return awb;
+  });
+}
+
+/** Optionally push AWB back if you want strict accounting on failures. */
+export async function releaseAwb(shop: string, awb: string) {
+  await db
+    .collection("accounts")
+    .doc(shop)
+    .collection("unused_awbs")
+    .doc(awb)
+    .set({ status: "unused", createdAt: new Date() }, { merge: true });
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderId, awb, shipping_mode, line_items_skus, pickupName } = await req.json();
+    const { shop, orderId, skus_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
 
     // Validate inputs
     if (
       !shop ||
       !orderId ||
-      !awb ||
       !pickupName ||
-      !Array.isArray(line_items_skus) ||
-      line_items_skus.length === 0
+      !Array.isArray(skus_of_selected_line_items_to_be_returned) ||
+      skus_of_selected_line_items_to_be_returned.length === 0
     ) {
       return NextResponse.json({
         ok: false,
@@ -135,6 +157,8 @@ export async function POST(req: NextRequest) {
     }
     const orderData = orderSnap.data() as any;
 
+    const awb = await allocateAwb(shop);
+
     // Prefer shipping address, fallback to billing
     const addr =
       orderData.raw.shipping_address ||
@@ -165,7 +189,7 @@ export async function POST(req: NextRequest) {
 
     // Build products_desc + quantity from selected line_items
     const lineItems: LineItem[] = Array.isArray(orderData.raw.line_items) ? orderData.raw.line_items : [];
-    const idSet = new Set(line_items_skus.map((x: any) => String(x)));
+    const idSet = new Set(skus_of_selected_line_items_to_be_returned.map((x: any) => String(x)));
     const selected = lineItems.filter(li => idSet.has(String(li.sku)));
 
     if (selected.length === 0) {
@@ -252,7 +276,8 @@ export async function POST(req: NextRequest) {
 
     // Call Delhivery
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
-    if(dlvResp.ok) {
+    if(!dlvResp.ok) {
+        await releaseAwb(shop, awb)
         return NextResponse.json(
         {
             ok: false,
@@ -271,6 +296,7 @@ export async function POST(req: NextRequest) {
       }
     })(dlvResp.text()))
     if(!verdict.ok) {
+        await releaseAwb(shop, awb)
         return NextResponse.json(
         {
             ok: false,

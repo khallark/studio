@@ -80,7 +80,7 @@ async function postToDelhivery(apiKey: string, payload: any) {
     body,
   });
 
-  return resp.json();
+  return resp;
 }
 
 /** Pops one AWB from accounts/{shop}/unused_awbs by deleting the first doc. */
@@ -278,11 +278,11 @@ export async function POST(req: NextRequest) {
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
     if(!dlvResp.ok) {
         await releaseAwb(shop, awb)
-        console.error(JSON.stringify(dlvResp))
+        console.error(JSON.stringify(await dlvResp.json()))
         return NextResponse.json(
         {
             ok: false,
-            reason: JSON.stringify(dlvResp),
+            reason: JSON.stringify(await dlvResp.json()),
             response: dlvResp
         },
         { status: 502 }
@@ -295,7 +295,8 @@ export async function POST(req: NextRequest) {
       } catch {
         return { raw: t };
       }
-    })(dlvResp.text()))
+    })(await dlvResp.json()))
+
     if(!verdict.ok) {
         await releaseAwb(shop, awb)
         return NextResponse.json(
@@ -313,7 +314,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
     {
         ok: true,
-        response: dlvResp,
+        response: await dlvResp.json(),
     },
     { status: 200 }
     );

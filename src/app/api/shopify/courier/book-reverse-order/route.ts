@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
 
     const payload: any = {
       shipments: [shipment],
-      pickup_location: { name: String(pickupName) },
+      pickup_location: { name: "Majime Productions 2" },
     };
 
     // Call Delhivery

@@ -50,7 +50,7 @@ import { Separator } from '@/components/ui/separator';
 import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown, ScanBarcode } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs, admin } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -825,7 +825,6 @@ export default function OrdersPage() {
       case 'RTO In Transit':
       case 'Out For Delivery':
       case 'DTO In Transit':
-      case 'DTO Delivered':
         return (
           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
             Cancel Order
@@ -841,6 +840,7 @@ export default function OrdersPage() {
           </DropdownMenuItem>
         );
       case 'DTO Booked':
+      case 'DTO Delivered':
         return (
            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
             Close Order
@@ -1124,26 +1124,26 @@ export default function OrdersPage() {
                 </div>
             </CardHeader>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
-                <div className="border-b px-2 shrink-0">
-                  <div className="overflow-x-auto">
-                      <TabsList className="w-full justify-start h-auto rounded-none bg-transparent p-0">
-                          <TabsTrigger value="All Orders" className="px-3 py-2.5">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
-                          <TabsTrigger value="New" className="px-3 py-2.5">New ({statusCounts['New'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Confirmed" className="px-3 py-2.5">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Ready To Dispatch" className="px-3 py-2.5">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Dispatched" className="px-3 py-2.5">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
-                          <TabsTrigger value="In Transit" className="px-3 py-2.5">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Out For Delivery" className="px-3 py-2.5">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Delivered" className="px-3 py-2.5">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO In Transit" className="px-3 py-2.5">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO Delivered" className="px-3 py-2.5">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO Booked" className="px-3 py-2.5">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO In Transit" className="px-3 py-2.5">DTO In Transit ({statusCounts['DTO In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO Delivered" className="px-3 py-2.5">DTO Delivered ({statusCounts['DTO Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Lost" className="px-3 py-2.5">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Closed" className="px-3 py-2.5">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO Closed" className="px-3 py-2.5">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Cancelled" className="px-3 py-2.5">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
+                <div className="border-b shrink-0">
+                  <div className="overflow-x-auto px-4">
+                      <TabsList className="h-auto rounded-none bg-transparent p-0 -mb-px">
+                          <TabsTrigger value="All Orders" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
+                          <TabsTrigger value="New" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">New ({statusCounts['New'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Confirmed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Ready To Dispatch" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Dispatched" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
+                          <TabsTrigger value="In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Out For Delivery" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Booked" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO In Transit ({statusCounts['DTO In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Delivered ({statusCounts['DTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Lost" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Cancelled" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                       </TabsList>
                   </div>
                 </div>
@@ -1489,5 +1489,6 @@ export default function OrdersPage() {
     </>
   );
 }
+
 
 

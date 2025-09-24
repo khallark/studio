@@ -284,13 +284,7 @@ export async function POST(req: NextRequest) {
         )
     }
     
-    const verdict = evalDelhiveryResp(((t: string) => {
-      try {
-        return JSON.parse(t);
-      } catch {
-        return { raw: t };
-      }
-    })(await dlvResp.json()))
+    const verdict = evalDelhiveryResp(await dlvResp.json())
 
     if(!verdict.ok) {
         await releaseAwb(shop, awb)

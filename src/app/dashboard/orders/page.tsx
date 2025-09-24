@@ -110,6 +110,7 @@ interface Order {
   fulfillmentStatus: string;
   customStatus: CustomStatus;
   awb?: string;
+  awb_reverse?: string;
   courier?: string;
   isDeleted?: boolean; // Tombstone flag
   logs?: OrderLog[];
@@ -1165,6 +1166,7 @@ export default function OrdersPage() {
                                     </Button>
                                 </TableHead>
                                 <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
                                 <TableHead>
                                     <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
                                         Date
@@ -1188,6 +1190,7 @@ export default function OrdersPage() {
                                 <TableRow key={i}>
                                     <TableCell className="py-2 px-5"><Skeleton className="h-5 w-5" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
+                                    <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
@@ -1218,6 +1221,7 @@ export default function OrdersPage() {
                                     </TableCell>
                                     <TableCell className="font-medium py-2">{order.name}</TableCell>
                                     <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
+                                    <TableCell className="py-2 text-xs">{order.awb_reverse || 'N/A'}</TableCell>
                                     <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                     <TableCell className="text-xs">{customerName || order.email}</TableCell>
                                     <TableCell className="text-right text-xs font-mono">
@@ -1258,7 +1262,7 @@ export default function OrdersPage() {
                                 })
                             ) : (
                                 <TableRow>
-                                <TableCell colSpan={11} className="text-center h-24">
+                                <TableCell colSpan={12} className="text-center h-24">
                                     {userData?.activeAccountId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
                                 </TableCell>
                                 </TableRow>
@@ -1489,6 +1493,7 @@ export default function OrdersPage() {
     </>
   );
 }
+
 
 
 

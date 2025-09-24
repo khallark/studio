@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
         {
             ok: false,
-            reason: "HTTP Error",
+            reason: JSON.stringify(dlvResp),
             response: dlvResp
         },
         { status: 502 }

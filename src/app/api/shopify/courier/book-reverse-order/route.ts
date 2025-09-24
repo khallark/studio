@@ -278,6 +278,7 @@ export async function POST(req: NextRequest) {
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
     if(!dlvResp.ok) {
         await releaseAwb(shop, awb)
+        console.error(JSON.stringify(dlvResp))
         return NextResponse.json(
         {
             ok: false,

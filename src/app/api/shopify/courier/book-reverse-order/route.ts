@@ -39,19 +39,14 @@ function evalDelhiveryResp(carrier: any): {
     let remarks = "";
     if (Array.isArray(remarksArr)) remarks = remarksArr.join("\n ");
 
-    // Success signals seen in Delhivery responses
-    const waybill =
-    carrier?.shipment_id ?? carrier?.packets?.[0]?.waybill ?? carrier?.waybill ?? null;
-
-    const okFlag = (carrier?.success === true && carrier?.error !== true) || Boolean(waybill);
+    const okFlag = (carrier?.success === true);
 
     if (okFlag) {
     return {
         ok: true,
         retryable: false,
         code: "OK",
-        message: "created",
-        carrierShipmentId: waybill,
+        message: "created"
     };
     }
 

@@ -90,12 +90,10 @@ type CustomStatus =
   | 'Cancelled';
 
 
-interface OrderLog {
-  type: 'USER_ACTION' | 'WEBHOOK';
-  action: string;
-  timestamp: Timestamp;
-  details: any;
-  user?: { displayName: string };
+interface CustomStatusLog {
+    status: string;
+    createdAt: Timestamp;
+    remarks: string;
 }
 
 interface Order {
@@ -113,7 +111,7 @@ interface Order {
   awb_reverse?: string;
   courier?: string;
   isDeleted?: boolean; // Tombstone flag
-  logs?: OrderLog[];
+  customStatusesLogs?: CustomStatusLog[];
   raw: {
     cancelled_at: string | null;
     customer?: {
@@ -1390,7 +1388,7 @@ export default function OrdersPage() {
                 <div className="space-y-6">
                   <h3 className="font-semibold text-lg">Order Details</h3>
                   <div className="space-y-4">
-                     {(viewingOrder.awb || viewingOrder.courier) && (
+                     {(viewingOrder.awb || viewingOrder.courier || viewingOrder.awb_reverse) && (
                         <div>
                             <h4 className="font-semibold">Shipment Details</h4>
                              <p className="text-sm text-muted-foreground">
@@ -1399,6 +1397,11 @@ export default function OrdersPage() {
                             <p className="text-sm text-muted-foreground font-mono">
                                 {viewingOrder.awb && `AWB: ${viewingOrder.awb}`}
                             </p>
+                            {viewingOrder.awb_reverse && (
+                                <p className="text-sm text-muted-foreground font-mono">
+                                    Return AWB: {viewingOrder.awb_reverse}
+                                </p>
+                            )}
                         </div>
                     )}
                     <div>
@@ -1413,6 +1416,7 @@ export default function OrdersPage() {
                                 <p>{viewingOrder.raw.shipping_address.address1}{viewingOrder.raw.shipping_address.address2}</p>
                                 <p>{viewingOrder.raw.shipping_address.city}, {viewingOrder.raw.shipping_address.province} {viewingOrder.raw.shipping_address.zip}</p>
                                 <p>{viewingOrder.raw.shipping_address.country}</p>
+                                {viewingOrder.raw.shipping_address.phone && <p>Phone: {viewingOrder.raw.shipping_address.phone}</p>}
                             </div>
                         ): (
                             <p className="text-sm text-muted-foreground">No shipping address provided.</p>
@@ -1456,29 +1460,26 @@ export default function OrdersPage() {
                     <div className="relative h-full">
                         <div className="absolute inset-0 overflow-y-auto pr-4">
                             <div className="space-y-6">
-                            {(viewingOrder.logs && viewingOrder.logs.length > 0) ? (
-                                [...viewingOrder.logs].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()).map((log, index) => (
+                            {(viewingOrder.customStatusesLogs && viewingOrder.customStatusesLogs.length > 0) ? (
+                                [...viewingOrder.customStatusesLogs].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).map((log, index) => (
                                 <div key={index} className="flex items-start gap-4">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
-                                        {log.type === 'WEBHOOK' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                        <Bot className="h-5 w-5" />
                                     </div>
                                     <div className="flex-1">
-                                    <p className="font-semibold text-sm">
-                                        {log.action.replace(/_/g, ' ')}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {log.type === 'USER_ACTION' ? 
-                                        `${log.user?.displayName || 'A user'} changed status from ${log.details.oldStatus} to ${log.details.newStatus}` :
-                                        `Webhook received with topic: ${log.details.topic}`
-                                        }
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">{log.timestamp?.toDate().toLocaleString()}</p>
+                                        <div className="flex items-baseline gap-2">
+                                            <p className="font-semibold text-sm">{log.status}</p>
+                                            <p className="text-xs text-muted-foreground">on {log.createdAt?.toDate().toLocaleString()}</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            {log.remarks}
+                                        </p>
                                     </div>
                                 </div>
                                 ))
                             ) : (
                                 <div className="text-center text-muted-foreground py-12">
-                                <p>No history for this order.</p>
+                                    <p>No logs were found for this order.</p>
                                 </div>
                             )}
                             </div>
@@ -1493,7 +1494,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-
-
-

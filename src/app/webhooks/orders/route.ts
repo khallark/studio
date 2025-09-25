@@ -470,6 +470,11 @@ export async function POST(req: NextRequest) {
         tx.update(orderRef, { 
             ...dataToSave, 
             updatedByTopic: topic,
+            customStatusesLogs: [{
+              status: "Updated By Shopify",
+              createdAt: FieldValue.serverTimestamp(),
+              remarks: `This order was updated on shopify`
+            }],
         });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);

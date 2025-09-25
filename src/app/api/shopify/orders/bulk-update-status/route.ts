@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -71,44 +71,33 @@ export async function POST(req: NextRequest) {
         // We don't fetch the old status for bulk updates to keep it simple and performant.
         // A more advanced implementation could fetch all docs first if old status is crucial for logging.
         // For now, we'll log it as "N/A" for individual order logs.
-        
-        // Log entry for individual orders, using a standard Date object
-        const individualLogEntry = {
-            type: 'USER_ACTION',
-            action: 'UPDATE_ORDER_STATUS',
-            timestamp: now, // Use JS Date object here
-            details: {
-                newStatus: status,
-                oldStatus: 'N/A (Bulk Action)', // Old status is not fetched in bulk updates
-            },
-            user: userRefData,
-        };
 
         orderIds.forEach(orderId => {
             const orderRef = ordersColRef.doc(String(orderId));
+            const log = {
+                status: status,
+                createdAt: Timestamp.now(),
+                remarks: (() => {
+                    let remarks = "";
+                    switch (status) {
+                    case "Confirmed":
+                        remarks = "This order was confirmed by the user";
+                        break;
+                    case "Closed":
+                        remarks = "This order was received by the customer";
+                        break;
+                    case "RTO Closed":
+                        remarks = "This order was returned and received by the owner";
+                        break;
+                    }
+                    return remarks; 
+                })()
+            }
             transaction.update(orderRef, {
                 customStatus: status,
                 lastUpdatedAt: FieldValue.serverTimestamp(), // This is fine, not in an array
                 lastUpdatedBy: userRefData,
-                // customStatusesLogs: FieldValue.arrayUnion({
-                //     status: status,
-                //     createdAt: FieldValue.serverTimestamp(),
-                //     remarks: (() => {
-                //         let remarks = "";
-                //         switch (status) {
-                //         case "Confirmed":
-                //             remarks = "This order was confirmed by the user";
-                //             break;
-                //         case "Closed":
-                //             remarks = "This order was received by the customer";
-                //             break;
-                //         case "RTO Closed":
-                //             remarks = "This order was returned and received by the owner";
-                //             break;
-                //         }
-                //         return remarks; 
-                //     })()
-                // }), // Append to order's log array
+                customStatusesLogs: FieldValue.arrayUnion(log), // Append to order's log array
             });
         });
 

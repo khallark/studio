@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -445,16 +445,17 @@ export async function POST(req: NextRequest) {
       // 3) Create → only here do we create the doc
       if (topic === 'orders/create') {
         created = true;
+        const log = [{
+          status: "New",
+          createdAt: Timestamp.now(),
+          remarks: `This order was newly created on Shopify`
+        }];
         tx.set(orderRef, {
           ...dataToSave,
           customStatus: 'New',
           isDeleted: false,
           createdByTopic: topic,
-          // customStatusesLogs: [{
-          //   status: "New",
-          //   createdAt: FieldValue.serverTimestamp(),
-          //   remarks: `This order was newly created on Shopify`
-          // }], // Initialize logs array
+          customStatusesLogs: log, // Initialize logs array
         });
         console.log(`Created order ${orderId} for ${shopDomain}`);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
@@ -467,14 +468,15 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
+        const log = {
+          status: "Updated By Shopify",
+          createdAt: Timestamp.now(),
+          remarks: `This order was updated on shopify`
+        };
         tx.update(orderRef, { 
             ...dataToSave, 
             updatedByTopic: topic,
-            // customStatusesLogs: [{
-            //   status: "Updated By Shopify",
-            //   createdAt: FieldValue.serverTimestamp(),
-            //   remarks: `This order was updated on shopify`
-            // }],
+            customStatusesLogs: FieldValue.arrayUnion(log),
         });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);

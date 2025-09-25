@@ -304,11 +304,11 @@ export async function POST(req: NextRequest) {
       awb_reverse: String(awb),
       customStatus: 'DTO Booked',
       lastStatusUpdate: FieldValue.serverTimestamp(),
-      customStatusesLogs: FieldValue.arrayUnion({
-        status: "DTO Booked",
-        createdAt: FieldValue.serverTimestamp(),
-        remarks: `A return for this order was booked by the user (AWB: ${String(awb)})`
-      })
+      // customStatusesLogs: FieldValue.arrayUnion({
+      //   status: "DTO Booked",
+      //   createdAt: FieldValue.serverTimestamp(),
+      //   remarks: `A return for this order was booked by the user (AWB: ${String(awb)})`
+      // })
     }, { merge: true });
 
     console.log(payload)

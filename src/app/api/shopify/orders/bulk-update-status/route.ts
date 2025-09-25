@@ -90,25 +90,25 @@ export async function POST(req: NextRequest) {
                 customStatus: status,
                 lastUpdatedAt: FieldValue.serverTimestamp(), // This is fine, not in an array
                 lastUpdatedBy: userRefData,
-                customStatusesLogs: FieldValue.arrayUnion({
-                    status: status,
-                    createdAt: FieldValue.serverTimestamp(),
-                    remarks: (() => {
-                        let remarks = "";
-                        switch (status) {
-                        case "Confirmed":
-                            remarks = "This order was confirmed by the user";
-                            break;
-                        case "Closed":
-                            remarks = "This order was received by the customer";
-                            break;
-                        case "RTO Closed":
-                            remarks = "This order was returned and received by the owner";
-                            break;
-                        }
-                        return remarks; 
-                    })()
-                }), // Append to order's log array
+                // customStatusesLogs: FieldValue.arrayUnion({
+                //     status: status,
+                //     createdAt: FieldValue.serverTimestamp(),
+                //     remarks: (() => {
+                //         let remarks = "";
+                //         switch (status) {
+                //         case "Confirmed":
+                //             remarks = "This order was confirmed by the user";
+                //             break;
+                //         case "Closed":
+                //             remarks = "This order was received by the customer";
+                //             break;
+                //         case "RTO Closed":
+                //             remarks = "This order was returned and received by the owner";
+                //             break;
+                //         }
+                //         return remarks; 
+                //     })()
+                // }), // Append to order's log array
             });
         });
 

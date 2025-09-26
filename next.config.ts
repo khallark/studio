@@ -116,9 +116,14 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/courier/book-reverse-order',
         destination: '/api/shopify/courier/book-reverse-order/route',
       },
+      {
+        source: '/api/shopify/orders/export-products',
+        destination: '/api/shopify/orders/export-products/route',
+      },
     ]
   },
 };
 
 export default nextConfig;
+
 

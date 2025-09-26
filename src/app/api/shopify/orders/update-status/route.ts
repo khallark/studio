@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
@@ -93,31 +93,32 @@ export async function POST(req: NextRequest) {
         timestamp: FieldValue.serverTimestamp(), // This is fine, not in an array
     };
 
+    const log = {
+        status: status,
+        createdAt: Timestamp.now(),
+        remarks: (() => {
+            let remarks = "";
+            switch (status) {
+            case "Confirmed":
+                remarks = "This order was confirmed by the user";
+                break;
+            case "Closed":
+                remarks = "This order was received by the customer";
+                break;
+            case "RTO Closed":
+                remarks = "This order was returned and received by the owner";
+                break;
+            }
+            return remarks; 
+        })()
+    }
     await db.runTransaction(async (transaction) => {
         // Update the order document
         transaction.update(orderRef, {
             customStatus: status,
             lastUpdatedAt: FieldValue.serverTimestamp(),
             lastUpdatedBy: userRefData,
-            // customStatusesLogs: FieldValue.arrayUnion({
-            //     status: status,
-            //     createdAt: FieldValue.serverTimestamp(),
-            //     remarks: (() => {
-            //         let remarks = "";
-            //         switch (status) {
-            //         case "Confirmed":
-            //             remarks = "This order was confirmed by the user";
-            //             break;
-            //         case "Closed":
-            //             remarks = "This order was received by the customer";
-            //             break;
-            //         case "RTO Closed":
-            //             remarks = "This order was returned and received by the owner";
-            //             break;
-            //         }
-            //         return remarks; 
-            //     })()
-            // }), // Append log to order's log array
+            customStatusesLogs: FieldValue.arrayUnion(log), // Append log to order's log array
         });
         
         // Create a log in the central logs collection

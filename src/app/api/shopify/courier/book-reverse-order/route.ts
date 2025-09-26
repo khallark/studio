@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -300,15 +300,17 @@ export async function POST(req: NextRequest) {
         )
     }
 
+    const log = {
+      status: "DTO Booked",
+      createdAt: Timestamp.now(),
+      remarks: `A return for this order was booked by the user (AWB: ${String(awb)})`
+    }
+
     await orderRef.set({
       awb_reverse: String(awb),
       customStatus: 'DTO Booked',
       lastStatusUpdate: FieldValue.serverTimestamp(),
-      // customStatusesLogs: FieldValue.arrayUnion({
-      //   status: "DTO Booked",
-      //   createdAt: FieldValue.serverTimestamp(),
-      //   remarks: `A return for this order was booked by the user (AWB: ${String(awb)})`
-      // })
+      customStatusesLogs: FieldValue.arrayUnion(log)
     }, { merge: true });
 
     console.log(payload)

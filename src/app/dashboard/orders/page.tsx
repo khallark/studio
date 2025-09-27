@@ -81,6 +81,7 @@ type CustomStatus =
   | 'Delivered'
   | 'RTO In Transit'
   | 'RTO Delivered'
+  | 'DTO Requested'
   | 'DTO Booked'
   | 'DTO In Transit'
   | 'DTO Delivered'
@@ -427,6 +428,7 @@ export default function OrdersPage() {
       'Delivered': 0,
       'RTO In Transit': 0,
       'RTO Delivered': 0,
+      'DTO Requested': 0,
       'DTO Booked': 0,
       'DTO In Transit': 0,
       'DTO Delivered': 0,
@@ -879,6 +881,7 @@ export default function OrdersPage() {
           </DropdownMenuItem>
         );
       case 'Delivered':
+      case 'DTO Requested':
         return (
           <DropdownMenuItem onClick={() => {
             setOrderForReturn(order);
@@ -972,7 +975,7 @@ export default function OrdersPage() {
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
   const shippedStatuses: (CustomStatus | 'All Orders')[] = [
-    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit', 'DTO Booked', 'DTO In Transit'
+    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit', 'DTO Requested', 'DTO Booked', 'DTO In Transit'
   ];
 
   const renderBulkActionButtons = () => {
@@ -1060,9 +1063,9 @@ export default function OrdersPage() {
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
-            case 'Delivered':
             case 'RTO In Transit':
             case 'RTO Delivered':
+            case 'DTO Requested':
             case 'DTO Booked':
             case 'DTO In Transit':
             case 'DTO Delivered':
@@ -1070,17 +1073,10 @@ export default function OrdersPage() {
             case 'Closed':
             case 'RTO Closed':
               return (
-                <>
-                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
-                  </Button>
-                  {activeTab !== 'Delivered' && activeTab !== 'RTO Delivered' && activeTab !== 'DTO Booked' && activeTab !== 'Lost' && activeTab !== 'Closed' && activeTab !== 'RTO Closed' && activeTab !== 'DTO Delivered' && (
-                    <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-                    </Button>
-                  )}
-                </>
+                </Button>
               );
             case 'Cancelled':
             default:
@@ -1196,6 +1192,7 @@ export default function OrdersPage() {
                           <TabsTrigger value="Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
                           <TabsTrigger value="RTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Requested" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Requested ({statusCounts['DTO Requested'] || 0})</TabsTrigger>
                           <TabsTrigger value="DTO Booked" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
                           <TabsTrigger value="DTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO In Transit ({statusCounts['DTO In Transit'] || 0})</TabsTrigger>
                           <TabsTrigger value="DTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Delivered ({statusCounts['DTO Delivered'] || 0})</TabsTrigger>

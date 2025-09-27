@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
         'Delivered',
         'RTO In Transit',
         'RTO Delivered',
+        'DTO Requested',
         'DTO Booked',
         'DTO In Transit',
         'DTO Delivered',
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
                 break;
             case "RTO Closed":
                 remarks = "This order was returned and received by the owner";
+                break;
+            case "DTO Requested":
+                remarks = "A return for this order was requested by the customer";
                 break;
             }
             return remarks; 

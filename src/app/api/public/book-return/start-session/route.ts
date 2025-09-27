@@ -19,11 +19,11 @@ try {
     // Rate limiting per IP to prevent session creation abuse
     const recentSessions = await db.collection('customer_sessions')
         .where('ip', '==', ip)
-        .where('createdAt', '>', new Date(Date.now() - 10 * 60 * 1000)) // Last 10 minutes
+        .where('isActive', '==', true)  // Only active sessions
         .get();
 
-    if (recentSessions.size >= 5) { // Max 5 sessions per IP per 10 minutes
-        return NextResponse.json({ error: 'Too many session requests' }, { status: 429 });
+    if (recentSessions.size >= 3) { // Max 3 active sessions per IP
+        return NextResponse.json({ error: 'Too many active sessions' }, { status: 429 });
     }
 
     // Validate store exists and has customer service enabled

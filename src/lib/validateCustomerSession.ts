@@ -39,7 +39,15 @@ export async function validateCustomerSession(req: NextRequest) {
   const sessionData = sessionDoc.data()!;
   
   // Check if session is valid (no storeId check yet)
-  if (!sessionData.isActive || sessionData.expiresAt.toDate() < new Date()) {
+  if (!sessionData.isActive) {
+    throw new Error('SESSION_EXPIRED');
+  }
+  if(sessionData.expiresAt.toDate() < new Date()) {
+    await db.collection('customer_sessions').doc(sessionId).update({
+      isActive: false,
+      endedAt: FieldValue.serverTimestamp(),
+      endReason: 'expired_during_validation'
+    });
     throw new Error('SESSION_EXPIRED');
   }
   

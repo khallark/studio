@@ -9,10 +9,10 @@ try {
     const ip = getClientIP(req);
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
-    const { storeAlias } = await req.json();
+    const { storeId } = await req.json();
 
-    // Validate storeAlias
-    if (!storeAlias || typeof storeAlias !== 'string' || storeAlias.trim() === '') {
+    // Validate storeId
+    if (!storeId || typeof storeId !== 'string' || storeId.trim() === '') {
         return NextResponse.json({ error: 'Store alias is required' }, { status: 400 });
     }
 
@@ -27,12 +27,7 @@ try {
     }
 
     // Validate store exists and has customer service enabled
-    const storeIdDoc = await db.collection('store_aliases').doc(storeAlias).get();
-    if (!storeIdDoc.exists) {
-        return NextResponse.json({ error: "Store alias doesn't exists" }, { status: 404 })
-    }
-    const storeId = storeIdDoc.data()?.mapped_store;
-    const storeDoc = await db.collection('accounts').doc(storeId).get();
+    const storeDoc = await db.collection('accounts').doc(`${storeId}.myshopify.com`).get();
     if (!storeDoc.exists || !storeDoc.data()?.customerServices?.bookReturnPage?.enabled) {
         return NextResponse.json({ error: 'Store not found' }, { status: 404 });
     }
@@ -76,7 +71,6 @@ try {
     // Store session in database
     await db.collection('customer_sessions').doc(sessionId).set({
         storeId: storeId,
-        storeAlias: storeAlias.trim(),
         csrfToken,
         ip,
         userAgent,

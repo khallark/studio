@@ -1,63 +1,78 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, PackageSearch } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-interface ServiceStatus {
-  serviceEnabled: boolean;
-  message: string;
-}
+type PageStatus =
+  | 'loading'
+  | 'initializing'
+  | 'ready'
+  | 'searching'
+  | 'order_found'
+  | 'error';
 
-interface SessionData {
+interface Session {
   sessionId: string;
   csrfToken: string;
 }
 
 interface OrderItem {
-    name: string;
-    sku: string;
-    quantity: number;
-    price: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
 }
 
-interface OrderData {
-    name: string;
-    status: string;
-    logs: any[];
-    payment_gateway_names: string[];
-    total_price: string;
-    total_outstanding: string;
-    shipping_address: any;
-    items: OrderItem[];
+interface Order {
+  name: string;
+  status: string;
+  payment_gateway_names: string[];
+  total_price: string;
+  total_outstanding: string;
+  shipping_address: any;
+  items: OrderItem[];
 }
 
-export default function BookReturnPage({ params }: { params: { storeId: string } }) {
-  const { toast } = useToast();
-  const storeId = params.storeId;
-
-  const [status, setStatus] = useState<ServiceStatus | null>(null);
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function BookReturnPage({
+  params,
+}: {
+  params: { storeId: string };
+}) {
+  const [status, setStatus] = useState<PageStatus>('loading');
+  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   const [orderNumber, setOrderNumber] = useState('');
   const [phoneNo, setPhoneNo] = useState('');
-  const [isFetchingOrder, setIsFetchingOrder] = useState(false);
-  const [order, setOrder] = useState<OrderData | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
 
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-
+  // 1. Initial validation and session creation
   useEffect(() => {
     const initializeSession = async () => {
-      setLoading(true);
+      setStatus('initializing');
       try {
         const response = await fetch('/api/public/book-return/start-session', {
           method: 'POST',
@@ -65,230 +80,261 @@ export default function BookReturnPage({ params }: { params: { storeId: string }
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({ storeId }),
+          body: JSON.stringify({
+            storeId: params.storeId,
+          }),
         });
 
+        const data = await response.json();
         if (!response.ok) {
-          const errorData = await response.json();
-          setStatus({ serviceEnabled: false, message: errorData.error || 'Failed to initialize session.' });
-          throw new Error(errorData.error || 'Failed to initialize session');
+          throw new Error(data.error || 'Failed to initialize session');
         }
 
-        const sessionData = await response.json();
-        setSession(sessionData);
-        localStorage.setItem('csrfToken', sessionData.csrfToken);
-        setStatus({ serviceEnabled: true, message: 'Service is active.' });
-      } catch (error) {
-        console.error('Session initialization error:', error);
-        if (!status) {
-          setStatus({ serviceEnabled: false, message: error instanceof Error ? error.message : 'An unknown error occurred.' });
-        }
-      } finally {
-        setLoading(false);
+        setSession(data);
+        localStorage.setItem('csrfToken', data.csrfToken);
+        setStatus('ready');
+      } catch (err: any) {
+        setError(
+          err.message || 'This return portal is currently unavailable.'
+        );
+        setStatus('error');
       }
     };
 
     initializeSession();
-  }, [storeId]);
-  
-  const handleFetchOrder = async (e: React.FormEvent) => {
+  }, [params.storeId]);
+
+  const handleSearchOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsFetchingOrder(true);
-    setFetchError(null);
-    setOrder(null);
-    setSelectedItems(new Set()); // Reset selection
-    
+    if (!orderNumber || !phoneNo) {
+      setError('Please enter both Order Number and Phone Number.');
+      return;
+    }
     const csrfToken = localStorage.getItem('csrfToken');
     if (!csrfToken) {
-        setFetchError('Session is invalid. Please refresh the page.');
-        setIsFetchingOrder(false);
-        return;
+      setError('Session is invalid. Please refresh the page.');
+      return;
     }
+
+    setStatus('searching');
+    setError(null);
+    setOrder(null);
+    setSelectedItems([]);
 
     try {
-        const response = await fetch('/api/public/book-return/order', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken,
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                orderNumber,
-                phoneNo,
-            })
-        });
-
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to fetch order.');
-        }
-
-        setOrder(result);
-
-    } catch (error) {
-        setFetchError(error instanceof Error ? error.message : 'An unknown error occurred.');
-    } finally {
-        setIsFetchingOrder(false);
-    }
-  }
-  
-  const handleToggleItem = (sku: string) => {
-      setSelectedItems(prev => {
-          const newSet = new Set(prev);
-          if (newSet.has(sku)) {
-              newSet.delete(sku);
-          } else {
-              newSet.add(sku);
-          }
-          return newSet;
+      const response = await fetch('/api/public/book-return/order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          orderNumber,
+          phoneNo,
+        }),
       });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not find the order.');
+      }
+      setOrder(data);
+      setStatus('order_found');
+    } catch (err: any) {
+      setError(
+        err.message || 'An unexpected error occurred while fetching your order.'
+      );
+      setStatus('ready'); // Go back to the form
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-muted/50 p-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-lg font-semibold">Initializing secure session...</p>
-        <p className="text-muted-foreground">Please wait.</p>
-      </div>
-    );
-  }
+  const handleToggleItem = (item: OrderItem) => {
+    setSelectedItems((prev) => {
+      const isSelected = prev.some((i) => i.sku === item.sku);
+      if (isSelected) {
+        return prev.filter((i) => i.sku !== item.sku);
+      } else {
+        return [...prev, item];
+      }
+    });
+  };
 
-  if (!status?.serviceEnabled) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-muted/50 p-4 text-center">
-        <Card className="w-full max-w-md">
-            <CardHeader>
-                <CardTitle>Service Not Available</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>{status?.message || 'This service is currently unavailable. Please try again later.'}</p>
-            </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const renderContent = () => {
+    switch (status) {
+      case 'loading':
+      case 'initializing':
+        return (
+          <div className="flex flex-col items-center gap-2 text-center p-4">
+            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            <h3 className="text-xl font-semibold tracking-tight">
+              Initializing Secure Session...
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Please wait while we prepare the return portal.
+            </p>
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="flex flex-col items-center gap-2 text-center p-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <h3 className="text-xl font-semibold tracking-tight">
+              An Error Occurred
+            </h3>
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-md max-w-sm">
+              {error}
+            </p>
+          </div>
+        );
+      case 'ready':
+      case 'searching':
+      case 'order_found':
+        return (
+          <div className="w-full max-w-2xl space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Book a Return</CardTitle>
+                <CardDescription>
+                  Enter your order details to begin the return process.
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleSearchOrder}>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="orderNumber">Order Number</Label>
+                    <Input
+                      id="orderNumber"
+                      placeholder="#1001"
+                      value={orderNumber}
+                      onChange={(e) => setOrderNumber(e.target.value)}
+                      required
+                      disabled={status === 'searching'}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="phoneNo">Phone Number</Label>
+                    <Input
+                      id="phoneNo"
+                      type="tel"
+                      placeholder="Your 10-digit phone number"
+                      value={phoneNo}
+                      onChange={(e) => setPhoneNo(e.target.value)}
+                      required
+                      disabled={status === 'searching'}
+                    />
+                  </div>
+                  {error && (
+                    <p className="text-sm text-destructive text-center">
+                      {error}
+                    </p>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={status === 'searching'}
+                  >
+                    {status === 'searching' && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Show my Order
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+
+            {status === 'searching' && (
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            )}
+
+            {order && (
+              <Card className="w-full max-w-2xl">
+                <CardHeader>
+                  <CardTitle>Order {order.name}</CardTitle>
+                  <CardDescription>
+                    Please select the items you wish to return.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]"></TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center">Quantity</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {order.items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedItems.some(
+                                  (i) => i.sku === item.sku
+                                )}
+                                onCheckedChange={() => handleToggleItem(item)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{item.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                SKU: {item.sku}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {item.quantity}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${Number(item.price).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Shipping Address</h4>
+                    <address className="text-sm text-muted-foreground not-italic mt-1">
+                      {order.shipping_address.address1}
+                      {order.shipping_address.address2 &&
+                        `, ${order.shipping_address.address2}`}
+                      <br />
+                      {order.shipping_address.city},{' '}
+                      {order.shipping_address.province}{' '}
+                      {order.shipping_address.zip}
+                      <br />
+                      {order.shipping_address.country}
+                    </address>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    disabled={selectedItems.length === 0}
+                    // onClick={handleRequestReturn}
+                  >
+                    Request a Return
+                  </Button>
+                </CardFooter>
+              </Card>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
-    <div className="flex justify-center items-start min-h-screen bg-muted/50 p-4 md:p-8">
-      <div className="w-full max-w-3xl space-y-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Book a Return</CardTitle>
-            <CardDescription>Enter your order details to begin the return process.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleFetchOrder} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="order-number">Order Number</Label>
-                  <Input 
-                    id="order-number" 
-                    placeholder="e.g., #1001"
-                    value={orderNumber}
-                    onChange={(e) => setOrderNumber(e.target.value)}
-                    required
-                    />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone-number">Phone Number</Label>
-                  <Input 
-                    id="phone-number" 
-                    type="tel"
-                    placeholder="Your 10-digit phone number" 
-                    value={phoneNo}
-                    onChange={(e) => setPhoneNo(e.target.value)}
-                    required
-                    />
-                </div>
-              </div>
-              <Button type="submit" className="w-full" disabled={isFetchingOrder}>
-                {isFetchingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Show my Order
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-        
-        {fetchError && (
-             <Card className="border-destructive">
-                <CardHeader>
-                    <CardTitle className="text-destructive">Error</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p>{fetchError}</p>
-                </CardContent>
-             </Card>
-        )}
-
-        {order && (
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle>Order {order.name}</CardTitle>
-                            <CardDescription>Select items you wish to return.</CardDescription>
-                        </div>
-                        <Badge>{order.status}</Badge>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <h4 className="font-semibold">Items</h4>
-                            <div className="border rounded-lg">
-                                {order.items.map(item => (
-                                    <div key={item.sku} className="flex items-center gap-4 p-4 border-b last:border-b-0">
-                                         <Checkbox 
-                                            id={`item-${item.sku}`} 
-                                            onCheckedChange={() => handleToggleItem(item.sku)}
-                                            checked={selectedItems.has(item.sku)}
-                                         />
-                                         <Label htmlFor={`item-${item.sku}`} className="flex-1 cursor-pointer">
-                                            <div className="flex justify-between">
-                                                <span>{item.name} (x{item.quantity})</span>
-                                                <span className="font-mono">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(item.price) * item.quantity)}</span>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
-                                         </Label>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <Separator />
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <h4 className="font-semibold">Shipping Address</h4>
-                                <div className="text-sm text-muted-foreground mt-2">
-                                    <p>{order.shipping_address.address1}</p>
-                                    {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
-                                    <p>{order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.zip}</p>
-                                    <p>{order.shipping_address.country}</p>
-                                </div>
-                            </div>
-                             <div className="text-right">
-                                <h4 className="font-semibold">Order Total</h4>
-                                <p className="text-2xl font-bold font-mono">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(order.total_price))}</p>
-                             </div>
-                        </div>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                     <Button size="lg" disabled={selectedItems.size === 0}>
-                        Request a Return
-                    </Button>
-                </CardFooter>
-            </Card>
-        )}
-         {!order && !isFetchingOrder && !fetchError && (
-             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed h-64 text-center p-8">
-                <PackageSearch className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold">Your order details will appear here.</h3>
-                <p className="text-muted-foreground text-sm">Please enter your order number and phone to find your order.</p>
-             </div>
-         )}
-      </div>
-    </div>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4 md:p-6">
+      <div className="w-full max-w-4xl">{renderContent()}</div>
+    </main>
   );
 }
+

@@ -31,7 +31,7 @@ export async function validateCustomerSession(req: NextRequest) {
   }
   
   // Validate session in database
-  const sessionDoc = await db.collection('customer_sessions').doc(sessionId).get();
+  const sessionDoc = await db.collection('book_return_sessions').doc(sessionId).get();
   if (!sessionDoc.exists) {
     throw new Error('INVALID_SESSION');
   }
@@ -43,7 +43,7 @@ export async function validateCustomerSession(req: NextRequest) {
     throw new Error('SESSION_EXPIRED');
   }
   if(sessionData.expiresAt.toDate() < new Date()) {
-    await db.collection('customer_sessions').doc(sessionId).update({
+    await db.collection('book_return_sessions').doc(sessionId).update({
       isActive: false,
       endedAt: FieldValue.serverTimestamp(),
       endReason: 'expired_during_validation'
@@ -66,7 +66,7 @@ export async function validateCustomerSession(req: NextRequest) {
   }
   
   // Update request count and last activity
-  await db.collection('customer_sessions').doc(sessionId).update({
+  await db.collection('book_return_sessions').doc(sessionId).update({
     requestCount: FieldValue.increment(1),
     lastActivity: FieldValue.serverTimestamp()
   });

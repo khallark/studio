@@ -17,7 +17,7 @@ try {
     }
 
     // Rate limiting per IP to prevent session creation abuse
-    const recentSessions = await db.collection('customer_sessions')
+    const recentSessions = await db.collection('book_return_sessions')
         .where('ip', '==', ip)
         .where('isActive', '==', true)  // Only active sessions
         .get();
@@ -36,7 +36,7 @@ try {
     const existingSessionId = req.cookies.get('customer_session')?.value;
 
     if (existingSessionId) {
-        const existingSessionDoc = await db.collection('customer_sessions').doc(existingSessionId).get();
+        const existingSessionDoc = await db.collection('book_return_sessions').doc(existingSessionId).get();
 
         if (existingSessionDoc.exists) {
             const sessionData = existingSessionDoc.data()!;
@@ -54,7 +54,7 @@ try {
                 });
             } else {
                 // Clean up expired/invalid session
-                await db.collection('customer_sessions').doc(existingSessionId).update({
+                await db.collection('book_return_sessions').doc(existingSessionId).update({
                     isActive: false,
                     endedAt: FieldValue.serverTimestamp(),
                     endReason: 'expired_or_invalid'
@@ -69,7 +69,7 @@ try {
     const csrfToken = crypto.randomUUID();
 
     // Store session in database
-    await db.collection('customer_sessions').doc(sessionId).set({
+    await db.collection('book_return_sessions').doc(sessionId).set({
         storeId: `${storeId}.myshopify.com`,
         csrfToken,
         ip,

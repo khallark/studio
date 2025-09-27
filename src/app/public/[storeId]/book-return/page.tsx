@@ -1,54 +1,68 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, PackageCheck, AlertCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ShieldCheck, Ticket, AlertCircle, Info } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
+type PageStatus = 'loading' | 'service_unavailable' | 'ready' | 'session_error';
 
 interface SessionData {
-  storeId: string;
-  storeAlias: string;
   csrfToken: string;
-  // ... other fields
 }
 
-export default function BookReturnPage() {
-  const params = useParams();
-  const storeId = params.storeId as string;
-  const { toast } = useToast();
+interface OrderItem {
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface OrderData {
+  name: string;
+  status: string;
+  payment_gateway_names: string[];
+  total_price: string;
+  total_outstanding: string;
+  shipping_address: {
+    address1: string;
+    address2: string;
+    city: string;
+    province: string;
+    zip: string;
+    country: string;
+    phone: string;
+  };
+  items: OrderItem[];
+}
+
+export default function BookReturnPage({ params }: { params: { storeId: string } }) {
+  const { toast } = useToast();
+  const { storeId } = params;
+
+  const [pageStatus, setPageStatus] = useState<PageStatus>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
   const [session, setSession] = useState<SessionData | null>(null);
-  
+
   const [orderNumber, setOrderNumber] = useState('');
   const [phoneNo, setPhoneNo] = useState('');
-  const [findingOrder, setFindingOrder] = useState(false);
-  const [order, setOrder] = useState<any | null>(null);
+  const [order, setOrder] = useState<OrderData | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
-
+  
   const [selectedSKUs, setSelectedSKUs] = useState<Set<string>>(new Set());
-  const [requestingReturn, setRequestingReturn] = useState(false);
-  const [returnResponse, setReturnResponse] = useState<{success: boolean, message: string} | null>(null);
+  const [returnRequestLoading, setReturnRequestLoading] = useState(false);
+  const [returnRequestResult, setReturnRequestResult] = useState<{ success: boolean, message: string } | null>(null);
 
 
   useEffect(() => {
-    const startSession = async () => {
+    const initializeSession = async () => {
       try {
         const response = await fetch('/api/public/book-return/start-session', {
           method: 'POST',
@@ -56,7 +70,7 @@ export default function BookReturnPage() {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({ storeId: storeId })
+          body: JSON.stringify({ storeId }),
         });
 
         if (!response.ok) {
@@ -67,287 +81,224 @@ export default function BookReturnPage() {
         const sessionData = await response.json();
         setSession(sessionData);
         localStorage.setItem('csrfToken', sessionData.csrfToken);
-
-      } catch (err: any) {
-        setError(err.message || 'An unknown error occurred.');
-      } finally {
-        setLoading(false);
+        setPageStatus('ready');
+      } catch (error) {
+        console.error(error);
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        if (message.includes('Service not enabled')) {
+            setPageStatus('service_unavailable');
+        } else {
+            setErrorMessage(message);
+            setPageStatus('session_error');
+        }
       }
     };
-
-    if (storeId) {
-      startSession();
-    }
+    initializeSession();
   }, [storeId]);
-
+  
   const handleFindOrder = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!orderNumber || !phoneNo) {
-          setOrderError('Please enter both Order Number and Phone Number.');
-          return;
-      }
+    e.preventDefault();
+    setOrder(null);
+    setOrderError(null);
+    setOrderLoading(true);
+    setSelectedSKUs(new Set()); // Reset selections on new search
+    setReturnRequestResult(null);
 
-      setFindingOrder(true);
-      setOrderError(null);
-      setOrder(null); // Reset previous order
-      setReturnResponse(null);
+    const csrfToken = localStorage.getItem('csrfToken');
+    if (!csrfToken) {
+      setOrderError('Session is invalid. Please refresh the page.');
+      setOrderLoading(false);
+      return;
+    }
 
-      try {
-          const csrfToken = localStorage.getItem('csrfToken');
-          if (!csrfToken) {
-              throw new Error('Session is invalid. Please refresh the page.');
-          }
+    try {
+        const response = await fetch('/api/public/book-return/order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+            credentials: 'include',
+            body: JSON.stringify({ orderNumber, phoneNo }),
+        });
 
-          const response = await fetch('/api/public/book-return/order', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'X-CSRF-Token': csrfToken,
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                  orderNumber: orderNumber,
-                  phoneNo: phoneNo,
-              })
-          });
-          
-          const responseData = await response.json();
-          if (!response.ok) {
-              throw new Error(responseData.error || 'Failed to find order.');
-          }
-          
-          setOrder(responseData);
-
-      } catch (err: any) {
-          setOrderError(err.message);
-      } finally {
-          setFindingOrder(false);
-      }
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to find order.');
+        }
+        setOrder(data);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        setOrderError(message);
+    } finally {
+        setOrderLoading(false);
+    }
   };
   
     const handleToggleSku = (sku: string) => {
         setSelectedSKUs(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(sku)) {
-            newSet.delete(sku);
-        } else {
-            newSet.add(sku);
-        }
-        return newSet;
-        });
-    };
-
-    const handleRequestReturn = async () => {
-        if (!order || selectedSKUs.size === 0) return;
-
-        setRequestingReturn(true);
-        setReturnResponse(null);
-
-        try {
-            const csrfToken = localStorage.getItem('csrfToken');
-            const response = await fetch('/api/public/book-return/request', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken!,
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    orderId: order.id,
-                    selectedSKUs: Array.from(selectedSKUs)
-                })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                if (result.sessionError) {
-                    setError('Your session has expired. Please refresh the page to continue.');
-                    setSession(null);
-                }
-                throw new Error(result.error || 'An unknown error occurred.');
+            const newSet = new Set(prev);
+            if (newSet.has(sku)) {
+                newSet.delete(sku);
+            } else {
+                newSet.add(sku);
             }
-            
-            setReturnResponse(result);
+            return newSet;
+        });
+  };
 
-        } catch (error: any) {
-            toast({
-                title: 'Return Request Failed',
-                description: error.message,
-                variant: 'destructive'
-            });
-        } finally {
-            setRequestingReturn(false);
+  const handleRequestReturn = async () => {
+    if (!order || selectedSKUs.size === 0) return;
+
+    setReturnRequestLoading(true);
+    setReturnRequestResult(null);
+
+    const csrfToken = localStorage.getItem('csrfToken');
+     if (!csrfToken) {
+        toast({ title: 'Session Error', description: 'Your session has expired. Please refresh the page.', variant: 'destructive' });
+        setReturnRequestLoading(false);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/public/book-return/request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+            credentials: 'include',
+            body: JSON.stringify({ orderId: order.name.substring(1), selectedSKUs: Array.from(selectedSKUs) }),
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            if (result.sessionError) {
+                toast({ title: 'Session Expired', description: result.error, variant: 'destructive' });
+                setPageStatus('session_error');
+            } else {
+                throw new Error(result.error || 'Failed to submit return request.');
+            }
+        } else {
+            setReturnRequestResult(result);
+            if(result.success) {
+              setOrder(null); // Clear order form on success
+            }
         }
-    };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        toast({ title: 'Error', description: message, variant: 'destructive' });
+    } finally {
+        setReturnRequestLoading(false);
+    }
+  };
 
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Initializing secure session...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 p-4">
-        <div className="text-center">
-            <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-destructive">Service Unavailable</h1>
-            <p className="text-muted-foreground mt-2">{error}</p>
-            <Button onClick={() => window.location.reload()} className="mt-6">
-                Refresh Page
-            </Button>
-        </div>
-      </div>
-    );
-  }
-
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold font-headline text-primary">Book a Return</h1>
-            <p className="text-muted-foreground mt-2">Find your order to begin the return process.</p>
-        </div>
-
-        {!order && (
-            <Card>
-                <form onSubmit={handleFindOrder}>
+  const renderContent = () => {
+    switch (pageStatus) {
+      case 'loading':
+        return (
+          <div className="flex items-center justify-center h-full gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <p className="text-lg">Initializing secure session...</p>
+          </div>
+        );
+      case 'service_unavailable':
+        return (
+          <div className="flex items-center justify-center h-full gap-2 text-red-600">
+            <AlertCircle className="h-6 w-6" />
+            <p className="text-lg font-semibold">Return Service Not Available</p>
+          </div>
+        );
+      case 'session_error':
+        return (
+          <div className="flex items-center justify-center h-full gap-2 text-red-600">
+            <AlertCircle className="h-6 w-6" />
+            <p className="text-lg font-semibold">{errorMessage || 'Could not establish a secure session. Please refresh.'}</p>
+          </div>
+        );
+      case 'ready':
+        return (
+            <div className="w-full max-w-2xl mx-auto">
+                <Card>
                     <CardHeader>
-                        <CardTitle>Find Your Order</CardTitle>
-                        <CardDescription>Enter your order number and the phone number used for the order.</CardDescription>
+                        <CardTitle>Request a Return</CardTitle>
+                        <CardDescription>Enter your order details to start the return process.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="orderNumber">Order Number</Label>
-                            <Input
-                            id="orderNumber"
-                            placeholder="e.g., #1001"
-                            value={orderNumber}
-                            onChange={(e) => setOrderNumber(e.target.value)}
-                            required
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="phoneNo">Phone Number</Label>
-                            <Input
-                            id="phoneNo"
-                            type="tel"
-                            placeholder="e.g., 9876543210"
-                            value={phoneNo}
-                            onChange={(e) => setPhoneNo(e.target.value)}
-                            required
-                            />
-                        </div>
-                        {orderError && (
-                            <Alert variant="destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertTitle>Error</AlertTitle>
-                                <AlertDescription>{orderError}</AlertDescription>
-                            </Alert>
+                    <CardContent>
+                        {returnRequestResult && (
+                            <div className={`p-4 rounded-md mb-4 flex items-start gap-3 ${returnRequestResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
+                                <PackageCheck className="h-5 w-5 mt-1" />
+                                <div>
+                                    <h4 className="font-semibold">{returnRequestResult.success ? 'Success' : 'Information'}</h4>
+                                    <p>{returnRequestResult.message}</p>
+                                </div>
+                            </div>
+                        )}
+                        <form onSubmit={handleFindOrder}>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="orderNumber">Order Number</Label>
+                                    <Input id="orderNumber" placeholder="#1001" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phoneNo">Phone Number</Label>
+                                    <Input id="phoneNo" type="tel" placeholder="Your 10-digit phone number" value={phoneNo} onChange={e => setPhoneNo(e.target.value)} required />
+                                </div>
+                            </div>
+                            {orderError && <p className="mt-2 text-sm text-red-600">{orderError}</p>}
+                            <Button type="submit" className="w-full mt-4" disabled={orderLoading}>
+                                {orderLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {orderLoading ? 'Finding Order...' : 'Show my Order'}
+                            </Button>
+                        </form>
+
+                        {order && (
+                            <div className="mt-6 space-y-6">
+                                <Separator />
+                                <div>
+                                    <h3 className="text-lg font-semibold">Order: {order.name}</h3>
+                                    <p className="text-sm text-muted-foreground">Status: {order.status}</p>
+                                </div>
+                                 <Card>
+                                    <CardHeader>
+                                        <CardTitle>Select Items to Return</CardTitle>
+                                        <CardDescription>Choose the items from your order you wish to send back.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        {order.items.map(item => (
+                                            <div key={item.sku} className="flex items-center space-x-3 p-3 border rounded-md">
+                                                <Checkbox
+                                                id={`item-${item.sku}`}
+                                                checked={selectedSKUs.has(item.sku)}
+                                                onCheckedChange={() => handleToggleSku(item.sku)}
+                                                />
+                                                <Label htmlFor={`item-${item.sku}`} className="flex-1 cursor-pointer">
+                                                    <p className="font-medium">{item.name}</p>
+                                                    <p className="text-xs text-muted-foreground">SKU: {item.sku} | Qty: {item.quantity}</p>
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                                <Button className="w-full" onClick={handleRequestReturn} disabled={selectedSKUs.size === 0 || returnRequestLoading}>
+                                    {returnRequestLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Request a Return
+                                </Button>
+                            </div>
                         )}
                     </CardContent>
-                    <CardFooter>
-                        <Button type="submit" disabled={findingOrder} className="w-full">
-                            {findingOrder ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...</>
-                            ) : (
-                                "Show my Order"
-                            )}
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Card>
-        )}
+                </Card>
+            </div>
+        );
+      default:
+        return null;
+    }
+  };
 
-        {order && (
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle>Order Details: {order.name}</CardTitle>
-                            <CardDescription>
-                                Review your order and select the items you wish to return.
-                            </CardDescription>
-                        </div>
-                         <Button variant="link" onClick={() => setOrder(null)}>Find a different order</Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {returnResponse ? (
-                         <Alert variant={returnResponse.success ? 'default' : 'destructive'}>
-                            {returnResponse.success ? <ShieldCheck className="h-4 w-4" /> : <Info className="h-4 w-4" />}
-                            <AlertTitle>{returnResponse.success ? 'Request Submitted' : 'Information'}</AlertTitle>
-                            <AlertDescription>
-                                {returnResponse.message}
-                            </AlertDescription>
-                        </Alert>
-                    ) : (
-                    <>
-                        <div>
-                            <h3 className="font-semibold mb-2">Select items to return</h3>
-                             <ScrollArea className="h-64 border rounded-md p-4">
-                                <div className="space-y-4">
-                                    {order.items.map((item: any) => (
-                                    <div key={item.sku} className="flex items-start space-x-4 p-2 rounded-md hover:bg-muted/50">
-                                        <Checkbox
-                                            id={`item-${item.sku}`}
-                                            checked={selectedSKUs.has(item.sku || '')}
-                                            onCheckedChange={() => handleToggleSku(item.sku || '')}
-                                            disabled={!item.sku || requestingReturn}
-                                            className="mt-1"
-                                        />
-                                        <Label htmlFor={`item-${item.sku}`} className="flex-1 cursor-pointer">
-                                            <p className="font-medium">{item.name}</p>
-                                            <p className="text-xs text-muted-foreground">SKU: {item.sku || 'N/A'}</p>
-                                            <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>
-                                        </Label>
-                                    </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                        
-                        <Separator />
-
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <h3 className="font-semibold mb-2">Order Status</h3>
-                                <p className="text-sm">{order.status}</p>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold mb-2">Shipping Address</h3>
-                                <address className="text-sm not-italic text-muted-foreground">
-                                    {order.shipping_address.address1}<br />
-                                    {order.shipping_address.address2 && <>{order.shipping_address.address2}<br /></>}
-                                    {order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.zip}<br />
-                                    {order.shipping_address.country}
-                                     {order.shipping_address.phone && <><br />Phone: {order.shipping_address.phone}</>}
-                                </address>
-                            </div>
-                        </div>
-                     </>
-                    )}
-                </CardContent>
-                {!returnResponse && (
-                    <CardFooter className="justify-end">
-                        <Button
-                            onClick={handleRequestReturn}
-                            disabled={selectedSKUs.size === 0 || requestingReturn}
-                        >
-                            {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Request a Return
-                        </Button>
-                    </CardFooter>
-                )}
-            </Card>
-        )}
-      </div>
-    </div>
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
+      {renderContent()}
+    </main>
   );
 }

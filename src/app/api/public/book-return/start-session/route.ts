@@ -70,7 +70,7 @@ try {
 
     // Store session in database
     await db.collection('customer_sessions').doc(sessionId).set({
-        storeId: storeId,
+        storeId: `${storeId}.myshopify.com`,
         csrfToken,
         ip,
         userAgent,

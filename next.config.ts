@@ -128,6 +128,14 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/account/toggle-service',
         destination: '/api/shopify/account/toggle-service/route',
       },
+      {
+        source: '/api/public/book-return/start-session',
+        destination: '/api/public/book-return/start-session/route',
+      },
+      {
+        source: '/api/public/book-return/order',
+        destination: '/api/public/book-return/order/route',
+      },
     ]
   },
 };

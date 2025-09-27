@@ -1,73 +1,91 @@
+// src/app/api/public/book-return/order/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateCustomerSession";
-import { NextRequest, NextResponse } from "next/server";
 
-// /api/public/book-return/order/route.ts
+// Helper to normalize phone numbers for comparison
+function normalizePhoneNumber(phone: string): string {
+    if (!phone) return '';
+    // Removes non-digit characters and takes the last 10 digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    return digitsOnly.slice(-10);
+}
+
 export async function POST(req: NextRequest) {
-  try {
-    // Get data from request body (aligned with session creation pattern)
-    const { orderNumber, phoneNo } = await req.json();
-    
-    if (!orderNumber || !phoneNo) {
-      return NextResponse.json({ error: 'Order Number and Phone Number are required' }, { status: 400 });
-    }
-
-    // Validate session (this is the key security check)
-    const session = await validateCustomerSession(req);
-    const storeId = session.storeId;
+    try {
+        const session = await validateCustomerSession(req);
         
-    // Rate limiting per session
-    if (session.requestCount > 100) { // 100 requests per session
-      throw new Error('SESSION_RATE_LIMIT_EXCEEDED');
-    }
-    
-    const ordersQuery = await db
-      .collection('accounts')
-      .doc(storeId)
-      .collection('orders')
-      .where('name', '==', orderNumber)
-      .limit(1)
-      .get();
+        const { orderNumber, phoneNo } = await req.json();
 
-    if (ordersQuery.empty) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        if (!orderNumber || !phoneNo) {
+            return NextResponse.json({ error: 'Order Number and Phone Number are required.' }, { status: 400 });
+        }
+        
+        const normalizedPhone = normalizePhoneNumber(phoneNo);
+        if (!normalizedPhone) {
+            return NextResponse.json({ error: 'A valid phone number is required.' }, { status: 400 });
+        }
+
+        // Query for the order by name within the correct account
+        const ordersRef = db.collection('accounts').doc(session.storeId).collection('orders');
+        const querySnapshot = await ordersRef.where('name', '==', `#${orderNumber}`).limit(1).get();
+
+        if (querySnapshot.empty) {
+            return NextResponse.json({ error: 'Order not found. Please check the order number.' }, { status: 404 });
+        }
+
+        const orderDoc = querySnapshot.docs[0];
+        const orderData = orderDoc.data();
+        
+        // Verify phone number
+        const billingPhone = normalizePhoneNumber(orderData.raw?.billing_address?.phone || '');
+        const shippingPhone = normalizePhoneNumber(orderData.raw?.shipping_address?.phone || '');
+        const customerPhone = normalizePhoneNumber(orderData.raw?.customer?.phone || '');
+
+        if (
+            normalizedPhone !== billingPhone &&
+            normalizedPhone !== shippingPhone &&
+            normalizedPhone !== customerPhone
+        ) {
+            return NextResponse.json({ error: 'Phone number does not match our records for this order.' }, { status: 403 });
+        }
+
+        // Return curated order data
+        return NextResponse.json({
+            name: orderData.raw.name,
+            status: orderData.customStatus,
+            logs: orderData.customStatusesLogs || [], // Ensure it's an array
+            payment_gateway_names: orderData.raw.payment_gateway_names,
+            total_price: orderData.raw.total_price,
+            total_outstanding: orderData.raw.total_outstanding,
+            shipping_address: orderData.raw.shipping_address,
+            items: orderData.raw.line_items?.map((item: any) => ({
+                name: item.name,
+                sku: item.sku,
+                quantity: item.quantity,
+                price: item.price
+            })),
+        });
+
+    } catch (error: any) {
+        console.error('Order lookup error:', error.message);
+        let status = 500;
+        let message = 'An internal server error occurred.';
+
+        switch (error.message) {
+            case 'NO_SESSION_COOKIE':
+            case 'NO_CSRF_TOKEN':
+            case 'INVALID_SESSION':
+            case 'CSRF_MISMATCH':
+                status = 401;
+                message = 'Your session is invalid. Please refresh the page.';
+                break;
+            case 'SESSION_EXPIRED':
+                status = 401;
+                message = 'Your session has expired. Please refresh the page.';
+                break;
+        }
+
+        return NextResponse.json({ error: message, details: error.message }, { status });
     }
-    
-    const orderDoc = ordersQuery.docs[0];
-    
-    // Return customer-safe data
-    const orderData = orderDoc.data()!;
-    return NextResponse.json({
-      name: orderData.raw.name,
-      status: orderData.customStatus,
-      logs: orderData.customeStatusesLogs,
-      items: orderData.raw.line_items?.map((item: any) => ({
-        name: item.name,
-        sku: item.sku,
-        quantity: item.quantity,
-        price: item.price
-      })),
-      payment_gateway_names: orderData.raw.payment_gateway_names,
-      total_price: orderData.raw.total_price,
-      total_outstanding: orderData.raw.total_outstanding,
-      shipping_address: orderData.raw.shipping_address,
-    });
-    
-  } catch (error: any) {
-    console.error('Customer service API error:', error);
-    
-    if (error instanceof SyntaxError) {
-      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
-    }
-    
-    if (error.message.includes('SESSION') || error.message.includes('CSRF')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-    
-    if (error.message === 'SESSION_RATE_LIMIT_EXCEEDED') {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
-    }
-    
-    return NextResponse.json({ error: 'Service unavailable' }, { status: 500 });
-  }
 }

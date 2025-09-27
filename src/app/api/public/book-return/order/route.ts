@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
 
         // Return curated order data
         return NextResponse.json({
+            id: orderDoc.id,
             name: orderData.raw.name,
             status: orderData.customStatus,
             logs: orderData.customStatusesLogs || [], // Ensure it's an array

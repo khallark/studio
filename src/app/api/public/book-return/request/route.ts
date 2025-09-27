@@ -8,7 +8,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 // Constants
 const DELIVERABLE_STATUSES = ["Delivered"];
 const IN_TRANSIT_STATUSES = ["In Transit", "RTO In Transit", "Out For Delivery"];
-const RETURN_BLOCKED_STATUSES = ["DTO Requested", "DTO In Transit", "DTO Delivered"];
+const RETURN_BLOCKED_STATUSES = ["DTO Requested", "DTO In Transit", "DTO Delivered", "DTO Booked"];
 
 interface DeliveryStatus {
     Status: string;

@@ -23,7 +23,7 @@ try {
         .get();
 
     if (recentSessions.size >= 3) { // Max 3 active sessions per IP
-        return NextResponse.json({ error: 'Too many active sessions' }, { status: 429 });
+        return NextResponse.json({ error: 'Too many active sessions' }, { status: 429 }); 
     }
 
     // Validate store exists and has customer service enabled
@@ -33,7 +33,7 @@ try {
     }
 
     // Check if there's already an existing valid session
-    const existingSessionId = req.cookies.get('book_return_sessions')?.value;
+    const existingSessionId = req.cookies.get('customer_session')?.value;
 
     if (existingSessionId) {
         const existingSessionDoc = await db.collection('book_return_sessions').doc(existingSessionId).get();
@@ -44,7 +44,7 @@ try {
             const expiresAt = sessionData.expiresAt.toDate();
 
             // Check if existing session is still valid
-            if (sessionData.isActive && sessionData.storeId === storeId && expiresAt > now) {
+            if (sessionData.isActive && sessionData.storeId === `${storeId}.myshopify.com` && expiresAt > now) {
                 console.log(`Reusing existing session ${existingSessionId} for store ${storeId}`);
 
                 // Return existing session details

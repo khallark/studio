@@ -132,6 +132,10 @@ const nextConfig: NextConfig = {
         source: '/api/public/book-return/order',
         destination: '/api/public/book-return/order/route',
       },
+      {
+        source: '/api/public/book-return/request',
+        destination: '/api/public/book-return/request/route',
+      },
     ]
   },
 };

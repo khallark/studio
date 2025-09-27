@@ -121,10 +121,6 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/export-products/route',
       },
       {
-        source: '/api/shopify/account/set-alias',
-        destination: '/api/shopify/account/set-alias/route',
-      },
-      {
         source: '/api/shopify/account/toggle-service',
         destination: '/api/shopify/account/toggle-service/route',
       },

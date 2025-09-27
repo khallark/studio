@@ -44,7 +44,6 @@ interface CustomerServices {
 interface AccountData {
   companyAddress?: CompanyAddress;
   primaryContact?: PrimaryContact;
-  storeAlias?: string;
   customerServices?: CustomerServices;
 }
 
@@ -61,11 +60,9 @@ export default function SettingsPage() {
   
   const [addressForm, setAddressForm] = useState<CompanyAddress>({ address: '', pincode: '', city: '', state: '', country: '' });
   const [contactForm, setContactForm] = useState<PrimaryContact>({ name: '', phone: '', email: '' });
-  const [aliasForm, setAliasForm] = useState('');
 
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [isSubmittingAlias, setIsSubmittingAlias] = useState(false);
   const [isTogglingService, setIsTogglingService] = useState(false);
 
 
@@ -100,7 +97,6 @@ export default function SettingsPage() {
             setAccountData(data);
             setAddressForm(data.companyAddress || { address: '', pincode: '', city: '', state: '', country: '' });
             setContactForm(data.primaryContact || { name: '', phone: '', email: '' });
-            setAliasForm(data.storeAlias || '');
         } else {
             setAccountData(null);
         }
@@ -116,7 +112,6 @@ export default function SettingsPage() {
   
   const hasAddress = !!accountData?.companyAddress;
   const hasContact = !!accountData?.primaryContact;
-  const hasAlias = !!accountData?.storeAlias;
 
   const handleSaveAddress = async () => {
     if (!activeAccountId || !user) return;
@@ -157,29 +152,6 @@ export default function SettingsPage() {
         toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
     } finally {
         setIsSubmittingContact(false);
-    }
-  };
-
-  const handleSetAlias = async () => {
-    if (!activeAccountId || !user || !aliasForm.trim()) {
-        toast({ title: 'Alias is required', description: 'Please enter a unique alias for your store.', variant: 'destructive' });
-        return;
-    }
-    setIsSubmittingAlias(true);
-    try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/shopify/account/set-alias', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-            body: JSON.stringify({ shop: activeAccountId, alias: aliasForm.trim() }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.details || 'Failed to set alias');
-        toast({ title: 'Alias Set', description: `Your store alias is now active.` });
-    } catch (error) {
-        toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
-    } finally {
-        setIsSubmittingAlias(false);
     }
   };
   
@@ -355,50 +327,25 @@ export default function SettingsPage() {
               <section>
                   <h2 className="text-xl font-semibold mb-4">Customer Services</h2>
                   <div className="rounded-lg border p-6 space-y-6">
-                      {!hasAlias ? (
-                          <div>
-                              <h3 className="font-semibold">Set Store Alias</h3>
-                              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                                  Create a unique, public-facing URL for your customer services (e.g., your-store-name). This cannot be changed later.
-                              </p>
-                              <div className="flex items-end gap-2">
-                                <div className="grid gap-2 flex-1">
-                                    <Label htmlFor="store-alias">Store Alias</Label>
-                                    <Input 
-                                        id="store-alias" 
-                                        placeholder="your-unique-store-name"
-                                        value={aliasForm}
-                                        onChange={e => setAliasForm(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                                        disabled={isSubmittingAlias}
-                                    />
-                                </div>
-                                <Button onClick={handleSetAlias} disabled={!aliasForm || isSubmittingAlias}>
-                                    {isSubmittingAlias && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Set Alias
-                                </Button>
-                              </div>
+                      <div>
+                          <h3 className="font-semibold">Enabled Services</h3>
+                          <p className="text-sm text-muted-foreground mt-1 mb-4">
+                              Enable or disable public-facing pages for your customers.
+                          </p>
+                          <div className="flex items-center justify-between p-4 border rounded-md">
+                            <div>
+                                <h4 className="font-medium">'Booking a return' page</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Allows customers to initiate returns from a public page.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={accountData?.customerServices?.bookReturnPage?.enabled || false}
+                                onCheckedChange={(isChecked) => handleToggleService('bookReturnPage', isChecked)}
+                                disabled={isTogglingService}
+                            />
                           </div>
-                      ) : (
-                          <div>
-                              <h3 className="font-semibold">Enabled Services</h3>
-                              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                                  Your unique store alias is <code className="bg-muted px-1.5 py-1 rounded-sm font-mono text-sm">{accountData.storeAlias}</code>.
-                              </p>
-                              <div className="flex items-center justify-between p-4 border rounded-md">
-                                <div>
-                                    <h4 className="font-medium">'Booking a return' page</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Allows customers to initiate returns from a public page.
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={accountData.customerServices?.bookReturnPage?.enabled || false}
-                                    onCheckedChange={(isChecked) => handleToggleService('bookReturnPage', isChecked)}
-                                    disabled={isTogglingService}
-                                />
-                              </div>
-                          </div>
-                      )}
+                      </div>
                   </div>
               </section>
 

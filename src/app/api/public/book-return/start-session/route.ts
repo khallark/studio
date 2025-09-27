@@ -33,7 +33,7 @@ try {
     }
 
     // Check if there's already an existing valid session
-    const existingSessionId = req.cookies.get('customer_session')?.value;
+    const existingSessionId = req.cookies.get('book_return_sessions')?.value;
 
     if (existingSessionId) {
         const existingSessionDoc = await db.collection('book_return_sessions').doc(existingSessionId).get();

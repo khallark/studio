@@ -36,6 +36,7 @@ interface FetchedOrder {
     name: string;
     status: string;
     items: OrderItem[];
+    shipping_address: any
     // Add other fields from your API response as needed
 }
 

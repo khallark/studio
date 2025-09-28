@@ -1233,7 +1233,7 @@ export default function OrdersPage() {
                                   ? <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
                                   : <></>
                                 }
-                                {activeTab !== 'New' && activeTab !== 'Confirmed'
+                                {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
                                   ? <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                   : <></>
                                 }
@@ -1297,7 +1297,7 @@ export default function OrdersPage() {
                                         </TableCell>
                                       : <></>
                                     }
-                                    {activeTab !== 'New' && activeTab !== 'Confirmed'
+                                    {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
                                       ? <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
                                       : <></>
                                     }

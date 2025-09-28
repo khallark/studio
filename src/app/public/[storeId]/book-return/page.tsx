@@ -43,7 +43,7 @@ export default function BookReturnPage() {
   const [order, setOrder] = useState<any | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  const [selectedSKUs, setSelectedSKUs] = useState<Set<string>>(new Set());
+  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<number>>(new Set());
   const [requestingReturn, setRequestingReturn] = useState(false);
   const [returnResponse, setReturnResponse] = useState<{success: boolean, message: string} | null>(null);
 
@@ -92,7 +92,7 @@ export default function BookReturnPage() {
       setOrderError(null);
       setOrder(null); // Reset previous order
       setReturnResponse(null);
-      setSelectedSKUs(new Set());
+      setSelectedVariantIds(new Set());
 
       try {
           const csrfToken = localStorage.getItem('csrfToken');
@@ -127,26 +127,26 @@ export default function BookReturnPage() {
       }
   };
   
-    const handleToggleSku = (sku: string) => {
-        // Safety check: ensure the SKU belongs to current order
-        if (!order || !order.items.some((item: any) => item.sku === sku)) {
-          console.warn('Attempted to toggle SKU not in current order:', sku);
+    const handleToggleVariantId = (variantId: number) => {
+        // Safety check: ensure the variant_id belongs to current order
+        if (!order || !order.items.some((item: any) => item.variant_id === variantId)) {
+          console.warn('Attempted to toggle variant_id not in current order:', variantId);
           return;
         }
 
-        setSelectedSKUs(prev => {
+        setSelectedVariantIds(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(sku)) {
-            newSet.delete(sku);
+        if (newSet.has(variantId)) {
+            newSet.delete(variantId);
         } else {
-            newSet.add(sku);
+            newSet.add(variantId);
         }
         return newSet;
         });
     };
 
     const handleRequestReturn = async () => {
-        if (!order || selectedSKUs.size === 0) return;
+        if (!order || selectedVariantIds.size === 0) return;
 
         setRequestingReturn(true);
         setReturnResponse(null);
@@ -162,7 +162,7 @@ export default function BookReturnPage() {
                 credentials: 'include',
                 body: JSON.stringify({
                     orderId: order.id,
-                    selectedSKUs: Array.from(selectedSKUs)
+                    selectedVariantIds: Array.from(selectedVariantIds)
                 })
             });
 
@@ -179,7 +179,7 @@ export default function BookReturnPage() {
             setReturnResponse(result);
 
             if (result.success) {
-              setSelectedSKUs(new Set());
+              setSelectedVariantIds(new Set());
             }
 
         } catch (error: any) {
@@ -246,7 +246,7 @@ export default function BookReturnPage() {
                               setOrderNumber(e.target.value);
                               if (orderError) setOrderError(null);
                               // Clear selections when user starts typing new order number
-                              if (selectedSKUs.size > 0) setSelectedSKUs(new Set());
+                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                             }}
                             required
                             />
@@ -262,7 +262,7 @@ export default function BookReturnPage() {
                               setPhoneNo(e.target.value);
                               if (orderError) setOrderError(null);
                               // Clear selections when user changes phone number
-                              if (selectedSKUs.size > 0) setSelectedSKUs(new Set());
+                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                             }}
                             required
                             />
@@ -305,7 +305,7 @@ export default function BookReturnPage() {
                          <Button variant="outline" onClick={
                           () => {
                             setOrder(null)
-                            setSelectedSKUs(new Set());
+                            setSelectedVariantIds(new Set());
                             setReturnResponse(null);
                          }}>← Go back</Button>
                     </div>
@@ -326,17 +326,16 @@ export default function BookReturnPage() {
                              <ScrollArea className="border rounded-md p-4">
                                 <div className="space-y-4">
                                     {order.items.map((item: any) => (
-                                    <div key={item.sku} className="flex items-start space-x-4 p-2 rounded-md hover:bg-muted/50">
+                                    <div key={item.variant_id} className="flex items-start space-x-4 p-2 rounded-md hover:bg-muted/50">
                                         <Checkbox
-                                            id={`item-${item.sku}`}
-                                            checked={selectedSKUs.has(item.sku || '')}
-                                            onCheckedChange={() => handleToggleSku(item.sku || '')}
-                                            disabled={!item.sku || requestingReturn}
+                                            id={`item-${item.variant_id}`}
+                                            checked={selectedVariantIds.has(item.variant_id)}
+                                            onCheckedChange={() => handleToggleVariantId(item.variant_id)}
+                                            disabled={!item.variant_id || requestingReturn}
                                             className="mt-1"
                                         />
-                                        <Label htmlFor={`item-${item.sku}`} className="flex-1 cursor-pointer">
+                                        <Label htmlFor={`item-${item.variant_id}`} className="flex-1 cursor-pointer">
                                             <p className="font-medium">{item.name}</p>
-                                            <p className="text-xs text-muted-foreground">SKU: {item.sku || 'N/A'}</p>
                                             <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>
                                         </Label>
                                     </div>
@@ -372,7 +371,7 @@ export default function BookReturnPage() {
                         <CardFooter className="hidden sm:flex justify-end">
                             <Button
                                 onClick={handleRequestReturn}
-                                disabled={selectedSKUs.size === 0 || requestingReturn}
+                                disabled={selectedVariantIds.size === 0 || requestingReturn}
                             >
                                 {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Request a Return
@@ -383,7 +382,7 @@ export default function BookReturnPage() {
                         <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                             <Button
                                 onClick={handleRequestReturn}
-                                disabled={selectedSKUs.size === 0 || requestingReturn}
+                                disabled={selectedVariantIds.size === 0 || requestingReturn}
                                 className="w-full"
                                 size="lg"
                             >

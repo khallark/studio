@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         
         // Parse and validate request body
         const body = await req.json();
-        const { orderId, selectedSKUs } = body;
+        const { orderId, selectedVariantIds } = body;
 
         // Input validation
         if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
@@ -41,20 +41,20 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        if (!selectedSKUs || !Array.isArray(selectedSKUs) || selectedSKUs.length === 0) {
+        if (!selectedVariantIds || !Array.isArray(selectedVariantIds) || selectedVariantIds.length === 0) {
             return NextResponse.json({ 
-                error: 'At least one item SKU must be selected for return.' 
+                error: 'At least one item variant must be selected for return.' 
             }, { status: 400 });
         }
 
-        // Validate SKUs are strings and not empty
-        const validSKUs = selectedSKUs.filter(sku => 
-            typeof sku === 'string' && sku.trim() !== ''
-        ).map(sku => sku.trim());
+        // Validate variant IDs are numbers
+        const validVariantIds = selectedVariantIds.filter(id => 
+            typeof id === 'number' && !isNaN(id) && id > 0
+        );
 
-        if (validSKUs.length === 0) {
+        if (validVariantIds.length === 0) {
             return NextResponse.json({ 
-                error: 'Valid item SKUs are required.' 
+                error: 'Valid item variant IDs are required.' 
             }, { status: 400 });
         }
 
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         if (DELIVERABLE_STATUSES.includes(currentStatus)) {
             await orderRef.update({
                 customStatus: "DTO Requested",
-                returnItemsSKUs: validSKUs,
+                returnItemsVariantIds: validVariantIds,
                 customStatusesLogs: FieldValue.arrayUnion({
                     status: "DTO Requested",
                     createdAt: Timestamp.now(),
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
                     // Order was delivered, allow return
                     await orderRef.update({
                         customStatus: "DTO Requested",
-                        returnItemsSKUs: validSKUs,
+                        returnItemsVariantIds: validVariantIds,
                         customStatusesLogs: FieldValue.arrayUnion({
                             status: "DTO Requested",
                             createdAt: Timestamp.now(),

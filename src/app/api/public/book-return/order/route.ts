@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
             shipping_address: orderData.raw.shipping_address,
             items: orderData.raw.line_items?.map((item: any) => ({
                 name: item.name,
-                sku: item.sku,
+                variant_id: item.variant_id,
                 quantity: item.quantity,
                 price: item.price
             })),

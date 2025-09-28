@@ -44,7 +44,7 @@ try {
             const expiresAt = sessionData.expiresAt.toDate();
 
             // Check if existing session is still valid
-            if (sessionData.isActive && sessionData.storeId === `${storeId}.myshopify.com` && expiresAt > now) {
+            if (expiresAt > now && sessionData.storeId === `${storeId}.myshopify.com`) {
                 console.log(`Reusing existing session ${existingSessionId} for store ${storeId}`);
 
                 // Return existing session details

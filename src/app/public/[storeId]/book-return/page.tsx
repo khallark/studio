@@ -290,7 +290,7 @@ export default function BookReturnPage() {
         )}
 
         {order && (
-            <Card>
+            <Card className='pb-24 sm:pb-4'>
                 <CardHeader>
                     <div className="flex justify-between gap-2 items-start">
                         <div className='flex flex-col gap-2 md:gap-1'>
@@ -310,7 +310,7 @@ export default function BookReturnPage() {
                          }}>← Go back</Button>
                     </div>
                 </CardHeader>
-                <CardContent className="pb-24 sm:pb-4 space-y-6">
+                <CardContent className="space-y-6">
                     {returnResponse ? (
                          <Alert variant={returnResponse.success ? 'default' : 'destructive'}>
                             {returnResponse.success ? <ShieldCheck className="h-4 w-4" /> : <Info className="h-4 w-4" />}

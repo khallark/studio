@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ShieldCheck, Ticket, AlertCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface SessionData {
   storeId: string;
@@ -291,7 +292,7 @@ export default function BookReturnPage() {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle>Order Details: {order.name}</CardTitle>
+                            <CardTitle>{order.name} <Badge variant="default">{order.status}</Badge></CardTitle>
                             <CardDescription>
                                 Review your order and select the items you wish to return.
                             </CardDescription>

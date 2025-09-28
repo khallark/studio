@@ -25,36 +25,36 @@ export async function POST(req: NextRequest) {
     const nowTs = Timestamp.now();
 
     // --- Optional hygiene: proactively deactivate expired sessions for this IP (prevents rate-limit lock) ---
-    const expiredSnap = await db
-      .collection("book_return_sessions")
-      .where("ip", "==", ip)
-      .where("isActive", "==", true)
-      .where("expiresAt", "<=", nowTs)
-      .get();
+    // const expiredSnap = await db
+    //   .collection("book_return_sessions")
+    //   .where("ip", "==", ip)
+    //   .where("isActive", "==", true)
+    //   .where("expiresAt", "<=", nowTs)
+    //   .get();
 
-    if (!expiredSnap.empty) {
-      const batch = db.batch();
-      expiredSnap.forEach((d) => {
-        batch.update(d.ref, {
-          isActive: false,
-          endedAt: FieldValue.serverTimestamp(),
-          endReason: "expired",
-        });
-      });
-      await batch.commit();
-    }
+    // if (!expiredSnap.empty) {
+    //   const batch = db.batch();
+    //   expiredSnap.forEach((d) => {
+    //     batch.update(d.ref, {
+    //       isActive: false,
+    //       endedAt: FieldValue.serverTimestamp(),
+    //       endReason: "expired",
+    //     });
+    //   });
+    //   await batch.commit();
+    // }
 
     // --- Rate limit: only count still-valid active sessions ---
-    const recentSessions = await db
-      .collection("book_return_sessions")
-      .where("ip", "==", ip)
-      .where("isActive", "==", true)
-      .where("expiresAt", ">", nowTs) // exclude expired
-      .get();
+    // const recentSessions = await db
+    //   .collection("book_return_sessions")
+    //   .where("ip", "==", ip)
+    //   .where("isActive", "==", true)
+    //   .where("expiresAt", ">", nowTs) // exclude expired
+    //   .get();
 
-    if (recentSessions.size >= 3) {
-      return NextResponse.json({ error: "Too many active sessions" }, { status: 429 });
-    }
+    // if (recentSessions.size >= 3) {
+    //   return NextResponse.json({ error: "Too many active sessions" }, { status: 429 });
+    // }
 
     // --- Validate store exists & feature flag ---
     const storeDoc = await db.collection("accounts").doc(storeId).get();

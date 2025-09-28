@@ -222,12 +222,13 @@ export default function BookReturnPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold font-headline text-primary">Book a Return</h1>
-            <p className="text-muted-foreground mt-2">Find your order to begin the return process.</p>
-        </div>
 
         {!order && (
+            <>
+            <div className="text-center mb-8">
+                <h1 className="text-4xl font-bold font-headline text-primary">Book a Return</h1>
+                <p className="text-muted-foreground mt-2">Find your order to begin the return process.</p>
+            </div>
             <Card>
                 <form onSubmit={handleFindOrder}>
                     <CardHeader>
@@ -285,13 +286,14 @@ export default function BookReturnPage() {
                     </CardFooter>
                 </form>
             </Card>
+            </>
         )}
 
         {order && (
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
-                        <div>
+                        <div className='flex flex-col gap-2 md:gap-1'>
                             <div className='flex flex-wrap gap-2 md:gap-4 items-center'>
                                 <CardTitle>{order.name}</CardTitle>
                                 <Badge variant="default">{order.status}</Badge>

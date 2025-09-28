@@ -292,7 +292,10 @@ export default function BookReturnPage() {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle>{order.name} <Badge variant="default">{order.status}</Badge></CardTitle>
+                            <div className='flex flex-wrap items-center'>
+                                <CardTitle>{order.name}</CardTitle>
+                                <Badge variant="default">{order.status}</Badge>
+                            </div>
                             <CardDescription>
                                 Review your order and select the items you wish to return.
                             </CardDescription>
@@ -302,7 +305,7 @@ export default function BookReturnPage() {
                             setOrder(null)
                             setSelectedSKUs(new Set());
                             setReturnResponse(null);
-                         }}>Find a different order</Button>
+                         }}>← Go back</Button>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">

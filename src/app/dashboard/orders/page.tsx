@@ -1223,14 +1223,24 @@ export default function OrdersPage() {
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
                                 <TableHead>
                                     <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
                                         Date
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
+                                {activeTab === 'All Orders'
+                                  ? <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
+                                  : <></>
+                                }
+                                {activeTab !== 'New' && activeTab !== 'Confirmed'
+                                  ? <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                                  : <></>
+                                }
+                                {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
+                                  ? <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
+                                  : <></>
+                                }
                                 <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
                                 <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
                                 <TableHead className="text-right font-medium text-muted-foreground">Outstanding</TableHead>
@@ -1278,9 +1288,23 @@ export default function OrdersPage() {
                                         />
                                     </TableCell>
                                     <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                    <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
-                                    <TableCell className="py-2 text-xs">{order.awb_reverse || 'N/A'}</TableCell>
                                     <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    {activeTab === 'All Orders'
+                                      ? <TableCell className="py-2">
+                                            <Badge variant='default' className="capitalize text-xs">
+                                            {order.customStatus}
+                                            </Badge>
+                                        </TableCell>
+                                      : <></>
+                                    }
+                                    {activeTab !== 'New' && activeTab !== 'Confirmed'
+                                      ? <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
+                                      : <></>
+                                    }
+                                    {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
+                                      ? <TableCell className="py-2 text-xs">{order.awb_reverse || 'N/A'}</TableCell>
+                                      : <></>
+                                    }
                                     <TableCell className="text-xs">{customerName || order.email}</TableCell>
                                     <TableCell className="text-right text-xs font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}

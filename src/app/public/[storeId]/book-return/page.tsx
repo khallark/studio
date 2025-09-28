@@ -310,7 +310,7 @@ export default function BookReturnPage() {
                          }}>← Go back</Button>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="pb-24 sm:pb-4 space-y-6">
                     {returnResponse ? (
                          <Alert variant={returnResponse.success ? 'default' : 'destructive'}>
                             {returnResponse.success ? <ShieldCheck className="h-4 w-4" /> : <Info className="h-4 w-4" />}

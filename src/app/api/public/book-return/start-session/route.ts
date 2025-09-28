@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             userAgent,
             createdAt: new Date(),
             lastActivity: new Date(),
-            expiresAt: new Date(Date.now() + 30 * 1000), // 2 hours
+            expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours
             requestCount: 0,
             browserFingerprint: req.headers.get('x-browser-fingerprint') || null,
         });

@@ -292,7 +292,7 @@ export default function BookReturnPage() {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <div className='flex flex-wrap items-center'>
+                            <div className='flex flex-wrap gap-2 md:gap-4 items-center'>
                                 <CardTitle>{order.name}</CardTitle>
                                 <Badge variant="default">{order.status}</Badge>
                             </div>

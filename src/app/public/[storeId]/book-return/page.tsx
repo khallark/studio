@@ -317,7 +317,7 @@ export default function BookReturnPage() {
                                 ? ''
                                 : (order.status.includes('In Transit')
                                     ? 'text-[#F0AD4E]'
-                                    : 'text-red'
+                                    : 'text-red-500'
                                   )}
                               `}
                             >
@@ -326,7 +326,9 @@ export default function BookReturnPage() {
                                   return "Review your order and select the items you wish to return."
                                 if(order.status.includes('In Transit'))
                                   return "⚠ The order may not be eligible for return, but you can still make a request."
-                                return "ⓘ This order is not eligible for return yet."
+                                if(order.status.includes('DTO'))
+                                  return "✖ This order is already booked for return, can't be booked again."
+                                return "✖ This order is not eligible for return yet."
                               })()}
                             </CardDescription>
                         </div>
@@ -359,7 +361,10 @@ export default function BookReturnPage() {
                                             id={`item-${item.variant_id}`}
                                             checked={selectedVariantIds.has(item.variant_id)}
                                             onCheckedChange={() => handleToggleVariantId(item.variant_id)}
-                                            disabled={!item.variant_id || requestingReturn}
+                                            disabled={
+                                              !item.variant_id ||
+                                              (order.status !== 'Delivered' && !order.status.include('In Transit')) ||
+                                              requestingReturn}
                                             className="mt-1"
                                         />
                                         <Label htmlFor={`item-${item.variant_id}`} className="flex-1 cursor-pointer">
@@ -396,28 +401,32 @@ export default function BookReturnPage() {
                 {!returnResponse && (
                     <>
                         {/* Desktop version - in CardFooter */}
-                        <CardFooter className="hidden sm:flex justify-end">
-                            <Button
-                                onClick={handleRequestReturn}
-                                disabled={selectedVariantIds.size === 0 || requestingReturn}
-                            >
-                                {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Request a Return
-                            </Button>
-                        </CardFooter>
+                        {!(order.status !== 'Delivered' && !order.status.include('In Transit')) &&
+                          <CardFooter className="hidden sm:flex justify-end">
+                              <Button
+                                  onClick={handleRequestReturn}
+                                  disabled={selectedVariantIds.size === 0 || requestingReturn}
+                              >
+                                  {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Request a Return
+                              </Button>
+                          </CardFooter>
+                        }
                         
                         {/* Mobile version - sticky at bottom */}
-                        <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
-                            <Button
-                                onClick={handleRequestReturn}
-                                disabled={selectedVariantIds.size === 0 || requestingReturn}
-                                className="w-full"
-                                size="lg"
-                            >
-                                {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Request a Return
-                            </Button>
-                        </div>
+                        {!(order.status !== 'Delivered' && !order.status.include('In Transit')) &&
+                          <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
+                              <Button
+                                  onClick={handleRequestReturn}
+                                  disabled={selectedVariantIds.size === 0 || requestingReturn}
+                                  className="w-full"
+                                  size="lg"
+                              >
+                                  {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Request a Return
+                              </Button>
+                          </div>
+                        }
                     </>
                 )}
             </Card>

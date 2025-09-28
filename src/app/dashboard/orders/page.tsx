@@ -575,7 +575,7 @@ export default function OrdersPage() {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
   
-  const getFulfillmentBadgeVariant = (status: string | null) => {
+  const getFulfillmentBadgeVariant = (status: string | null): Variant => {
     switch(status?.toLowerCase()) {
         case 'fulfilled':
             return 'default';
@@ -589,7 +589,7 @@ export default function OrdersPage() {
     }
   }
 
-  const getPaymentBadgeVariant = (status: string | null) => {
+  const getPaymentBadgeVariant = (status: string | null): Variant => {
     switch(status?.toLowerCase()) {
         case 'paid':
             return 'default';
@@ -604,6 +604,31 @@ export default function OrdersPage() {
             return 'secondary';
     }
   }
+  
+  type Variant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" | null | undefined;
+  
+  const getStatusBadgeVariant = (status: CustomStatus | null): Variant => {
+      switch(status) {
+          case 'New': return 'info';
+          case 'Confirmed': return 'default';
+          case 'Ready To Dispatch': return 'default';
+          case 'Dispatched': return 'warning';
+          case 'In Transit': return 'warning';
+          case 'Out For Delivery': return 'warning';
+          case 'Delivered': return 'success';
+          case 'RTO In Transit': return 'warning';
+          case 'RTO Delivered': return 'success';
+          case 'DTO Requested': return 'warning';
+          case 'DTO Booked': return 'warning';
+          case 'DTO In Transit': return 'warning';
+          case 'DTO Delivered': return 'success';
+          case 'Lost': return 'destructive';
+          case 'Closed': return 'success';
+          case 'RTO Closed': return 'success';
+          case 'Cancelled': return 'destructive';
+          default: return 'secondary';
+      }
+  };
 
   const handleDownloadSlips = useCallback(async () => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
@@ -1121,7 +1146,7 @@ export default function OrdersPage() {
                         />
                         <div className="flex items-center space-x-2">
                             <Switch id="invert-search" checked={invertSearch} onCheckedChange={setInvertSearch} />
-                            <Label htmlFor="invert-search">Invert</Label>
+                            <Label htmlFor="invert-search" className="text-sm md:text-base">Invert</Label>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1131,7 +1156,7 @@ export default function OrdersPage() {
                                 id="date"
                                 variant={"outline"}
                                 className={cn(
-                                "w-[240px] justify-start text-left font-normal",
+                                "w-[240px] justify-start text-left font-normal text-sm md:text-base",
                                 !dateRange && "text-muted-foreground"
                                 )}
                             >
@@ -1169,7 +1194,7 @@ export default function OrdersPage() {
                     </div>
                     {activeTab === 'Ready To Dispatch' && (
                         <Select value={courierFilter} onValueChange={setCourierFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectTrigger className="w-full md:w-[180px] text-sm md:text-base">
                                 <SelectValue placeholder="Filter by courier..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -1185,24 +1210,24 @@ export default function OrdersPage() {
                 <div className="border-b shrink-0">
                   <div className="overflow-x-auto px-4">
                       <TabsList className="h-auto rounded-none bg-transparent p-0 -mb-px">
-                          <TabsTrigger value="All Orders" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
-                          <TabsTrigger value="New" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">New ({statusCounts['New'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Confirmed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Ready To Dispatch" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Dispatched" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
-                          <TabsTrigger value="In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Out For Delivery" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO Requested" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Requested ({statusCounts['DTO Requested'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO Booked" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO In Transit ({statusCounts['DTO In Transit'] || 0})</TabsTrigger>
-                          <TabsTrigger value="DTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">DTO Delivered ({statusCounts['DTO Delivered'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Lost" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="RTO Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>
-                          <TabsTrigger value="Cancelled" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
+                          <TabsTrigger value="All Orders" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">All ({statusCounts['All Orders'] || 0})</TabsTrigger>
+                          <TabsTrigger value="New" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">New ({statusCounts['New'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Confirmed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Confirmed ({statusCounts['Confirmed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Ready To Dispatch" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Dispatched" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Dispatched ({statusCounts['Dispatched'] || 0})</TabsTrigger>
+                          <TabsTrigger value="In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">In Transit ({statusCounts['In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Out For Delivery" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Out For Delivery ({statusCounts['Out For Delivery'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Delivered ({statusCounts['Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">RTO In Transit ({statusCounts['RTO In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">RTO Delivered ({statusCounts['RTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Requested" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">DTO Requested ({statusCounts['DTO Requested'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Booked" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">DTO Booked ({statusCounts['DTO Booked'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO In Transit" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">DTO In Transit ({statusCounts['DTO In Transit'] || 0})</TabsTrigger>
+                          <TabsTrigger value="DTO Delivered" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">DTO Delivered ({statusCounts['DTO Delivered'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Lost" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Lost ({statusCounts['Lost'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Closed ({statusCounts['Closed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="RTO Closed" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">RTO Closed ({statusCounts['RTO Closed'] || 0})</TabsTrigger>
+                          <TabsTrigger value="Cancelled" className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 font-semibold text-muted-foreground shadow-none transition-none hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none text-sm md:text-base">Cancelled ({statusCounts['Cancelled'] || 0})</TabsTrigger>
                       </TabsList>
                   </div>
                 </div>
@@ -1218,25 +1243,28 @@ export default function OrdersPage() {
                                 />
                                 </TableHead>
                                 <TableHead>
-                                    <Button variant="ghost" onClick={() => handleSort('name')} className="px-1">
+                                    <Button variant="ghost" onClick={() => handleSort('name')} className="px-1 text-sm md:text-base">
                                         Order ID
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">AWB</TableHead>
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Return AWB</TableHead>
                                 <TableHead>
-                                    <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
+                                    <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1 text-sm md:text-base">
                                         Date
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
-                                <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
-                                <TableHead className="text-right font-medium text-muted-foreground">Outstanding</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground">Items</TableHead>
+                                {activeTab === 'All Orders' && (
+                                    <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Current Status</TableHead>
+                                )}
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Customer</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground text-sm md:text-base">Total</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground text-sm md:text-base">Outstanding</TableHead>
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Payment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Fulfillment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Items</TableHead>
                                 <TableHead>
                                 <span className="sr-only">Actions</span>
                                 </TableHead>
@@ -1251,6 +1279,7 @@ export default function OrdersPage() {
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                    {activeTab === 'All Orders' && <TableCell className="py-2"><Skeleton className="h-6 w-28" /></TableCell>}
                                     <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
                                     <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                                     <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
@@ -1277,28 +1306,35 @@ export default function OrdersPage() {
                                         aria-label={`Select order ${order.name}`}
                                         />
                                     </TableCell>
-                                    <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                    <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
-                                    <TableCell className="py-2 text-xs">{order.awb_reverse || 'N/A'}</TableCell>
-                                    <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                                    <TableCell className="text-xs">{customerName || order.email}</TableCell>
-                                    <TableCell className="text-right text-xs font-mono">
+                                    <TableCell className="font-medium text-sm md:text-base">{order.name}</TableCell>
+                                    <TableCell className="py-2 text-xs md:text-sm">{order.awb || 'N/A'}</TableCell>
+                                    <TableCell className="py-2 text-xs md:text-sm">{order.awb_reverse || 'N/A'}</TableCell>
+                                    <TableCell className="py-2 text-xs md:text-sm">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    {activeTab === 'All Orders' && (
+                                        <TableCell className="py-2 text-xs md:text-sm">
+                                            <Badge variant={getStatusBadgeVariant(order.customStatus)} className="text-xs capitalize">
+                                                {order.customStatus}
+                                            </Badge>
+                                        </TableCell>
+                                    )}
+                                    <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                                     </TableCell>
-                                    <TableCell className="text-right text-xs font-mono">
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
                                     </TableCell>
                                     <TableCell className="py-2">
-                                        <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize text-xs">
+                                        <Badge variant={getPaymentBadgeVariant(order.financialStatus)} className="capitalize text-xs md:text-sm">
                                         {order.financialStatus?.replace('_', ' ') || 'N/A'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="py-2">
-                                        <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize text-xs">
+                                        <Badge variant={getFulfillmentBadgeVariant(order.fulfillmentStatus)} className="capitalize text-xs md:text-sm">
                                         {order.fulfillmentStatus || 'unfulfilled'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-xs">
+                                    <TableCell className="text-xs md:text-sm">
                                         {order.raw?.line_items?.length || 0}
                                     </TableCell>
                                     <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
@@ -1320,7 +1356,7 @@ export default function OrdersPage() {
                                 })
                             ) : (
                                 <TableRow>
-                                <TableCell colSpan={12} className="text-center h-24">
+                                <TableCell colSpan={13} className="text-center h-24">
                                     {userData?.activeAccountId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
                                 </TableCell>
                                 </TableRow>

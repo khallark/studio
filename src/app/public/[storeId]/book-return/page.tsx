@@ -21,12 +21,6 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-interface SessionData {
-  storeId: string;
-  storeAlias: string;
-  csrfToken: string;
-  // ... other fields
-}
 
 export default function BookReturnPage() {
   const params = useParams();
@@ -35,7 +29,6 @@ export default function BookReturnPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<SessionData | null>(null);
   
   const [orderNumber, setOrderNumber] = useState('');
   const [phoneNo, setPhoneNo] = useState('');
@@ -48,7 +41,7 @@ export default function BookReturnPage() {
   const [returnResponse, setReturnResponse] = useState<{success: boolean, message: string} | null>(null);
 
   useEffect(() => {
-    document.title = "Book a return!";
+    document.title = "Book a return";
   })
 
   useEffect(() => {
@@ -69,7 +62,6 @@ export default function BookReturnPage() {
         }
 
         const sessionData = await response.json();
-        setSession(sessionData);
         localStorage.setItem('csrfToken', sessionData.csrfToken);
 
       } catch (err: any) {
@@ -174,7 +166,6 @@ export default function BookReturnPage() {
             if (!response.ok) {
                 if (result.sessionError) {
                     setError('Your session has expired. Please refresh the page to continue.');
-                    setSession(null);
                 }
                 throw new Error(result.error || 'An unknown error occurred.');
             }
@@ -321,8 +312,22 @@ export default function BookReturnPage() {
                                 <CardTitle>{order.name}</CardTitle>
                                 <Badge variant="default">{order.status}</Badge>
                             </div>
-                            <CardDescription>
-                                Review your order and select the items you wish to return.
+                            <CardDescription className={`
+                              ${order.status === 'Delivered'
+                                ? ''
+                                : (order.status.includes('In Transit')
+                                    ? 'text-[#F0AD4E]'
+                                    : 'text-red'
+                                  )}
+                              `}
+                            >
+                              {(() => {
+                                if(order.status === 'Delivered')
+                                  return "Review your order and select the items you wish to return."
+                                if(order.status.includes('In Transit'))
+                                  return "⚠ The order may not be eligible for return, but you can still make a request."
+                                return "ⓘ This order is not eligible for return yet."
+                              })()}
                             </CardDescription>
                         </div>
                          <Button variant="outline" onClick={

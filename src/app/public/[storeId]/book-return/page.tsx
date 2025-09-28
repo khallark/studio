@@ -296,7 +296,7 @@ export default function BookReturnPage() {
                                 Review your order and select the items you wish to return.
                             </CardDescription>
                         </div>
-                         <Button variant="link" onClick={
+                         <Button variant="outline" onClick={
                           () => {
                             setOrder(null)
                             setSelectedSKUs(new Set());
@@ -317,7 +317,7 @@ export default function BookReturnPage() {
                     <>
                         <div>
                             <h3 className="font-semibold mb-2">Select items to return</h3>
-                             <ScrollArea className="h-64 border rounded-md p-4">
+                             <ScrollArea className="border rounded-md p-4">
                                 <div className="space-y-4">
                                     {order.items.map((item: any) => (
                                     <div key={item.sku} className="flex items-start space-x-4 p-2 rounded-md hover:bg-muted/50">

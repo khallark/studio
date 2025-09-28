@@ -194,6 +194,9 @@ export default function OrdersPage() {
   
   const [isDownloadingProductsExcel, setIsDownloadingProductsExcel] = useState(false);
 
+  useEffect(() => {
+    document.title = "Dashboard - Orders";
+  })
 
   useEffect(() => {
     const fetchUserData = async () => {

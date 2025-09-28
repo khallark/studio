@@ -91,6 +91,10 @@ export default function AppsSettingsPage() {
   const [appUrl, setAppUrl] = useState('');
 
   useEffect(() => {
+    document.title = "Settings - Apps";
+  })
+
+  useEffect(() => {
     // This will only run on the client side
     setAppUrl(window.location.origin);
   }, []);

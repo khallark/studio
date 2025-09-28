@@ -41,6 +41,10 @@ export default function SettingsLayout({
   const pathname = usePathname();
 
   useEffect(() => {
+    document.title = "Settings";
+  })
+
+  useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }

@@ -26,6 +26,10 @@ export default function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
+    document.title = "Dashboard";
+  })
+
+  useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         const userRef = doc(db, 'users', user.uid);

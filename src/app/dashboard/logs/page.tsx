@@ -41,6 +41,10 @@ export default function LogsPage() {
   const observer = useRef<IntersectionObserver>();
   const isInitialLoadDone = useRef(false);
 
+  useEffect(() => {
+    document.title = "Dashboard - Logs";
+  })
+
   // Fetch user data to get active account
   useEffect(() => {
     const fetchUserData = async () => {

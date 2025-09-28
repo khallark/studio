@@ -70,6 +70,10 @@ export default function PickupLocationsPage() {
   const [country, setCountry] = useState('');
 
   useEffect(() => {
+    document.title = "Settings - Pickup Locations";
+  })
+
+  useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         const userRef = doc(db, 'users', user.uid);

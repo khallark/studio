@@ -53,6 +53,10 @@ export default function AwbProcessingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.title = "Dashboard - AWB Processing";
+  })
+
+  useEffect(() => {
     const run = async () => {
       if (!user) return;
       const uref = doc(db, 'users', user.uid);

@@ -109,6 +109,10 @@ export default function InteraktPage() {
   // New state for Create Template Dialog
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = "Communicaitions - Interakt";
+  })
+
   // 1. Fetch User's Active Account ID and check for keys
   useEffect(() => {
     if (userLoading) return;

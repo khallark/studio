@@ -27,6 +27,10 @@ export default function ConnectStorePage() {
   const [user] = useAuthState(auth);
 
   useEffect(() => {
+    document.title = "Connect your shopify store!";
+  })
+
+  useEffect(() => {
     // Store user UID in a cookie to be accessed by the server-side callback
     if (user) {
       Cookies.set('user_uid', user.uid, { expires: 1 }); // Expires in 1 day

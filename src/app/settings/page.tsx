@@ -65,6 +65,9 @@ export default function SettingsPage() {
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [isTogglingService, setIsTogglingService] = useState(false);
 
+  useEffect(() => {
+    document.title = "Settings - Store Details";
+  })
 
   // 1. Fetch User's Active Account ID
   useEffect(() => {

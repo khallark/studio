@@ -47,6 +47,9 @@ export default function BookReturnPage() {
   const [requestingReturn, setRequestingReturn] = useState(false);
   const [returnResponse, setReturnResponse] = useState<{success: boolean, message: string} | null>(null);
 
+  useEffect(() => {
+    document.title = "Book a return!";
+  })
 
   useEffect(() => {
     const startSession = async () => {

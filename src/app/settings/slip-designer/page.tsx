@@ -1,11 +1,14 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Palette } from 'lucide-react';
 
 export default function SlipDesignerPage() {
+  useEffect(() => {
+    document.title = "Settings - Slip Designer";
+  })
   return (
     <div className="flex justify-center items-start h-full p-4 md:p-6">
       <Card className="w-full max-w-4xl">

@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'OrderFlow',
+  title: 'Majime',
   description: 'Manage your Shopify orders in a single dashboard.',
 };
 

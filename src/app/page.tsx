@@ -87,7 +87,7 @@ export default function Home() {
                 All Your Shopify orders, in one place.
               </h1>
               <p className="text-lg text-muted-foreground">
-                OrderFlow brings all your Shopify data into a single, powerful dashboard. Stop switching tabs and start making smarter decisions.
+                Majime brings all your Shopify data into a single, powerful dashboard. Stop switching tabs and start making smarter decisions.
               </p>
               <Button size="lg" asChild>
                 <Link href="/signup">
@@ -148,7 +148,7 @@ export default function Home() {
       </main>
 
       <footer className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} OrderFlow. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Majime. All rights reserved.</p>
       </footer>
     </div>
   );

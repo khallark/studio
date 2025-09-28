@@ -315,7 +315,7 @@ export default function BookReturnPage() {
                             <CardDescription className={`
                               ${order.status === 'Delivered'
                                 ? ''
-                                : (order.status.includes('In Transit')
+                                : (order.status.includes('In Transit') && order.status !== 'DTO In Transit'
                                     ? 'text-[#F0AD4E]'
                                     : 'text-red-500'
                                   )}
@@ -324,7 +324,7 @@ export default function BookReturnPage() {
                               {(() => {
                                 if(order.status === 'Delivered')
                                   return "Review your order and select the items you wish to return."
-                                if(order.status.includes('In Transit'))
+                                if(order.status.includes('In Transit') && order.status !== 'DTO In Transit')
                                   return "⚠ The order may not be eligible for return, but you can still make a request."
                                 if(order.status.includes('DTO'))
                                   return "✖ This order is already booked for return, can't be booked again."
@@ -363,7 +363,7 @@ export default function BookReturnPage() {
                                             onCheckedChange={() => handleToggleVariantId(item.variant_id)}
                                             disabled={
                                               !item.variant_id ||
-                                              (order.status !== 'Delivered' && !order.status.includes('In Transit')) ||
+                                              (order.status !== 'Delivered' && !(order.status.includes('In Transit') && order.status !== 'DTO In Transit')) ||
                                               requestingReturn}
                                             className="mt-1"
                                         />
@@ -401,7 +401,7 @@ export default function BookReturnPage() {
                 {!returnResponse && (
                     <>
                         {/* Desktop version - in CardFooter */}
-                        {!(order.status !== 'Delivered' && !order.status.includes('In Transit')) &&
+                        {!(order.status !== 'Delivered' && !(order.status.includes('In Transit') && order.status !== 'DTO In Transit')) &&
                           <CardFooter className="hidden sm:flex justify-end">
                               <Button
                                   onClick={handleRequestReturn}
@@ -414,7 +414,7 @@ export default function BookReturnPage() {
                         }
                         
                         {/* Mobile version - sticky at bottom */}
-                        {!(order.status !== 'Delivered' && !order.status.includes('In Transit')) &&
+                        {!(order.status !== 'Delivered' && !(order.status.includes('In Transit') && order.status !== 'DTO In Transit')) &&
                           <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                               <Button
                                   onClick={handleRequestReturn}

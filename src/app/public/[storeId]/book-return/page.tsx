@@ -304,7 +304,7 @@ export default function BookReturnPage() {
         )}
 
         {order && (
-            <Card className='pb-24 sm:pb-4'>
+            <Card className='pb-11 sm:pb-4'>
                 <CardHeader>
                     <div className="flex justify-between gap-2 items-start">
                         <div className='flex flex-col gap-2 md:gap-1'>

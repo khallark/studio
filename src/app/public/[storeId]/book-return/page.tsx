@@ -380,7 +380,7 @@ export default function BookReturnPage() {
                         </CardFooter>
                         
                         {/* Mobile version - sticky at bottom */}
-                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t sm:hidden">
+                        <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                             <Button
                                 onClick={handleRequestReturn}
                                 disabled={selectedSKUs.size === 0 || requestingReturn}

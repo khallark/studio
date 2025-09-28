@@ -367,15 +367,31 @@ export default function BookReturnPage() {
                     )}
                 </CardContent>
                 {!returnResponse && (
-                    <CardFooter className="justify-end">
-                        <Button
-                            onClick={handleRequestReturn}
-                            disabled={selectedSKUs.size === 0 || requestingReturn}
-                        >
-                            {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Request a Return
-                        </Button>
-                    </CardFooter>
+                    <>
+                        {/* Desktop version - in CardFooter */}
+                        <CardFooter className="hidden sm:flex justify-end">
+                            <Button
+                                onClick={handleRequestReturn}
+                                disabled={selectedSKUs.size === 0 || requestingReturn}
+                            >
+                                {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Request a Return
+                            </Button>
+                        </CardFooter>
+                        
+                        {/* Mobile version - sticky at bottom */}
+                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t sm:hidden">
+                            <Button
+                                onClick={handleRequestReturn}
+                                disabled={selectedSKUs.size === 0 || requestingReturn}
+                                className="w-full"
+                                size="lg"
+                            >
+                                {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Request a Return
+                            </Button>
+                        </div>
+                    </>
                 )}
             </Card>
         )}

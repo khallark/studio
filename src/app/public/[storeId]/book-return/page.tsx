@@ -363,7 +363,7 @@ export default function BookReturnPage() {
                                             onCheckedChange={() => handleToggleVariantId(item.variant_id)}
                                             disabled={
                                               !item.variant_id ||
-                                              (order.status !== 'Delivered' && !order.status.include('In Transit')) ||
+                                              (order.status !== 'Delivered' && !order.status.includes('In Transit')) ||
                                               requestingReturn}
                                             className="mt-1"
                                         />
@@ -401,7 +401,7 @@ export default function BookReturnPage() {
                 {!returnResponse && (
                     <>
                         {/* Desktop version - in CardFooter */}
-                        {!(order.status !== 'Delivered' && !order.status.include('In Transit')) &&
+                        {!(order.status !== 'Delivered' && !order.status.includes('In Transit')) &&
                           <CardFooter className="hidden sm:flex justify-end">
                               <Button
                                   onClick={handleRequestReturn}
@@ -414,7 +414,7 @@ export default function BookReturnPage() {
                         }
                         
                         {/* Mobile version - sticky at bottom */}
-                        {!(order.status !== 'Delivered' && !order.status.include('In Transit')) &&
+                        {!(order.status !== 'Delivered' && !order.status.includes('In Transit')) &&
                           <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                               <Button
                                   onClick={handleRequestReturn}

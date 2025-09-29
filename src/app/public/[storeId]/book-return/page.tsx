@@ -260,7 +260,7 @@ export default function BookReturnPage() {
                         <CardDescription>Enter your order number and the phone number used for the order.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid gap-2">
+                      <div className="relative grid gap-2">
                           <Label htmlFor="orderNumber">Order Number</Label>
                           <div className="absolute left-3 flex items-center pointer-events-none">
                             <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded border border-gray-300">

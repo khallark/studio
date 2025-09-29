@@ -105,13 +105,13 @@ export async function POST(req: NextRequest) {
                 remarks = "This order was confirmed by the user";
                 break;
             case "Closed":
-                remarks = "This order was received by the customer";
+                remarks = "This order was received by the customer and manually closed";
                 break;
             case "RTO Closed":
-                remarks = "This order was returned and received by the owner";
+                remarks = "This order was returned and received by the owner and manually closed";
                 break;
             case "DTO Closed":
-                remarks = "This order was returned by the customed and received by the owner";
+                remarks = "This order was returned by the customer after delivery, received by the owner and manually closed";
                 break;
             }
             return remarks; 

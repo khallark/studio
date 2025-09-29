@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -842,9 +840,9 @@ export default function OrdersPage() {
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
               Confirm
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
               Cancel
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
           </>
         );
       case 'Confirmed':
@@ -857,9 +855,9 @@ export default function OrdersPage() {
             }}>
               Assign AWB
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
               Cancel
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
           </>
         );
       case 'Ready To Dispatch':
@@ -868,26 +866,26 @@ export default function OrdersPage() {
              <DropdownMenuItem onClick={() => handleDispatch([order.id])}>
               Dispatch
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
               Cancel
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
           </>
         );
       case 'Dispatched':
-        return (
-           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-              Cancel
-            </DropdownMenuItem>
-        );
+        // return (
+        //    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+        //       Cancel
+        //     </DropdownMenuItem>
+        // );
       case 'In Transit':
       case 'RTO In Transit':
       case 'Out For Delivery':
       case 'DTO In Transit':
-        return (
-          <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-            Cancel Order
-          </DropdownMenuItem>
-        );
+        // return (
+        //   <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
+        //     Cancel
+        //   </DropdownMenuItem>
+        // );
       case 'Delivered':
       case 'DTO Requested':
         return (
@@ -921,14 +919,14 @@ export default function OrdersPage() {
       case 'Closed':
       case 'RTO Closed':
       case 'Cancelled':
-        return (
-          <>
-            <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Order
-            </DropdownMenuItem>
-          </>
-        );
+        // return (
+        //   <>
+        //     <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-destructive">
+        //       <Trash2 className="mr-2 h-4 w-4" />
+        //       Delete Order
+        //     </DropdownMenuItem>
+        //   </>
+        // );
       default:
         return null;
     }
@@ -1063,6 +1061,12 @@ export default function OrdersPage() {
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
                       {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
                   </Button>
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/orders/awb-processing">
+                        Go to AWB Processing
+                        <MoveRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
                 </>
               );
             case 'Delivered':
@@ -1091,7 +1095,6 @@ export default function OrdersPage() {
               );
             case 'Cancelled':
             default:
-              return null;
           }
         })()}
       </div>
@@ -1255,35 +1258,35 @@ export default function OrdersPage() {
                                 />
                                 </TableHead>
                                 <TableHead>
-                                    <Button variant="ghost" onClick={() => handleSort('name')} className="px-1 text-sm md:text-base">
+                                    <Button variant="ghost" onClick={() => handleSort('name')} className="px-1">
                                         Order ID
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
                                 <TableHead>
-                                    <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1 text-sm md:text-base">
+                                    <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
                                         Date
                                         <ArrowUpDown className="ml-2 h-4 w-4" />
                                     </Button>
                                 </TableHead>
                                 {activeTab === 'All Orders'
-                                  ? <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Current Status</TableHead>
+                                  ? <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
                                   : <></>
                                 }
                                 {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
-                                  ? <TableHead className="font-medium text-muted-foreground text-sm md:text-base">AWB</TableHead>
+                                  ? <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                   : <></>
                                 }
                                 {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
-                                  ? <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Return AWB</TableHead>
+                                  ? <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
                                   : <></>
                                 }
-                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Customer</TableHead>
-                                <TableHead className="text-right font-medium text-muted-foreground text-sm md:text-base">Total</TableHead>
-                                <TableHead className="text-right font-medium text-muted-foreground text-sm md:text-base">Outstanding</TableHead>
-                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Payment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Fulfillment Status</TableHead>
-                                <TableHead className="font-medium text-muted-foreground text-sm md:text-base">Items</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
+                                <TableHead className="text-right font-medium text-muted-foreground">Outstanding</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Payment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Fulfillment Status</TableHead>
+                                <TableHead className="font-medium text-muted-foreground">Items</TableHead>
                                 <TableHead>
                                 <span className="sr-only">Actions</span>
                                 </TableHead>
@@ -1325,7 +1328,7 @@ export default function OrdersPage() {
                                         />
                                     </TableCell>
                                     <TableCell className="font-medium text-sm md:text-base py-2">{order.name}</TableCell>
-                                    <TableCell className="text-sm md:text-base py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-xs md:text-sm py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                     {activeTab === 'All Orders' && (
                                         <TableCell className="py-2">
                                             <Badge 
@@ -1337,18 +1340,18 @@ export default function OrdersPage() {
                                         </TableCell>
                                     )}
                                     {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
-                                      ? <TableCell className="text-sm md:text-base py-2">{order.awb || 'N/A'}</TableCell>
+                                      ? <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
                                       : <></>
                                     }
                                     {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
-                                      ? <TableCell className="text-sm md:text-base py-2">{order.awb_reverse || 'N/A'}</TableCell>
+                                      ? <TableCell className="text-xs md:text-sm py-2">{order.awb_reverse || 'N/A'}</TableCell>
                                       : <></>
                                     }
-                                    <TableCell className="text-sm md:text-base">{customerName || order.email}</TableCell>
-                                    <TableCell className="text-right text-sm md:text-base font-mono">
+                                    <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                                     </TableCell>
-                                    <TableCell className="text-right text-sm md:text-base font-mono">
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
                                     </TableCell>
                                     <TableCell className="py-2">
@@ -1361,7 +1364,7 @@ export default function OrdersPage() {
                                         {order.fulfillmentStatus || 'unfulfilled'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm md:text-base">
+                                    <TableCell className="text-xs md:text-sm">
                                         {order.raw?.line_items?.length || 0}
                                     </TableCell>
                                     <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
@@ -1617,6 +1620,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-
-

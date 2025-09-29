@@ -6,9 +6,9 @@ import { validateCustomerSession } from "@/lib/validateCustomerSession";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 // Constants
-const DELIVERABLE_STATUSES = ["Delivered"];
+const DELIVERABLE_STATUSES = ["Delivered", "DTO Requested"];
 const IN_TRANSIT_STATUSES = ["In Transit", "RTO In Transit", "Out For Delivery"];
-const RETURN_BLOCKED_STATUSES = ["DTO Requested", "DTO In Transit", "DTO Delivered", "DTO Booked"];
+const RETURN_BLOCKED_STATUSES = ["DTO In Transit", "DTO Delivered", "DTO Booked"];
 
 interface DeliveryStatus {
     Status: string;
@@ -89,14 +89,22 @@ export async function POST(req: NextRequest) {
 
         // Handle delivered orders - immediate return approval
         if (DELIVERABLE_STATUSES.includes(currentStatus)) {
+            let logEntry = {
+                status: "DTO Requested",
+                createdAt: Timestamp.now(),
+                remarks: "The Return for this order was requested by the customer."
+            }
+            if(currentStatus === 'DTO Requested') {
+                logEntry = {
+                    status: "DTO Requested Again",
+                    createdAt: Timestamp.now(),
+                    remarks: "The Return for this order was requested again by the customer."
+                }
+            }
             await orderRef.update({
                 customStatus: "DTO Requested",
                 returnItemsVariantIds: validVariantIds,
-                customStatusesLogs: FieldValue.arrayUnion({
-                    status: "DTO Requested",
-                    createdAt: Timestamp.now(),
-                    remarks: "The Return for this order was requested by the customer."
-                })
+                customStatusesLogs: FieldValue.arrayUnion(logEntry)
             });
 
             return NextResponse.json({

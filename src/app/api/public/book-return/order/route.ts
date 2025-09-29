@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             '==',
             orderNumber.length >= 3
                 ? orderNumber.substring(0, 2).toLowerCase() === 'mt'
-                    ? `#OWR-${orderNumber}`
+                    ? `#OWR-${orderNumber.toUpperCase()}`
                     : `#OWR-MT${orderNumber}`
                 : orderNumber
         ).limit(1).get();

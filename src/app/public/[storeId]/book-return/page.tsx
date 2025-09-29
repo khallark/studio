@@ -263,7 +263,7 @@ export default function BookReturnPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="orderNumber">Order Number</Label>
                         <div className="relative flex items-center">
-                          <div className="absolute left-3 flex items-center pointer-events-none">
+                          <div className="absolute left-1 flex items-center pointer-events-none">
                             <span className="text-sm font-semibold bg-white px-2 py-1 rounded border border-gray-300">
                               #OWR-MT
                             </span>
@@ -277,7 +277,7 @@ export default function BookReturnPage() {
                               if (orderError) setOrderError(null);
                               if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                             }}
-                            className="pl-32"
+                            className="pl-18"
                             required
                           />
                         </div>

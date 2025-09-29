@@ -194,8 +194,8 @@ export default function BookReturnPage() {
 
     const canRequest = ['Delivered'];
     const alreadyRequested = ['DTO Requested'];
-    const canTryRequesting = ['Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit'];
-    const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'];
+    const canTryRequesting = ['In Transit', 'Out For Delivery', 'RTO In Transit'];
+    const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'];
     const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered'];
 
   if (loading) {

@@ -260,44 +260,49 @@ export default function BookReturnPage() {
                         <CardDescription>Enter your order number and the phone number used for the order.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="orderNumber">Order Number</Label>
-                            <Input
-                            id="orderNumber"
-                            placeholder="e.g., OWR-MT1001"
-                            value={orderNumber}
-                            onChange={(e) => {
-                              setOrderNumber(e.target.value);
-                              if (orderError) setOrderError(null);
-                              // Clear selections when user starts typing new order number
-                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
-                            }}
-                            required
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="phoneNo">Phone Number</Label>
-                            <Input
-                            id="phoneNo"
-                            type="tel"
-                            placeholder="e.g., 9876543210"
-                            value={phoneNo}
-                            onChange={(e) => {
-                              setPhoneNo(e.target.value);
-                              if (orderError) setOrderError(null);
-                              // Clear selections when user changes phone number
-                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
-                            }}
-                            required
-                            />
-                        </div>
-                        {orderError && (
-                            <Alert variant="destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertTitle>Error</AlertTitle>
-                                <AlertDescription>{orderError}</AlertDescription>
-                            </Alert>
-                        )}
+                      <div className="grid gap-2">
+                          <Label htmlFor="orderNumber">Order Number</Label>
+                          <div className="absolute left-3 flex items-center pointer-events-none">
+                            <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded border border-gray-300">
+                              #OWR-MT
+                            </span>
+                          </div>
+                          <Input
+                          id="orderNumber"
+                          placeholder="e.g., OWR-MT1001"
+                          value={orderNumber}
+                          onChange={(e) => {
+                            setOrderNumber(e.target.value);
+                            if (orderError) setOrderError(null);
+                            // Clear selections when user starts typing new order number
+                            if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
+                          }}
+                          required
+                          />
+                      </div>
+                      <div className="grid gap-2">
+                          <Label htmlFor="phoneNo">Phone Number</Label>
+                          <Input
+                          id="phoneNo"
+                          type="tel"
+                          placeholder="e.g., 9876543210"
+                          value={phoneNo}
+                          onChange={(e) => {
+                            setPhoneNo(e.target.value);
+                            if (orderError) setOrderError(null);
+                            // Clear selections when user changes phone number
+                            if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
+                          }}
+                          required
+                          />
+                      </div>
+                      {orderError && (
+                          <Alert variant="destructive">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>Error</AlertTitle>
+                              <AlertDescription>{orderError}</AlertDescription>
+                          </Alert>
+                      )}
                     </CardContent>
                     <CardFooter>
                         <Button type="submit" disabled={findingOrder} className="w-full">

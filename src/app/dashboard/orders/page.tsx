@@ -877,6 +877,9 @@ export default function OrdersPage() {
         //       Cancel
         //     </DropdownMenuItem>
         // );
+        return (
+          <></>
+        );
       case 'In Transit':
       case 'RTO In Transit':
       case 'Out For Delivery':
@@ -886,6 +889,9 @@ export default function OrdersPage() {
         //     Cancel
         //   </DropdownMenuItem>
         // );
+        return (
+          <></>
+        );
       case 'Delivered':
       case 'DTO Requested':
         return (

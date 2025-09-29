@@ -263,21 +263,21 @@ export default function BookReturnPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="orderNumber">Order Number</Label>
                         <div className="relative flex items-center">
-                          <div className="absolute left-1 flex items-center pointer-events-none">
+                          <div className="absolute left-[5px] flex items-center pointer-events-none">
                             <span className="text-sm font-semibold bg-white px-2 py-1 rounded border border-gray-300">
                               #OWR-MT
                             </span>
                           </div>
                           <Input
                             id="orderNumber"
-                            placeholder="MT14659"
+                            placeholder="e.g., 14569"
                             value={orderNumber}
                             onChange={(e) => {
                               setOrderNumber(e.target.value);
                               if (orderError) setOrderError(null);
                               if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                             }}
-                            className="pl-[85px]"
+                            className="pl-[86.5px]"
                             required
                           />
                         </div>

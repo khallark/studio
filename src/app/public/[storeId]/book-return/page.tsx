@@ -260,25 +260,27 @@ export default function BookReturnPage() {
                         <CardDescription>Enter your order number and the phone number used for the order.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="relative grid gap-2">
-                          <Label htmlFor="orderNumber">Order Number</Label>
+                      <div className="grid gap-2">
+                        <Label htmlFor="orderNumber">Order Number</Label>
+                        <div className="relative flex items-center">
                           <div className="absolute left-3 flex items-center pointer-events-none">
-                            <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded border border-gray-300">
+                            <span className="text-sm font-semibold bg-white px-2 py-1 rounded border border-gray-300">
                               #OWR-MT
                             </span>
                           </div>
                           <Input
-                          id="orderNumber"
-                          placeholder="e.g., OWR-MT1001"
-                          value={orderNumber}
-                          onChange={(e) => {
-                            setOrderNumber(e.target.value);
-                            if (orderError) setOrderError(null);
-                            // Clear selections when user starts typing new order number
-                            if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
-                          }}
-                          required
+                            id="orderNumber"
+                            placeholder="MT14659"
+                            value={orderNumber}
+                            onChange={(e) => {
+                              setOrderNumber(e.target.value);
+                              if (orderError) setOrderError(null);
+                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
+                            }}
+                            className="pl-32"
+                            required
                           />
+                        </div>
                       </div>
                       <div className="grid gap-2">
                           <Label htmlFor="phoneNo">Phone Number</Label>

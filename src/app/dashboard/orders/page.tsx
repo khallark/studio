@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
@@ -350,14 +350,18 @@ export default function OrdersPage() {
 
   const handleBulkUpdateStatus = useCallback(async (status: CustomStatus) => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
-    
-    // Intercept dispatch action to use the correct endpoint
+
     if (status === 'Dispatched') {
       await handleDispatch(selectedOrders);
       return;
     }
-    
+
     setIsBulkUpdating(true);
+    const { dismiss } = toast({
+      title: 'Bulk Update in Progress',
+      description: `Updating ${selectedOrders.length} order(s) to "${status}". Please wait.`,
+    });
+
     try {
         const idToken = await user.getIdToken();
         const response = await fetch('/api/shopify/orders/bulk-update-status', {
@@ -377,16 +381,17 @@ export default function OrdersPage() {
         if (!response.ok) {
             throw new Error(result.details || `Failed to update ${selectedOrders.length} orders.`);
         }
-
+        
+        dismiss();
         toast({
             title: 'Bulk Update Successful',
             description: result.message,
         });
 
-        setSelectedOrders([]); // Clear selection after successful update
+        setSelectedOrders([]);
 
     } catch (error) {
-        console.error('Bulk update error:', error);
+        dismiss();
         toast({
             title: 'Bulk Update Failed',
             description: error instanceof Error ? error.message : 'An unknown error occurred.',
@@ -1063,6 +1068,12 @@ export default function OrdersPage() {
                   </Button>
                 </>
               );
+            case 'Delivered':
+                return (
+                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Closed')}>
+                        {isBulkUpdating ? 'Closing...' : `Close Orders (${selectedOrders.length})`}
+                    </Button>
+                )
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
@@ -1323,29 +1334,31 @@ export default function OrdersPage() {
                                         aria-label={`Select order ${order.name}`}
                                         />
                                     </TableCell>
-                                    <TableCell className="font-medium py-2">{order.name}</TableCell>
-                                    <TableCell className="py-2 text-xs">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                                    {activeTab === 'All Orders'
-                                      ? <TableCell className="py-2">
-                                            <Badge variant='default' className="capitalize text-xs">
-                                            {order.customStatus}
+                                    <TableCell className="font-medium text-sm md:text-base py-2">{order.name}</TableCell>
+                                    <TableCell className="text-xs md:text-sm py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                                    {activeTab === 'All Orders' && (
+                                        <TableCell className="py-2">
+                                            <Badge 
+                                                variant={order.customStatus === 'Delivered' ? 'success' : order.customStatus === 'Cancelled' ? 'destructive' : 'secondary'} 
+                                                className="capitalize text-xs"
+                                            >
+                                                {order.customStatus}
                                             </Badge>
                                         </TableCell>
-                                      : <></>
-                                    }
+                                    )}
                                     {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
-                                      ? <TableCell className="py-2 text-xs">{order.awb || 'N/A'}</TableCell>
+                                      ? <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
                                       : <></>
                                     }
                                     {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
-                                      ? <TableCell className="py-2 text-xs">{order.awb_reverse || 'N/A'}</TableCell>
+                                      ? <TableCell className="text-xs md:text-sm py-2">{order.awb_reverse || 'N/A'}</TableCell>
                                       : <></>
                                     }
-                                    <TableCell className="text-xs">{customerName || order.email}</TableCell>
-                                    <TableCell className="text-right text-xs font-mono">
+                                    <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
                                     </TableCell>
-                                    <TableCell className="text-right text-xs font-mono">
+                                    <TableCell className="text-right text-xs md:text-sm font-mono">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
                                     </TableCell>
                                     <TableCell className="py-2">
@@ -1358,7 +1371,7 @@ export default function OrdersPage() {
                                         {order.fulfillmentStatus || 'unfulfilled'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-xs">
+                                    <TableCell className="text-xs md:text-sm">
                                         {order.raw?.line_items?.length || 0}
                                     </TableCell>
                                     <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
@@ -1614,4 +1627,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
 

@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         'Lost',
         'Closed',
         'RTO Closed',
+        'DTO Closed',
         'Cancelled'
     ];
     if (!validStatuses.includes(status)) {
@@ -90,8 +91,8 @@ export async function POST(req: NextRequest) {
                     case "RTO Closed":
                         remarks = "This order was returned and received by the owner";
                         break;
-                    case "DTO Requested":
-                        remarks = "A return for this order was requested by the customer";
+                    case 'DTO Closed':
+                        remarks = "This order was returned by the customed and received by the owner";
                         break;
                     }
                     return remarks; 

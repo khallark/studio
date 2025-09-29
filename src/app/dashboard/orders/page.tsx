@@ -86,6 +86,7 @@ type CustomStatus =
   | 'Lost'
   | 'Closed'
   | 'RTO Closed'
+  | 'DTO Closed'
   | 'Cancelled';
 
 
@@ -441,6 +442,7 @@ export default function OrdersPage() {
       'Lost': 0,
       'Closed': 0,
       'RTO Closed': 0,
+      'DTO Closed': 0,
       'Cancelled': 0,
     };
 
@@ -910,8 +912,8 @@ export default function OrdersPage() {
         );
       case 'DTO Delivered':
         return (
-           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
-            Close Order
+           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'DTO Closed')}>
+            DTO Close Order
           </DropdownMenuItem>
         );
       case 'RTO Delivered':
@@ -924,6 +926,7 @@ export default function OrdersPage() {
         return null;
       case 'Closed':
       case 'RTO Closed':
+      case 'DTO Closed':
       case 'Cancelled':
         // return (
         //   <>
@@ -1093,6 +1096,7 @@ export default function OrdersPage() {
             case 'Lost':
             case 'Closed':
             case 'RTO Closed':
+            case 'DTO Closed':
               return (
                 <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
@@ -1245,6 +1249,9 @@ export default function OrdersPage() {
                           </TabsTrigger>
                           <TabsTrigger value="RTO Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
                               RTO Closed ({statusCounts['RTO Closed'] || 0})
+                          </TabsTrigger>
+                          <TabsTrigger value="DTO Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                              DTO Closed ({statusCounts['DTO Closed'] || 0})
                           </TabsTrigger>
                           <TabsTrigger value="Cancelled" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
                               Cancelled ({statusCounts['Cancelled'] || 0})

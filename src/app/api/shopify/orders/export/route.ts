@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
            flattenedData.push({
                 'Order name': order.name,
                 'AWB': order.awb ?? 'N/A',
+                'Return AWB': order.awb_reverse ?? 'N/A',
                 'Courier': order.courier ?? 'N/A',
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
         flattenedData.push({
             'Order name': order.name,
             'AWB': order.awb ?? 'N/A',
+            'Return AWB': order.awb_reverse ?? 'N/A',
             'Courier': order.courier ?? 'N/A',
                 'Order date': new Date(order.createdAt).toLocaleDateString(),
                 'Customer': customerName,

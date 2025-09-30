@@ -19,10 +19,11 @@ import { X, Search } from 'lucide-react';
 interface AwbBulkSelectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (awbs: string[]) => void;
+  onConfirm: (awbs: string[], customStatus: string) => void;
+  customStatus: string;
 }
 
-export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSelectionDialogProps) {
+export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm, customStatus }: AwbBulkSelectionDialogProps) {
   const [scannedAwbs, setScannedAwbs] = useState<Set<string>>(new Set());
   const [currentAwb, setCurrentAwb] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,7 +62,7 @@ export function AwbBulkSelectionDialog({ isOpen, onClose, onConfirm }: AwbBulkSe
   );
 
   const handleConfirm = () => {
-    onConfirm(Array.from(scannedAwbs));
+    onConfirm(Array.from(scannedAwbs), customStatus);
     onClose();
   };
 

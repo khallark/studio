@@ -184,6 +184,7 @@ export default function OrdersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
   const [isAwbBulkSelectOpen, setIsAwbBulkSelectOpen] = useState(false);
+  const [awbBulkSelectStatus, setAwbBulkSelectStatus] = useState('');
   
   const [isUpdatingShippedStatuses, setIsUpdatingShippedStatuses] = useState(false);
 
@@ -953,10 +954,17 @@ export default function OrdersPage() {
         }
     };
     
-    const handleBulkSelectByAwb = (awbs: string[]) => {
+    const handleBulkSelectByAwb = (awbs: string[], customStatus: string) => {
+      if(!customStatus) {
+        toast({
+            title: 'Internal Error',
+            description: `Please correct it`
+        });
+        return;
+      }
         const readyToDispatchAwbs = new Map(
             filteredOrders
-                .filter(o => o.customStatus === 'Ready To Dispatch' && o.awb)
+                .filter(o => o.customStatus === customStatus && o.awb)
                 .map(o => [o.awb!, o.id])
         );
 
@@ -1050,7 +1058,10 @@ export default function OrdersPage() {
             case 'Ready To Dispatch':
               return (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setIsAwbBulkSelectOpen(true)}>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setIsAwbBulkSelectOpen(true);
+                    setAwbBulkSelectStatus("Ready To Dispatch");
+                  }}>
                       <ScanBarcode className="mr-2 h-4 w-4" />
                       AWB Bulk Selection
                   </Button>
@@ -1079,11 +1090,29 @@ export default function OrdersPage() {
                         {isBulkUpdating ? 'Closing...' : `Close Orders (${selectedOrders.length})`}
                     </Button>
                 )
+            case 'RTO Delivered':
+              return (
+                <>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setIsAwbBulkSelectOpen(true);
+                  setAwbBulkSelectStatus("RTO Delivered");
+                }}>
+                    <ScanBarcode className="mr-2 h-4 w-4" />
+                    AWB Bulk Selection
+                </Button>
+                <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                </Button>
+                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
+                    {isBulkUpdating ? 'RTO Closing...' : 'RTO Close'}
+                </Button>
+                </>
+              );
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
             case 'RTO In Transit':
-            case 'RTO Delivered':
             case 'DTO Requested':
             case 'DTO Booked':
             case 'DTO In Transit':
@@ -1472,8 +1501,12 @@ export default function OrdersPage() {
     
     <AwbBulkSelectionDialog 
         isOpen={isAwbBulkSelectOpen}
-        onClose={() => setIsAwbBulkSelectOpen(false)}
+        onClose={() => {
+          setIsAwbBulkSelectOpen(false)
+          setAwbBulkSelectStatus('')
+        }}
         onConfirm={handleBulkSelectByAwb}
+        customStatus={awbBulkSelectStatus}
     />
 
     <AssignAwbDialog

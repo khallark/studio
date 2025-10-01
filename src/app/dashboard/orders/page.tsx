@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -619,6 +620,15 @@ export default function OrdersPage() {
 
     return filtered;
 }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
+
+  const availabilityCounts = useMemo(() => {
+    const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');
+    
+    const available = confirmedOrders.filter(order => order.tags_confirmed?.includes('Available')).length;
+    const unavailable = confirmedOrders.length - available;
+
+    return { available, unavailable };
+  }, [orders]);
 
 
   const indexOfLastOrder = currentPage * rowsPerPage;
@@ -1333,9 +1343,9 @@ export default function OrdersPage() {
                                 <SelectValue placeholder="Filter by availability..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Items</SelectItem>
-                                <SelectItem value="available">Available</SelectItem>
-                                <SelectItem value="unavailable">Unavailable</SelectItem>
+                                <SelectItem value="all">All Items ({availabilityCounts.available + availabilityCounts.unavailable})</SelectItem>
+                                <SelectItem value="available">Available ({availabilityCounts.available})</SelectItem>
+                                <SelectItem value="unavailable">Unavailable ({availabilityCounts.unavailable})</SelectItem>
                             </SelectContent>
                         </Select>
                     )}
@@ -1345,58 +1355,58 @@ export default function OrdersPage() {
                 <div className="border-b border-gray-200 shrink-0 bg-white shadow-sm">
                   <div className="overflow-x-auto px-2 sm:px-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                       <TabsList className="inline-flex h-auto rounded-none bg-transparent p-0 gap-0 min-w-max">
-                          <TabsTrigger value="All Orders" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="All Orders" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               All ({statusCounts['All Orders'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="New" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="New" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               New ({statusCounts['New'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Confirmed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Confirmed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Confirmed ({statusCounts['Confirmed'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Ready To Dispatch" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Ready To Dispatch" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Dispatched" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Dispatched" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Dispatched ({statusCounts['Dispatched'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               In Transit ({statusCounts['In Transit'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Out For Delivery" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Out For Delivery" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Out For Delivery ({statusCounts['Out For Delivery'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Delivered ({statusCounts['Delivered'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="RTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="RTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               RTO In Transit ({statusCounts['RTO In Transit'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="RTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="RTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               RTO Delivered ({statusCounts['RTO Delivered'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="DTO Requested" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="DTO Requested" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               DTO Requested ({statusCounts['DTO Requested'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="DTO Booked" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="DTO Booked" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               DTO Booked ({statusCounts['DTO Booked'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="DTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="DTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               DTO In Transit ({statusCounts['DTO In Transit'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="DTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="DTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               DTO Delivered ({statusCounts['DTO Delivered'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Lost" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Lost" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Lost ({statusCounts['Lost'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Closed ({statusCounts['Closed'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="RTO Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="RTO Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               RTO Closed ({statusCounts['RTO Closed'] || 0})
                           </TabsTrigger>
-                          <TabsTrigger value="Cancelled" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50 data-[state=active]:shadow-none">
+                          <TabsTrigger value="Cancelled" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Cancelled ({statusCounts['Cancelled'] || 0})
                           </TabsTrigger>
                       </TabsList>
@@ -1824,3 +1834,6 @@ export default function OrdersPage() {
   );
 }
 
+
+
+    

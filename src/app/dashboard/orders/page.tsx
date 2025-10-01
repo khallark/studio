@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -192,6 +193,27 @@ export default function OrdersPage() {
   const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
   
   const [isDownloadingProductsExcel, setIsDownloadingProductsExcel] = useState(false);
+  
+  // State for item availability checklist
+  const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
+
+  const handleItemCheck = (orderId: string, lineItemId: string | number) => {
+    setItemSelection(prev => {
+        const newSelection = { ...prev };
+        if (!newSelection[orderId]) {
+            newSelection[orderId] = new Set();
+        }
+        
+        const orderItems = new Set(newSelection[orderId]);
+        if (orderItems.has(lineItemId)) {
+            orderItems.delete(lineItemId);
+        } else {
+            orderItems.add(lineItemId);
+        }
+        newSelection[orderId] = orderItems;
+        return newSelection;
+    });
+  };
 
   useEffect(() => {
     document.title = "Dashboard - Orders";
@@ -608,6 +630,36 @@ export default function OrdersPage() {
             return 'secondary';
     }
   }
+  
+    const getStatusBadgeVariant = (status: CustomStatus | string | null): "default" | "secondary" | "destructive" | "outline" | "success" => {
+        switch (status) {
+            case 'New':
+            case 'Confirmed':
+            case 'Ready To Dispatch':
+                return 'secondary';
+            case 'Dispatched':
+            case 'In Transit':
+            case 'Out For Delivery':
+            case 'RTO In Transit':
+            case 'DTO Requested':
+            case 'DTO Booked':
+            case 'DTO In Transit':
+                return 'default';
+            case 'Delivered':
+            case 'RTO Delivered':
+            case 'DTO Delivered':
+                return 'success';
+            case 'Lost':
+            case 'Cancelled':
+                return 'destructive';
+            case 'Closed':
+            case 'RTO Closed':
+                return 'outline';
+            default:
+                return 'secondary';
+        }
+    }
+
 
   const handleDownloadSlips = useCallback(async () => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
@@ -1076,12 +1128,6 @@ export default function OrdersPage() {
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
                       {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
                   </Button>
-                  <Button asChild size="sm">
-                    <Link href="/dashboard/orders/awb-processing">
-                        Go to AWB Processing
-                        <MoveRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
                 </>
               );
             case 'Delivered':
@@ -1109,6 +1155,15 @@ export default function OrdersPage() {
                 </Button>
                 </>
               );
+            case 'Cancelled':
+              return (
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/orders/awb-processing">
+                        Go to AWB Processing
+                        <MoveRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+              );
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
@@ -1126,7 +1181,6 @@ export default function OrdersPage() {
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
                 </Button>
               );
-            case 'Cancelled':
             default:
           }
         })()}
@@ -1365,7 +1419,7 @@ export default function OrdersPage() {
                                     {activeTab === 'All Orders' && (
                                         <TableCell className="py-2">
                                             <Badge 
-                                                variant={order.customStatus === 'Delivered' ? 'success' : order.customStatus === 'Cancelled' ? 'destructive' : 'secondary'} 
+                                                variant={getStatusBadgeVariant(order.customStatus)} 
                                                 className="capitalize text-xs"
                                             >
                                                 {order.customStatus}
@@ -1397,8 +1451,46 @@ export default function OrdersPage() {
                                         {order.fulfillmentStatus || 'unfulfilled'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-xs md:text-sm">
-                                        {order.raw?.line_items?.length || 0}
+                                    <TableCell className="text-xs md:text-sm" onClick={(e) => e.stopPropagation()}>
+                                        {activeTab === 'Confirmed' ? (
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-8">
+                                                        {order.raw?.line_items?.length || 0} items
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-80">
+                                                    <div className="grid gap-4">
+                                                        <div className="space-y-2">
+                                                            <h4 className="font-medium leading-none">Items for Order {order.name}</h4>
+                                                            <p className="text-sm text-muted-foreground">Select items to make available.</p>
+                                                        </div>
+                                                        <div className="grid gap-2">
+                                                            {order.raw.line_items.map((item: any) => (
+                                                                <div key={item.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
+                                                                    <Checkbox
+                                                                        id={`item-${order.id}-${item.id}`}
+                                                                        checked={itemSelection[order.id]?.has(item.id)}
+                                                                        onCheckedChange={() => handleItemCheck(order.id, item.id)}
+                                                                    />
+                                                                    <Label htmlFor={`item-${order.id}-${item.id}`} className="flex-1 text-sm font-normal">
+                                                                        {item.title} (Qty: {item.quantity})
+                                                                    </Label>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <Button
+                                                            className="w-full"
+                                                            disabled={(itemSelection[order.id]?.size || 0) !== order.raw.line_items.length}
+                                                        >
+                                                            Make Available
+                                                        </Button>
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
+                                        ) : (
+                                            order.raw?.line_items?.length || 0
+                                        )}
                                     </TableCell>
                                     <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
                                         <DropdownMenu>
@@ -1657,3 +1749,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

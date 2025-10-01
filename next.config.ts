@@ -73,8 +73,8 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/shiprocket/refresh-token/route',
       },
       {
-        source: '/api/shopify/courier/download-failed-jobs',
-        destination: '/api/shopify/courier/download-failed-jobs/route',
+        source: '/api/shopify/courier/download-jobs',
+        destination: '/api/shopify/courier/download-jobs/route',
       },
       {
         source: '/api/shopify/orders/download-slips',

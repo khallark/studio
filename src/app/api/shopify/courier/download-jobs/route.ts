@@ -20,10 +20,14 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, batchId } = await req.json();
+    const { shop, batchId, status } = await req.json();
 
-    if (!shop || !batchId) {
+    if (!shop || !batchId || !status) {
       return NextResponse.json({ error: 'Shop and batchId are required' }, { status: 400 });
+    }
+
+    if(typeof status !== 'string' || !['success', 'failed'].includes(status)) {
+      return NextResponse.json({ error: 'Wrong status value (only "success" or "failed")' }, { status: 400 });
     }
 
     const userId = await getUserIdFromToken(req);
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     const jobsRef = db.collection('accounts').doc(shop).collection('shipment_batches').doc(batchId).collection('jobs');
-    const failedJobsSnapshot = await jobsRef.where('status', '==', 'failed').get();
+    const failedJobsSnapshot = await jobsRef.where('status', '==', status).get();
 
     if (failedJobsSnapshot.empty) {
         return NextResponse.json({ error: 'No failed jobs found for this batch.' }, { status: 404 });

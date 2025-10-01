@@ -190,6 +190,7 @@ export default function AwbProcessingPage() {
 function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
   const [user] = useAuthState(auth);
   const { toast } = useToast();
+  const [isDownloadingSuccess, setIsDownloadingSuccess] = useState(false);
   const [isDownloadingFailed, setIsDownloadingFailed] = useState(false);
   const done = (batch?.success || 0) + (batch?.failed || 0);
   const pct = batch?.total > 0 ? Math.round((done / batch.total) * 100) : 0;
@@ -208,13 +209,13 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
 
     try {
         const idToken = await user.getIdToken();
-        const response = await fetch('/api/shopify/courier/download-failed-jobs', {
+        const response = await fetch('/api/shopify/courier/download-jobs', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`,
             },
-            body: JSON.stringify({ shop: shopId, batchId }),
+            body: JSON.stringify({ shop: shopId, batchId, status: "success" }),
         });
 
         if (!response.ok) {
@@ -241,6 +242,49 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
         });
     } finally {
         setIsDownloadingFailed(false);
+    }
+  }, [shopId, user, toast]);
+
+  const handleDownloadSuccess = useCallback(async (batchId: string) => {
+    if (!shopId || !user) return;
+    setIsDownloadingSuccess(true);
+    toast({ title: 'Generating Report', description: 'Your download will begin shortly.' });
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/courier/download-jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ shop: shopId, batchId, status: "success" }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `success-jobs-${batchId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Failed to download success jobs report:', error);
+      toast({
+        title: 'Download Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloadingSuccess(false);
     }
   }, [shopId, user, toast]);
 
@@ -275,23 +319,34 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
             </div>
             
             <div className="flex items-center gap-4 mt-3 sm:mt-0">
-                 {batch.failed > 0 && (
-                    <TooltipProvider>
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleDownloadFailed(batch.id)} disabled={isDownloadingFailed}>
-                                <Download className="mr-2 h-4 w-4" />
-                                {isDownloadingFailed ? 'Downloading...' : 'Failed Report'}
-                            </Button>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button size="sm" variant="outline" onClick={handleRetryFailed}>
-                                    <RotateCcw className="mr-2 h-4 w-4" /> Retry Failed
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </TooltipProvider>
+                {batch.success > 0 && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => handleDownloadSuccess(batch.id)} 
+                    disabled={isDownloadingSuccess}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {isDownloadingSuccess ? 'Downloading...' : 'Success Report'}
+                  </Button>
+                )}
+                {batch.failed > 0 && (
+                  <TooltipProvider>
+                      <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleDownloadFailed(batch.id)} disabled={isDownloadingFailed}>
+                              <Download className="mr-2 h-4 w-4" />
+                              {isDownloadingFailed ? 'Downloading...' : 'Failed Report'}
+                          </Button>
+                          <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <Button size="sm" variant="outline" onClick={handleRetryFailed}>
+                                  <RotateCcw className="mr-2 h-4 w-4" /> Retry Failed
+                                  </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
+                          </Tooltip>
+                      </div>
+                  </TooltipProvider>
                 )}
                  <Button asChild variant="ghost" size="sm">
                     <Link

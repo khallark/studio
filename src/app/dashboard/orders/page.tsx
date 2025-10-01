@@ -111,6 +111,7 @@ interface Order {
   awb_reverse?: string;
   courier?: string;
   isDeleted?: boolean; // Tombstone flag
+  tags_confirmed?: string[];
   customStatusesLogs?: CustomStatusLog[];
   raw: {
     cancelled_at: string | null;
@@ -180,6 +181,7 @@ export default function OrdersPage() {
   const [invertSearch, setInvertSearch] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [courierFilter, setCourierFilter] = useState<string>('all');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable'>('all');
   
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -196,6 +198,7 @@ export default function OrdersPage() {
   
   // State for item availability checklist
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
+  const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<string | null>(null);
 
   const handleItemCheck = (orderId: string, lineItemId: string | number) => {
     setItemSelection(prev => {
@@ -214,6 +217,53 @@ export default function OrdersPage() {
         return newSelection;
     });
   };
+  
+    const handleAvailabilityToggle = async (order: Order) => {
+        if (!userData?.activeAccountId || !user) return;
+        
+        const isCurrentlyAvailable = order.tags_confirmed?.includes('Available');
+        const action = isCurrentlyAvailable ? 'remove' : 'add';
+
+        setIsUpdatingAvailability(order.id);
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/shopify/orders/update-tags', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    shop: userData.activeAccountId,
+                    orderId: order.id,
+                    tag: 'Available',
+                    action,
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to update availability');
+
+            toast({
+                title: 'Availability Updated',
+                description: `Order ${order.name} has been marked as ${action === 'add' ? 'Available' : 'Unavailable'}.`
+            });
+            // Reset checkbox state for this order after action
+            setItemSelection(prev => {
+                const newState = {...prev};
+                delete newState[order.id];
+                return newState;
+            });
+        } catch (error) {
+            toast({
+                title: 'Update Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUpdatingAvailability(null);
+        }
+    };
 
   useEffect(() => {
     document.title = "Dashboard - Orders";
@@ -536,6 +586,15 @@ export default function OrdersPage() {
       }
     }
     
+    // Filter by availability on 'Confirmed' tab
+    if (activeTab === 'Confirmed' && availabilityFilter !== 'all') {
+      if (availabilityFilter === 'available') {
+        filtered = filtered.filter(order => order.tags_confirmed?.includes('Available'));
+      } else if (availabilityFilter === 'unavailable') {
+        filtered = filtered.filter(order => !order.tags_confirmed?.includes('Available'));
+      }
+    }
+    
     // Finally, apply sorting
     filtered.sort((a, b) => {
         let valA, valB;
@@ -559,7 +618,7 @@ export default function OrdersPage() {
 
 
     return filtered;
-}, [orders, activeTab, searchQuery, dateRange, courierFilter, invertSearch, sortKey, sortDirection]);
+}, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
 
 
   const indexOfLastOrder = currentPage * rowsPerPage;
@@ -592,7 +651,7 @@ export default function OrdersPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedOrders([]);
-  }, [activeTab, dateRange, courierFilter]);
+  }, [activeTab, dateRange, courierFilter, availabilityFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -1079,6 +1138,20 @@ export default function OrdersPage() {
                 </Button>
               );
             case 'New':
+              return (
+                <>
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                      {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+                  </Button>
+                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
+                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                </>
+              );
             case 'Confirmed':
               return (
                 <>
@@ -1086,22 +1159,13 @@ export default function OrdersPage() {
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
                   </Button>
-                  {activeTab === 'New' && 
-                      <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                          {isBulkUpdating ? 'Confirming...' : 'Confirm'}
-                      </Button>
-                  }
-                  {activeTab === 'Confirmed' && (
-                    <>
-                      <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
-                          {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                          {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel (${selectedOrders.length})`}
-                      </Button>
-                      <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
-                          Assign AWBs
-                      </Button>
-                    </>
-                  )}
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
+                      {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                      {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel (${selectedOrders.length})`}
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
+                      Assign AWBs
+                  </Button>
                   <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
                       {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
                   </Button>
@@ -1156,14 +1220,7 @@ export default function OrdersPage() {
                 </>
               );
             case 'Cancelled':
-              return (
-                  <Button asChild size="sm">
-                    <Link href="/dashboard/orders/awb-processing">
-                        Go to AWB Processing
-                        <MoveRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-              );
+              return null;
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
@@ -1267,6 +1324,18 @@ export default function OrdersPage() {
                                 <SelectItem value="all">All Couriers</SelectItem>
                                 <SelectItem value="Delhivery">Delhivery</SelectItem>
                                 <SelectItem value="Shiprocket">Shiprocket</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
+                    {activeTab === 'Confirmed' && (
+                        <Select value={availabilityFilter} onValueChange={(value) => setAvailabilityFilter(value as any)}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectValue placeholder="Filter by availability..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Items</SelectItem>
+                                <SelectItem value="available">Available</SelectItem>
+                                <SelectItem value="unavailable">Unavailable</SelectItem>
                             </SelectContent>
                         </Select>
                     )}
@@ -1481,9 +1550,14 @@ export default function OrdersPage() {
                                                         </div>
                                                         <Button
                                                             className="w-full"
-                                                            disabled={(itemSelection[order.id]?.size || 0) !== order.raw.line_items.length}
+                                                            onClick={() => handleAvailabilityToggle(order)}
+                                                            disabled={
+                                                                isUpdatingAvailability === order.id ||
+                                                                (itemSelection[order.id]?.size || 0) !== order.raw.line_items.length
+                                                            }
                                                         >
-                                                            Make Available
+                                                            {isUpdatingAvailability === order.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                            {order.tags_confirmed?.includes('Available') ? 'Make Unavailable' : 'Make Available'}
                                                         </Button>
                                                     </div>
                                                 </PopoverContent>
@@ -1750,4 +1824,3 @@ export default function OrdersPage() {
   );
 }
 
-    

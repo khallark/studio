@@ -215,7 +215,7 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`,
             },
-            body: JSON.stringify({ shop: shopId, batchId, status: "success" }),
+            body: JSON.stringify({ shop: shopId, batchId, status: "failed" }),
         });
 
         if (!response.ok) {

@@ -412,13 +412,9 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
 
                 <div>
                     <div className="flex items-center gap-2">
-                        <Link
-                            href={`/dashboard/orders/awb-processing/${batch.id}?shop=${encodeURIComponent(shopId)}`}
-                            className="font-semibold hover:underline"
-                            title={`Open batch ${batch.id}`}
-                        >
+                        <div className="font-semibold hover:underline">
                             Batch {batch.id}
-                        </Link>
+                        </div>
                         <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted border">
                             {batch.courier || batch.carrier || 'Unknown'}
                         </span>

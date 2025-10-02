@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
@@ -14,6 +13,8 @@ import {
   orderBy,
   query,
   Timestamp,
+  getDocs,
+  where,
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { PackagePlus, Loader2, CheckCircle, XCircle, RotateCcw, ChevronRight, Download } from 'lucide-react';
+import { PackagePlus, Loader2, CheckCircle, XCircle, RotateCcw, ChevronRight, Download, MoveRight } from 'lucide-react';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +40,9 @@ type ShipmentBatch = {
   success: number;
   failed: number;
   carrier?: string;
+  courier?: string;
+  pickupName?: string;
+  shippingMode?: string;
 };
 
 type UserData = { activeAccountId: string | null };
@@ -192,14 +196,122 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
   const { toast } = useToast();
   const [isDownloadingSuccess, setIsDownloadingSuccess] = useState(false);
   const [isDownloadingFailed, setIsDownloadingFailed] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const done = (batch?.success || 0) + (batch?.failed || 0);
   const pct = batch?.total > 0 ? Math.round((done / batch.total) * 100) : 0;
   const running = batch?.status === 'running' || done < (batch?.total || 0);
   const completed = !running && batch?.failed === 0;
 
+  const retryFailedAwbAssignments = useCallback(async (batchId: string) => {
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
+        return;
+    }
+    
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists() || !userDoc.data()?.activeAccountId) {
+        toast({ title: "No Active Store", description: "Could not find an active store to process orders for.", variant: "destructive" });
+        return;
+    }
+    const activeShopId = userDoc.data()?.activeAccountId;
+
+    setIsRetrying(true);
+
+    try {
+        // Get batch document to extract required fields
+        const batchRef = doc(db, 'accounts', activeShopId, 'shipment_batches', batchId);
+        const batchDoc = await getDoc(batchRef);
+        
+        if (!batchDoc.exists()) {
+            throw new Error('Batch not found');
+        }
+
+        const batchData = batchDoc.data();
+        const courier = batchData?.courier;
+        const pickupName = batchData?.pickupName;
+        const shippingMode = batchData?.shippingMode;
+
+        // Validate required fields
+        if (!courier || !pickupName || !shippingMode) {
+            toast({
+                title: "Missing Configuration",
+                description: "Batch is missing required fields (courier, pickupName, or shippingMode). Cannot retry.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        // Get all failed jobs from the batch's jobs subcollection
+        const jobsRef = collection(db, 'accounts', activeShopId, 'shipment_batches', batchId, 'jobs');
+        const failedJobsQuery = query(jobsRef, where('status', '==', 'failed'));
+        const failedJobsSnapshot = await getDocs(failedJobsQuery);
+
+        if (failedJobsSnapshot.empty) {
+            toast({
+                title: "No Failed Jobs",
+                description: "There are no failed jobs to retry for this batch.",
+            });
+            return;
+        }
+
+        // Extract order details from failed jobs
+        const ordersToProcess = failedJobsSnapshot.docs.map(jobDoc => {
+            const jobData = jobDoc.data();
+            return {
+                orderId: jobData.orderId,
+                name: jobData.orderName
+            };
+        });
+
+        // Call the API to retry
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/shopify/courier/assign-awb', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ 
+                shop: activeShopId,
+                orders: ordersToProcess,
+                courier,
+                pickupName,
+                shippingMode
+            }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.details || 'Failed to start AWB assignment');
+
+        toast({
+            title: `AWB Assignment Started`,
+            description: `Retrying ${ordersToProcess.length} failed order(s) in the background.`,
+            action: (
+                <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/orders/awb-processing">
+                        View Progress
+                        <MoveRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            )
+        });
+
+    } catch (error) {
+        console.error('Failed to retry failed jobs:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast({
+            title: 'Retry Failed',
+            description: message,
+            variant: 'destructive',
+        });
+    } finally {
+        setIsRetrying(false);
+    }
+  }, [user, toast]);
+
   const handleRetryFailed = async () => {
-    // Retry logic would go here
-    console.log(`Retrying failed jobs for batch ${batch.id}`);
+    await retryFailedAwbAssignments(batch.id);
   };
 
   const handleDownloadFailed = useCallback(async (batchId: string) => {
@@ -308,7 +420,7 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
                             Batch {batch.id}
                         </Link>
                         <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted border">
-                            {batch.carrier || 'Unknown'}
+                            {batch.courier || batch.carrier || 'Unknown'}
                         </span>
                     </div>
 
@@ -339,8 +451,8 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
                           </Button>
                           <Tooltip>
                               <TooltipTrigger asChild>
-                                  <Button size="sm" variant="outline" onClick={handleRetryFailed}>
-                                  <RotateCcw className="mr-2 h-4 w-4" /> Retry Failed
+                                  <Button size="sm" variant="outline" onClick={handleRetryFailed} disabled={isRetrying}>
+                                  <RotateCcw className="mr-2 h-4 w-4" /> {isRetrying ? 'Retrying...' : 'Retry Failed'}
                                   </Button>
                               </TooltipTrigger>
                               <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
@@ -348,13 +460,6 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
                       </div>
                   </TooltipProvider>
                 )}
-                 <Button asChild variant="ghost" size="sm">
-                    <Link
-                    href={`/dashboard/orders/awb-processing/${batch.id}?shop=${encodeURIComponent(shopId)}`}
-                    >
-                    Details <ChevronRight className="h-4 w-4 ml-1" />
-                    </Link>
-                </Button>
             </div>
         </div>
 

@@ -117,12 +117,16 @@ interface Order {
   raw: {
     cancelled_at: string | null;
     customer?: {
+      name?: string;
       first_name?: string;
       last_name?: string;
       phone?: string;
     };
     contact_email?: string;
     billing_address?: {
+        name?: string;
+        first_name?: string;
+        last_name?: string;
         phone?: string;
         address1: string;
         address2: string;
@@ -133,6 +137,9 @@ interface Order {
     };
     line_items: any[];
     shipping_address?: {
+        name?: string;
+        first_name?: string;
+        last_name?: string;
         phone?: string;
         address1: string;
         address2: string;
@@ -540,7 +547,7 @@ export default function OrdersPage() {
     return counts as Record<CustomStatus | 'All Orders', number>;
   }, [orders]);
   
-    const filteredOrders = useMemo(() => {
+  const filteredOrders = useMemo(() => {
     let filtered = orders.filter(order => !order.isDeleted);
 
     // Filter by status tab first
@@ -559,13 +566,25 @@ export default function OrdersPage() {
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         filtered = filtered.filter(order => {
-            const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim().toLowerCase();
-            const match = (
-                order.name.toLowerCase().includes(lowercasedQuery) ||
-                customerName.includes(lowercasedQuery) ||
-                (order.awb && order.awb.toLowerCase().includes(lowercasedQuery))
-            );
-            return invertSearch ? !match : match;
+          const customerName = 
+            order.raw.shipping_address?.name ??
+            order.raw.billing_address?.name ??
+            order.raw.customer?.name ??
+            `${order.raw.shipping_address?.first_name || ''} 
+            ${order.raw.shipping_address?.last_name || ''}`.trim() ??
+            `${order.raw.billing_address?.first_name || ''} 
+            ${order.raw.billing_address?.last_name || ''}`.trim() ??
+            `${order.raw.customer?.first_name || ''} 
+            ${order.raw.customer?.last_name || ''}`.trim() ??
+            order.email ??
+            "";
+          const match = (
+            order.name.toLowerCase().includes(lowercasedQuery) ||
+            customerName.includes(lowercasedQuery) ||
+            (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
+            (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery))
+          );
+          return invertSearch ? !match : match;
         });
     }
     
@@ -598,28 +617,28 @@ export default function OrdersPage() {
     
     // Finally, apply sorting
     filtered.sort((a, b) => {
-        let valA, valB;
-        
-        if (sortKey === 'createdAt') {
-            valA = new Date(a.createdAt).getTime();
-            valB = new Date(b.createdAt).getTime();
-        } else { // 'name'
-            valA = a.name;
-            valB = b.name;
-        }
+      let valA, valB;
+      
+      if (sortKey === 'createdAt') {
+          valA = new Date(a.createdAt).getTime();
+          valB = new Date(b.createdAt).getTime();
+      } else { // 'name'
+          valA = a.name;
+          valB = b.name;
+      }
 
-        if (valA < valB) {
-            return sortDirection === 'asc' ? -1 : 1;
-        }
-        if (valA > valB) {
-            return sortDirection === 'asc' ? 1 : -1;
-        }
-        return 0;
+      if (valA < valB) {
+          return sortDirection === 'asc' ? -1 : 1;
+      }
+      if (valA > valB) {
+          return sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
     });
 
 
     return filtered;
-}, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
+  }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
 
   const availabilityCounts = useMemo(() => {
     const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');
@@ -1478,7 +1497,19 @@ export default function OrdersPage() {
                                 ))
                             ) : currentOrders.length > 0 ? (
                                 currentOrders.map((order) => {
-                                const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim();
+                                
+                                const customerName = 
+                                  order.raw.shipping_address?.name ??
+                                  order.raw.billing_address?.name ??
+                                  order.raw.customer?.name ??
+                                  `${order.raw.shipping_address?.first_name || ''} 
+                                  ${order.raw.shipping_address?.last_name || ''}`.trim() ??
+                                  `${order.raw.billing_address?.first_name || ''} 
+                                  ${order.raw.billing_address?.last_name || ''}`.trim() ??
+                                  `${order.raw.customer?.first_name || ''} 
+                                  ${order.raw.customer?.last_name || ''}`.trim() ??
+                                  "";
+                                
                                 return (
                                     <TableRow 
                                     key={order.id} 

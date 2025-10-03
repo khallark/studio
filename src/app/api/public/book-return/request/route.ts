@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        if (!selectedVariantIds || !Array.isArray(selectedVariantIds) || selectedVariantIds.length === 0) {
+        if (!selectedVariantIds || !Array.isArray(selectedVariantIds)) {
             return NextResponse.json({ 
                 error: 'At least one item variant must be selected for return.' 
             }, { status: 400 });

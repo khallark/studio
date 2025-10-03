@@ -52,6 +52,28 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
+        // Get bucket reference
+        const bucket = storage.bucket();
+        const folderPath = `return-images/${session.storeId}/${orderId}/`;
+
+        // Delete all existing images in the folder
+        try {
+            const [files] = await bucket.getFiles({ prefix: folderPath });
+            
+            if (files.length > 0) {
+                // Delete all files in parallel
+                await Promise.all(
+                    files.map(file => file.delete().catch(err => {
+                        console.warn(`Failed to delete file ${file.name}:`, err);
+                    }))
+                );
+                console.log(`Deleted ${files.length} existing images from ${folderPath}`);
+            }
+        } catch (deleteError) {
+            console.warn('Error deleting existing files:', deleteError);
+            // Continue with upload even if deletion fails
+        }
+
         // Convert File to Buffer
         const arrayBuffer = await imageFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -59,10 +81,9 @@ export async function POST(req: NextRequest) {
         // Generate unique filename
         const fileExtension = imageFile.name.split('.').pop() || 'jpg';
         const uniqueFileName = `${session.storeId}_${orderId}_${uuidv4()}.${fileExtension}`;
-        const filePath = `return-images/${session.storeId}/${orderId}/${uniqueFileName}`;
+        const filePath = `${folderPath}${uniqueFileName}`;
 
         // Upload to Firebase Storage
-        const bucket = storage.bucket();
         const file = bucket.file(filePath);
 
         await file.save(buffer, {

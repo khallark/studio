@@ -24,12 +24,14 @@ export async function POST(req: NextRequest) {
 
         // Input validation
         if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
+            console.error('Valid Order ID is required.');
             return NextResponse.json({ 
                 error: 'Valid Order ID is required.' 
             }, { status: 400 });
         }
 
         if (!imageFile) {
+            console.error('Image file is required.');
             return NextResponse.json({ 
                 error: 'Image file is required.' 
             }, { status: 400 });
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
 
         // Validate file type
         if (!ALLOWED_MIME_TYPES.includes(imageFile.type)) {
+            console.error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.')
             return NextResponse.json({ 
                 error: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.' 
             }, { status: 400 });
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
 
         // Validate file size
         if (imageFile.size > MAX_FILE_SIZE) {
+            console.error('File size exceeds 2 MB limit.');
             return NextResponse.json({ 
                 error: 'File size exceeds 2 MB limit.' 
             }, { status: 400 });
@@ -103,17 +107,20 @@ export async function POST(req: NextRequest) {
         }
 
         if (error.code === 'storage/unauthorized') {
+            console.error('Unauthorized to upload files.');
             return NextResponse.json({ 
                 error: 'Unauthorized to upload files.' 
             }, { status: 403 });
         }
 
         if (error.code === 'storage/quota-exceeded') {
+            console.error('Storage quota exceeded. Please contact support.');
             return NextResponse.json({ 
                 error: 'Storage quota exceeded. Please contact support.' 
             }, { status: 507 });
         }
 
+        console.error('An internal server error occurred during upload. Please try again later.');
         return NextResponse.json({ 
             error: 'An internal server error occurred during upload. Please try again later.' 
         }, { status: 500 });

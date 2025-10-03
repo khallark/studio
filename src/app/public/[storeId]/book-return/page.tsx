@@ -671,7 +671,7 @@ export default function BookReturnPage() {
                         <Separator />
 
                         <div className="flex flex-col sm:flex-row gap-3">
-                          {order.customStatus === 'DTO Requested' && (
+                          {order.status === 'DTO Requested' && (
                             <Button
                               variant="destructive"
                               onClick={handleCancelRequest}

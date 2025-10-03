@@ -348,7 +348,7 @@ export default function BookReturnPage() {
     
     const awb = order.awb_reverse || order.awb;
     if (awb) {
-      window.open(`https://one.delhivery.com/shipments/forward/${awb}`, '_blank');
+      window.open(`https://www.delhivery.com/track-v2/package/${awb}`, '_blank');
     }
   };
 
@@ -737,7 +737,7 @@ export default function BookReturnPage() {
                         <Separator />
 
                         <div className="flex flex-col sm:flex-row gap-3">
-                          {order.customStatus === 'DTO Requested' && (
+                          {order.status === 'DTO Requested' && (
                             <Button
                               variant="destructive"
                               onClick={handleCancelRequest}
@@ -748,15 +748,13 @@ export default function BookReturnPage() {
                               Cancel Request
                             </Button>
                           )}
+                          {alreadyInProcess.includes(order.status) &&
                           <Button
-                            variant="outline"
                             onClick={handleTrackOrder}
-                            disabled={!order.awb && !order.awb_reverse}
-                            title={!order.awb && !order.awb_reverse ? 'This order is not shipped yet' : 'Track your shipment'}
                             className="text-xs sm:text-sm flex-1"
                           >
-                            Track Order
-                          </Button>
+                            Track my Return
+                          </Button>}
                         </div>
 
                         <Separator />

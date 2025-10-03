@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import imageCompression from 'browser-image-compression';
 
 const STATUS_MAP: Record<string, string> = {
   'New': 'In process',
@@ -182,7 +181,7 @@ export default function BookReturnPage() {
       });
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -194,27 +193,13 @@ export default function BookReturnPage() {
       return;
     }
 
-    const compressedFiles: File[] = [];
-
     for (const file of newFiles) {
-      if (!file.type.startsWith('image/')) {
-        setUploadError('Only image files are allowed.');
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Each image must be less than 5 MB.');
         return;
       }
-
-      try {
-        // Compress image
-        const options = {
-          maxSizeMB: 1, // Max 1MB per image
-          maxWidthOrHeight: 1920,
-          useWebWorker: true
-        };
-        
-        const compressedFile = await imageCompression(file, options);
-        compressedFiles.push(compressedFile);
-      } catch (error) {
-        console.error('Compression error:', error);
-        setUploadError('Failed to process images. Please try again.');
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Only image files are allowed.');
         return;
       }
     }
@@ -267,33 +252,26 @@ export default function BookReturnPage() {
 
       setRequestingReturn(true);
       setReturnResponse(null);
-      setUploadProgress('Preparing your request...');
+      setUploadProgress('Submitting your return request...');
 
       try {
           const csrfToken = localStorage.getItem('csrfToken');
+          const finalReason = returnReason === 'Others' ? otherReasonText : returnReason;
           
-          setUploadProgress(`Uploading ${uploadedImages.length} image(s)...`);
-          
-          // Create FormData to send images along with other data
-          const formData = new FormData();
-          formData.append('orderId', order.id);
-          formData.append('selectedVariantIds', JSON.stringify(Array.from(selectedVariantIds)));
-          formData.append('booked_return_reason', returnReason === 'Others' ? otherReasonText : returnReason);
-          
-          // Append all images
-          uploadedImages.forEach((file, index) => {
-            formData.append(`image_${index}`, file);
-          });
-
-          setUploadProgress('Submitting your request...');
-
+          // Step 1: Submit return request first (without images)
           const response = await fetch('/api/public/book-return/request', {
               method: 'POST',
               headers: {
+                  'Content-Type': 'application/json',
                   'X-CSRF-Token': csrfToken!,
               },
               credentials: 'include',
-              body: formData
+              body: JSON.stringify({
+                  orderId: order.id,
+                  selectedVariantIds: Array.from(selectedVariantIds),
+                  booked_return_reason: finalReason,
+                  booked_return_images: [] // Placeholder, will be updated
+              })
           });
 
           let result;
@@ -312,6 +290,60 @@ export default function BookReturnPage() {
                   setError('Your session has expired. Please refresh the page to continue.');
               }
               throw new Error(result.error || 'An unknown error occurred.');
+          }
+
+          // If request was not successful, don't proceed with image upload
+          if (!result.success) {
+            setUploadProgress('');
+            setReturnResponse(result);
+            return;
+          }
+
+          // Step 2: Delete existing images (if any)
+          try {
+            setUploadProgress('Preparing image upload...');
+            await fetch('/api/public/book-return/delete-images', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken!,
+              },
+              credentials: 'include',
+              body: JSON.stringify({ orderId: order.id })
+            });
+          } catch (deleteError) {
+            console.warn('Failed to delete existing images, continuing with upload:', deleteError);
+          }
+
+          // Step 3: Upload new images one by one
+          const uploadedImageNames: string[] = [];
+          for (let i = 0; i < uploadedImages.length; i++) {
+            try {
+              setUploadProgress(`Uploading image ${i + 1} of ${uploadedImages.length}...`);
+              
+              const formData = new FormData();
+              formData.append('orderId', order.id);
+              formData.append('image', uploadedImages[i]);
+              
+              const uploadResponse = await fetch('/api/public/book-return/upload-image', {
+                method: 'POST',
+                headers: {
+                  'X-CSRF-Token': csrfToken!,
+                },
+                credentials: 'include',
+                body: formData
+              });
+
+              if (uploadResponse.ok) {
+                const uploadResult = await uploadResponse.json();
+                uploadedImageNames.push(uploadResult.fileName);
+              } else {
+                console.warn(`Failed to upload image ${i + 1}, continuing...`);
+              }
+            } catch (uploadError) {
+              console.warn(`Error uploading image ${i + 1}:`, uploadError);
+              // Continue with next image
+            }
           }
           
           setUploadProgress('');
@@ -828,10 +860,7 @@ export default function BookReturnPage() {
                     <>
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
-                          <CardFooter className="hidden sm:flex justify-end flex-col gap-2">
-                              {uploadProgress && (
-                                <p className="text-xs text-muted-foreground w-full text-right">{uploadProgress}</p>
-                              )}
+                          <CardFooter className="hidden sm:flex justify-end">
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}
@@ -845,10 +874,7 @@ export default function BookReturnPage() {
                         
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
-                          <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden bg-white border-t">
-                              {uploadProgress && (
-                                <p className="text-xs text-muted-foreground mb-2 text-center">{uploadProgress}</p>
-                              )}
+                          <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}

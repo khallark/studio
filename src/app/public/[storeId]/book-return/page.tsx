@@ -78,6 +78,14 @@ export default function BookReturnPage() {
   const [cancellingRequest, setCancellingRequest] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
 
+  const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+  }, []);
+
   useEffect(() => {
     document.title = "Book a return";
   })
@@ -735,7 +743,7 @@ export default function BookReturnPage() {
                                 className="text-xs sm:text-sm"
                               >
                                 <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                                Choose Images
+                                {isMobile ? 'Click and add a photo' : 'Choose Images'}
                               </Button>
                               <span className="text-[10px] sm:text-xs text-muted-foreground">
                                 {uploadedImages.length}/10 uploaded

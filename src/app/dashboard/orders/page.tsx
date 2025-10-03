@@ -1776,7 +1776,19 @@ export default function OrdersPage() {
                     )}
                     <div>
                         <h4 className="font-semibold">Customer</h4>
-                        <p className="text-sm text-muted-foreground">{`${viewingOrder.raw.customer?.first_name || ''} ${viewingOrder.raw.customer?.last_name || ''}`.trim()}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {viewingOrder.raw.shipping_address?.name ??
+                          viewingOrder.raw.billing_address?.name ??
+                          viewingOrder.raw.customer?.name ??
+                          `${viewingOrder.raw.shipping_address?.first_name || ''} 
+                          ${viewingOrder.raw.shipping_address?.last_name || ''}`.trim() ??
+                          `${viewingOrder.raw.billing_address?.first_name || ''} 
+                          ${viewingOrder.raw.billing_address?.last_name || ''}`.trim() ??
+                          `${viewingOrder.raw.customer?.first_name || ''} 
+                          ${viewingOrder.raw.customer?.last_name || ''}`.trim() ??
+                          viewingOrder.email ??
+                          "Not provided"}
+                        </p>
                         <p className="text-sm text-muted-foreground">{viewingOrder.email}</p>
                     </div>
                     <div>

@@ -247,10 +247,12 @@ export default function BookReturnPage() {
           
           // Upload images to Firebase Storage
           const uploadedImageUrls: string[] = [];
-          for (const file of uploadedImages) {
+          for (let i = 0; i < uploadedImages.length; i++) {
+            const file = uploadedImages[i];
             const formData = new FormData();
             formData.append('image', file);
             formData.append('orderId', order.id);
+            formData.append('isFirstImage', i === 0 ? 'true' : 'false'); // Only first image triggers deletion
             
             const uploadResponse = await fetch('/api/public/book-return/upload-image', {
               method: 'POST',
@@ -380,68 +382,70 @@ export default function BookReturnPage() {
                 <p className="text-muted-foreground mt-2 text-sm sm:text-base">Find your order to begin the return process.</p>
             </div>
             <Card>
-                <form onSubmit={handleFindOrder}>
-                    <CardHeader>
-                        <CardTitle className="text-lg sm:text-xl">Find Your Order</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Enter your order number and the phone number used for the order.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="orderNumber" className="text-xs sm:text-sm">Order Number</Label>
-                        <div className="relative flex items-center">
-                          <div className="absolute left-[5px] flex items-center pointer-events-none">
-                            <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
-                              #OWR-MT
-                            </span>
-                          </div>
-                          <Input
-                            id="orderNumber"
-                            placeholder="e.g., 14569"
-                            value={orderNumber}
-                            onChange={(e) => {
-                              setOrderNumber(e.target.value);
-                              if (orderError) setOrderError(null);
-                              if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
-                            }}
-                            className="pl-[70px] sm:pl-[88px] text-sm"
-                            required
-                          />
-                        </div>
+                <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl">Find Your Order</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Enter your order number and the phone number used for the order.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="orderNumber" className="text-xs sm:text-sm">Order Number</Label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-[5px] flex items-center pointer-events-none">
+                        <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
+                          #OWR-MT
+                        </span>
                       </div>
-                      <div className="grid gap-2">
-                          <Label htmlFor="phoneNo" className="text-xs sm:text-sm">Phone Number</Label>
-                          <Input
-                          id="phoneNo"
-                          type="tel"
-                          placeholder="e.g., 9876543210"
-                          value={phoneNo}
-                          onChange={(e) => {
-                            setPhoneNo(e.target.value);
-                            if (orderError) setOrderError(null);
-                            if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
-                          }}
-                          className="text-sm"
-                          required
-                          />
-                      </div>
-                      {orderError && (
-                          <Alert variant="destructive">
-                              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <AlertTitle className="text-xs sm:text-sm">Error</AlertTitle>
-                              <AlertDescription className="text-xs sm:text-sm">{orderError}</AlertDescription>
-                          </Alert>
-                      )}
-                    </CardContent>
-                    <CardFooter>
-                        <Button type="submit" disabled={findingOrder} className="w-full text-sm">
-                            {findingOrder ? (
-                                <><Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> Searching...</>
-                            ) : (
-                                "Show my Order"
-                            )}
-                        </Button>
-                    </CardFooter>
-                </form>
+                      <Input
+                        id="orderNumber"
+                        placeholder="e.g., 14569"
+                        value={orderNumber}
+                        onChange={(e) => {
+                          setOrderNumber(e.target.value);
+                          if (orderError) setOrderError(null);
+                          if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
+                        }}
+                        className="pl-[70px] sm:pl-[88px] text-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                      <Label htmlFor="phoneNo" className="text-xs sm:text-sm">Phone Number</Label>
+                      <Input
+                      id="phoneNo"
+                      type="tel"
+                      placeholder="e.g., 9876543210"
+                      value={phoneNo}
+                      onChange={(e) => {
+                        setPhoneNo(e.target.value);
+                        if (orderError) setOrderError(null);
+                        if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
+                      }}
+                      className="text-sm"
+                      required
+                      />
+                  </div>
+                  {orderError && (
+                      <Alert variant="destructive">
+                          <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <AlertTitle className="text-xs sm:text-sm">Error</AlertTitle>
+                          <AlertDescription className="text-xs sm:text-sm">{orderError}</AlertDescription>
+                      </Alert>
+                  )}
+                </CardContent>
+                <CardFooter>
+                    <Button 
+                      onClick={handleFindOrder}
+                      disabled={findingOrder} 
+                      className="w-full text-sm"
+                    >
+                        {findingOrder ? (
+                            <><Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> Searching...</>
+                        ) : (
+                            "Show my Order"
+                        )}
+                    </Button>
+                </CardFooter>
             </Card>
             </>
         )}

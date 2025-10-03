@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const imageFile = formData.get('image') as File;
         const orderId = formData.get('orderId') as string;
+        const isFirstImage = formData.get('isFirstImage') as string; // 'true' or 'false'
 
         // Input validation
         if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {

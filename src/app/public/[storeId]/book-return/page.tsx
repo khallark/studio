@@ -539,6 +539,9 @@ export default function BookReturnPage() {
                         <div className="bg-muted/50 border rounded-lg p-4">
                           <p className="text-xs sm:text-sm font-bold leading-relaxed">
                             {(() => {
+                              if(order.status == 'Delivered') {
+                                <></>
+                              }
                               if (order.status === 'DTO Requested') {
                                 return (
                                   <>

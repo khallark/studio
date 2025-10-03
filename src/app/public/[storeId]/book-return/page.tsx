@@ -245,66 +245,24 @@ export default function BookReturnPage() {
       try {
           const csrfToken = localStorage.getItem('csrfToken');
           
-          // Step 1: Delete all existing images FIRST (single API call)
-          try {
-            const deleteResponse = await fetch('/api/public/book-return/delete-images', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken!,
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                orderId: order.id
-              })
-            });
-
-            if (!deleteResponse.ok) {
-              console.warn('Failed to delete existing images, continuing with upload');
-            }
-          } catch (deleteError) {
-            console.warn('Error deleting existing images:', deleteError);
-          }
-
-          // Step 2: Upload all new images
-          const uploadedImageUrls: string[] = [];
-          for (const file of uploadedImages) {
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('orderId', order.id);
-            
-            const uploadResponse = await fetch('/api/public/book-return/upload-image', {
-              method: 'POST',
-              headers: {
-                'X-CSRF-Token': csrfToken!,
-              },
-              credentials: 'include',
-              body: formData
-            });
-
-            if (!uploadResponse.ok) {
-              throw new Error('Failed to upload images.');
-            }
-
-            const uploadResult = await uploadResponse.json();
-            uploadedImageUrls.push(uploadResult.fileName);
-          }
-
-          const finalReason = returnReason === 'Others' ? otherReasonText : returnReason;
+          // Create FormData to send images along with other data
+          const formData = new FormData();
+          formData.append('orderId', order.id);
+          formData.append('selectedVariantIds', JSON.stringify(Array.from(selectedVariantIds)));
+          formData.append('booked_return_reason', returnReason === 'Others' ? otherReasonText : returnReason);
+          
+          // Append all images
+          uploadedImages.forEach((file, index) => {
+            formData.append(`image_${index}`, file);
+          });
 
           const response = await fetch('/api/public/book-return/request', {
               method: 'POST',
               headers: {
-                  'Content-Type': 'application/json',
                   'X-CSRF-Token': csrfToken!,
               },
               credentials: 'include',
-              body: JSON.stringify({
-                  orderId: order.id,
-                  selectedVariantIds: Array.from(selectedVariantIds),
-                  booked_return_images: uploadedImageUrls,
-                  booked_return_reason: finalReason
-              })
+              body: formData
           });
 
           const result = await response.json();

@@ -136,14 +136,6 @@ const nextConfig: NextConfig = {
         source: '/api/public/book-return/request',
         destination: '/api/public/book-return/request/route',
       },
-      {
-        source: '/api/public/book-return/upload-image',
-        destination: '/api/public/book-return/upload-image/route',
-      },
-      {
-        source: '/api/public/book-return/delete-images',
-        destination: '/api/public/book-return/delete-images/route',
-      },
     ]
   },
 };

@@ -542,8 +542,6 @@ export default function BookReturnPage() {
                               if(order.status == 'Delivered') {
                                 return (
                                   <>
-                                    <span className="text-blue-600">Proceed booking the request</span>
-                                    <br />
                                     Your can book a return request for this order from here.
                                   </>
                                 )
@@ -595,7 +593,7 @@ export default function BookReturnPage() {
                               }
                               return (
                                 <>
-                                  This order is not eligible for requesting return. If you have any questions, please DM us on Instagram @owr.life.
+                                  This order may not be eligible for requesting return. If you have any questions, please DM us on Instagram @owr.life.
                                 </>
                               );
                             })()}

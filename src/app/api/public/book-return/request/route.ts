@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        if (!selectedVariantIds || !Array.isArray(selectedVariantIds)) {
+        if (!selectedVariantIds || !Array.isArray(selectedVariantIds) || selectedVariantIds.length === 0) {
             return NextResponse.json({ 
                 error: 'At least one item variant must be selected for return.' 
             }, { status: 400 });
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Validate return images
-        if (!booked_return_images || !Array.isArray(booked_return_images) || booked_return_images.length === 0) {
+        if (!booked_return_images || !Array.isArray(booked_return_images)) {
             return NextResponse.json({ 
                 error: 'At least one image is required for return request.' 
             }, { status: 400 });

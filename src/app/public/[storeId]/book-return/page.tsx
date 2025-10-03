@@ -594,8 +594,6 @@ export default function BookReturnPage() {
                               if(canTryRequesting.includes(order.status)) {
                                 return (
                                   <>
-                                    <span className="text-gray-600">Return Closed</span>
-                                    <br />
                                     This order may not be eligible for requesting return, but you can still try to request a return. If you have any questions, please DM us on Instagram @owr.life.
                                   </>
                                 );

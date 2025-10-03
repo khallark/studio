@@ -540,7 +540,13 @@ export default function BookReturnPage() {
                           <p className="text-xs sm:text-sm font-bold leading-relaxed">
                             {(() => {
                               if(order.status == 'Delivered') {
-                                <></>
+                                return (
+                                  <>
+                                    <span className="text-blue-600">Proceed booking the request</span>
+                                    <br />
+                                    Your can book a return request for this order from here.
+                                  </>
+                                )
                               }
                               if (order.status === 'DTO Requested') {
                                 return (

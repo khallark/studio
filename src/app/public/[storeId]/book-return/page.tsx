@@ -627,7 +627,7 @@ export default function BookReturnPage() {
                             </ScrollArea>
                         </div>
 
-                        <div>
+                        {order.status === 'Delivered' || order.status === 'DTO Requested' && <><div>
                           <Label htmlFor="image-upload" className="text-sm sm:text-base font-semibold mb-2 block">
                             Upload Images <span className="text-destructive">*</span>
                           </Label>
@@ -730,7 +730,7 @@ export default function BookReturnPage() {
                               </p>
                             </div>
                           )}
-                        </div>
+                        </div></>}
                         
                         <Separator />
 

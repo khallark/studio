@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             id: orderDoc.id,
             name: orderData.raw.name,
+            awb: orderData.awb ?? '',
+            awb_reverse: orderData.awb_reverse ?? '',
             status: orderData.customStatus,
             logs: orderData.customStatusesLogs || [], // Ensure it's an array
             payment_gateway_names: orderData.raw.payment_gateway_names,

@@ -251,9 +251,18 @@ export async function POST(req: NextRequest) {
                             orderId: orderId,
                             storeId: session.storeId,
                             uploadedAt: new Date().toISOString(),
-                            originalName: imageFile.name
+                            originalName: imageFile.name,
+                            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
                         }
                     }
+                });
+                
+                // Set expiration time (e.g., 30 days from now)
+                const expirationDate = new Date();
+                expirationDate.setDate(expirationDate.getDate() + 30);
+
+                await file.setMetadata({
+                    customTime: expirationDate.toISOString()
                 });
 
                 uploadedImageNames.push(uniqueFileName);

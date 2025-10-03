@@ -75,6 +75,7 @@ export default function BookReturnPage() {
   const [returnReason, setReturnReason] = useState('');
   const [otherReasonText, setOtherReasonText] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [cancellingRequest, setCancellingRequest] = useState(false);
 
   useEffect(() => {
     document.title = "Book a return";
@@ -292,6 +293,63 @@ export default function BookReturnPage() {
       } finally {
           setRequestingReturn(false);
       }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!order) return;
+
+    setCancellingRequest(true);
+
+    try {
+      const csrfToken = localStorage.getItem('csrfToken');
+      
+      const response = await fetch('/api/public/book-return/cancel-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken!,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          orderId: order.id
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (result.sessionError) {
+          setError('Your session has expired. Please refresh the page to continue.');
+        }
+        throw new Error(result.error || 'An unknown error occurred.');
+      }
+
+      toast({
+        title: 'Request Cancelled',
+        description: result.message,
+      });
+
+      // Refresh the page to show updated order status
+      window.location.reload();
+
+    } catch (error: any) {
+      toast({
+        title: 'Cancellation Failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setCancellingRequest(false);
+    }
+  };
+
+  const handleTrackOrder = () => {
+    if (!order) return;
+    
+    const awb = order.awb_reverse || order.awb;
+    if (awb) {
+      window.open(`https://one.delhivery.com/shipments/forward/${awb}`, '_blank');
+    }
   };
 
   useEffect(() => {
@@ -610,6 +668,31 @@ export default function BookReturnPage() {
                           )}
                         </div>
                         
+                        <Separator />
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          {order.customStatus === 'DTO Requested' && (
+                            <Button
+                              variant="destructive"
+                              onClick={handleCancelRequest}
+                              disabled={cancellingRequest}
+                              className="text-xs sm:text-sm flex-1"
+                            >
+                              {cancellingRequest && <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
+                              Cancel Request
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            onClick={handleTrackOrder}
+                            disabled={!order.awb && !order.awb_reverse}
+                            title={!order.awb && !order.awb_reverse ? 'This order is not shipped yet' : 'Track your shipment'}
+                            className="text-xs sm:text-sm flex-1"
+                          >
+                            Track Order
+                          </Button>
+                        </div>
+
                         <Separator />
 
                         <div className="grid md:grid-cols-2 gap-6">

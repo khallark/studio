@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         
         // Parse and validate request body
         const body = await req.json();
-        const { orderId, selectedVariantIds } = body;
+        const { orderId, selectedVariantIds, booked_return_images, booked_return_reason } = body;
 
         // Input validation
         if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
@@ -55,6 +55,32 @@ export async function POST(req: NextRequest) {
         if (validVariantIds.length === 0) {
             return NextResponse.json({ 
                 error: 'Valid item variant IDs are required.' 
+            }, { status: 400 });
+        }
+
+        // Validate return images
+        if (!booked_return_images || !Array.isArray(booked_return_images) || booked_return_images.length === 0) {
+            return NextResponse.json({ 
+                error: 'At least one image is required for return request.' 
+            }, { status: 400 });
+        }
+
+        if (booked_return_images.length > 10) {
+            return NextResponse.json({ 
+                error: 'Maximum 10 images are allowed.' 
+            }, { status: 400 });
+        }
+
+        // Validate return reason
+        if (!booked_return_reason || typeof booked_return_reason !== 'string' || booked_return_reason.trim() === '') {
+            return NextResponse.json({ 
+                error: 'Return reason is required.' 
+            }, { status: 400 });
+        }
+
+        if (booked_return_reason.length > 500) {
+            return NextResponse.json({ 
+                error: 'Return reason must not exceed 500 characters.' 
             }, { status: 400 });
         }
 
@@ -92,18 +118,21 @@ export async function POST(req: NextRequest) {
             let logEntry = {
                 status: "DTO Requested",
                 createdAt: Timestamp.now(),
-                remarks: "The Return for this order was requested by the customer."
+                remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
             }
             if(currentStatus === 'DTO Requested') {
                 logEntry = {
                     status: "DTO Requested Again",
                     createdAt: Timestamp.now(),
-                    remarks: "The Return for this order was requested again by the customer."
+                    remarks: `The Return for this order was requested again by the customer. Reason: ${booked_return_reason}`
                 }
             }
             await orderRef.update({
                 customStatus: "DTO Requested",
                 returnItemsVariantIds: validVariantIds,
+                booked_return_images: booked_return_images,
+                booked_return_reason: booked_return_reason.trim(),
+                return_request_date: Timestamp.now(),
                 customStatusesLogs: FieldValue.arrayUnion(logEntry)
             });
 
@@ -123,10 +152,13 @@ export async function POST(req: NextRequest) {
                     await orderRef.update({
                         customStatus: "DTO Requested",
                         returnItemsVariantIds: validVariantIds,
+                        booked_return_images: booked_return_images,
+                        booked_return_reason: booked_return_reason.trim(),
+                        return_request_date: Timestamp.now(),
                         customStatusesLogs: FieldValue.arrayUnion({
                             status: "DTO Requested",
                             createdAt: Timestamp.now(),
-                            remarks: "The Return for this order was requested by the customer."
+                            remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
                         })
                     });
 

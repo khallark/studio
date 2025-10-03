@@ -16,11 +16,42 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ShieldCheck, Ticket, AlertCircle, Info } from 'lucide-react';
+import { Loader2, ShieldCheck, Ticket, AlertCircle, Info, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
+const STATUS_MAP: Record<string, string> = {
+  'New': 'In process',
+  'Confirmed': 'In process',
+  'Ready To Dispatch': 'Ready to ship',
+  'Dispatched': 'On its way',
+  'In Transit': 'On its way',
+  'Out For Delivery': 'Near the destination',
+  'Delivered': 'Delivered',
+  'RTO In Transit': 'On way back',
+  'RTO Delivered': 'Return Completed',
+  'DTO Requested': 'Return requested',
+  'DTO Booked': 'Return booked',
+  'DTO In Transit': 'On way back',
+  'DTO Delivered': 'Return Completed',
+  'Lost': 'Lost',
+  'Closed': 'Delivered',
+  'RTO Closed': 'Return Completed',
+  'Cancelled': 'Cancelled'
+};
+
+const getMappedStatus = (status: string): string => {
+  return STATUS_MAP[status] || status;
+};
 
 export default function BookReturnPage() {
   const params = useParams();
@@ -39,6 +70,11 @@ export default function BookReturnPage() {
   const [selectedVariantIds, setSelectedVariantIds] = useState<Set<number>>(new Set());
   const [requestingReturn, setRequestingReturn] = useState(false);
   const [returnResponse, setReturnResponse] = useState<{success: boolean, message: string} | null>(null);
+
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [returnReason, setReturnReason] = useState('');
+  const [otherReasonText, setOtherReasonText] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Book a return";
@@ -85,9 +121,13 @@ export default function BookReturnPage() {
 
       setFindingOrder(true);
       setOrderError(null);
-      setOrder(null); // Reset previous order
+      setOrder(null);
       setReturnResponse(null);
       setSelectedVariantIds(new Set());
+      setUploadedImages([]);
+      setReturnReason('');
+      setOtherReasonText('');
+      setUploadError(null);
 
       try {
           const csrfToken = localStorage.getItem('csrfToken');
@@ -122,14 +162,13 @@ export default function BookReturnPage() {
       }
   };
   
-    const handleToggleVariantId = (variantId: number) => {
-        // Safety check: ensure the variant_id belongs to current order
-        if (!order || !order.items.some((item: any) => item.variant_id === variantId)) {
-          console.warn('Attempted to toggle variant_id not in current order:', variantId);
-          return;
-        }
+  const handleToggleVariantId = (variantId: number) => {
+      if (!order || !order.items.some((item: any) => item.variant_id === variantId)) {
+        console.warn('Attempted to toggle variant_id not in current order:', variantId);
+        return;
+      }
 
-        setSelectedVariantIds(prev => {
+      setSelectedVariantIds(prev => {
         const newSet = new Set(prev);
         if (newSet.has(variantId)) {
             newSet.delete(variantId);
@@ -137,72 +176,161 @@ export default function BookReturnPage() {
             newSet.add(variantId);
         }
         return newSet;
+      });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    setUploadError(null);
+    const newFiles = Array.from(files);
+    
+    if (uploadedImages.length + newFiles.length > 10) {
+      setUploadError('You can upload a maximum of 10 images.');
+      return;
+    }
+
+    for (const file of newFiles) {
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Each image must be less than 5 MB.');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Only image files are allowed.');
+        return;
+      }
+    }
+
+    setUploadedImages(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRequestReturn = async () => {
+      if (!order || selectedVariantIds.size === 0) return;
+
+      if (uploadedImages.length === 0) {
+        toast({
+          title: 'Image Required',
+          description: 'Please upload at least one image.',
+          variant: 'destructive'
         });
-    };
+        return;
+      }
 
-    const handleRequestReturn = async () => {
-        if (!order || selectedVariantIds.size === 0) return;
+      if (!returnReason) {
+        toast({
+          title: 'Reason Required',
+          description: 'Please select a reason for return.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
-        setRequestingReturn(true);
-        setReturnResponse(null);
+      if (returnReason === 'Others' && !otherReasonText.trim()) {
+        toast({
+          title: 'Details Required',
+          description: 'Please provide details for your return reason.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
-        try {
-            const csrfToken = localStorage.getItem('csrfToken');
-            const response = await fetch('/api/public/book-return/request', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken!,
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    orderId: order.id,
-                    selectedVariantIds: Array.from(selectedVariantIds)
-                })
-            });
+      setRequestingReturn(true);
+      setReturnResponse(null);
 
-            const result = await response.json();
-
-            if (!response.ok) {
-                if (result.sessionError) {
-                    setError('Your session has expired. Please refresh the page to continue.');
-                }
-                throw new Error(result.error || 'An unknown error occurred.');
-            }
+      try {
+          const csrfToken = localStorage.getItem('csrfToken');
+          
+          // Upload images to Firebase Storage
+          const uploadedImageUrls: string[] = [];
+          for (const file of uploadedImages) {
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('orderId', order.id);
             
-            setReturnResponse(result);
+            const uploadResponse = await fetch('/api/public/book-return/upload-image', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': csrfToken!,
+              },
+              credentials: 'include',
+              body: formData
+            });
 
-            if (result.success) {
-              setSelectedVariantIds(new Set());
+            if (!uploadResponse.ok) {
+              throw new Error('Failed to upload images.');
             }
 
-        } catch (error: any) {
-            toast({
-                title: 'Return Request Failed',
-                description: error.message,
-                variant: 'destructive'
-            });
-        } finally {
-            setRequestingReturn(false);
-        }
-    };
+            const uploadResult = await uploadResponse.json();
+            uploadedImageUrls.push(uploadResult.fileName);
+          }
 
-    useEffect(() => {
-      if(order && order.returnItemsVariantIds)
-        setSelectedVariantIds(new Set(order.returnItemsVariantIds))
-    }, [order])
+          const finalReason = returnReason === 'Others' ? otherReasonText : returnReason;
 
-    const canRequest = ['Delivered'];
-    const alreadyRequested = ['DTO Requested'];
-    const canTryRequesting = ['In Transit', 'Out For Delivery', 'RTO In Transit'];
-    const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'];
-    const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered'];
+          const response = await fetch('/api/public/book-return/request', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': csrfToken!,
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                  orderId: order.id,
+                  selectedVariantIds: Array.from(selectedVariantIds),
+                  booked_return_images: uploadedImageUrls,
+                  booked_return_reason: finalReason
+              })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+              if (result.sessionError) {
+                  setError('Your session has expired. Please refresh the page to continue.');
+              }
+              throw new Error(result.error || 'An unknown error occurred.');
+          }
+          
+          setReturnResponse(result);
+
+          if (result.success) {
+            setSelectedVariantIds(new Set());
+            setUploadedImages([]);
+            setReturnReason('');
+            setOtherReasonText('');
+          }
+
+      } catch (error: any) {
+          toast({
+              title: 'Return Request Failed',
+              description: error.message,
+              variant: 'destructive'
+          });
+      } finally {
+          setRequestingReturn(false);
+      }
+  };
+
+  useEffect(() => {
+    if(order && order.returnItemsVariantIds)
+      setSelectedVariantIds(new Set(order.returnItemsVariantIds))
+  }, [order])
+
+  const canRequest = ['Delivered'];
+  const alreadyRequested = ['DTO Requested'];
+  const canTryRequesting = ['In Transit', 'Out For Delivery', 'RTO In Transit'];
+  const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed'];
+  const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered'];
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Initializing secure session...</p>
+        <p className="text-muted-foreground text-sm sm:text-base">Initializing secure session...</p>
       </div>
     );
   }
@@ -211,9 +339,9 @@ export default function BookReturnPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 p-4">
         <div className="text-center">
-            <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-destructive">Service Unavailable</h1>
-            <p className="text-muted-foreground mt-2">{error}</p>
+            <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mx-auto mb-4" />
+            <h1 className="text-xl sm:text-2xl font-bold text-destructive">Service Unavailable</h1>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">{error}</p>
             <Button onClick={() => window.location.reload()} className="mt-6">
                 Refresh Page
             </Button>
@@ -222,26 +350,24 @@ export default function BookReturnPage() {
     );
   }
 
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl mx-auto">
 
-        {/* Store link at the top */}
         <div className="text-center mb-6">
           <a 
             href={`https://${storeId}.myshopify.com`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors duration-200 group"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors duration-200 group"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="border-b border-transparent group-hover:border-current">
               Visit the Store
             </span>
-            <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
@@ -250,21 +376,21 @@ export default function BookReturnPage() {
         {!order && (
             <>
             <div className="text-center mb-8">
-                <h1 className="text-4xl font-bold font-headline text-primary">Book a Return</h1>
-                <p className="text-muted-foreground mt-2">Find your order to begin the return process.</p>
+                <h1 className="text-2xl sm:text-4xl font-bold font-headline text-primary">Book a Return</h1>
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base">Find your order to begin the return process.</p>
             </div>
             <Card>
                 <form onSubmit={handleFindOrder}>
                     <CardHeader>
-                        <CardTitle>Find Your Order</CardTitle>
-                        <CardDescription>Enter your order number and the phone number used for the order.</CardDescription>
+                        <CardTitle className="text-lg sm:text-xl">Find Your Order</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">Enter your order number and the phone number used for the order.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="orderNumber">Order Number</Label>
+                        <Label htmlFor="orderNumber" className="text-xs sm:text-sm">Order Number</Label>
                         <div className="relative flex items-center">
                           <div className="absolute left-[5px] flex items-center pointer-events-none">
-                            <span className="text-sm font-semibold bg-white px-2 py-1 rounded border border-gray-300">
+                            <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
                               #OWR-MT
                             </span>
                           </div>
@@ -277,13 +403,13 @@ export default function BookReturnPage() {
                               if (orderError) setOrderError(null);
                               if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                             }}
-                            className="pl-[88px]"
+                            className="pl-[70px] sm:pl-[88px] text-sm"
                             required
                           />
                         </div>
                       </div>
                       <div className="grid gap-2">
-                          <Label htmlFor="phoneNo">Phone Number</Label>
+                          <Label htmlFor="phoneNo" className="text-xs sm:text-sm">Phone Number</Label>
                           <Input
                           id="phoneNo"
                           type="tel"
@@ -292,24 +418,24 @@ export default function BookReturnPage() {
                           onChange={(e) => {
                             setPhoneNo(e.target.value);
                             if (orderError) setOrderError(null);
-                            // Clear selections when user changes phone number
                             if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                           }}
+                          className="text-sm"
                           required
                           />
                       </div>
                       {orderError && (
                           <Alert variant="destructive">
-                              <AlertCircle className="h-4 w-4" />
-                              <AlertTitle>Error</AlertTitle>
-                              <AlertDescription>{orderError}</AlertDescription>
+                              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <AlertTitle className="text-xs sm:text-sm">Error</AlertTitle>
+                              <AlertDescription className="text-xs sm:text-sm">{orderError}</AlertDescription>
                           </Alert>
                       )}
                     </CardContent>
                     <CardFooter>
-                        <Button type="submit" disabled={findingOrder} className="w-full">
+                        <Button type="submit" disabled={findingOrder} className="w-full text-sm">
                             {findingOrder ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...</>
+                                <><Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> Searching...</>
                             ) : (
                                 "Show my Order"
                             )}
@@ -326,10 +452,10 @@ export default function BookReturnPage() {
                     <div className="flex justify-between gap-2 items-start">
                         <div className='flex flex-col gap-2 md:gap-1'>
                             <div className='flex flex-wrap gap-2 md:gap-4 items-center'>
-                                <CardTitle>{order.name}</CardTitle>
-                                <Badge variant="default">{order.status}</Badge>
+                                <CardTitle className="text-lg sm:text-xl">{order.name}</CardTitle>
+                                <Badge variant="default" className="text-xs">{getMappedStatus(order.status)}</Badge>
                             </div>
-                            <CardDescription className={`
+                            <CardDescription className={`text-xs sm:text-sm
                               ${canTryRequesting.includes(order.status) ? 'text-[#F0AD4E]' : ''} 
                               ${notEligible.includes(order.status) ? 'text-red-500' : ''} 
                               ${alreadyInProcess.includes(order.status) ? 'text-red-500' : ''} 
@@ -349,27 +475,30 @@ export default function BookReturnPage() {
                               })()}
                             </CardDescription>
                         </div>
-                         <Button variant="outline" onClick={
+                         <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={
                           () => {
                             setOrder(null)
                             setSelectedVariantIds(new Set());
                             setReturnResponse(null);
+                            setUploadedImages([]);
+                            setReturnReason('');
+                            setOtherReasonText('');
                          }}>← Go back</Button>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {returnResponse ? (
                          <Alert variant={returnResponse.success ? 'default' : 'destructive'}>
-                            {returnResponse.success ? <ShieldCheck className="h-4 w-4" /> : <Info className="h-4 w-4" />}
-                            <AlertTitle>{returnResponse.success ? 'Request Submitted' : 'Information'}</AlertTitle>
-                            <AlertDescription>
+                            {returnResponse.success ? <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4" /> : <Info className="h-3 w-3 sm:h-4 sm:w-4" />}
+                            <AlertTitle className="text-xs sm:text-sm">{returnResponse.success ? 'Request Submitted' : 'Information'}</AlertTitle>
+                            <AlertDescription className="text-xs sm:text-sm">
                                 {returnResponse.message}
                             </AlertDescription>
                         </Alert>
                     ) : (
                     <>
                         <div>
-                            <h3 className="font-semibold mb-2">Select items to return</h3>
+                            <h3 className="font-semibold mb-2 text-sm sm:text-base">Select items to return</h3>
                              <ScrollArea className="border rounded-md p-4">
                                 <div className="space-y-4">
                                     {order.items.map((item: any) => (
@@ -386,25 +515,130 @@ export default function BookReturnPage() {
                                             className="mt-1"
                                         />
                                         <Label htmlFor={`item-${item.variant_id}`} className="flex-1 cursor-pointer">
-                                            <p className="font-medium">{item.name}</p>
-                                            <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>
+                                            <p className="font-medium text-xs sm:text-sm">{item.name}</p>
+                                            <p className="text-[10px] sm:text-xs text-muted-foreground">Quantity: {item.quantity}</p>
                                         </Label>
                                     </div>
                                     ))}
                                 </div>
                             </ScrollArea>
                         </div>
+
+                        <div>
+                          <Label htmlFor="image-upload" className="text-sm sm:text-base font-semibold mb-2 block">
+                            Upload Images <span className="text-destructive">*</span>
+                          </Label>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">
+                            Upload 1-10 images (max 5 MB each)
+                          </p>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="image-upload"
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleImageUpload}
+                                className="hidden"
+                                disabled={notEligible.includes(order.status) || alreadyInProcess.includes(order.status) || requestingReturn || uploadedImages.length >= 10}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => document.getElementById('image-upload')?.click()}
+                                disabled={notEligible.includes(order.status) || alreadyInProcess.includes(order.status) || requestingReturn || uploadedImages.length >= 10}
+                                className="text-xs sm:text-sm"
+                              >
+                                <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                                Choose Images
+                              </Button>
+                              <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                {uploadedImages.length}/10 uploaded
+                              </span>
+                            </div>
+                            {uploadError && (
+                              <p className="text-xs text-destructive">{uploadError}</p>
+                            )}
+                            {uploadedImages.length > 0 && (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                {uploadedImages.map((file, index) => (
+                                  <div key={index} className="relative group">
+                                    <img
+                                      src={URL.createObjectURL(file)}
+                                      alt={`Upload ${index + 1}`}
+                                      className="w-full h-20 sm:h-24 object-cover rounded-md border"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveImage(index)}
+                                      className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      disabled={requestingReturn}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                    <p className="text-[8px] sm:text-[10px] text-muted-foreground mt-1 truncate">
+                                      {file.name}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="return-reason" className="text-sm sm:text-base font-semibold mb-2 block">
+                            Select a Reason <span className="text-destructive">*</span>
+                          </Label>
+                          <Select
+                            value={returnReason}
+                            onValueChange={setReturnReason}
+                            disabled={notEligible.includes(order.status) || alreadyInProcess.includes(order.status) || requestingReturn}
+                          >
+                            <SelectTrigger className="text-xs sm:text-sm">
+                              <SelectValue placeholder="Choose a reason for return" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Size Exchange" className="text-xs sm:text-sm">Size Exchange</SelectItem>
+                              <SelectItem value="Wrong Product Delivered" className="text-xs sm:text-sm">Wrong Product Delivered</SelectItem>
+                              <SelectItem value="Not Satisfied with quality" className="text-xs sm:text-sm">Not Satisfied with quality</SelectItem>
+                              <SelectItem value="Manufacturing Defect" className="text-xs sm:text-sm">Manufacturing Defect</SelectItem>
+                              <SelectItem value="Product Doesn't look like images uploaded" className="text-xs sm:text-sm">Product Doesn't look like images uploaded</SelectItem>
+                              <SelectItem value="Others" className="text-xs sm:text-sm">Others</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {returnReason === 'Others' && (
+                            <div className="mt-3">
+                              <Label htmlFor="other-reason" className="text-xs sm:text-sm mb-1 block">
+                                Please specify <span className="text-destructive">*</span>
+                              </Label>
+                              <Textarea
+                                id="other-reason"
+                                placeholder="Enter your reason here..."
+                                value={otherReasonText}
+                                onChange={(e) => setOtherReasonText(e.target.value.slice(0, 500))}
+                                maxLength={500}
+                                className="text-xs sm:text-sm"
+                                disabled={requestingReturn}
+                              />
+                              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                                {otherReasonText.length}/500 characters
+                              </p>
+                            </div>
+                          )}
+                        </div>
                         
                         <Separator />
 
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
-                                <h3 className="font-semibold mb-2">Order Status</h3>
-                                <p className="text-sm">{order.status}</p>
+                                <h3 className="font-semibold mb-2 text-sm sm:text-base">Order Status</h3>
+                                <p className="text-xs sm:text-sm">{getMappedStatus(order.status)}</p>
                             </div>
                             <div>
-                                <h3 className="font-semibold mb-2">Shipping Address</h3>
-                                <address className="text-sm not-italic text-muted-foreground">
+                                <h3 className="font-semibold mb-2 text-sm sm:text-base">Shipping Address</h3>
+                                <address className="text-xs sm:text-sm not-italic text-muted-foreground">
                                     {order.shipping_address.address1}<br />
                                     {order.shipping_address.address2 && <>{order.shipping_address.address2}<br /></>}
                                     {order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.zip}<br />
@@ -418,13 +652,13 @@ export default function BookReturnPage() {
                 </CardContent>
                 {!returnResponse && (
                     <>
-                        {/* Desktop version - in CardFooter */}
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
                           <CardFooter className="hidden sm:flex justify-end">
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}
+                                  className="text-sm"
                               >
                                   {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                   Request a Return
@@ -432,14 +666,13 @@ export default function BookReturnPage() {
                           </CardFooter>
                         }
                         
-                        {/* Mobile version - sticky at bottom */}
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
                           <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}
-                                  className="w-full"
+                                  className="w-full text-sm"
                                   size="lg"
                               >
                                   {requestingReturn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

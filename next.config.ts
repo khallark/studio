@@ -136,6 +136,10 @@ const nextConfig: NextConfig = {
         source: '/api/public/book-return/request',
         destination: '/api/public/book-return/request/route',
       },
+      {
+        source: '/api/public/book-return/cancel-request',
+        destination: '/api/public/book-return/cancel-request/route',
+      },
     ]
   },
 };

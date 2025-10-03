@@ -6,7 +6,7 @@ import { storage, db } from "@/lib/firebase-admin";
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from "firebase-admin/firestore";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = [
     'image/jpeg',
     'image/jpg',

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateCustomerSession } from "@/lib/validateCustomerSession";
 import { storage } from "@/lib/firebase-admin";
+import admin from 'firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 
 // Constants
@@ -24,7 +25,6 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const imageFile = formData.get('image') as File;
         const orderId = formData.get('orderId') as string;
-        const isFirstImage = formData.get('isFirstImage') as string; // 'true' or 'false'
 
         // Input validation
         if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
@@ -56,24 +56,6 @@ export async function POST(req: NextRequest) {
         // Get bucket reference
         const bucket = storage.bucket();
         const folderPath = `return-images/${session.storeId}/${orderId}/`;
-
-        // Delete all existing images in the folder
-        try {
-            const [files] = await bucket.getFiles({ prefix: folderPath });
-            
-            if (files.length > 0) {
-                // Delete all files in parallel
-                await Promise.all(
-                    files.map(file => file.delete().catch(err => {
-                        console.warn(`Failed to delete file ${file.name}:`, err);
-                    }))
-                );
-                console.log(`Deleted ${files.length} existing images from ${folderPath}`);
-            }
-        } catch (deleteError) {
-            console.warn('Error deleting existing files:', deleteError);
-            // Continue with upload even if deletion fails
-        }
 
         // Convert File to Buffer
         const arrayBuffer = await imageFile.arrayBuffer();

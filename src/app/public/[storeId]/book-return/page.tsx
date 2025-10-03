@@ -245,14 +245,33 @@ export default function BookReturnPage() {
       try {
           const csrfToken = localStorage.getItem('csrfToken');
           
-          // Upload images to Firebase Storage
+          // Step 1: Delete all existing images FIRST (single API call)
+          try {
+            const deleteResponse = await fetch('/api/public/book-return/delete-images', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken!,
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                orderId: order.id
+              })
+            });
+
+            if (!deleteResponse.ok) {
+              console.warn('Failed to delete existing images, continuing with upload');
+            }
+          } catch (deleteError) {
+            console.warn('Error deleting existing images:', deleteError);
+          }
+
+          // Step 2: Upload all new images
           const uploadedImageUrls: string[] = [];
-          for (let i = 0; i < uploadedImages.length; i++) {
-            const file = uploadedImages[i];
+          for (const file of uploadedImages) {
             const formData = new FormData();
             formData.append('image', file);
             formData.append('orderId', order.id);
-            formData.append('isFirstImage', i === 0 ? 'true' : 'false'); // Only first image triggers deletion
             
             const uploadResponse = await fetch('/api/public/book-return/upload-image', {
               method: 'POST',

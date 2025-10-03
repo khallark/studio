@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import imageCompression from 'browser-image-compression';
 
 const STATUS_MAP: Record<string, string> = {
   'New': 'In process',
@@ -76,6 +77,7 @@ export default function BookReturnPage() {
   const [otherReasonText, setOtherReasonText] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cancellingRequest, setCancellingRequest] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   useEffect(() => {
     document.title = "Book a return";
@@ -180,7 +182,7 @@ export default function BookReturnPage() {
       });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -192,15 +194,38 @@ export default function BookReturnPage() {
       return;
     }
 
+    const compressedFiles: File[] = [];
+
     for (const file of newFiles) {
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError('Each image must be less than 5 MB.');
-        return;
-      }
       if (!file.type.startsWith('image/')) {
         setUploadError('Only image files are allowed.');
         return;
       }
+
+      try {
+        // Compress image
+        const options = {
+          maxSizeMB: 1, // Max 1MB per image
+          maxWidthOrHeight: 1920,
+          useWebWorker: true
+        };
+        
+        const compressedFile = await imageCompression(file, options);
+        compressedFiles.push(compressedFile);
+      } catch (error) {
+        console.error('Compression error:', error);
+        setUploadError('Failed to process images. Please try again.');
+        return;
+      }
+    }
+
+    // Warn on mobile if images are large
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile && newFiles.some(f => f.size > 2 * 1024 * 1024)) {
+      toast({
+        title: 'Large Images Detected',
+        description: 'Uploading large images on mobile may take longer. Please be patient.',
+      });
     }
 
     setUploadedImages(prev => [...prev, ...newFiles]);
@@ -242,9 +267,12 @@ export default function BookReturnPage() {
 
       setRequestingReturn(true);
       setReturnResponse(null);
+      setUploadProgress('Preparing your request...');
 
       try {
           const csrfToken = localStorage.getItem('csrfToken');
+          
+          setUploadProgress(`Uploading ${uploadedImages.length} image(s)...`);
           
           // Create FormData to send images along with other data
           const formData = new FormData();
@@ -257,6 +285,8 @@ export default function BookReturnPage() {
             formData.append(`image_${index}`, file);
           });
 
+          setUploadProgress('Submitting your request...');
+
           const response = await fetch('/api/public/book-return/request', {
               method: 'POST',
               headers: {
@@ -266,7 +296,16 @@ export default function BookReturnPage() {
               body: formData
           });
 
-          const result = await response.json();
+          let result;
+          const contentType = response.headers.get('content-type');
+          
+          if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
+          } else {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            throw new Error('Server returned an invalid response. Please try again or contact support if the issue persists.');
+          }
 
           if (!response.ok) {
               if (result.sessionError) {
@@ -275,6 +314,7 @@ export default function BookReturnPage() {
               throw new Error(result.error || 'An unknown error occurred.');
           }
           
+          setUploadProgress('');
           setReturnResponse(result);
 
           if (result.success) {
@@ -285,6 +325,7 @@ export default function BookReturnPage() {
           }
 
       } catch (error: any) {
+          setUploadProgress('');
           toast({
               title: 'Return Request Failed',
               description: error.message,
@@ -787,7 +828,10 @@ export default function BookReturnPage() {
                     <>
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
-                          <CardFooter className="hidden sm:flex justify-end">
+                          <CardFooter className="hidden sm:flex justify-end flex-col gap-2">
+                              {uploadProgress && (
+                                <p className="text-xs text-muted-foreground w-full text-right">{uploadProgress}</p>
+                              )}
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}
@@ -801,7 +845,10 @@ export default function BookReturnPage() {
                         
                         {!(notEligible.includes(order.status) ||
                           alreadyInProcess.includes(order.status)) &&
-                          <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden">
+                          <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden bg-white border-t">
+                              {uploadProgress && (
+                                <p className="text-xs text-muted-foreground mb-2 text-center">{uploadProgress}</p>
+                              )}
                               <Button
                                   onClick={handleRequestReturn}
                                   disabled={selectedVariantIds.size === 0 || requestingReturn}

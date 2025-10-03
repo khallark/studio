@@ -1,5 +1,16 @@
 // src/app/api/public/book-return/request/route.ts
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Maximum execution time in seconds
+
+// If you're on Vercel, you may also need:
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  },
+};
+
 import { NextRequest, NextResponse } from "next/server";
 import { db, storage } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateCustomerSession";

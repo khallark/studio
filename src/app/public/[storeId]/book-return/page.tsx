@@ -545,7 +545,7 @@ export default function BookReturnPage() {
                               if (order.status === 'DTO Requested') {
                                 return (
                                   <>
-                                    <span className="text-blue-600">🔹 Return Requested</span>
+                                    <span className="text-blue-600">Return Requested</span>
                                     <br />
                                     Your return request has been successfully processed. If you wish to update the items or cancel the request, you can still do so using the options available on your screen.
                                   </>
@@ -554,7 +554,7 @@ export default function BookReturnPage() {
                               if (order.status === 'DTO Booked') {
                                 return (
                                   <>
-                                    <span className="text-green-600">🔹 Return Booked</span>
+                                    <span className="text-green-600">Return Booked</span>
                                     <br />
                                     Your return has been booked. A delivery partner will reach you within 48 hours to pick up the items. Once picked, the parcel will reach our warehouse in 3–5 days. After a successful Quality Check (QC), your refund will be credited to your OWR wallet.
                                   </>
@@ -563,7 +563,7 @@ export default function BookReturnPage() {
                               if (order.status === 'DTO In Transit') {
                                 return (
                                   <>
-                                    <span className="text-orange-600">🔹 Return In-Transit</span>
+                                    <span className="text-orange-600">Return In-Transit</span>
                                     <br />
                                     Your return is on the way to our warehouse. Once delivered, it will go through our Quality Check (QC) process. After a successful QC, your refund will be credited to your OWR wallet. You can track your return parcel using the "Track" button above.
                                   </>
@@ -572,7 +572,7 @@ export default function BookReturnPage() {
                               if (order.status === 'DTO Delivered') {
                                 return (
                                   <>
-                                    <span className="text-purple-600">🔹 Pending Refund</span>
+                                    <span className="text-purple-600">Pending Refund</span>
                                     <br />
                                     We've received your return at our warehouse. It is currently under Quality Check (QC), which usually takes up to 24 hours. After a successful QC, your refund will be processed and credited to your OWR wallet.
                                   </>
@@ -581,7 +581,7 @@ export default function BookReturnPage() {
                               if (order.status === 'DTO Closed') {
                                 return (
                                   <>
-                                    <span className="text-gray-600">🔹 Return Closed</span>
+                                    <span className="text-gray-600">Return Closed</span>
                                     <br />
                                     Your return has been successfully closed, and no further action is required for this order. If you still have any questions, please DM us on Instagram @owr.life.
                                   </>

@@ -720,6 +720,7 @@ export default function BookReturnPage() {
                                 id="image-upload"
                                 type="file"
                                 accept="image/*"
+                                capture="environment"
                                 multiple
                                 onChange={handleImageUpload}
                                 className="hidden"

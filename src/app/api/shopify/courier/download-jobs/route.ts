@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import * as xlsx from 'xlsx';
@@ -40,24 +39,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Forbidden: User is not authorized to access this shop.' }, { status: 403 });
     }
 
-    const jobsRef = db.collection('accounts').doc(shop).collection('shipment_batches').doc(batchId).collection('jobs');
-    const failedJobsSnapshot = await jobsRef.where('status', '==', status).get();
-
-    if (failedJobsSnapshot.empty) {
-        return NextResponse.json({ error: 'No failed jobs found for this batch.' }, { status: 404 });
+    // Fetch batch document to check courier type
+    const batchRef = db.collection('accounts').doc(shop).collection('shipment_batches').doc(batchId);
+    const batchDoc = await batchRef.get();
+    
+    if (!batchDoc.exists) {
+      return NextResponse.json({ error: 'Batch not found' }, { status: 404 });
     }
 
-    const reportData = failedJobsSnapshot.docs.map(doc => {
+    const batchData = batchDoc.data();
+    const isPriority = batchData?.courier === 'Priority';
+
+    const jobsRef = batchRef.collection('jobs');
+    const jobsSnapshot = await jobsRef.where('status', '==', status).get();
+
+    if (jobsSnapshot.empty) {
+        return NextResponse.json({ error: `No ${status} jobs found for this batch.` }, { status: 404 });
+    }
+
+    const reportData = jobsSnapshot.docs.map(doc => {
         const data = doc.data();
-        return {
+        const row: Record<string, string> = {
             'Order Id': data.orderName || doc.id,
-            'Error Reason': data.errorMessage || 'No error message provided',
         };
+
+        // Add Courier column if batch is Priority
+        if (isPriority) {
+            row['Courier'] = data.courier || 'N/A';
+        }
+
+        // Add Error Reason only for failed jobs
+        if (status === 'failed') {
+            row['Error Reason'] = data.errorMessage || 'No error message provided';
+        }
+
+        return row;
     });
 
     const worksheet = xlsx.utils.json_to_sheet(reportData);
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Failed Jobs');
+    const sheetName = status === 'success' ? 'Successful Jobs' : 'Failed Jobs';
+    xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
     
     const buf = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
@@ -65,13 +87,13 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="failed-jobs-${batchId}.xlsx"`,
+        'Content-Disposition': `attachment; filename="${status}-jobs-${batchId}.xlsx"`,
       },
     });
 
   } catch (error) {
-    console.error('Error exporting failed jobs:', error);
+    console.error('Error exporting jobs:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ error: 'Failed to export failed jobs', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to export jobs', details: errorMessage }, { status: 500 });
   }
 }

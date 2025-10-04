@@ -94,8 +94,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       return;
     }
     
-    // If a courier other than Delhivery is chosen, go directly to confirm
-    if (step === 1 && selectedCourier !== 'Delhivery') {
+    // If Shiprocket is chosen, go directly to confirm
+    if (step === 1 && selectedCourier === 'Shiprocket') {
       handleConfirm();
       return;
     }
@@ -112,7 +112,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
       return;
     }
-    if (selectedCourier === 'Delhivery' && !selectedMode) {
+    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority') && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
@@ -149,7 +149,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
           </div>
         );
       case 2:
-        if (selectedCourier !== 'Delhivery') return null;
+        if (selectedCourier === 'Shiprocket') return null;
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
@@ -168,7 +168,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     }
   };
   
-  const isFinalStep = (selectedCourier === 'Delhivery' && step === 2) || (selectedCourier !== 'Delhivery' && step === 1);
+  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority') && step === 2) || (selectedCourier === 'Shiprocket' && step === 1);
   const canProceed = availableCouriers.length > 0;
 
 

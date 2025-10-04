@@ -174,7 +174,7 @@ export default function AppsSettingsPage() {
 
                 const couriers = accData.integrations?.couriers;
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList');
+                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && accData.integrations?.couriers?.[k as keyof typeof couriers]);
                 setCourierPriorityList(couriers?.priorityList || integrated);
             }
         });
@@ -428,7 +428,7 @@ export default function AppsSettingsPage() {
                                       setCourierPriorityEnabled(checked);
                                       updatePrioritySettings(checked, courierPriorityList);
                                   }}
-                                  disabled={isSubmittingPriority || courierPriorityList.length < 2}
+                                  disabled={isSubmittingPriority || courierPriorityList.length === 0}
                                 />
                             </div>
                         </div>

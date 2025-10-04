@@ -13,11 +13,21 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft } from 'lucide-react';
 
 interface Order {
   id: string;
   name: string;
+}
+
+interface PickupLocation {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
 }
 
 interface AssignAwbDialogProps {
@@ -34,27 +44,57 @@ const shippingModes = ['Surface', 'Express'];
 export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: AssignAwbDialogProps) {
   const [step, setStep] = useState(1);
   const [selectedCourier, setSelectedCourier] = useState<string | null>('Delhivery');
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   
+  const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen && shopId) {
+      setLoadingLocations(true);
+      const locationsRef = collection(db, 'accounts', shopId, 'pickupLocations');
+      const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
+        const fetchedLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PickupLocation));
+        setPickupLocations(fetchedLocations);
+        
+        // Only set default location if no location is currently selected
+        if (fetchedLocations.length > 0 && !selectedLocation) {
+            setSelectedLocation(fetchedLocations[0].id);
+        }
+        setLoadingLocations(false);
+      }, (error) => {
+        console.error("Error fetching locations:", error);
+        toast({ title: "Error", description: "Could not fetch pickup locations.", variant: "destructive" });
+        setLoadingLocations(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [isOpen, shopId, toast, selectedLocation]);
   
   useEffect(() => {
-    // Reset state when dialog opens
+    // Reset state when dialog opens - ONLY depend on isOpen
     if (isOpen) {
       setStep(1);
       setSelectedCourier('Delhivery');
+      setSelectedLocation(null); // Will be set by the locations effect
       setSelectedMode(null);
     }
-  }, [isOpen]);
+  }, [isOpen]); // Removed pickupLocations from dependency array
 
   const handleNext = () => {
     if (step === 1 && !selectedCourier) {
       toast({ title: "Selection Required", description: "Please select a courier service.", variant: "destructive" });
       return;
     }
+    if (step === 2 && !selectedLocation) {
+        toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
+        return;
+    }
     
-    // If Shiprocket is chosen, go directly to confirm
-    if (step === 1 && selectedCourier === 'Shiprocket') {
+    // No "next" from step 2 if Shiprocket is chosen, it's the final step.
+    if (step === 2 && selectedCourier === 'Shiprocket') {
       handleConfirm();
       return;
     }
@@ -75,8 +115,17 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
+    if (!selectedLocation) {
+        toast({ title: "Selection Required", description: "Please select a pickup location.", variant: "destructive" });
+        return;
+    }
 
-    const pickupName = "Majime Productions 2"; // Hardcoded pickup name
+    const pickupName = pickupLocations.find(loc => loc.id === selectedLocation)?.name;
+
+    if (!pickupName) {
+        toast({ title: "Error", description: "Could not find selected pickup location name.", variant: "destructive" });
+        return;
+    }
     
     onConfirm(selectedCourier, pickupName, selectedMode || 'Surface');
     onClose();
@@ -99,10 +148,33 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
           </div>
         );
       case 2:
-        if (selectedCourier === 'Shiprocket') return null; // Should not happen with current logic
         return (
           <div className="space-y-4">
-            <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
+            <h3 className="font-semibold">Step 2: Select Pickup Location</h3>
+            {loadingLocations ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                </div>
+            ): pickupLocations.length > 0 ? (
+                <RadioGroup value={selectedLocation || ""} onValueChange={setSelectedLocation}>
+                    {pickupLocations.map(location => (
+                        <div key={location.id} className="flex items-center space-x-2">
+                            <RadioGroupItem value={location.id} id={location.id} />
+                            <Label htmlFor={location.id}>{location.name} - {location.address}, {location.city}</Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No pickup locations found. Please add one in Settings.</p>
+            )}
+          </div>
+        );
+      case 3:
+        if (selectedCourier === 'Shiprocket') return null; // Should not happen with current logic, but as a safeguard.
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Step 3: Choose Shipping Mode</h3>
             <RadioGroup value={selectedMode || ""} onValueChange={setSelectedMode}>
               {shippingModes.map(mode => (
                 <div key={mode} className="flex items-center space-x-2">
@@ -118,7 +190,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     }
   };
   
-  const isFinalStep = (selectedCourier === 'Delhivery' && step === 2) || (selectedCourier === 'Shiprocket' && step === 1);
+  const isFinalStep = (selectedCourier === 'Delhivery' && step === 3) || (selectedCourier === 'Shiprocket' && step === 2);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -144,7 +216,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             <div>
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
               {!isFinalStep && (
-                <Button onClick={handleNext} className="ml-2">Next</Button>
+                <Button onClick={handleNext} className="ml-2" disabled={step === 2 && pickupLocations.length === 0}>Next</Button>
               )}
               {isFinalStep && (
                   <Button onClick={handleConfirm} className="ml-2">

@@ -29,6 +29,10 @@ import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AssignAwbDialog } from '@/components/assign-awb-dialog';
+import { useProcessingQueue } from '@/contexts/processing-queue-context';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
+import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
 
 type ShipmentBatch = {
   id: string;
@@ -47,8 +51,18 @@ type ShipmentBatch = {
 
 type UserData = { activeAccountId: string | null };
 
+interface Order {
+  id: string;
+  name: string;
+};
+
 export default function AwbProcessingPage() {
-  const [isGenerateAwbOpen, setIsGenerateAwbOpen] = useState(false);
+  const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
+  const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
+  const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
+  const [isLowAwbAlertOpen, setIsLowAwbAlertOpen] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<Order[]>([]);
+  const { processAwbAssignments } = useProcessingQueue();
   const [user] = useAuthState(auth);
   const { toast } = useToast();
 
@@ -97,7 +111,16 @@ export default function AwbProcessingPage() {
         setLoading(false);
       },
     );
-    return unsub;
+    // Listen for AWB count
+    const awbsRef = collection(db, 'accounts', shopId, 'unused_awbs');
+    const unsubscribeAwbs = onSnapshot(awbsRef, (snapshot) => {
+        setUnusedAwbsCount(snapshot.size);
+    });
+
+    return () => {
+      unsub();
+      unsubscribeAwbs();
+    }
   }, [shopId, toast]);
 
   const ongoing = useMemo(
@@ -109,6 +132,25 @@ export default function AwbProcessingPage() {
     [batches],
   );
 
+  const handleAssignAwbClick = useCallback((ordersToProcess: Order[]) => {
+      if (ordersToProcess.length === 0) {
+          toast({ 
+              title: 'No orders selected', 
+              description: 'Please select orders from the "Confirmed" tab to assign AWBs.', 
+              variant: 'destructive'
+          });
+          return;
+      }
+      
+      setSelectedOrders(ordersToProcess);
+      
+      if (ordersToProcess.length > unusedAwbsCount) {
+          setIsLowAwbAlertOpen(true);
+      } else {
+          setIsAwbDialogOpen(true);
+      }
+  }, [unusedAwbsCount, toast]); // Dependencies: values that are used inside
+
   return (
     <>
       <main className="flex h-full flex-col">
@@ -117,7 +159,7 @@ export default function AwbProcessingPage() {
                 <h1 className="text-2xl font-bold font-headline">AWB Processing</h1>
                 <p className="text-muted-foreground">Manage bulk AWB assignments and generate shipping slips.</p>
             </div>
-          <Button onClick={() => setIsGenerateAwbOpen(true)}>
+          <Button onClick={() => setIsFetchAwbDialogOpen(true)}>
             <PackagePlus className="mr-2 h-4 w-4" />
             Generate AWBs
           </Button>
@@ -161,7 +203,12 @@ export default function AwbProcessingPage() {
                         <div className="space-y-4">
                           <h4 className="font-semibold">Ongoing</h4>
                           {ongoing.map((b) => (
-                            <BatchRow key={b.id} shopId={shopId} batch={b} />
+                            <BatchRow
+                              key={b.id}
+                              shopId={shopId}
+                              batch={b}
+                              handleAssignAwbClick={handleAssignAwbClick}
+                            />
                           ))}
                         </div>
                       )}
@@ -170,7 +217,12 @@ export default function AwbProcessingPage() {
                         <div className="space-y-4 mt-6">
                           <h4 className="font-semibold">Completed</h4>
                           {completed.map((b) => (
-                            <BatchRow key={b.id} shopId={shopId} batch={b} />
+                            <BatchRow
+                              key={b.id}
+                              shopId={shopId}
+                              batch={b}
+                              handleAssignAwbClick={handleAssignAwbClick}
+                            />
                           ))}
                         </div>
                       )}
@@ -183,15 +235,45 @@ export default function AwbProcessingPage() {
         </div>
       </main>
 
+      <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Not Enough AWBs</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      You have selected {selectedOrders.length} orders but only have {unusedAwbsCount} unused AWBs available. Please fetch more to proceed.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>OK</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    setIsLowAwbAlertOpen(false);
+                    setIsFetchAwbDialogOpen(true);
+                  }}>
+                      Fetch More AWBs
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      <AssignAwbDialog
+        isOpen={isAwbDialogOpen}
+        onClose={() => setIsAwbDialogOpen(false)}
+        orders={selectedOrders}
+        onConfirm={(courier, pickupName, shippingMode) => {
+            processAwbAssignments(selectedOrders.map(o => ({id: o.id, name: o.name})), courier, pickupName, shippingMode);
+        }}
+        shopId={shopId || ''}
+      />
+
       <GenerateAwbDialog
-        isOpen={isGenerateAwbOpen}
-        onClose={() => setIsGenerateAwbOpen(false)}
+        isOpen={isFetchAwbDialogOpen}
+        onClose={() => setIsFetchAwbDialogOpen(false)}
       />
     </>
   );
 }
 
-function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
+function BatchRow({ shopId, batch, handleAssignAwbClick }: { shopId: string; batch: ShipmentBatch, handleAssignAwbClick: (ordersToProcess: Order[]) => void }) {
   const [user] = useAuthState(auth);
   const { toast } = useToast();
   const [isDownloadingSuccess, setIsDownloadingSuccess] = useState(false);
@@ -219,96 +301,50 @@ function BatchRow({ shopId, batch }: { shopId: string; batch: ShipmentBatch }) {
     setIsRetrying(true);
 
     try {
-        // Get batch document to extract required fields
-        const batchRef = doc(db, 'accounts', activeShopId, 'shipment_batches', batchId);
-        const batchDoc = await getDoc(batchRef);
-        
-        if (!batchDoc.exists()) {
-            throw new Error('Batch not found');
-        }
+      // Get batch document to extract required fields
+      const batchRef = doc(db, 'accounts', activeShopId, 'shipment_batches', batchId);
+      const batchDoc = await getDoc(batchRef);
+      
+      if (!batchDoc.exists()) {
+          throw new Error('Batch not found');
+      }
 
-        const batchData = batchDoc.data();
-        const courier = batchData?.courier;
-        const pickupName = batchData?.pickupName;
-        const shippingMode = batchData?.shippingMode;
+      // Get all failed jobs from the batch's jobs subcollection
+      const jobsRef = collection(db, 'accounts', activeShopId, 'shipment_batches', batchId, 'jobs');
+      const failedJobsQuery = query(jobsRef, where('status', '==', 'failed'));
+      const failedJobsSnapshot = await getDocs(failedJobsQuery);
 
-        // Validate required fields
-        if (!courier || !pickupName || !shippingMode) {
-            toast({
-                title: "Missing Configuration",
-                description: "Batch is missing required fields (courier, pickupName, or shippingMode). Cannot retry.",
-                variant: "destructive"
-            });
-            return;
-        }
+      if (failedJobsSnapshot.empty) {
+          toast({
+              title: "No Failed Jobs",
+              description: "There are no failed jobs to retry for this batch.",
+          });
+          return;
+      }
 
-        // Get all failed jobs from the batch's jobs subcollection
-        const jobsRef = collection(db, 'accounts', activeShopId, 'shipment_batches', batchId, 'jobs');
-        const failedJobsQuery = query(jobsRef, where('status', '==', 'failed'));
-        const failedJobsSnapshot = await getDocs(failedJobsQuery);
+      // Extract order details from failed jobs
+      const ordersToProcess = failedJobsSnapshot.docs.map(jobDoc => {
+          const jobData = jobDoc.data();
+          return {
+              id: jobData.orderId,
+              name: jobData.orderName
+          };
+      });
 
-        if (failedJobsSnapshot.empty) {
-            toast({
-                title: "No Failed Jobs",
-                description: "There are no failed jobs to retry for this batch.",
-            });
-            return;
-        }
-
-        // Extract order details from failed jobs
-        const ordersToProcess = failedJobsSnapshot.docs.map(jobDoc => {
-            const jobData = jobDoc.data();
-            return {
-                orderId: jobData.orderId,
-                name: jobData.orderName
-            };
-        });
-
-        // Call the API to retry
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/shopify/courier/assign-awb', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ 
-                shop: activeShopId,
-                orders: ordersToProcess,
-                courier,
-                pickupName,
-                shippingMode
-            }),
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.details || 'Failed to start AWB assignment');
-
-        toast({
-            title: `AWB Assignment Started`,
-            description: `Retrying ${ordersToProcess.length} failed order(s) in the background.`,
-            action: (
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/dashboard/orders/awb-processing">
-                        View Progress
-                        <MoveRight className="ml-2 h-4 w-4" />
-                    </Link>
-                </Button>
-            )
-        });
+      handleAssignAwbClick(ordersToProcess);
 
     } catch (error) {
-        console.error('Failed to retry failed jobs:', error);
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        toast({
-            title: 'Retry Failed',
-            description: message,
-            variant: 'destructive',
-        });
+      console.error('Failed to retry failed jobs:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+          title: 'Retry Failed',
+          description: message,
+          variant: 'destructive',
+      });
     } finally {
-        setIsRetrying(false);
+      setIsRetrying(false);
     }
-  }, [user, toast]);
+  }, [user, toast, handleAssignAwbClick]);
 
   const handleRetryFailed = async () => {
     await retryFailedAwbAssignments(batch.id);

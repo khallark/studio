@@ -148,6 +148,14 @@ const nextConfig: NextConfig = {
         source: '/api/public/book-return/delete-images',
         destination: '/api/public/book-return/delete-images/route',
       },
+      {
+        source: '/api/integrations/courier/update-priority',
+        destination: '/api/integrations/courier/update-priority/route',
+      },
+      {
+        source: '/api/shopify/orders/update-tags',
+        destination: '/api/shopify/orders/update-tags/route',
+      },
     ]
   },
 };

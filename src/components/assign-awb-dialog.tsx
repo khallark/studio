@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +15,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from './ui/skeleton';
 
 interface Order {
   id: string;
@@ -28,24 +32,61 @@ interface AssignAwbDialogProps {
   shopId: string;
 }
 
-const courierServices = ['Delhivery', 'Shiprocket'];
 const shippingModes = ['Surface', 'Express'];
+
+interface CourierIntegrations {
+    delhivery?: { apiKey: string; };
+    shiprocket?: { email: string; apiKey: string; };
+    priorityEnabled?: boolean;
+    priorityList?: string[];
+}
 
 export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: AssignAwbDialogProps) {
   const [step, setStep] = useState(1);
-  const [selectedCourier, setSelectedCourier] = useState<string | null>('Delhivery');
+  const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   
+  const [availableCouriers, setAvailableCouriers] = useState<string[]>([]);
+  const [loadingCouriers, setLoadingCouriers] = useState(true);
+
   const { toast } = useToast();
   
   useEffect(() => {
-    // Reset state when dialog opens
+    if (isOpen && shopId) {
+      setLoadingCouriers(true);
+      const accountRef = doc(db, 'accounts', shopId);
+      getDoc(accountRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const integrations: CourierIntegrations | undefined = data.integrations?.couriers;
+          let courierOptions: string[] = [];
+
+          if (integrations) {
+            // Check for priority
+            if (integrations.priorityEnabled && integrations.priorityList && integrations.priorityList.length > 0) {
+              courierOptions.push('Priority');
+            }
+            // Add integrated couriers
+            if (integrations.delhivery) courierOptions.push('Delhivery');
+            if (integrations.shiprocket) courierOptions.push('Shiprocket');
+          }
+          
+          setAvailableCouriers(courierOptions);
+          setSelectedCourier(courierOptions[0] || null);
+        }
+        setLoadingCouriers(false);
+      }).catch(err => {
+        console.error("Failed to fetch courier integrations", err);
+        toast({ title: "Error", description: "Could not load courier options.", variant: "destructive"});
+        setLoadingCouriers(false);
+      });
+    }
+
     if (isOpen) {
       setStep(1);
-      setSelectedCourier('Delhivery');
       setSelectedMode(null);
     }
-  }, [isOpen]);
+  }, [isOpen, shopId, toast]);
 
   const handleNext = () => {
     if (step === 1 && !selectedCourier) {
@@ -53,8 +94,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       return;
     }
     
-    // If Shiprocket is chosen, go directly to confirm
-    if (step === 1 && selectedCourier === 'Shiprocket') {
+    // If a courier other than Delhivery is chosen, go directly to confirm
+    if (step === 1 && selectedCourier !== 'Delhivery') {
       handleConfirm();
       return;
     }
@@ -88,18 +129,27 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 1: Choose Courier Service</h3>
-            <RadioGroup value={selectedCourier || ""} onValueChange={setSelectedCourier}>
-              {courierServices.map(service => (
-                <div key={service} className="flex items-center space-x-2">
-                  <RadioGroupItem value={service} id={service} />
-                  <Label htmlFor={service}>{service}</Label>
-                </div>
-              ))}
-            </RadioGroup>
+            {loadingCouriers ? (
+              <div className="space-y-2">
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+              </div>
+            ) : availableCouriers.length > 0 ? (
+                <RadioGroup value={selectedCourier || ""} onValueChange={setSelectedCourier}>
+                  {availableCouriers.map(service => (
+                    <div key={service} className="flex items-center space-x-2">
+                      <RadioGroupItem value={service} id={service} />
+                      <Label htmlFor={service} className="capitalize">{service}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+            ) : (
+                 <p className="text-sm text-muted-foreground text-center py-4">No courier services integrated. Please connect a courier in Settings.</p>
+            )}
           </div>
         );
       case 2:
-        if (selectedCourier === 'Shiprocket') return null; // Should not happen with current logic
+        if (selectedCourier !== 'Delhivery') return null;
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
@@ -118,7 +168,9 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     }
   };
   
-  const isFinalStep = (selectedCourier === 'Delhivery' && step === 2) || (selectedCourier === 'Shiprocket' && step === 1);
+  const isFinalStep = (selectedCourier === 'Delhivery' && step === 2) || (selectedCourier !== 'Delhivery' && step === 1);
+  const canProceed = availableCouriers.length > 0;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -144,11 +196,11 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             <div>
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
               {!isFinalStep && (
-                <Button onClick={handleNext} className="ml-2">Next</Button>
+                <Button onClick={handleNext} className="ml-2" disabled={!canProceed}>Next</Button>
               )}
               {isFinalStep && (
-                  <Button onClick={handleConfirm} className="ml-2">
-                      {selectedCourier === 'Shiprocket' ? 'Create Shipment' : 'Assign AWBs & Create Shipments'}
+                  <Button onClick={handleConfirm} className="ml-2" disabled={!canProceed}>
+                      Assign AWBs & Create Shipments
                   </Button>
               )}
             </div>

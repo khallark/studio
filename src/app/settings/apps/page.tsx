@@ -31,30 +31,33 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Info, Copy } from 'lucide-react';
+import { Info, Copy, GripVertical, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Reorder } from "framer-motion"
+
 
 interface UserData {
   activeAccountId: string | null;
   accounts: string[];
 }
 
+interface CourierIntegrations {
+    delhivery?: { apiKey: string; };
+    shiprocket?: { email: string; apiKey: string; };
+    priorityEnabled?: boolean;
+    priorityList?: string[];
+}
+
 interface AccountData {
     integrations?: {
-        couriers?: {
-            delhivery?: {
-                apiKey: string;
-            },
-            shiprocket?: {
-                email: string;
-                apiKey: string;
-            }
-        },
+        couriers?: CourierIntegrations,
         communication?: {
           interakt?: {
             apiKey?: string;
@@ -87,6 +90,11 @@ export default function AppsSettingsPage() {
   const [interaktWebhookKey, setInteraktWebhookKey] = useState('');
   const [isEditingInteraktWebhook, setIsEditingInteraktWebhook] = useState(false);
   const [isSubmittingInteraktWebhook, setIsSubmittingInteraktWebhook] = useState(false);
+  
+  const [courierPriorityEnabled, setCourierPriorityEnabled] = useState(false);
+  const [courierPriorityList, setCourierPriorityList] = useState<string[]>([]);
+  const [isSubmittingPriority, setIsSubmittingPriority] = useState(false);
+
 
   const [appUrl, setAppUrl] = useState('');
 
@@ -98,6 +106,27 @@ export default function AppsSettingsPage() {
     // This will only run on the client side
     setAppUrl(window.location.origin);
   }, []);
+
+  const updatePrioritySettings = async (enabled: boolean, list: string[]) => {
+      if (!userData?.activeAccountId || !user) return;
+      setIsSubmittingPriority(true);
+      try {
+          const idToken = await user.getIdToken();
+          const response = await fetch('/api/integrations/courier/update-priority', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}`},
+              body: JSON.stringify({ shop: userData.activeAccountId, enabled, priorityList: list })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.details || 'Failed to update priority settings');
+          toast({ title: 'Priority Settings Updated' });
+      } catch (error) {
+          toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
+      } finally {
+          setIsSubmittingPriority(false);
+      }
+  };
+
 
   useEffect(() => {
     if (loading) return;
@@ -119,6 +148,11 @@ export default function AppsSettingsPage() {
                         setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
                         setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
                         setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
+                        
+                        const couriers = accData.integrations?.couriers;
+                        setCourierPriorityEnabled(couriers?.priorityEnabled || false);
+                        const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList');
+                        setCourierPriorityList(couriers?.priorityList || integrated);
                     }
                 }
             }
@@ -137,6 +171,11 @@ export default function AppsSettingsPage() {
                 if (!isEditingDelhivery) setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
                 if (!isEditingInteraktApi) setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
                 if (!isEditingInteraktWebhook) setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
+
+                const couriers = accData.integrations?.couriers;
+                setCourierPriorityEnabled(couriers?.priorityEnabled || false);
+                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList');
+                setCourierPriorityList(couriers?.priorityList || integrated);
             }
         });
         return () => unsubscribe();
@@ -371,8 +410,48 @@ export default function AppsSettingsPage() {
             <section>
                  <h2 className="text-lg font-semibold mb-4 text-primary">Courier Services</h2>
                  <div className="rounded-lg border">
+                    {/* Courier Priority */}
+                    <div className="p-6">
+                         <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-semibold">Courier Priority</h3>
+                                <p className="text-sm text-muted-foreground">Enable and set the priority of your couriers.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="courier-priority-switch" className="text-sm">
+                                  {courierPriorityEnabled ? 'Enabled' : 'Disabled'}
+                                </Label>
+                                <Switch
+                                  id="courier-priority-switch"
+                                  checked={courierPriorityEnabled}
+                                  onCheckedChange={(checked) => {
+                                      setCourierPriorityEnabled(checked);
+                                      updatePrioritySettings(checked, courierPriorityList);
+                                  }}
+                                  disabled={isSubmittingPriority || courierPriorityList.length < 2}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                     {courierPriorityEnabled && (
+                        <div className="border-t bg-muted/50 p-6">
+                            <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
+                             {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
+                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={(newList) => {
+                                setCourierPriorityList(newList);
+                                updatePrioritySettings(courierPriorityEnabled, newList);
+                            }} className="space-y-2">
+                            {courierPriorityList.map((courier) => (
+                                <Reorder.Item key={courier} value={courier} className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing">
+                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                    <span className="font-medium capitalize">{courier}</span>
+                                </Reorder.Item>
+                            ))}
+                            </Reorder.Group>
+                        </div>
+                    )}
                     {/* Delhivery */}
-                    <div className="p-6 flex items-center justify-between">
+                    <div className="border-t p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <div>
                                 <h3 className="text-xl font-semibold">Delhivery</h3>
@@ -611,5 +690,3 @@ export default function AppsSettingsPage() {
     </TooltipProvider>
   )
 }
-
-    

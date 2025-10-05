@@ -574,7 +574,7 @@ export default function OrdersPage() {
 
     // Then, filter by search query
     if (searchQuery) {
-        const lowercasedQuery = searchQuery.toLowerCase();
+        const lowercasedQuery = searchQuery.toLowerCase().trim();
         filtered = filtered.filter(order => {
           const customerName = 
             order.raw.shipping_address?.name ??
@@ -589,11 +589,11 @@ export default function OrdersPage() {
             order.email ??
             "";
           const match = (
-            order.name.toLowerCase().trim().includes(lowercasedQuery) ||
-            (activeTab === "All Orders" && order.customStatus.toLowerCase().trim().includes(lowercasedQuery)) ||
-            customerName.toLowerCase().trim().includes(lowercasedQuery) ||
-            (order.awb && order.awb.toLowerCase().trim().includes(lowercasedQuery)) ||
-            (order.awb_reverse && order.awb_reverse.toLowerCase().trim().includes(lowercasedQuery))
+            order.name.toLowerCase().includes(lowercasedQuery) ||
+            (activeTab === "All Orders" && order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
+            customerName.toLowerCase().includes(lowercasedQuery) ||
+            (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
+            (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery))
           );
           return invertSearch ? !match : match;
         });

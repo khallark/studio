@@ -85,6 +85,7 @@ type CustomStatus =
   | 'DTO Booked'
   | 'DTO In Transit'
   | 'DTO Delivered'
+  | 'Pending Refunds'
   | 'Lost'
   | 'Closed'
   | 'RTO Closed'
@@ -519,6 +520,7 @@ export default function OrdersPage() {
       'DTO Booked': 0,
       'DTO In Transit': 0,
       'DTO Delivered': 0,
+      'Pending Refunds': 0,
       'Lost': 0,
       'Closed': 0,
       'RTO Closed': 0,
@@ -724,6 +726,7 @@ export default function OrdersPage() {
             case 'New':
             case 'Confirmed':
             case 'Ready To Dispatch':
+            case 'Pending Refunds':
                 return 'secondary';
             case 'Dispatched':
             case 'In Transit':
@@ -1258,6 +1261,7 @@ export default function OrdersPage() {
             case 'DTO Booked':
             case 'DTO In Transit':
             case 'DTO Delivered':
+            case 'Pending Refunds':
             case 'Lost':
             case 'Closed':
             case 'RTO Closed':
@@ -1416,6 +1420,9 @@ export default function OrdersPage() {
                           <TabsTrigger value="DTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               DTO Delivered ({statusCounts['DTO Delivered'] || 0})
                           </TabsTrigger>
+                          <TabsTrigger value="Pending Refunds" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
+                              Pending Refunds ({statusCounts['Pending Refunds'] || 0})
+                          </TabsTrigger>
                           <TabsTrigger value="Lost" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:text-primary-foreground data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                               Lost ({statusCounts['Lost'] || 0})
                           </TabsTrigger>
@@ -1462,7 +1469,7 @@ export default function OrdersPage() {
                                   ? <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                   : <></>
                                 }
-                                {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
+                                {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab)
                                   ? <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
                                   : <></>
                                 }

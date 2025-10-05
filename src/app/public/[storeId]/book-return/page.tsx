@@ -496,7 +496,7 @@ export default function BookReturnPage() {
             <>
             <div className="text-center mb-8">
                 <h1 className="text-2xl sm:text-4xl font-bold font-headline text-primary">Book a Return</h1>
-                <p className="text-muted-foreground mt-2 text-sm sm:text-base">Find your order to begin the return process.</p>
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base">Find your order to begin the return process. <b>Come back anytime to view your return status.</b></p>
             </div>
             <Card>
                 <CardHeader>

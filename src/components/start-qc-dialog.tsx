@@ -167,8 +167,9 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user, onStatusUp
       // Upload video
       toast({ title: 'Uploading video...', description: 'Please wait.' });
       const videoFileName = `unboxing_video_${Date.now()}.webm`;
-      const videoRef = ref(storage, `/return-images/${shopId}/${order.id}/${videoFileName}`);
-      await uploadBytes(videoRef, recordedVideo);
+      const videoPath = `/return-images/${shopId}/${order.id}/${videoFileName}`;
+      const videoRef = ref(storage, videoPath);
+      const uploadResult = await uploadBytes(videoRef, recordedVideo);
 
       // Update Firestore
       toast({ title: 'Saving QC results...', description: 'Almost there!' });
@@ -180,7 +181,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user, onStatusUp
 
       await updateDoc(orderRef, {
         'raw.line_items': updatedLineItems,
-        'unboxing_video_path': videoRef.fullPath
+        'unboxing_video_path': uploadResult.ref.fullPath  // ✅ Use uploadResult.ref.fullPath
       });
 
       // Update status

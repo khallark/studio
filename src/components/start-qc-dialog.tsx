@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -14,10 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { storage, db } from '@/lib/firebase';
-import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
-import { doc, updateDoc } from 'firebase/firestore';
-import { Loader2, Camera, Video, AlertTriangle } from 'lucide-react';
+import { storage, auth } from '@/lib/firebase'; // Only need auth now
+import { ref, getDownloadURL } from 'firebase/storage';
+import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
@@ -163,35 +161,51 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user, onStatusUp
       if (!recordedVideo) {
         throw new Error('Please record an unboxing video before submitting.');
       }
-      
-      // Upload video
+
       toast({ title: 'Uploading video...', description: 'Please wait.' });
-      const videoFileName = `unboxing_video_${Date.now()}.webm`;
-      const videoPath = `/return-images/${shopId}/${order.id}/${videoFileName}`;
-      const videoRef = ref(storage, videoPath);
-      const uploadResult = await uploadBytes(videoRef, recordedVideo);
 
-      // Update Firestore
-      toast({ title: 'Saving QC results...', description: 'Almost there!' });
-      const orderRef = doc(db, 'accounts', shopId, 'orders', order.id);
-      const updatedLineItems = order.raw.line_items.map(item => ({
-        ...item,
-        qc_status: qcStatuses[item.id] || null,
-      }));
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('video', recordedVideo);
+      formData.append('shopId', shopId);
+      formData.append('orderId', order.id);
+      formData.append('qcStatuses', JSON.stringify(qcStatuses));
 
-      await updateDoc(orderRef, {
-        'raw.line_items': updatedLineItems,
-        'unboxing_video_path': uploadResult.ref.fullPath  // ✅ Use uploadResult.ref.fullPath
+      // Get auth token
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      // Call API
+      const response = await fetch('/api/shopify/orders/qc-test', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
       });
 
-      // Update status
-      await onStatusUpdate(order.id, 'Pending Refunds');
-      
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Submission failed');
+      }
+
       toast({ title: 'QC Submitted', description: 'The order is now pending refund.' });
       onClose();
+      
+      // Refresh the order list or trigger any necessary updates
+      if (onStatusUpdate) {
+        await onStatusUpdate(order.id, 'Pending Refunds');
+      }
     } catch (error) {
       console.error('QC submission error:', error);
-      toast({ title: 'Submission Failed', description: error instanceof Error ? error.message : 'An unknown error occurred', variant: 'destructive' });
+      toast({ 
+        title: 'Submission Failed', 
+        description: error instanceof Error ? error.message : 'An unknown error occurred', 
+        variant: 'destructive' 
+      });
     } finally {
       setIsSubmitting(false);
     }

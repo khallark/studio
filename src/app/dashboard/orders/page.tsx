@@ -1764,7 +1764,6 @@ export default function OrdersPage() {
             order={orderForQc}
             shopId={userData.activeAccountId}
             user={user}
-            onStatusUpdate={handleUpdateStatus}
         />
     )}
 

@@ -46,10 +46,9 @@ interface StartQcDialogProps {
   order: Order;
   shopId: string;
   user: any; // Firebase user object
-  onStatusUpdate: (orderId: string, status: any) => Promise<void>;
 }
 
-export function StartQcDialog({ isOpen, onClose, order, shopId, user, onStatusUpdate }: StartQcDialogProps) {
+export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcDialogProps) {
   const [qcStatuses, setQcStatuses] = useState<Record<string | number, QcStatus | null>>({});
   const [customerImageUrls, setCustomerImageUrls] = useState<string[]>([]);
   const [loadingImages, setLoadingImages] = useState(true);
@@ -194,11 +193,6 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user, onStatusUp
 
       toast({ title: 'QC Submitted', description: 'The order is now pending refund.' });
       onClose();
-      
-      // Refresh the order list or trigger any necessary updates
-      if (onStatusUpdate) {
-        await onStatusUpdate(order.id, 'Pending Refunds');
-      }
     } catch (error) {
       console.error('QC submission error:', error);
       toast({ 

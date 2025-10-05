@@ -590,7 +590,8 @@ export default function OrdersPage() {
             "";
           const match = (
             order.name.toLowerCase().includes(lowercasedQuery) ||
-            customerName.includes(lowercasedQuery) ||
+            (activeTab === "All Orders" && order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
+            customerName.toLowerCase().includes(lowercasedQuery) ||
             (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
             (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery))
           );

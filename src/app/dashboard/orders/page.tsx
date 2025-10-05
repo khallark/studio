@@ -70,6 +70,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 import { BookReturnDialog } from '@/components/book-return-dialog';
+import { StartQcDialog } from '@/components/start-qc-dialog';
 
 type CustomStatus = 
   | 'New' 
@@ -115,6 +116,9 @@ interface Order {
   isDeleted?: boolean; // Tombstone flag
   tags_confirmed?: string[];
   customStatusesLogs?: CustomStatusLog[];
+  booked_return_reason?: string;
+  booked_return_images?: string[];
+  returnItemsVariantIds?: (string | number)[];
   raw: {
     cancelled_at: string | null;
     customer?: {
@@ -123,6 +127,7 @@ interface Order {
       last_name?: string;
       phone?: string;
     };
+    line_items: any[];
     contact_email?: string;
     billing_address?: {
         name?: string;
@@ -136,7 +141,6 @@ interface Order {
         zip: string;
         country: string;
     };
-    line_items: any[];
     shipping_address?: {
         name?: string;
         first_name?: string;
@@ -208,6 +212,10 @@ export default function OrdersPage() {
   // State for item availability checklist
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<string | null>(null);
+
+  const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
+  const [orderForQc, setOrderForQc] = useState<Order | null>(null);
+
 
   const handleItemCheck = (orderId: string, lineItemId: string | number) => {
     setItemSelection(prev => {
@@ -1054,7 +1062,12 @@ export default function OrdersPage() {
         );
       case 'DTO Delivered':
         return (
-          <></>
+           <DropdownMenuItem onClick={() => {
+            setOrderForQc(order);
+            setIsQcDialogOpen(true);
+           }}>
+            Start QC
+          </DropdownMenuItem>
         );
       case 'RTO Delivered':
         return (
@@ -1179,9 +1192,6 @@ export default function OrdersPage() {
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
                       {isBulkUpdating ? 'Confirming...' : 'Confirm'}
                   </Button>
-                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
-                  </Button>
                 </>
               );
             case 'Confirmed':
@@ -1197,9 +1207,6 @@ export default function OrdersPage() {
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                       Assign AWBs
-                  </Button>
-                  <Button variant="destructive" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Cancelled')}>
-                      {isBulkUpdating ? 'Cancelling...' : 'Cancel'}
                   </Button>
                 </>
               );
@@ -1749,6 +1756,18 @@ export default function OrdersPage() {
             user={user}
         />
     )}
+
+    {orderForQc && userData?.activeAccountId && user && (
+        <StartQcDialog
+            isOpen={isQcDialogOpen}
+            onClose={() => setIsQcDialogOpen(false)}
+            order={orderForQc}
+            shopId={userData.activeAccountId}
+            user={user}
+            onStatusUpdate={handleUpdateStatus}
+        />
+    )}
+
 
     <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
         <DialogContent className="max-w-4xl">

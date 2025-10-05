@@ -653,7 +653,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery])
+  }, [filteredOrders])
 
   const availabilityCounts = useMemo(() => {
     const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');

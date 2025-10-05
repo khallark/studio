@@ -589,11 +589,11 @@ export default function OrdersPage() {
             order.email ??
             "";
           const match = (
-            order.name.toLowerCase().includes(lowercasedQuery) ||
-            (activeTab === "All Orders" && order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
-            customerName.toLowerCase().includes(lowercasedQuery) ||
-            (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
-            (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery))
+            order.name.toLowerCase().trim().includes(lowercasedQuery) ||
+            (activeTab === "All Orders" && order.customStatus.toLowerCase().trim().includes(lowercasedQuery)) ||
+            customerName.toLowerCase().trim().includes(lowercasedQuery) ||
+            (order.awb && order.awb.toLowerCase().trim().includes(lowercasedQuery)) ||
+            (order.awb_reverse && order.awb_reverse.toLowerCase().trim().includes(lowercasedQuery))
           );
           return invertSearch ? !match : match;
         });
@@ -650,6 +650,10 @@ export default function OrdersPage() {
 
     return filtered;
   }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery])
 
   const availabilityCounts = useMemo(() => {
     const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');

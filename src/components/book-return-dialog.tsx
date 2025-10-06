@@ -48,23 +48,26 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
   const isCustomerReturn = order.returnItemsVariantIds && order.returnItemsVariantIds.length > 0;
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedVariantIds(new Set());
-      setIsSubmitting(false);
+  if (isOpen) {
+    setSelectedVariantIds(new Set());
+    setIsSubmitting(false);
+    
+    // If customer has selected items for return, pre-select them
+    if (isCustomerReturn) {
+      const preSelectedVariantIds = new Set<string>();
+      // FIX: Convert returnItemsVariantIds to strings for comparison
+      const customerSelectedIds = order.returnItemsVariantIds?.map(String) || [];
       
-      // If customer has selected items for return, pre-select them
-      if (isCustomerReturn) {
-        const preSelectedVariantIds = new Set<string>();
-        order.raw.line_items.forEach(item => {
-          const variantId = String(item.variant_id);
-          if (order.returnItemsVariantIds?.includes(variantId) && item.variant_id) {
-            preSelectedVariantIds.add(variantId);
-          }
-        });
-        setSelectedVariantIds(preSelectedVariantIds);
-      }
+      order.raw.line_items.forEach(item => {
+        const variantId = String(item.variant_id);
+        if (customerSelectedIds.includes(variantId) && item.variant_id) {
+          preSelectedVariantIds.add(variantId);
+        }
+      });
+      setSelectedVariantIds(preSelectedVariantIds);
     }
-  }, [isOpen, order, isCustomerReturn]);
+  }
+}, [isOpen, order, isCustomerReturn]);
 
   const handleToggleVariant = (variantId: string) => {
     setSelectedVariantIds(prev => {
@@ -145,7 +148,8 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
   const isItemSelected = (item: typeof order.raw.line_items[0]) => {
     if (isCustomerReturn && order.returnItemsVariantIds) {
       const variantId = String(item.variant_id);
-      return order.returnItemsVariantIds.includes(variantId);
+      // FIX: Convert to strings for comparison
+      return order.returnItemsVariantIds.map(String).includes(variantId);
     }
     return false;
   };
@@ -190,7 +194,7 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
                       />
                       <Label htmlFor={`item-${item.id}`} className="flex-1">
                         <p>{item.title}</p>
-                        <p className="text-xs text-muted-foreground">SKU: {item.sku || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground">Qty: {item.quantity || '0'}</p>
                       </Label>
                     </div>
                   );

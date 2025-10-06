@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
             reason: JSON.stringify(respBody),
             response: dlvResp
         },
-        { status: 502 }
+        { status: 400 }
         )
     }
     
@@ -297,7 +297,7 @@ export async function POST(req: NextRequest) {
             reason: verdict.message,
             response: dlvResp
         },
-        { status: 502 }
+        { status: 400 }
         )
     }
 
@@ -330,7 +330,7 @@ export async function POST(req: NextRequest) {
         reason: error?.message || 'Unknown',
         body: error?.body,
       },
-      { status: 502 }
+      { status: 500 }
     );
   }
 }

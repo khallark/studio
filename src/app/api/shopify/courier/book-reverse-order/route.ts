@@ -26,6 +26,7 @@ type LineItem = {
   weight?: number;    // or weight in kg
   variant_title?: string;
   sku?: string | null;
+  variant_id?: string | number;
 };
 
 /** Classify Delhivery create-shipment response */
@@ -104,15 +105,15 @@ async function releaseAwb(shop: string, awb: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderId, skus_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
+    const { shop, orderId, variant_ids_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
 
     // Validate inputs
     if (
       !shop ||
       !orderId ||
       !pickupName ||
-      !Array.isArray(skus_of_selected_line_items_to_be_returned) ||
-      skus_of_selected_line_items_to_be_returned.length === 0
+      !Array.isArray(variant_ids_of_selected_line_items_to_be_returned) ||
+      variant_ids_of_selected_line_items_to_be_returned.length === 0
     ) {
       return NextResponse.json({
         ok: false,
@@ -183,10 +184,10 @@ export async function POST(req: NextRequest) {
     const country = addr?.country || 'India';
     const pin = addr?.zip || '';
 
-    // Build products_desc + quantity from selected line_items
+    // Build products_desc + quantity from selected line_items (filtered by variant_id)
     const lineItems: LineItem[] = Array.isArray(orderData.raw.line_items) ? orderData.raw.line_items : [];
-    const idSet = new Set(skus_of_selected_line_items_to_be_returned.map((x: any) => String(x)));
-    const selected = lineItems.filter(li => idSet.has(String(li.sku)));
+    const variantIdSet = new Set(variant_ids_of_selected_line_items_to_be_returned.map((x: any) => String(x)));
+    const selected = lineItems.filter(li => variantIdSet.has(String(li.variant_id)));
 
     if (selected.length === 0) {
       return NextResponse.json({

@@ -169,7 +169,7 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
             <Alert className="mb-4">
               <Info className="h-4 w-4" />
               <AlertDescription>
-                The selected items were booked for return by the customer.
+                The selected items were requested for return by the customer.
               </AlertDescription>
             </Alert>
           )}

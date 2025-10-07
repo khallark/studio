@@ -1,7 +1,6 @@
 // apps/web/src/app/api/returns/bulk-book/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { db, auth as adminAuth } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { auth as adminAuth } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
 
@@ -27,15 +26,15 @@ export async function POST(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // ----- Input -----
-    const { shop, orders, pickupName, shippingMode } = (await req.json()) as {
+    const { shop, orderIds, pickupName, shippingMode } = (await req.json()) as {
       shop: string;
-      orders: Array<{ orderId: string; name: string }>;
+      orderIds: string[];
       pickupName?: string;
       shippingMode?: string;
     };
 
     // Note: No courier param - it's read from order.courier in the function
-    if (!shop || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
+    if (!shop || !pickupName || !shippingMode || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(
         { error: "missing params in the request body" },
         { status: 400 }
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         shop,
-        orders,
+        orderIds,
         pickupName,
         shippingMode,
         requestedBy: userId,

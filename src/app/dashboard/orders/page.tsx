@@ -407,7 +407,7 @@ export default function OrdersPage() {
       }
       
       toast({
-        title: 'Dispatch Process Complete',
+        title: 'Dispatch Process Started',
         description: result.message,
       });
       
@@ -436,11 +436,75 @@ export default function OrdersPage() {
   }, [userData, user, toast]);
 
 
+  const handleReturnBooking = useCallback(async (orderIds: string[]) => {
+    if (!userData?.activeAccountId || !user || orderIds.length === 0) return;
+
+    toast({
+      title: 'Processing orders',
+      description: 'Please wait...',
+    });
+
+    setIsBulkUpdating(true);
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/courier/bulk-book-return', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          orderIds,
+          pickupName: "Majime Productions 2",
+          shippingMode: "Surface",
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok && response.status !== 207) {
+        throw new Error(result.details || 'Failed to book return for orders.');
+      }
+      
+      toast({
+        title: 'Return booking Process Started',
+        description: result.message,
+      });
+      
+      if (result.errors && result.errors.length > 0) {
+        // Optionally show another toast for errors
+        toast({
+          title: 'Some Bookings Failed',
+          description: `Check the console for details on ${result.errors.length} failed orders.`,
+          variant: 'destructive',
+        });
+        console.error('Return Booking failures:', result.errors);
+      }
+
+      setSelectedOrders(prev => prev.filter(id => !orderIds.includes(id)));
+
+    } catch (error) {
+      console.error('Return Booking error:', error);
+      toast({
+        title: 'Return Booking Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }, [userData, user, toast]);
+
   const handleBulkUpdateStatus = useCallback(async (status: CustomStatus) => {
     if (!userData?.activeAccountId || !user || selectedOrders.length === 0) return;
 
     if (status === 'Dispatched') {
       await handleDispatch(selectedOrders);
+      return;
+    }
+
+    if(status === 'DTO Requested') {
+      await handleReturnBooking(selectedOrders);
       return;
     }
 
@@ -488,7 +552,7 @@ export default function OrdersPage() {
     } finally {
         setIsBulkUpdating(false);
     }
-}, [userData, user, selectedOrders, toast, handleDispatch]);
+}, [userData, user, selectedOrders, toast, handleDispatch, handleReturnBooking]);
 
 
   const handleDeleteOrder = useCallback(async (orderId: string) => {
@@ -1184,7 +1248,7 @@ export default function OrdersPage() {
               return (
                 <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                   {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                  {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                  {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                 </Button>
               );
             case 'New':
@@ -1192,7 +1256,7 @@ export default function OrdersPage() {
                 <>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
                       {isBulkUpdating ? 'Confirming...' : 'Confirm'}
@@ -1204,11 +1268,11 @@ export default function OrdersPage() {
                 <>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
                       {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                      {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel (${selectedOrders.length})`}
+                      {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                       Assign AWBs
@@ -1227,21 +1291,21 @@ export default function OrdersPage() {
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
                     {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingSlips ? 'Downloading...' : `Download Slips (${selectedOrders.length})`}
+                    {isDownloadingSlips ? 'Downloading...' : `Download Slips ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                      {isBulkUpdating ? 'Dispatching...' : 'Dispatch'}
+                      {isBulkUpdating ? 'Dispatching...' : `Dispatch ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
                 </>
               );
             case 'Delivered':
                 return (
                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Closed')}>
-                        {isBulkUpdating ? 'Closing...' : `Close Orders (${selectedOrders.length})`}
+                        {isBulkUpdating ? 'Closing...' : `Close Orders ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                     </Button>
                 )
             case 'RTO Delivered':
@@ -1256,20 +1320,31 @@ export default function OrdersPage() {
                 </Button>
                 <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                 </Button>
                 <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
                     {isBulkUpdating ? 'RTO Closing...' : 'RTO Close'}
                 </Button>
                 </>
               );
+            case 'DTO Requested':
+              return (
+                <>
+                  <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
+                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
+                      {isBulkUpdating ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length}) Returns` : ''}`}
+                  </Button>
+                </>
+              )
             case 'Cancelled':
               return null;
             case 'Dispatched':
             case 'In Transit':
             case 'Out For Delivery':
             case 'RTO In Transit':
-            case 'DTO Requested':
             case 'DTO Booked':
             case 'DTO In Transit':
             case 'DTO Delivered':
@@ -1280,7 +1355,7 @@ export default function OrdersPage() {
               return (
                 <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isDownloadingExcel ? 'Downloading...' : `Download Excel (${selectedOrders.length})`}
+                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                 </Button>
               );
             default:

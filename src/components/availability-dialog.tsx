@@ -57,6 +57,7 @@ export function AvailabilityDialog({
   const [orders, setOrders] = useState<Order[]>([]);
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
   const [processingOrder, setProcessingOrder] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<'Available' | 'Unavailable' | null>(null); // Add this
 
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +90,7 @@ export function AvailabilityDialog({
     }
 
     setProcessingOrder(order.id);
+    setProcessingAction(action);
     const tagAction = action === 'Available' ? 'add' : 'remove';
 
     try {
@@ -128,19 +130,6 @@ export function AvailabilityDialog({
     }
   };
 
-  useEffect(() => {
-    if (orders.length === 0 && isOpen && confirmedOrders.length > 0) {
-      toast({
-        title: 'All Done!',
-        description: 'You have processed all confirmed orders.',
-      });
-      const timer = setTimeout(() => {
-        onClose();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [orders, isOpen, confirmedOrders, toast, onClose]);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl h-[90vh] flex flex-col">
@@ -168,7 +157,7 @@ export function AvailabilityDialog({
                     exit={{
                         opacity: 0,
                         x: processingOrder === order.id
-                            ? (isCurrentlyAvailable ? -300 : 300)
+                            ? (processingAction === 'Available' ? 300 : -300)  // Use the action taken
                             : 0,
                         scale: processingOrder !== order.id ? 0.8 : 1,
                         transition: { duration: 0.3 }
@@ -216,7 +205,6 @@ export function AvailabilityDialog({
                           <SelectItem value="Ignore">Ignore</SelectItem>
                         </SelectContent>
                       </Select>
-                      {processingOrder === order.id && <Loader2 className="h-4 w-4 animate-spin" />}
                     </div>
                   </motion.div>
                 );

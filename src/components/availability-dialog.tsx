@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -56,19 +57,13 @@ export function AvailabilityDialog({
   const [orders, setOrders] = useState<Order[]>([]);
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
   const [processingOrder, setProcessingOrder] = useState<string | null>(null);
-  const [processedOrderIds, setProcessedOrderIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
-      // Filter out orders that have already been processed
-      const filteredOrders = confirmedOrders.filter(order => !processedOrderIds.has(order.id));
-      setOrders(filteredOrders);
+      setOrders(confirmedOrders);
       setItemSelection({});
-    } else {
-      // Reset processed orders when dialog closes
-      setProcessedOrderIds(new Set());
     }
-  }, [isOpen, confirmedOrders, processedOrderIds]);
+  }, [isOpen]);
 
   const handleItemCheck = (orderId: string, lineItemId: string | number) => {
     setItemSelection((prev) => {
@@ -89,8 +84,6 @@ export function AvailabilityDialog({
 
   const handleAction = async (order: Order, action: 'Available' | 'Unavailable' | 'Ignore') => {
     if (action === 'Ignore') {
-      // Mark as processed so it doesn't reappear
-      setProcessedOrderIds(prev => new Set([...prev, order.id]));
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
       return;
     }
@@ -119,9 +112,6 @@ export function AvailabilityDialog({
         description: `Order ${order.name} marked as ${action}.`,
       });
 
-      // Mark as processed so it doesn't reappear
-      setProcessedOrderIds(prev => new Set([...prev, order.id]));
-      
       // Animate out after success
       setTimeout(() => {
         setOrders((prev) => prev.filter((o) => o.id !== order.id));
@@ -243,3 +233,4 @@ export function AvailabilityDialog({
     </Dialog>
   );
 }
+

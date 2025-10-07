@@ -120,6 +120,7 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/export-products',
         destination: '/api/shopify/orders/export-products/route',
       },
+
       {
         source: '/api/shopify/orders/qc-test',
         destination: '/api/shopify/orders/qc-test/route',
@@ -139,6 +140,10 @@ const nextConfig: NextConfig = {
       {
         source: '/api/public/book-return/request',
         destination: '/api/public/book-return/request/route',
+      },
+      {
+        source: '/api/shopify/courier/bulk-book-return',
+        destination: '/api/shopify/courier/bulk-book-return/route',
       },
       {
         source: '/api/shopify/orders/update-tags',

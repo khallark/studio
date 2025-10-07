@@ -447,7 +447,7 @@ export default function OrdersPage() {
     setIsBulkUpdating(true);
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/shopify/orders/courier/bulk-book-return', {
+      const response = await fetch('/api/shopify/courier/bulk-book-returnn', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

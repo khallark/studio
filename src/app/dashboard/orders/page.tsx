@@ -1218,7 +1218,7 @@ export default function OrdersPage() {
     const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
 
   const shippedStatuses: (CustomStatus | 'All Orders')[] = [
-    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit', 'DTO Requested', 'DTO Booked', 'DTO In Transit'
+    'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit', 'DTO Booked', 'DTO In Transit'
   ];
 
   const renderBulkActionButtons = () => {
@@ -1330,12 +1330,12 @@ export default function OrdersPage() {
             case 'DTO Requested':
               return (
                 <>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
+                      {isBulkUpdating ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns`}
+                  </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
-                      {isBulkUpdating ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length}) Returns` : ''}`}
                   </Button>
                 </>
               )

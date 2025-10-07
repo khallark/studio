@@ -108,12 +108,7 @@ export function AvailabilityDialog({
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.details || 'Failed to update order');
-
-      toast({
-        title: 'Order Updated',
-        description: `Order ${order.name} marked as ${action}.`,
-      });
-
+      
       // Animate out after success
       setTimeout(() => {
         setOrders((prev) => prev.filter((o) => o.id !== order.id));

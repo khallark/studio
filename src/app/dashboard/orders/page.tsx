@@ -71,6 +71,7 @@ import { Label } from '@/components/ui/label';
 import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 import { BookReturnDialog } from '@/components/book-return-dialog';
 import { StartQcDialog } from '@/components/start-qc-dialog';
+import { AvailabilityDialog } from '@/components/availability-dialog';
 
 type CustomStatus = 
   | 'New' 
@@ -215,6 +216,8 @@ export default function OrdersPage() {
 
   const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
   const [orderForQc, setOrderForQc] = useState<Order | null>(null);
+
+  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
 
 
   const handleItemCheck = (orderId: string, lineItemId: string | number) => {
@@ -1266,6 +1269,9 @@ export default function OrdersPage() {
             case 'Confirmed':
               return (
                 <>
+                  <Button variant="outline" size="sm" onClick={() => setIsAvailabilityDialogOpen(true)}>
+                      Perform Items availability
+                  </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
@@ -1844,6 +1850,16 @@ export default function OrdersPage() {
             order={orderForQc}
             shopId={userData.activeAccountId}
             user={user}
+        />
+    )}
+    
+    {isAvailabilityDialogOpen && userData?.activeAccountId && user && (
+        <AvailabilityDialog
+            isOpen={isAvailabilityDialogOpen}
+            onClose={() => setIsAvailabilityDialogOpen(false)}
+            user={user}
+            shopId={userData.activeAccountId}
+            confirmedOrders={filteredOrders.filter(o => o.customStatus === 'Confirmed')}
         />
     )}
 

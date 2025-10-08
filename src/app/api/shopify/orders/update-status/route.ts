@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
         transaction.update(orderRef, {
             customStatus: status,
             lastUpdatedAt: FieldValue.serverTimestamp(),
+            lastStatusUpdate: FieldValue.serverTimestamp(),
             lastUpdatedBy: userRefData,
             customStatusesLogs: FieldValue.arrayUnion(log), // Append log to order's log array
         });

@@ -3,18 +3,18 @@ import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            return decodedToken.uid;
-        } catch (error) {
-            console.error('Error verifying auth token:', error);
-            return null;
-        }
+  const authHeader = req.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const idToken = authHeader.split('Bearer ')[1];
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      return decodedToken.uid;
+    } catch (error) {
+      console.error('Error verifying auth token:', error);
+      return null;
     }
-    return null;
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!shop || !orderId) {
       return NextResponse.json({ error: 'Shop and orderId are required' }, { status: 400 });
     }
-    
+
     const userId = await getUserIdFromToken(req);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,16 +33,17 @@ export async function POST(req: NextRequest) {
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
 
     const logEntry = {
-        status: 'Delivered',
-        createdAt: Timestamp.now(),
-        remarks: 'Order status reverted to Delivered by user from DTO Booked.',
+      status: 'Delivered',
+      createdAt: Timestamp.now(),
+      remarks: 'Order status reverted to Delivered by user.',
     };
 
     await orderRef.update({
-        customStatus: 'Delivered',
-        awb_reverse: FieldValue.delete(),
-        lastUpdatedAt: FieldValue.serverTimestamp(),
-        customStatusesLogs: FieldValue.arrayUnion(logEntry),
+      customStatus: 'Delivered',
+      awb_reverse: FieldValue.delete(),
+      lastUpdatedAt: FieldValue.serverTimestamp(),
+      lastStatusUpdate: FieldValue.serverTimestamp(),
+      customStatusesLogs: FieldValue.arrayUnion(logEntry),
     });
 
     return NextResponse.json({ message: 'Order status successfully reverted to Delivered.' });

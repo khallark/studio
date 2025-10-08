@@ -385,6 +385,36 @@ export default function OrdersPage() {
       });
     }
   }, [userData, toast, user]);
+
+  const handleRevertStatus = useCallback(async (orderId: string, revertTo: 'Confirmed' | 'Delivered') => {
+      if (!userData?.activeAccountId || !user) return;
+
+      const endpoint = revertTo === 'Confirmed' ? '/api/shopify/orders/revert-to-confirmed' : '/api/shopify/orders/revert-to-delivered';
+      const toastTitle = `Reverting to ${revertTo}`;
+      
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ shop: userData.activeAccountId, orderId }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.details || `Failed to revert status to ${revertTo}`);
+        toast({ title: 'Status Reverted', description: `Order status changed back to ${revertTo}.` });
+      } catch (error) {
+        console.error('Status revert error:', error);
+        toast({
+          title: 'Revert Failed',
+          description: error instanceof Error ? error.message : 'An unknown error occurred.',
+          variant: 'destructive',
+        });
+      }
+    }, [userData, toast, user]);
+
   
   const handleDispatch = useCallback(async (orderIds: string[]) => {
     if (!userData?.activeAccountId || !user || orderIds.length === 0) return;
@@ -1064,9 +1094,6 @@ export default function OrdersPage() {
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
               Confirm
             </DropdownMenuItem>
-            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-              Cancel
-            </DropdownMenuItem> */}
           </>
         );
       case 'Confirmed':
@@ -1079,43 +1106,26 @@ export default function OrdersPage() {
             }}>
               Assign AWB
             </DropdownMenuItem>
-            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-              Cancel
-            </DropdownMenuItem> */}
           </>
         );
       case 'Ready To Dispatch':
         return (
           <>
-             <DropdownMenuItem onClick={() => handleDispatch([order.id])}>
+            <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>
+              Back to Confirmed
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDispatch([order.id])}>
               Dispatch
             </DropdownMenuItem>
-            {/* <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-              Cancel
-            </DropdownMenuItem> */}
           </>
         );
       case 'Dispatched':
-        // return (
-        //    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-        //       Cancel
-        //     </DropdownMenuItem>
-        // );
-        return (
-          <></>
-        );
+        return null;
       case 'In Transit':
       case 'RTO In Transit':
       case 'Out For Delivery':
       case 'DTO In Transit':
-        // return (
-        //   <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Cancelled')} className="text-destructive">
-        //     Cancel
-        //   </DropdownMenuItem>
-        // );
-        return (
-          <></>
-        );
+        return null;
       case 'Delivered':
       case 'DTO Requested':
         return (
@@ -1128,9 +1138,14 @@ export default function OrdersPage() {
         );
       case 'DTO Booked':
         return (
-           <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
-            Close Order
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>
+              Back to Delivered
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>
+              Close Order
+            </DropdownMenuItem>
+          </>
         );
       case 'DTO Delivered':
         return (
@@ -1152,14 +1167,6 @@ export default function OrdersPage() {
       case 'Closed':
       case 'RTO Closed':
       case 'Cancelled':
-        // return (
-        //   <>
-        //     <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-destructive">
-        //       <Trash2 className="mr-2 h-4 w-4" />
-        //       Delete Order
-        //     </DropdownMenuItem>
-        //   </>
-        // );
       default:
         return null;
     }

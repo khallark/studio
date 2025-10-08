@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db, auth as adminAuth } from '@/lib/firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+
+async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+        const idToken = authHeader.split('Bearer ')[1];
+        try {
+            const decodedToken = await adminAuth.verifyIdToken(idToken);
+            return decodedToken.uid;
+        } catch (error) {
+            console.error('Error verifying auth token:', error);
+            return null;
+        }
+    }
+    return null;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { shop, orderId } = await req.json();
+
+    if (!shop || !orderId) {
+      return NextResponse.json({ error: 'Shop and orderId are required' }, { status: 400 });
+    }
+    
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
+
+    const logEntry = {
+        status: 'Confirmed',
+        createdAt: Timestamp.now(),
+        remarks: 'Order status reverted to Confirmed by user.',
+    };
+
+    await orderRef.update({
+        customStatus: 'Confirmed',
+        awb: FieldValue.delete(),
+        courier: FieldValue.delete(),
+        lastUpdatedAt: FieldValue.serverTimestamp(),
+        customStatusesLogs: FieldValue.arrayUnion(logEntry),
+    });
+
+    return NextResponse.json({ message: 'Order status successfully reverted to Confirmed.' });
+  } catch (error) {
+    console.error('Error reverting order status:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: 'Failed to revert order status', details: errorMessage }, { status: 500 });
+  }
+}

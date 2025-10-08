@@ -160,6 +160,14 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/update-tags',
         destination: '/api/shopify/orders/update-tags/route',
       },
+      {
+        source: '/api/shopify/orders/revert-to-confirmed',
+        destination: '/api/shopify/orders/revert-to-confirmed/route',
+      },
+      {
+        source: '/api/shopify/orders/revert-to-delivered',
+        destination: '/api/shopify/orders/revert-to-delivered/route',
+      },
     ]
   },
 };

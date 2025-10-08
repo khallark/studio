@@ -186,21 +186,32 @@ export function AvailabilityDialog({
                           </div>
                         ))}
                       </div>
-                      <Select
-                        disabled={!allItemsSelected || processingOrder === order.id}
-                        onValueChange={(value: 'Available' | 'Unavailable' | 'Ignore') =>
-                          handleAction(order, value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select action..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Available">Available</SelectItem>
-                          <SelectItem value="Unavailable">Unavailable</SelectItem>
-                          <SelectItem value="Ignore">Ignore</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleAction(order, 'Available')}
+                          disabled={!allItemsSelected || processingOrder === order.id}
+                          variant="default"
+                          className="flex-1"
+                        >
+                          Available
+                        </Button>
+                        <Button
+                          onClick={() => handleAction(order, 'Unavailable')}
+                          disabled={!allItemsSelected || processingOrder === order.id}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          Unavailable
+                        </Button>
+                        <Button
+                          onClick={() => handleAction(order, 'Ignore')}
+                          disabled={processingOrder === order.id}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Ignore
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 );

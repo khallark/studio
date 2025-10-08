@@ -34,6 +34,7 @@ interface Order {
       id: string | number;
       title: string;
       quantity: number;
+      sku: string;
     }>;
   };
 }
@@ -180,7 +181,7 @@ export function AvailabilityDialog({
                               htmlFor={`item-${order.id}-${item.id}`}
                               className="text-sm font-normal"
                             >
-                              {item.title} (Qty: {item.quantity})
+                              {item.sku} (Qty: {item.quantity})
                             </Label>
                           </div>
                         ))}

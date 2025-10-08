@@ -1166,9 +1166,7 @@ export default function OrdersPage() {
         return null;
       case 'Closed':
         return (
-            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Delivered')}>
-                Undo Closed
-            </DropdownMenuItem>
+            <></>
         );
       case 'RTO Closed':
       case 'Cancelled':

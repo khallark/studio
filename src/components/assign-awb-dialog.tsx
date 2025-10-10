@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -96,8 +95,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       return;
     }
     
-    // If Shiprocket or Xpressbees is chosen, go directly to confirm
-    if (step === 1 && (selectedCourier === 'Shiprocket' || selectedCourier === 'Xpressbees')) {
+    // If Shiprocket is chosen, go directly to confirm
+    if (step === 1 && selectedCourier === 'Shiprocket') {
       handleConfirm();
       return;
     }
@@ -114,7 +113,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
       return;
     }
-    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority') && !selectedMode) {
+    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority' || selectedCourier === 'Xpressbees') && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
@@ -151,7 +150,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
           </div>
         );
       case 2:
-        if (selectedCourier === 'Shiprocket' || selectedCourier === 'Xpressbees') return null;
+        if (selectedCourier === 'Shiprocket') return null;
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
@@ -170,7 +169,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     }
   };
   
-  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority') && step === 2) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Xpressbees') && step === 1);
+  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority' || selectedCourier === 'Xpressbees') && step === 2) || (selectedCourier === 'Shiprocket' && step === 1);
   const canProceed = availableCouriers.length > 0;
 
 
@@ -211,5 +210,3 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     </Dialog>
   );
 }
-
-    

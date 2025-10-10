@@ -138,24 +138,25 @@ export default function DashboardLayout({
     }
   }, [user, loading, router]);
   
-  // Logic for automatic Shiprocket token refresh
+  // Logic for automatic token refreshes
   useEffect(() => {
     if (!user) return;
 
-    const checkAndRefreshToken = async (shopId: string) => {
+    const checkAndRefreshTokens = async (shopId: string) => {
       const accountRef = doc(db, 'accounts', shopId);
       const accountDoc = await getDoc(accountRef);
       if (accountDoc.exists()) {
         const data = accountDoc.data();
-        const shiprocketIntegration = data.integrations?.couriers?.shiprocket;
+        const couriers = data.integrations?.couriers;
 
-        if (shiprocketIntegration?.apiKey && shiprocketIntegration.lastUpdatedAt) {
-          const lastUpdated = (shiprocketIntegration.lastUpdatedAt as Timestamp).toDate();
-          const eightDaysAgo = new Date();
-          eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+        // Refresh Shiprocket
+        if (couriers?.shiprocket?.apiKey && couriers.shiprocket.lastUpdatedAt) {
+          const lastUpdated = (couriers.shiprocket.lastUpdatedAt as Timestamp).toDate();
+          const oneDayAgo = new Date();
+          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-          if (lastUpdated < eightDaysAgo) {
-            console.log('Shiprocket token is older than 8 days. Refreshing...');
+          if (lastUpdated < oneDayAgo) {
+            console.log('Shiprocket token is older than 1 day. Refreshing...');
             try {
               const idToken = await user.getIdToken();
               await fetch('/api/integrations/shiprocket/refresh-token', {
@@ -171,6 +172,31 @@ export default function DashboardLayout({
             }
           }
         }
+        
+        // Refresh Xpressbees
+        if (couriers?.xpressbees?.apiKey && couriers.xpressbees.lastUpdatedAt) {
+          const lastUpdated = (couriers.xpressbees.lastUpdatedAt as Timestamp).toDate();
+          const oneDayAgo = new Date();
+          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+          if (lastUpdated < oneDayAgo) {
+            console.log('Xpressbees token is older than 1 day. Refreshing...');
+            try {
+              const idToken = await user.getIdToken();
+              await fetch('/api/integrations/xpressbees/refresh-token', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ shop: shopId }),
+              });
+            } catch (error) {
+              console.error('Failed to auto-refresh Xpressbees token:', error);
+            }
+          }
+        }
+
       }
     };
 
@@ -179,7 +205,7 @@ export default function DashboardLayout({
       if (userDoc.exists()) {
         const activeAccountId = userDoc.data().activeAccountId;
         if (activeAccountId) {
-          checkAndRefreshToken(activeAccountId);
+          checkAndRefreshTokens(activeAccountId);
         }
       }
     });

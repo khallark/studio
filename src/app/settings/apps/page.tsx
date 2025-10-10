@@ -51,6 +51,7 @@ interface UserData {
 interface CourierIntegrations {
     delhivery?: { apiKey: string; };
     shiprocket?: { email: string; apiKey: string; };
+    xpressbees?: { email: string; apiKey: string; };
     priorityEnabled?: boolean;
     priorityList?: string[];
 }
@@ -69,10 +70,11 @@ interface AccountData {
 
 export default function AppsSettingsPage() {
   const [user, loading] = useAuthState(auth);
+  const { toast } = useToast();
+
   const [userData, setUserData] = useState<UserData | null>(null);
   const [accountData, setAccountData] = useState<AccountData | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
-  const { toast } = useToast();
 
   const [delhiveryApiKey, setDelhiveryApiKey] = useState('');
   const [isEditingDelhivery, setIsEditingDelhivery] = useState(false);
@@ -82,6 +84,11 @@ export default function AppsSettingsPage() {
   const [shiprocketPassword, setShiprocketPassword] = useState('');
   const [isEditingShiprocket, setIsEditingShiprocket] = useState(false);
   const [isSubmittingShiprocket, setIsSubmittingShiprocket] = useState(false);
+
+  const [xpressbeesEmail, setXpressbeesEmail] = useState('');
+  const [xpressbeesPassword, setXpressbeesPassword] = useState('');
+  const [isEditingXpressbees, setIsEditingXpressbees] = useState(false);
+  const [isSubmittingXpressbees, setIsSubmittingXpressbees] = useState(false);
 
   const [interaktApiKey, setInteraktApiKey] = useState('');
   const [isEditingInteraktApi, setIsEditingInteraktApi] = useState(false);
@@ -151,7 +158,7 @@ export default function AppsSettingsPage() {
                         
                         const couriers = accData.integrations?.couriers;
                         setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                        const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList');
+                        const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && couriers?.[k as keyof typeof couriers]);
                         setCourierPriorityList(couriers?.priorityList || integrated);
                     }
                 }
@@ -174,7 +181,7 @@ export default function AppsSettingsPage() {
 
                 const couriers = accData.integrations?.couriers;
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && accData.integrations?.couriers?.[k as keyof typeof couriers]);
+                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && couriers?.[k as keyof typeof couriers]);
                 setCourierPriorityList(couriers?.priorityList || integrated);
             }
         });
@@ -186,6 +193,7 @@ export default function AppsSettingsPage() {
   const hasConnectedStore = userData?.activeAccountId;
   const hasDelhiveryKey = !!accountData?.integrations?.couriers?.delhivery?.apiKey;
   const hasShiprocketCreds = !!accountData?.integrations?.couriers?.shiprocket?.apiKey;
+  const hasXpressbeesCreds = !!accountData?.integrations?.couriers?.xpressbees?.apiKey;
   const hasInteraktApiKey = !!accountData?.integrations?.communication?.interakt?.apiKey;
   const hasInteraktWebhookKey = !!accountData?.integrations?.communication?.interakt?.webhookKey;
 
@@ -265,6 +273,42 @@ export default function AppsSettingsPage() {
         toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
     } finally {
         setIsSubmittingShiprocket(false);
+    }
+  };
+
+  const handleSaveXpressbeesCreds = async () => {
+    if (!userData?.activeAccountId || !user || !xpressbeesEmail || !xpressbeesPassword) {
+        toast({ title: "Email and Password are required", variant: "destructive"});
+        return;
+    };
+
+    setIsSubmittingXpressbees(true);
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/integrations/xpressbees/update', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                shop: userData.activeAccountId,
+                email: xpressbeesEmail,
+                password: xpressbeesPassword,
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.details || 'Failed to connect to Xpressbees');
+
+        toast({ title: 'Xpressbees Connected', description: 'Xpressbees integration has been successfully set up.' });
+        setIsEditingXpressbees(false);
+        setXpressbeesEmail('');
+        setXpressbeesPassword('');
+    } catch (error) {
+        toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
+    } finally {
+        setIsSubmittingXpressbees(false);
     }
   };
 
@@ -564,6 +608,66 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     )}
+                    
+                    {/* Xpressbees */}
+                    <div className="border-t p-6 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div>
+                                <h3 className="text-xl font-semibold">Xpressbees</h3>
+                                <p className="text-sm text-muted-foreground">Integrate with your Xpressbees account.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {hasXpressbeesCreds && !isEditingXpressbees ? (
+                                <>
+                                    <Badge variant="default">Connected</Badge>
+                                    <Button variant="outline" onClick={() => setIsEditingXpressbees(true)}>Change Credentials</Button>
+                                </>
+                            ) : (
+                                <Button variant="outline" onClick={() => setIsEditingXpressbees(true)} disabled={!hasConnectedStore}>
+                                    {hasConnectedStore ? 'Connect' : 'No Store'}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    {isEditingXpressbees && (
+                        <div className="border-t bg-muted/50 p-6">
+                            <div className="space-y-4">
+                                <h4 className="font-medium">Xpressbees Credentials</h4>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="grid gap-1.5">
+                                        <label className="text-sm font-medium">Email</label>
+                                        <Input
+                                            type="email"
+                                            placeholder="Your Xpressbees email"
+                                            value={xpressbeesEmail}
+                                            onChange={(e) => setXpressbeesEmail(e.target.value)}
+                                            disabled={isSubmittingXpressbees}
+                                        />
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                        <label className="text-sm font-medium">Password</label>
+                                        <Input
+                                            type="password"
+                                            placeholder="Your Xpressbees password"
+                                            value={xpressbeesPassword}
+                                            onChange={(e) => setXpressbeesPassword(e.target.value)}
+                                            disabled={isSubmittingXpressbees}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="secondary" onClick={() => {setIsEditingXpressbees(false); setXpressbeesEmail(''); setXpressbeesPassword('');}} disabled={isSubmittingXpressbees}>
+                                        Cancel
+                                    </Button>
+                                    <Button onClick={handleSaveXpressbeesCreds} disabled={isSubmittingXpressbees}>
+                                        {isSubmittingXpressbees ? 'Connecting...' : 'Save & Connect'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                  </div>
             </section>
 
@@ -690,3 +794,5 @@ export default function AppsSettingsPage() {
     </TooltipProvider>
   )
 }
+
+    

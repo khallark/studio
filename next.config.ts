@@ -73,6 +73,10 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/shiprocket/update/route',
       },
       {
+        source: '/api/integrations/xpressbees/update',
+        destination: '/api/integrations/xpressbees/update/route',
+      },
+      {
         source: '/api/integrations/shiprocket/refresh-token',
         destination: '/api/integrations/shiprocket/refresh-token/route',
       },
@@ -173,3 +177,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+    

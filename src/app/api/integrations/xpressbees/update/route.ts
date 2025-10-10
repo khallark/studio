@@ -27,12 +27,12 @@ async function getXpressbeesToken(email: string, password: string): Promise<stri
 
     const data = await response.json();
 
-    if (!response.ok || !data.data?.token) {
+    if (!response.ok || !data.data) {
         console.error('Xpressbees auth failed:', data);
         throw new Error(data.message || 'Incorrect email or password');
     }
 
-    return data.data.token;
+    return data.data;
 }
 
 export async function POST(req: NextRequest) {

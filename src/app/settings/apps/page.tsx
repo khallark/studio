@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -41,7 +40,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Reorder } from "framer-motion"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+interface CourierSetting {
+  name: string;
+  mode: 'Surface' | 'Express';
+}
 
 interface UserData {
   activeAccountId: string | null;
@@ -53,7 +57,7 @@ interface CourierIntegrations {
     shiprocket?: { email: string; apiKey: string; };
     xpressbees?: { email: string; apiKey: string; };
     priorityEnabled?: boolean;
-    priorityList?: string[];
+    priorityList?: CourierSetting[];
 }
 
 interface AccountData {
@@ -99,7 +103,7 @@ export default function AppsSettingsPage() {
   const [isSubmittingInteraktWebhook, setIsSubmittingInteraktWebhook] = useState(false);
   
   const [courierPriorityEnabled, setCourierPriorityEnabled] = useState(false);
-  const [courierPriorityList, setCourierPriorityList] = useState<string[]>([]);
+  const [courierPriorityList, setCourierPriorityList] = useState<CourierSetting[]>([]);
   const [isSubmittingPriority, setIsSubmittingPriority] = useState(false);
 
 
@@ -114,7 +118,7 @@ export default function AppsSettingsPage() {
     setAppUrl(window.location.origin);
   }, []);
 
-  const updatePrioritySettings = async (enabled: boolean, list: string[]) => {
+  const updatePrioritySettings = async (enabled: boolean, list: CourierSetting[]) => {
       if (!userData?.activeAccountId || !user) return;
       setIsSubmittingPriority(true);
       try {
@@ -132,6 +136,14 @@ export default function AppsSettingsPage() {
       } finally {
           setIsSubmittingPriority(false);
       }
+  };
+
+  const handlePriorityModeChange = (courierName: string, mode: 'Surface' | 'Express') => {
+      const newList = courierPriorityList.map(item => 
+          item.name === courierName ? { ...item, mode } : item
+      );
+      setCourierPriorityList(newList);
+      updatePrioritySettings(courierPriorityEnabled, newList);
   };
 
 
@@ -158,8 +170,14 @@ export default function AppsSettingsPage() {
                         
                         const couriers = accData.integrations?.couriers;
                         setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                        const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && couriers?.[k as keyof typeof couriers]);
-                        setCourierPriorityList(couriers?.priorityList || integrated);
+                        
+                        const integrated = Object.keys(couriers || {}).filter(k => !['priorityEnabled', 'priorityList'].includes(k) && couriers?.[k as keyof typeof couriers]);
+                        const savedList = couriers?.priorityList || [];
+                        const mergedList = integrated.map(name => {
+                          const existing = savedList.find(item => item.name === name);
+                          return existing || { name, mode: 'Surface' };
+                        });
+                        setCourierPriorityList(mergedList);
                     }
                 }
             }
@@ -181,8 +199,17 @@ export default function AppsSettingsPage() {
 
                 const couriers = accData.integrations?.couriers;
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                const integrated = Object.keys(couriers || {}).filter(k => k !== 'priorityEnabled' && k !== 'priorityList' && couriers?.[k as keyof typeof couriers]);
-                setCourierPriorityList(couriers?.priorityList || integrated);
+                const integrated = Object.keys(couriers || {}).filter(k => !['priorityEnabled', 'priorityList'].includes(k) && couriers?.[k as keyof typeof couriers]);
+                const savedList = couriers?.priorityList || [];
+                const mergedList = integrated.map(name => {
+                    const existing = savedList.find(item => item.name === name);
+                    return existing || { name, mode: 'Surface' };
+                });
+
+                // Preserve order from savedList if possible
+                const orderedList = savedList.map(item => mergedList.find(m => m.name === item.name)).filter(Boolean) as CourierSetting[];
+                const newIntegrated = mergedList.filter(m => !savedList.some(s => s.name === m.name));
+                setCourierPriorityList([...orderedList, ...newIntegrated]);
             }
         });
         return () => unsubscribe();
@@ -486,9 +513,23 @@ export default function AppsSettingsPage() {
                                 updatePrioritySettings(courierPriorityEnabled, newList);
                             }} className="space-y-2">
                             {courierPriorityList.map((courier) => (
-                                <Reorder.Item key={courier} value={courier} className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing">
+                                <Reorder.Item key={courier.name} value={courier} className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing">
                                     <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                    <span className="font-medium capitalize">{courier}</span>
+                                    <span className="font-medium capitalize flex-1">{courier.name}</span>
+                                    {courier.name !== 'Shiprocket' && (
+                                        <Select 
+                                            value={courier.mode} 
+                                            onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                        >
+                                            <SelectTrigger className="w-[120px] h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Surface">Surface</SelectItem>
+                                                <SelectItem value="Express">Express</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </Reorder.Item>
                             ))}
                             </Reorder.Group>
@@ -794,5 +835,3 @@ export default function AppsSettingsPage() {
     </TooltipProvider>
   )
 }
-
-    

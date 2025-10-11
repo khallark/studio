@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
@@ -134,7 +133,7 @@ async function createSlipPage(
 ): Promise<PDFPage> {
   const page = pdfDoc.addPage([595, 842]); // A4 size
   const { width, height } = page.getSize();
-  const { regular, bold } = fonts;
+  const { bold } = fonts; // Only using bold now
   
   const margin = 30;
   const contentWidth = width - 2 * margin;
@@ -266,7 +265,7 @@ async function createSlipPage(
     _rightColX,
     y,
     _rightColMaxWidth,
-    regular,
+    bold, // Changed from regular to bold
     15,
     16 // line height
   );
@@ -320,7 +319,7 @@ async function createSlipPage(
   drawSanitizedText('Date', {
     x: width - margin - 150,
     y: y + 30,
-    font: regular,
+    font: bold, // Changed from regular to bold
     size: 10,
     color: rgb(0, 0, 0),
   });
@@ -341,7 +340,7 @@ async function createSlipPage(
   drawSanitizedText(`Seller: ${sellerDetails.name}`, {
     x: margin + 10,
     y,
-    font: regular,
+    font: bold, // Changed from regular to bold
     size: 11,
     color: rgb(0, 0, 0),
   });
@@ -361,7 +360,7 @@ async function createSlipPage(
   drawSanitizedText(`GST: 03AAQCM9385B1Z8`, {
     x: margin + 10,
     y,
-    font: regular,
+    font: bold, // Changed from regular to bold
     size: 10,
     color: rgb(0, 0, 0),
   });
@@ -441,7 +440,7 @@ async function createSlipPage(
       drawSanitizedText(data, {
         x: xPos,
         y,
-        font: regular,
+        font: bold, // Changed from regular to bold
         size: 10,
         color: rgb(0, 0, 0),
       });
@@ -464,7 +463,7 @@ async function createSlipPage(
     xText,
     y,
     maxTextWidth,
-    regular,
+    bold, // Changed from regular to bold
     11
   );
 
@@ -553,12 +552,12 @@ export async function POST(req: NextRequest) {
     }
 
     const pdfDoc = await PDFDocument.create();
-    const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // No need to embed regular font anymore since everything is bold
     const pages: PDFPage[] = [];
     for (const d of allDocs) {
       const order = d.data();
-      const page = await createSlipPage(pdfDoc, { regular, bold }, order, sellerDetails);
+      const page = await createSlipPage(pdfDoc, { regular: bold, bold }, order, sellerDetails);
       pages.push(page);
     }
 

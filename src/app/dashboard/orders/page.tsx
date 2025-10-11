@@ -47,7 +47,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown, ScanBarcode } from 'lucide-react';
+import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown, ScanBarcode, Clock } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs } from 'firebase/firestore';
@@ -1979,7 +1979,7 @@ export default function OrdersPage() {
                                 [...viewingOrder.customStatusesLogs].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).map((log, index) => (
                                 <div key={index} className="flex items-start gap-4">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
-                                        <Bot className="h-5 w-5" />
+                                        <Clock className='h-5 w-5'/>
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-baseline gap-2">

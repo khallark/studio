@@ -95,8 +95,8 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       return;
     }
     
-    // If Shiprocket is chosen, go directly to confirm
-    if (step === 1 && selectedCourier === 'Shiprocket') {
+    // If Shiprocket or Priority is chosen, go directly to confirm
+    if (step === 1 && (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority')) {
       handleConfirm();
       return;
     }
@@ -113,7 +113,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
       return;
     }
-    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority' || selectedCourier === 'Xpressbees') && !selectedMode) {
+    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
@@ -150,7 +150,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
           </div>
         );
       case 2:
-        if (selectedCourier === 'Shiprocket') return null;
+        if (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') return null;
         return (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
@@ -169,7 +169,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
     }
   };
   
-  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Priority' || selectedCourier === 'Xpressbees') && step === 2) || (selectedCourier === 'Shiprocket' && step === 1);
+  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && step === 2) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 1);
   const canProceed = availableCouriers.length > 0;
 
 

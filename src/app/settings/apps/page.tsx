@@ -72,6 +72,29 @@ interface AccountData {
     }
 }
 
+// Helper function to merge priority list while preserving order
+const mergePriorityList = (savedList: CourierSetting[], couriers: CourierIntegrations | undefined): CourierSetting[] => {
+    if (!couriers) return [];
+    
+    // Get all integrated couriers
+    const integrated = Object.keys(couriers).filter(k => 
+        !['priorityEnabled', 'priorityList'].includes(k) && 
+        couriers?.[k as keyof typeof couriers]
+    );
+    
+    // Start with saved list items that are still integrated
+    const orderedList = (savedList || [])
+        .filter(item => integrated.includes(item.name))
+        .map(item => ({ ...item })); // Create new objects to avoid reference issues
+    
+    // Add newly integrated couriers that aren't in the saved list
+    const newIntegrated = integrated
+        .filter(name => !savedList?.some(s => s.name === name))
+        .map(name => ({ name, mode: 'Surface' as const }));
+    
+    return [...orderedList, ...newIntegrated];
+};
+
 export default function AppsSettingsPage() {
   const [user, loading] = useAuthState(auth);
   const { toast } = useToast();
@@ -171,12 +194,8 @@ export default function AppsSettingsPage() {
                         const couriers = accData.integrations?.couriers;
                         setCourierPriorityEnabled(couriers?.priorityEnabled || false);
                         
-                        const integrated = Object.keys(couriers || {}).filter(k => !['priorityEnabled', 'priorityList'].includes(k) && couriers?.[k as keyof typeof couriers]);
-                        const savedList = couriers?.priorityList || [];
-                        const mergedList = integrated.map(name => {
-                          const existing = savedList.find(item => item.name === name);
-                          return existing || { name, mode: 'Surface' };
-                        });
+                        // Use the helper function for consistent ordering
+                        const mergedList = mergePriorityList(couriers?.priorityList || [], couriers);
                         setCourierPriorityList(mergedList);
                     }
                 }
@@ -199,17 +218,10 @@ export default function AppsSettingsPage() {
 
                 const couriers = accData.integrations?.couriers;
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                const integrated = Object.keys(couriers || {}).filter(k => !['priorityEnabled', 'priorityList'].includes(k) && couriers?.[k as keyof typeof couriers]);
-                const savedList = couriers?.priorityList || [];
-                const mergedList = integrated.map(name => {
-                    const existing = savedList.find(item => item.name === name);
-                    return existing || { name, mode: 'Surface' };
-                });
-
-                // Preserve order from savedList if possible
-                const orderedList = savedList.map(item => mergedList.find(m => m.name === item.name)).filter(Boolean) as CourierSetting[];
-                const newIntegrated = mergedList.filter(m => !savedList.some(s => s.name === m.name));
-                setCourierPriorityList([...orderedList, ...newIntegrated]);
+                
+                // Use the helper function for consistent ordering
+                const mergedList = mergePriorityList(couriers?.priorityList || [], couriers);
+                setCourierPriorityList(mergedList);
             }
         });
         return () => unsubscribe();
@@ -508,15 +520,17 @@ export default function AppsSettingsPage() {
                         <div className="border-t bg-muted/50 p-6">
                             <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
                              {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
-                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={(newList) => {
-                                setCourierPriorityList(newList);
-                                updatePrioritySettings(courierPriorityEnabled, newList);
-                            }} className="space-y-2">
+                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={setCourierPriorityList} className="space-y-2">
                             {courierPriorityList.map((courier) => (
-                                <Reorder.Item key={courier.name} value={courier} className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing">
+                                <Reorder.Item 
+                                    key={courier.name} 
+                                    value={courier} 
+                                    className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
+                                    onDragEnd={() => updatePrioritySettings(courierPriorityEnabled, courierPriorityList)}
+                                >
                                     <GripVertical className="h-5 w-5 text-muted-foreground" />
                                     <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                    {courier.name !== 'Shiprocket' && (
+                                    {courier.name !== 'shiprocket' && courier.name !== 'priority' && (
                                         <Select 
                                             value={courier.mode} 
                                             onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}

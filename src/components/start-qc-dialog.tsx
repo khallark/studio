@@ -364,30 +364,6 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
                 </div>
               </section>
 
-              {/* Reference Information */}
-              <section className="space-y-4 text-sm text-muted-foreground">
-                  <h3 className="font-semibold text-foreground mb-2">Reference Information</h3>
-                  {customerRequestedItems.length > 0 ? (
-                    <div>
-                        <h4 className="font-medium">Customer Requested Items:</h4>
-                        <ul className="list-disc list-inside">
-                        {customerRequestedItems.map(item => <li key={item.id}>{item.title} (Qty: {item.quantity})</li>)}
-                        </ul>
-                    </div>
-                  ) : (
-                    <p>This order was manually booked for return, so no customer-requested items can be shown.</p>
-                  )}
-                  {order.booked_return_reason && (
-                     <div>
-                        <h4 className="font-medium">Reason for Return:</h4>
-                        <p>{order.booked_return_reason}</p>
-                     </div>
-                  )}
-              </section>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
               {/* Customer Images */}
               <section>
                 <h3 className="font-semibold mb-3">2. Customer Images</h3>
@@ -406,6 +382,30 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
                 ) : (
                     <p className="text-sm text-muted-foreground">No customer images were provided for this return.</p>
                 )}
+              </section>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Reference Information */}
+              <section className="space-y-4 text-sm text-muted-foreground">
+                  <h3 className="font-semibold text-foreground mb-2">2. Reference Information</h3>
+                  {customerRequestedItems.length > 0 ? (
+                    <div>
+                        <h4 className="font-medium">Customer Requested Items:</h4>
+                        <ul className="list-disc list-inside">
+                        {customerRequestedItems.map(item => <li key={item.id}>{item.title} (Qty: {item.quantity})</li>)}
+                        </ul>
+                    </div>
+                  ) : (
+                    <p>This order was manually booked for return, so no customer-requested items can be shown.</p>
+                  )}
+                  {order.booked_return_reason && (
+                     <div>
+                        <h4 className="font-medium">Reason for Return:</h4>
+                        <p>{order.booked_return_reason}</p>
+                     </div>
+                  )}
               </section>
 
               {/* Video Recording */}

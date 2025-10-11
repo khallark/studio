@@ -530,7 +530,7 @@ export default function AppsSettingsPage() {
                                 >
                                     <GripVertical className="h-5 w-5 text-muted-foreground" />
                                     <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                    {courier.name !== 'shiprocket' && courier.name !== 'priority' && (
+                                    {courier.name !== 'shiprocket' && (
                                         <Select 
                                             value={courier.mode} 
                                             onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}

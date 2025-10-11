@@ -452,7 +452,7 @@ async function createSlipPage(
   });
 
   // Return address at bottom (wrap to fit inside the outer border)
-  y = margin + 100;
+  y = margin + 20;
 
   const padX = 10; // left/right padding inside the border
   const xText = margin + padX;

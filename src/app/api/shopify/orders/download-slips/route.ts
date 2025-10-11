@@ -394,60 +394,94 @@ async function createSlipPage(
   // Product items
   const lineItems = order.raw.line_items || [];
   y -= 20;
-  
+
   lineItems.forEach((item: any) => {
-    xPos = margin + 10;
-    
     const productName = item.name || item.title || 'Product';
     const quantity = item.quantity || 1;
     const hsn = item.hsn || '6109';
     const total = (parseFloat(item.price) * quantity).toFixed(2);
-    const price = (Number(total) * (100/105)).toFixed(); // assuming 5% tax inclusive
+    const price = (Number(total) * (100/105)).toFixed();
     const taxAmount = Number(total) - Number(price);
 
-    function truncateKeepTailAfterHyphen(name: string, max = 30): string {
-      const s = String(name ?? '');
-      if (s.length <= max) return s;
-
-      const hyphen = s.lastIndexOf('-');
-      if (hyphen === -1) {
-        // No hyphen → regular ellipsis trim
-        return s.slice(0, Math.max(0, max - 3)) + '...';
-      }
-
-      const tail = s.slice(hyphen); // includes the hyphen itself
-      const headRoom = max - 3 - tail.length;
-
-      if (headRoom > 0) {
-        // Enough room for some head + "..." + full tail
-        return s.slice(0, headRoom) + '...' + tail;
-      }
-
-      // Tail alone is too long → show as much of the tail (starting at the hyphen) as fits
-      return '...' + tail.slice(0, max - 3);
-    }
-
-    const rowData = [
-      truncateKeepTailAfterHyphen(productName, 25),
-      hsn,
-      quantity.toString(),
-      price,
-      taxAmount.toFixed(2),
-      total,
-    ];
-
-    rowData.forEach((data, i) => {
-      drawSanitizedText(data, {
-        x: xPos,
-        y,
-        font: bold, // Changed from regular to bold
-        size: 10,
+    // Wrap product name to multiple lines
+    const productNameMaxWidth = 190; // Slightly less than column width for padding
+    const wrappedNameLines = wrapTextByWidth(productName, productNameMaxWidth, bold, S(9));
+    
+    // Calculate row height based on number of lines
+    const lineHeight = 15;
+    const rowHeight = Math.max(wrappedNameLines.length * lineHeight, 20);
+    
+    // Starting Y position for this row
+    const rowStartY = y;
+    
+    // Draw product name (multi-line)
+    let nameY = rowStartY;
+    wrappedNameLines.forEach(line => {
+      drawSanitizedText(line, {
+        x: margin + 10,
+        y: nameY,
+        font: bold,
+        size: 9,
         color: rgb(0, 0, 0),
       });
-      xPos += colWidths[i];
+      nameY -= lineHeight;
     });
     
-    y -= 20;
+    // Other columns - align to the middle of the row for better visual balance
+    const middleY = rowStartY - (rowHeight / 2) + 5;
+    
+    // HSN
+    drawSanitizedText(hsn, {
+      x: margin + 10 + 200,
+      y: middleY,
+      font: bold,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Quantity
+    drawSanitizedText(quantity.toString(), {
+      x: margin + 10 + 260,
+      y: middleY,
+      font: bold,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Taxable Price
+    drawSanitizedText(price, {
+      x: margin + 10 + 300,
+      y: middleY,
+      font: bold,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Taxes
+    drawSanitizedText(taxAmount.toFixed(2), {
+      x: margin + 10 + 380,
+      y: middleY,
+      font: bold,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Total
+    drawSanitizedText(total, {
+      x: margin + 10 + 440,
+      y: middleY,
+      font: bold,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Move Y down by the row height
+    y -= rowHeight;
+    
+    // Optional: Add a light horizontal line between products for clarity
+    if (lineItems.indexOf(item) < lineItems.length - 1) {
+      drawLine(y + 5, 0.3);
+    }
   });
 
   // Return address at bottom (wrap to fit inside the outer border)

@@ -57,6 +57,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `No ${status} jobs found for this batch.` }, { status: 404 });
     }
 
+    // Check if any successful job has an errorMessage (for Remarks column)
+    const hasRemarks = status === 'success' && jobsSnapshot.docs.some(doc => doc.data().errorMessage);
+
     const reportData = jobsSnapshot.docs.map(doc => {
         const data = doc.data();
         const row: Record<string, string> = {
@@ -68,9 +71,14 @@ export async function POST(req: NextRequest) {
             row['Courier'] = data.courier || 'N/A';
         }
 
-        // Add Error Reason only for failed jobs
+        // Add Error Reason for failed jobs
         if (status === 'failed') {
             row['Error Reason'] = data.errorMessage || 'No error message provided';
+        }
+
+        // Add Remarks for successful jobs if any job has an errorMessage
+        if (hasRemarks) {
+            row['Remarks'] = data.errorMessage || '';
         }
 
         return row;

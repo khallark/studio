@@ -2010,7 +2010,7 @@ export default function OrdersPage() {
                 <a
                   href={(() => {
                     const awb =  viewingOrder.awb;
-                    if (viewingOrder.courier.toLowerCase().includes('delhivery')) {
+                    if (viewingOrder.courier.toLowerCase() === 'delhivery') {
                       return `https://www.delhivery.com/track-v2/package/${awb}`;
                     } else if (viewingOrder.courier.toLowerCase().includes('shiprocket')) {
                       return `https://shiprocket.co/tracking/${awb}`;

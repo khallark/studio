@@ -1455,19 +1455,17 @@ export default function OrdersPage() {
                         </PopoverContent>
                     </Popover>
                     </div>
-                    {activeTab === 'Ready To Dispatch' && (
-                        <Select value={courierFilter} onValueChange={setCourierFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
-                                <SelectValue placeholder="Filter by courier..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Couriers</SelectItem>
-                                <SelectItem value="Delhivery">Delhivery</SelectItem>
-                                <SelectItem value="Shiprocket">Shiprocket</SelectItem>
-                                <SelectItem value="Xpressbees">Xpressbees</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
+                    <Select value={courierFilter} onValueChange={setCourierFilter}>
+                        <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectValue placeholder="Filter by courier..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Couriers</SelectItem>
+                            <SelectItem value="Delhivery">Delhivery</SelectItem>
+                            <SelectItem value="Shiprocket">Shiprocket</SelectItem>
+                            <SelectItem value="Xpressbees">Xpressbees</SelectItem>
+                        </SelectContent>
+                    </Select>
                     {activeTab === 'Confirmed' && (
                         <Select value={availabilityFilter} onValueChange={(value) => setAvailabilityFilter(value as any)}>
                             <SelectTrigger className="w-full md:w-[180px]">

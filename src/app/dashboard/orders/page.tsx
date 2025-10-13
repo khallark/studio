@@ -1880,135 +1880,157 @@ export default function OrdersPage() {
 
 
     <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
-        <DialogContent className="max-w-4xl">
-          {viewingOrder && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Order {viewingOrder.name}</DialogTitle>
-                <DialogDescription>
-                  Details and history for order placed on {new Date(viewingOrder.createdAt).toLocaleString()}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid md:grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto p-1">
-                {/* Left side: Order Details */}
-                <div className="space-y-6">
-                  <h3 className="font-semibold text-lg">Order Details</h3>
-                  <div className="space-y-4">
-                     {(viewingOrder.awb || viewingOrder.courier || viewingOrder.awb_reverse) && (
-                        <div>
-                            <h4 className="font-semibold">Shipment Details</h4>
-                             <p className="text-sm text-muted-foreground">
-                                {viewingOrder.courier && `Courier: ${viewingOrder.courier}`}
-                            </p>
-                            <p className="text-sm text-muted-foreground font-mono">
-                                {viewingOrder.awb && `AWB: ${viewingOrder.awb}`}
-                            </p>
-                            {viewingOrder.awb_reverse && (
-                                <p className="text-sm text-muted-foreground font-mono">
-                                    Return AWB: {viewingOrder.awb_reverse}
-                                </p>
-                            )}
-                        </div>
-                    )}
-                    <div>
-                        <h4 className="font-semibold">Customer</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {viewingOrder.raw.shipping_address?.name ??
-                          viewingOrder.raw.billing_address?.name ??
-                          viewingOrder.raw.customer?.name ??
-                          `${viewingOrder.raw.shipping_address?.first_name || ''} 
-                          ${viewingOrder.raw.shipping_address?.last_name || ''}`.trim() ??
-                          `${viewingOrder.raw.billing_address?.first_name || ''} 
-                          ${viewingOrder.raw.billing_address?.last_name || ''}`.trim() ??
-                          `${viewingOrder.raw.customer?.first_name || ''} 
-                          ${viewingOrder.raw.customer?.last_name || ''}`.trim() ??
-                          viewingOrder.email ??
-                          "Not provided"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{viewingOrder.email}</p>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold">Shipping Address</h4>
-                        {viewingOrder.raw.shipping_address ? (
-                            <div className="text-sm text-muted-foreground">
-                                <p>{viewingOrder.raw.shipping_address.address1}{viewingOrder.raw.shipping_address.address2}</p>
-                                <p>{viewingOrder.raw.shipping_address.city}, {viewingOrder.raw.shipping_address.province} {viewingOrder.raw.shipping_address.zip}</p>
-                                <p>{viewingOrder.raw.shipping_address.country}</p>
-                                {viewingOrder.raw.shipping_address.phone && <p>Phone: {viewingOrder.raw.shipping_address.phone}</p>}
-                            </div>
-                        ): (
-                            <p className="text-sm text-muted-foreground">No shipping address provided.</p>
-                        )}
-                    </div>
+      <DialogContent className="max-w-4xl">
+        {viewingOrder && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Order {viewingOrder.name}</DialogTitle>
+              <DialogDescription>
+                Details and history for order placed on {new Date(viewingOrder.createdAt).toLocaleString()}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid md:grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto p-1">
+              {/* Left side: Order Details */}
+              <div className="space-y-6">
+                <h3 className="font-semibold text-lg">Order Details</h3>
+                <div className="space-y-4">
+                    {(viewingOrder.awb || viewingOrder.courier || viewingOrder.awb_reverse) && (
+                      <div>
+                          <h4 className="font-semibold">Shipment Details</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {viewingOrder.courier && `Courier: ${viewingOrder.courier}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground font-mono">
+                              {viewingOrder.awb && `AWB: ${viewingOrder.awb}`}
+                          </p>
+                          {viewingOrder.awb_reverse && (
+                              <p className="text-sm text-muted-foreground font-mono">
+                                  Return AWB: {viewingOrder.awb_reverse}
+                              </p>
+                          )}
+                      </div>
+                  )}
+                  <div>
+                      <h4 className="font-semibold">Customer</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {viewingOrder.raw.shipping_address?.name ??
+                        viewingOrder.raw.billing_address?.name ??
+                        viewingOrder.raw.customer?.name ??
+                        `${viewingOrder.raw.shipping_address?.first_name || ''} 
+                        ${viewingOrder.raw.shipping_address?.last_name || ''}`.trim() ??
+                        `${viewingOrder.raw.billing_address?.first_name || ''} 
+                        ${viewingOrder.raw.billing_address?.last_name || ''}`.trim() ??
+                        `${viewingOrder.raw.customer?.first_name || ''} 
+                        ${viewingOrder.raw.customer?.last_name || ''}`.trim() ??
+                        viewingOrder.email ??
+                        "Not provided"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{viewingOrder.email}</p>
                   </div>
-                  <Separator />
-                   <div>
-                        <h4 className="font-semibold mb-2">Items</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                <TableHead>Product</TableHead>
-                                <TableHead>SKU</TableHead>
-                                <TableHead className="text-center">Qty</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {viewingOrder.raw.line_items.map((item: any, index: number) => (
-                                <TableRow key={index}>
-                                    <TableCell className="font-medium">{item.title}</TableCell>
-                                    <TableCell>{item.sku || 'N/A'}</TableCell>
-                                    <TableCell className="text-center">{item.quantity}</TableCell>
-                                    <TableCell className="text-right font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                     <Separator />
-                     <div className="flex justify-end items-center gap-4 text-lg font-bold">
-                        <span>Total:</span>
-                        <span className="font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
-                     </div>
+                  <div>
+                      <h4 className="font-semibold">Shipping Address</h4>
+                      {viewingOrder.raw.shipping_address ? (
+                          <div className="text-sm text-muted-foreground">
+                              <p>{viewingOrder.raw.shipping_address.address1}{viewingOrder.raw.shipping_address.address2}</p>
+                              <p>{viewingOrder.raw.shipping_address.city}, {viewingOrder.raw.shipping_address.province} {viewingOrder.raw.shipping_address.zip}</p>
+                              <p>{viewingOrder.raw.shipping_address.country}</p>
+                              {viewingOrder.raw.shipping_address.phone && <p>Phone: {viewingOrder.raw.shipping_address.phone}</p>}
+                          </div>
+                      ): (
+                          <p className="text-sm text-muted-foreground">No shipping address provided.</p>
+                      )}
+                  </div>
                 </div>
-
-                {/* Right side: Logs */}
-                <div className="space-y-6">
-                    <h3 className="font-semibold text-lg">History</h3>
-                    <div className="relative h-full">
-                        <div className="absolute inset-0 overflow-y-auto pr-4">
-                            <div className="space-y-6">
-                            {(viewingOrder.customStatusesLogs && viewingOrder.customStatusesLogs.length > 0) ? (
-                                [...viewingOrder.customStatusesLogs].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).map((log, index) => (
-                                <div key={index} className="flex items-start gap-4">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
-                                        <Clock className='h-5 w-5'/>
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-baseline gap-2">
-                                            <p className="font-semibold text-sm">{log.status}</p>
-                                            <p className="text-xs text-muted-foreground">on {log.createdAt?.toDate().toLocaleString()}</p>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            {log.remarks}
-                                        </p>
-                                    </div>
-                                </div>
-                                ))
-                            ) : (
-                                <div className="text-center text-muted-foreground py-12">
-                                    <p>No logs were found for this order.</p>
-                                </div>
-                            )}
-                            </div>
-                        </div>
+                <Separator />
+                  <div>
+                      <h4 className="font-semibold mb-2">Items</h4>
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                              <TableHead>Product</TableHead>
+                              <TableHead>SKU</TableHead>
+                              <TableHead className="text-center">Qty</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              {viewingOrder.raw.line_items.map((item: any, index: number) => (
+                              <TableRow key={index}>
+                                  <TableCell className="font-medium">{item.title}</TableCell>
+                                  <TableCell>{item.sku || 'N/A'}</TableCell>
+                                  <TableCell className="text-center">{item.quantity}</TableCell>
+                                  <TableCell className="text-right font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>
+                              </TableRow>
+                              ))}
+                          </TableBody>
+                      </Table>
+                  </div>
+                    <Separator />
+                    <div className="flex justify-end items-center gap-4 text-lg font-bold">
+                      <span>Total:</span>
+                      <span className="font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
                     </div>
-                </div>
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+
+              {/* Right side: Logs */}
+              <div className="space-y-6">
+                  <h3 className="font-semibold text-lg">History</h3>
+                  <div className="relative h-full">
+                      <div className="absolute inset-0 overflow-y-auto pr-4">
+                          <div className="space-y-6">
+                          {(viewingOrder.customStatusesLogs && viewingOrder.customStatusesLogs.length > 0) ? (
+                              [...viewingOrder.customStatusesLogs].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()).map((log, index) => (
+                              <div key={index} className="flex items-start gap-4">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted flex-shrink-0">
+                                      <Clock className='h-5 w-5'/>
+                                  </div>
+                                  <div className="flex-1">
+                                      <div className="flex items-baseline gap-2">
+                                          <p className="font-semibold text-sm">{log.status}</p>
+                                          <p className="text-xs text-muted-foreground">on {log.createdAt?.toDate().toLocaleString()}</p>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                          {log.remarks}
+                                      </p>
+                                  </div>
+                              </div>
+                              ))
+                          ) : (
+                              <div className="text-center text-muted-foreground py-12">
+                                  <p>No logs were found for this order.</p>
+                              </div>
+                          )}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            </div>
+            {viewingOrder.courier && (viewingOrder.awb || viewingOrder.awb_reverse) && (
+              <div className="flex justify-end pt-4 border-t">
+                <a
+                  href={(() => {
+                    const awb = viewingOrder.awb_reverse || viewingOrder.awb;
+                    if (viewingOrder.courier.toLowerCase().includes('delhivery')) {
+                      return `https://www.delhivery.com/track-v2/package/${awb}`;
+                    } else if (viewingOrder.courier.toLowerCase().includes('shiprocket')) {
+                      return `https://shiprocket.co/tracking/${awb}`;
+                    } else if (viewingOrder.courier.toLowerCase().includes('xpressbees')) {
+                      return `https://www.xpressbees.com/shipment/tracking?awbNo=${awb}`;
+                    }
+                    return '#';
+                  })()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                >
+                  Track Order
+                </a>
+              </div>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

@@ -176,11 +176,11 @@ export default function DashboardLayout({
         // Refresh Xpressbees
         if (couriers?.xpressbees?.apiKey && couriers.xpressbees.lastUpdatedAt) {
           const lastUpdated = (couriers.xpressbees.lastUpdatedAt as Timestamp).toDate();
-          const fiveHoursAgo = new Date();
-          fiveHoursAgo.setHours(fiveHoursAgo.getHours() - 5);
+          const oneHourAgo = new Date();
+          oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-          if (lastUpdated < fiveHoursAgo) {
-            console.log('Xpressbees token is older than 5 hours. Refreshing...');
+          if (lastUpdated < oneHourAgo) {
+            console.log('Xpressbees token is older than 1 hour. Refreshing...');
             try {
               const idToken = await user.getIdToken();
               await fetch('/api/integrations/xpressbees/refresh-token', {

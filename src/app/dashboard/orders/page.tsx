@@ -711,6 +711,8 @@ export default function OrdersPage() {
         filtered = filtered.filter(order => order.courier === courierFilter);
       } else if (courierFilter === 'Shiprocket') {
         filtered = filtered.filter(order => order.courier?.includes('Shiprocket'));
+      } else if (courierFilter === 'Xpressbees') {
+        filtered = filtered.filter(order => order.courier?.includes('Xpressbees'));
       }
     }
     
@@ -1462,6 +1464,7 @@ export default function OrdersPage() {
                                 <SelectItem value="all">All Couriers</SelectItem>
                                 <SelectItem value="Delhivery">Delhivery</SelectItem>
                                 <SelectItem value="Shiprocket">Shiprocket</SelectItem>
+                                <SelectItem value="Xpressbees">Xpressbees</SelectItem>
                             </SelectContent>
                         </Select>
                     )}

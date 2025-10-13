@@ -706,7 +706,7 @@ export default function OrdersPage() {
     }
 
     // Then, filter by courier if on the 'Ready To Dispatch' tab
-    if (activeTab === 'Ready To Dispatch' && courierFilter !== 'all') {
+    if (!['New', 'Confirmed', 'Cancelled'].includes(activeTab) && courierFilter !== 'all') {
       if (courierFilter === 'Delhivery') { 
         filtered = filtered.filter(order => order.courier === courierFilter);
       } else if (courierFilter === 'Shiprocket') {

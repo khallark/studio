@@ -1958,7 +1958,7 @@ export default function OrdersPage() {
                           <TableBody>
                               {viewingOrder.raw.line_items.map((item: any, index: number) => (
                               <TableRow key={index}>
-                                  <TableCell className="font-medium">{item.title}</TableCell>
+                                  <TableCell className="font-medium">{item.name}</TableCell>
                                   <TableCell>{item.sku || 'N/A'}</TableCell>
                                   <TableCell className="text-center">{item.quantity}</TableCell>
                                   <TableCell className="text-right font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(item.price * item.quantity)}</TableCell>

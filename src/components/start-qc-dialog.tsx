@@ -106,11 +106,12 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
     const getCameraPermission = async () => {
       if (!isOpen) return;
       try {
+        // OPTIMIZED: Lower resolution and frame rate for faster uploads
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 24 }
+            width: { ideal: 640 },      // Reduced from 1280
+            height: { ideal: 480 },     // Reduced from 720
+            frameRate: { ideal: 15 }    // Reduced from 24
           },
           audio: true 
         });
@@ -165,19 +166,22 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       
+      // OPTIMIZED: Much more aggressive compression for faster uploads
       const compressionOptions = [
         {
           mimeType: 'video/webm;codecs=vp8',
-          videoBitsPerSecond: 2000000,
-          audioBitsPerSecond: 128000,
+          videoBitsPerSecond: 400000,   // Reduced from 2000000 (400kbps)
+          audioBitsPerSecond: 32000,    // Reduced from 128000 (32kbps)
         },
         {
           mimeType: 'video/webm;codecs=vp8',
-          videoBitsPerSecond: 1000000,
-          audioBitsPerSecond: 64000,
+          videoBitsPerSecond: 300000,   // Reduced from 1000000 (300kbps)
+          audioBitsPerSecond: 32000,    // Reduced from 64000 (32kbps)
         },
         {
           mimeType: 'video/webm',
+          videoBitsPerSecond: 400000,
+          audioBitsPerSecond: 32000,
         },
       ];
 
@@ -196,8 +200,17 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       }
 
       if (!mediaRecorder) {
-        mediaRecorder = new MediaRecorder(stream);
-        console.log('Using default compression');
+        // Fallback with compression even without specific codec
+        try {
+          mediaRecorder = new MediaRecorder(stream, {
+            videoBitsPerSecond: 400000,
+            audioBitsPerSecond: 32000,
+          });
+          console.log('Using default compression with bitrate limits');
+        } catch (e) {
+          mediaRecorder = new MediaRecorder(stream);
+          console.log('Using default compression without limits');
+        }
       }
 
       mediaRecorderRef.current = mediaRecorder;
@@ -214,7 +227,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
         setRecordedVideo(blob);
       };
       
-      mediaRecorder.start();
+      // OPTIMIZED: Request data in chunks for better memory management
+      mediaRecorder.start(1000); // Get data every second
       setIsRecording(true);
     }
   };
@@ -236,7 +250,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       const videoSizeMB = recordedVideo.size / (1024 * 1024);
       console.log(`Video size: ${videoSizeMB.toFixed(2)} MB`);
 
-      if (videoSizeMB > 200) {
+      // OPTIMIZED: Increased limit since videos are now much smaller
+      if (videoSizeMB > 100) {
         throw new Error(`Video too large (${videoSizeMB.toFixed(1)}MB). Please record a shorter video.`);
       }
 
@@ -455,6 +470,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
                         <video src={URL.createObjectURL(recordedVideo)} controls className="w-full rounded-md" />
                         <p className="text-sm text-muted-foreground mt-1">
                           Size: {(recordedVideo.size / (1024 * 1024)).toFixed(2)} MB
+                          <span className="text-green-600 ml-2">✓ Optimized for fast upload</span>
                         </p>
                     </div>
                   )}

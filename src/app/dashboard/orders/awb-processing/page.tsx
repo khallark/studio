@@ -540,14 +540,14 @@ function BatchRow({
                   <Download className="mr-2 h-4 w-4" />
                   {isDownloadingFailed ? 'Downloading...' : 'Failed Report'}
                 </Button>
-                <Tooltip>
+                {batchType === "forward" && (<Tooltip>
                   <TooltipTrigger asChild>
                     <Button size="sm" variant="outline" onClick={handleRetryFailed} disabled={isRetrying}>
                       <RotateCcw className="mr-2 h-4 w-4" /> {isRetrying ? 'Retrying...' : 'Retry Failed'}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Re-enqueue only the failed jobs for this batch</TooltipContent>
-                </Tooltip>
+                </Tooltip>)}
               </div>
             </TooltipProvider>
           )}

@@ -114,6 +114,7 @@ interface Order {
   awb?: string;
   awb_reverse?: string;
   courier?: string;
+  courierProvider?: string;
   courier_reverse?: string;
   isDeleted?: boolean; // Tombstone flag
   tags_confirmed?: string[];
@@ -711,9 +712,9 @@ export default function OrdersPage() {
       if (courierFilter === 'Delhivery') { 
         filtered = filtered.filter(order => order.courier === courierFilter);
       } else if (courierFilter === 'Shiprocket') {
-        filtered = filtered.filter(order => order.courier?.includes('Shiprocket'));
+        filtered = filtered.filter(order => order.courierProvider === 'Shiprocket');
       } else if (courierFilter === 'Xpressbees') {
-        filtered = filtered.filter(order => order.courier?.includes('Xpressbees'));
+        filtered = filtered.filter(order => order.courierProvider === 'Xpressbees');
       }
     }
     

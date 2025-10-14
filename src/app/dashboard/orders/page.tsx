@@ -114,6 +114,7 @@ interface Order {
   awb?: string;
   awb_reverse?: string;
   courier?: string;
+  courier_reverse?: string;
   isDeleted?: boolean; // Tombstone flag
   tags_confirmed?: string[];
   customStatusesLogs?: CustomStatusLog[];
@@ -1906,6 +1907,7 @@ export default function OrdersPage() {
                           {viewingOrder.awb_reverse && (
                               <p className="text-sm text-muted-foreground font-mono">
                                   Return AWB: {viewingOrder.awb_reverse}
+                                  Return Courier: {viewingOrder.courier_reverse}
                               </p>
                           )}
                       </div>

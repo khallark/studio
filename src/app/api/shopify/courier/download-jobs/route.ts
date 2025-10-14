@@ -19,10 +19,10 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, batchId, status } = await req.json();
+    const { shop, batchId, status, collectionName } = await req.json();
 
-    if (!shop || !batchId || !status) {
-      return NextResponse.json({ error: 'Shop and batchId are required' }, { status: 400 });
+    if (!shop || !batchId || !status || !collectionName) {
+      return NextResponse.json({ error: 'Missing params in payload' }, { status: 400 });
     }
 
     if(typeof status !== 'string' || !['success', 'failed'].includes(status)) {
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch batch document to check courier type
-    const batchRef = db.collection('accounts').doc(shop).collection('shipment_batches').doc(batchId);
+    const batchRef = db.collection('accounts').doc(shop).collection(collectionName).doc(batchId);
     const batchDoc = await batchRef.get();
     
     if (!batchDoc.exists) {

@@ -11,6 +11,21 @@ export const dynamic = "force-dynamic";
 const APP_SECRET = process.env.SHOPIFY_API_SECRET || "";
 
 export async function POST(req: NextRequest) {
+  const allowedOrigins = [
+    'https://owr.life',
+    'https://nfkjgp-sv.myshopify.com', // Your Shopify admin domain if needed
+  ];
+
+  const origin = req.headers.get('origin') || '';
+  const corsHeaders = (allowedOrigins.includes(origin)
+    ? {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Credentials': 'true',
+      }
+    : {}) as HeadersInit;
+
   if (!APP_SECRET || APP_SECRET.length < 16) {
     return NextResponse.json({ error: "server config error" }, { status: 500 });
   }
@@ -79,7 +94,7 @@ export async function POST(req: NextRequest) {
         sessionId: sessionRef.id,
         draftOrderId: draftOrderRef.id,
       },
-      { status: 200 }
+      { status: 200, headers: corsHeaders }
     );
   } catch (error) {
     console.error("Error creating draft session:", error);

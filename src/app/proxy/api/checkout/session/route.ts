@@ -1,3 +1,4 @@
+// app/proxy/api/checkout/session/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAppProxySignature as verify } from "@/lib/verifyAppProxy";
 
@@ -7,164 +8,96 @@ export const dynamic = "force-dynamic";
 const APP_SECRET = process.env.SHOPIFY_API_SECRET || "";
 const PROXY_PREFIX = "/apps/majime/api/checkout";
 
-// Get the base URL for fetching the checkout page
-function getAppBaseUrl() {
-  // In production (Vercel), use VERCEL_URL
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  // In development
-  if (process.env.NODE_ENV === "development") {
-    return "http://localhost:3000";
-  }
-  // Fallback to APP_ORIGIN if set
-  return process.env.APP_ORIGIN || "https://majime.in";
-}
-
-// Fetch the checkout page HTML
-async function fetchCheckoutHtml() {
-  const baseUrl = getAppBaseUrl();
-  const checkoutUrl = `${baseUrl}/checkout`;
-  
-  console.log("[session] Fetching checkout from:", checkoutUrl);
-  
-  try {
-    let resp = await fetch(checkoutUrl, {
-      headers: { 
-        Accept: "text/html",
-        "User-Agent": "Shopify-Proxy-Session"
-      },
-      redirect: "manual",
-    });
-
-    // Handle redirect
-    if (resp.status >= 300 && resp.status < 400) {
-      const loc = resp.headers.get("location");
-      if (!loc) {
-        console.error("[session] Redirect without location");
-        return new NextResponse("redirect w/o location", { status: 502 });
-      }
-      const absolute = loc.startsWith("http") ? loc : `${baseUrl}${loc}`;
-      console.log("[session] Following redirect to:", absolute);
-      resp = await fetch(absolute, { 
-        headers: { Accept: "text/html" }, 
-        redirect: "manual" 
-      });
-    }
-
-    if (!resp.ok) {
-      const errorText = await resp.text().catch(() => "");
-      console.error("[session] Fetch failed:", resp.status, resp.statusText);
-      console.error("[session] Error body:", errorText.slice(0, 500));
-      return new NextResponse(`upstream error: ${resp.status}`, { status: 502 });
-    }
-
-    const html = await resp.text();
-    console.log("[session] Successfully fetched checkout HTML");
-    return new NextResponse(html);
-    
-  } catch (error) {
-    console.error("[session] Fetch exception:", error);
-    return new NextResponse("fetch failed", { status: 502 });
-  }
-}
-
-// Rewrite asset URLs to work through the proxy
-function rewriteAssetUrls(html: string) {
-  const baseUrl = getAppBaseUrl();
-  
-  // Rewrite _next assets to absolute URLs
-  html = html.replace(/(\b(?:href|src)=["'])\/_next\//g, `$1${baseUrl}/_next/`);
-  
-  // Rewrite other static assets
-  html = html.replace(
-    /(\b(?:href|src)=["'])\/(?!_next\/)([^"']+\.(?:css|js|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot))(["'])/g,
-    `$1${baseUrl}/$2$3`
-  );
-  
-  // Add base tag for relative URLs
-  html = html.replace(/<base\b[^>]*>/i, "");
-  html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${PROXY_PREFIX}/">`);
-  
-  return html;
-}
-
-// Inject boot data
-function injectBootData(html: string, sessionId: string, shopDomain: string) {
-  const boot = `<script>
+function generateStandaloneCheckoutHTML(sessionId: string, shopDomain: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checkout - OWR</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Inject session data BEFORE any React code loads
     window.__CHECKOUT_SESSION__ = ${JSON.stringify({ id: sessionId, shop: shopDomain })};
     window.__APP_PROXY_PREFIX__ = ${JSON.stringify(PROXY_PREFIX)};
-  </script>`;
+    
+    // Prevent Next.js from taking over navigation
+    window.__NEXT_DATA__ = { props: { pageProps: {} } };
+  </script>
+</head>
+<body>
+  <div id="checkout-root"></div>
   
-  return html.replace(/<\/head>/i, `${boot}</head>`);
+  <script type="module">
+    // Import your checkout component directly
+    import { createElement } from 'https://esm.sh/react@18';
+    import { createRoot } from 'https://esm.sh/react-dom@18/client';
+    
+    // Dynamically import and render your checkout
+    const root = createRoot(document.getElementById('checkout-root'));
+    
+    // Simple loading state
+    root.render(createElement('div', {
+      className: 'flex min-h-screen items-center justify-center',
+      children: createElement('p', { className: 'text-lg' }, 'Loading checkout...')
+    }));
+    
+    // Load your actual checkout bundle
+    import('https://majime.in/_next/static/chunks/app/checkout/page.js')
+      .then(module => {
+        // Render your checkout component
+        const CheckoutPage = module.default;
+        root.render(createElement(CheckoutPage, { 
+          sessionId: window.__CHECKOUT_SESSION__.id 
+        }));
+      })
+      .catch(err => {
+        console.error('Failed to load checkout:', err);
+        root.render(createElement('div', {
+          className: 'p-8 text-center',
+          children: [
+            createElement('h1', { key: 'h1', className: 'text-2xl font-bold text-red-600' }, 'Failed to load checkout'),
+            createElement('p', { key: 'p', className: 'mt-4' }, 'Please refresh the page.'),
+            createElement('button', {
+              key: 'btn',
+              onClick: () => location.reload(),
+              className: 'mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg'
+            }, 'Refresh')
+          ]
+        }));
+      });
+  </script>
+</body>
+</html>`;
 }
 
-// Main render function
-async function render(sessionId: string, shopDomain: string) {
-  const upstream = await fetchCheckoutHtml();
-  
-  if (!upstream.ok) {
-    console.error("[session] Failed to fetch checkout");
-    return upstream;
-  }
+export async function GET(req: NextRequest) {
+  if (!APP_SECRET) return new NextResponse("server config error", { status: 500 });
+  if (!verify(req.url, APP_SECRET)) return new NextResponse("bad signature", { status: 401 });
 
-  let html = await upstream.text();
-  
-  // Rewrite URLs and inject boot data
-  html = rewriteAssetUrls(html);
-  html = injectBootData(html, sessionId, shopDomain);
+  const u = new URL(req.url);
+  const sessionId = u.searchParams.get("sessionId") || "";
+  const shopDomain = u.searchParams.get("shop") || "";
+
+  const html = generateStandaloneCheckoutHTML(sessionId, shopDomain);
 
   return new NextResponse(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Frame-Options": "SAMEORIGIN",
     },
   });
 }
 
-// POST handler (from cart form submission)
 export async function POST(req: NextRequest) {
-  if (!APP_SECRET) {
-    console.error("[session] Missing APP_SECRET");
-    return new NextResponse("server config error", { status: 500 });
-  }
-  
-  if (!verify(req.url, APP_SECRET)) {
-    console.error("[session] Bad signature");
-    return new NextResponse("bad signature", { status: 401 });
-  }
-
+  // Redirect POST to GET with params
   const form = await req.formData();
   const sessionId = String(form.get("sessionId") || "");
-  const shopDomain = String(form.get("shopDomain") || form.get("shop") || "");
-
-  console.log("[session] POST request - sessionId:", sessionId, "shop:", shopDomain);
-
-  if (!sessionId) {
-    return new NextResponse("sessionId required", { status: 400 });
-  }
-
-  return render(sessionId, shopDomain);
-}
-
-// GET handler (for reloads)
-export async function GET(req: NextRequest) {
-  if (!APP_SECRET) {
-    console.error("[session] Missing APP_SECRET");
-    return new NextResponse("server config error", { status: 500 });
-  }
+  const shopDomain = String(form.get("shopDomain") || "");
   
-  if (!verify(req.url, APP_SECRET)) {
-    console.error("[session] Bad signature");
-    return new NextResponse("bad signature", { status: 401 });
-  }
-
-  const u = new URL(req.url);
-  const sessionId = u.searchParams.get("sessionId") || "";
-  const shopDomain = u.searchParams.get("shopDomain") || u.searchParams.get("shop") || "";
-
-  console.log("[session] GET request - sessionId:", sessionId, "shop:", shopDomain);
-
-  return render(sessionId, shopDomain);
+  const redirectUrl = `/apps/majime/api/checkout/session?sessionId=${encodeURIComponent(sessionId)}&shop=${encodeURIComponent(shopDomain)}`;
+  
+  return NextResponse.redirect(new URL(redirectUrl, req.url), 303);
 }

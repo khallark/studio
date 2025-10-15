@@ -176,30 +176,30 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/revert-to-delivered',
         destination: '/api/shopify/orders/revert-to-delivered/route',
       },
-      {
-        source: '/proxy/api/checkout/customer',
-        destination: '/proxy/api/checkout/customer/route',
-      },
-      {
-        source: '/proxy/api/checkout/draft-session-creation',
-        destination: '/proxy/api/checkout/draft-session-creation/route',
-      },
-      {
-        source: '/proxy/api/checkout/order-create-cod',
-        destination: '/proxy/api/checkout/order-create-cod/route',
-      },
-      {
-        source: '/proxy/api/checkout/products-details',
-        destination: '/proxy/api/checkout/products-details/route',
-      },
-      {
-        source: '/proxy/api/checkout/send-otp',
-        destination: '/proxy/api/checkout/send-otp/route',
-      },
-      {
-        source: '/proxy/api/checkout/verify-otp',
-        destination: '/proxy/api/checkout/verify-otp/route',
-      },
+      // {
+      //   source: '/proxy/api/checkout/customer',
+      //   destination: '/proxy/api/checkout/customer/route',
+      // },
+      // {
+      //   source: '/proxy/api/checkout/draft-session-creation',
+      //   destination: '/proxy/api/checkout/draft-session-creation/route',
+      // },
+      // {
+      //   source: '/proxy/api/checkout/order-create-cod',
+      //   destination: '/proxy/api/checkout/order-create-cod/route',
+      // },
+      // {
+      //   source: '/proxy/api/checkout/products-details',
+      //   destination: '/proxy/api/checkout/products-details/route',
+      // },
+      // {
+      //   source: '/proxy/api/checkout/send-otp',
+      //   destination: '/proxy/api/checkout/send-otp/route',
+      // },
+      // {
+      //   source: '/proxy/api/checkout/verify-otp',
+      //   destination: '/proxy/api/checkout/verify-otp/route',
+      // },
     ]
   },
 };

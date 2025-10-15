@@ -1908,6 +1908,7 @@ export default function OrdersPage() {
                           {viewingOrder.awb_reverse && (
                               <p className="text-sm text-muted-foreground font-mono">
                                   Return AWB: {viewingOrder.awb_reverse}
+                                  <br />
                                   Return Courier: {viewingOrder.courier_reverse}
                               </p>
                           )}

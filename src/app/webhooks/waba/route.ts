@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
                                     if (orderDoc.exists) {
                                         const [updation, messageSending] = quickReplyActions.get(buttonText)
                                         await updation(orderDoc);
-                                        const orderData = orderDoc.data();
-                                        const shopData = shopDoc.data();
+                                        const orderData = orderDoc.data() as any;
+                                        const shopData = shopDoc.data() as any;
                                         await messageSending(orderData, shopData);
                                     }
                                 }

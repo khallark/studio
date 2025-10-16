@@ -169,6 +169,7 @@ export async function sendNewOrderWhatsAppMessage(
 
         const messageDoc = {
             orderName: orderName,
+            forStatus: "New",
             orderId: order.orderId,
             shopName: shop.shopName,
             sentAt: FieldValue.serverTimestamp(),
@@ -274,6 +275,7 @@ export async function sendConfirmOrderWhatsAppMessage(
 
         const messageDoc = {
             orderName: orderName,
+            forStatus: "Confirmed",
             orderId: order.orderId,
             shopName: shop.shopName,
             sentAt: FieldValue.serverTimestamp(),
@@ -377,6 +379,7 @@ export async function sendCancelOrderWhatsAppMessage(
 
         const messageDoc = {
             orderName: orderName,
+            forStatus: "Cancellation Requested",
             orderId: order.orderId,
             shopName: shop.shopName,
             sentAt: FieldValue.serverTimestamp(),

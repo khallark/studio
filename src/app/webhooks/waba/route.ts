@@ -53,10 +53,12 @@ export async function POST(request: NextRequest) {
                                     const orderDoc = await shopDoc.ref.collection('orders').doc(String(orderId)).get();
                                     if (orderDoc.exists) {
                                         const [updation, messageSending] = quickReplyActions.get(buttonText)
-                                        await updation(orderDoc);
-                                        const orderData = orderDoc.data() as any;
-                                        const shopData = shopDoc.data() as any;
-                                        await messageSending(shopData, orderData);
+                                        const shouldSendMessage = await updation(orderDoc);
+                                        if (shouldSendMessage) {
+                                            const orderData = orderDoc.data() as any;
+                                            const shopData = shopDoc.data() as any;
+                                            await messageSending(shopData, orderData);
+                                        }
                                     }
                                 }
                             }
@@ -98,8 +100,13 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle confirm order action
-async function updateToConfirmed(orderDoc: DocumentSnapshot) {
+async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
     try {
+        const orderData = orderDoc.data();
+        if(orderData?.customStatus !== 'New') {
+            console.warn(`⚠️ Order ${orderDoc.data()?.name ?? '{Unknown}'} is not a "NEW ORDER" anymore. Cancellation can be requested only on the new orders.`)
+            return false;
+        }
         const log = {
             status: 'Confirmed',
             createdAt: Timestamp.now(),
@@ -113,14 +120,21 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot) {
         });
 
         console.log(`✅ Order ${orderDoc.data()?.name ?? '{Unknown}'} confirmed`);
+        return true;
     } catch (error) {
         console.error('Error handling confirm order:', error);
+        return false;
     }
 }
 
 // Handle cancel order action
-async function updateToCancallationRequested(orderDoc: DocumentSnapshot) {
+async function updateToCancallationRequested(orderDoc: DocumentSnapshot): Promise<Boolean> {
     try {
+        const orderData = orderDoc.data();
+        if(orderData?.customStatus !== 'New') {
+            console.warn(`⚠️ Order ${orderDoc.data()?.name ?? '{Unknown}'} is not a "NEW ORDER" anymore. Cancellation can be requested only on the new orders.`)
+            return false;
+        }
         const log = {
             status: 'Cancellation Requested',
             createdAt: Timestamp.now(),
@@ -134,7 +148,9 @@ async function updateToCancallationRequested(orderDoc: DocumentSnapshot) {
         });
 
         console.log(`⚠️ Cancellation requested for order ${orderDoc.data()?.name ?? '{Unknown}'}`);
+        return true;
     } catch (error) {
         console.error('Error handling cancel order:', error);
+        return false;
     }
 }

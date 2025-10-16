@@ -28,23 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     const validStatuses = [
-        'New', 
-        'Confirmed', 
-        'Ready To Dispatch', 
-        'Dispatched', 
-        'In Transit',
-        'Out For Delivery',
-        'Delivered',
-        'RTO In Transit',
-        'RTO Delivered',
-        'DTO Requested',
-        'DTO Booked',
-        'DTO In Transit',
-        'DTO Delivered',
-        'Lost',
+        'Confirmed',
         'Closed',
         'RTO Closed',
-        'Cancelled'
     ];
     if (!validStatuses.includes(status)) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });

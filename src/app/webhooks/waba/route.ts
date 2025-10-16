@@ -30,64 +30,62 @@ export async function GET(request: NextRequest) {
 // POST - Receive webhook events
 export async function POST(request: NextRequest) {
     try {
-        // const body = await request.json();
-        // const message = body.entry[0].changes[0].value.messages[0];
-        // const buttonText = message.button.text;
-        // const originalMessageId = message.context?.id;
+        const body = await request.json();
+        const message = body.entry[0].changes[0].value.messages[0];
+        const buttonText = message.button.text;
+        const originalMessageId = message.context?.id;
 
-        // // Handle incoming messages (button clicks, text messages, etc.)
-        // if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
-        //     try {
-        //         if (message.type === 'button') {
-        //             console.log('🔘 Quick reply received');
-        //             if (originalMessageId) {
-        //                 const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
-        //                 if (messageDoc.exists) {
-        //                     const messageData = messageDoc.data();
-        //                     const shopName = messageData?.shopName;
-        //                     const orderName = messageData?.orderName;
-        //                     const orderId = messageData?.orderId;
-        //                     if (shopName && orderName) {
-        //                         const shopDoc = await db.collection('accounts').doc(shopName).get();
-        //                         if (shopDoc.exists) {
-        //                             const orderDoc = await shopDoc.ref.collection('orders').doc(String(orderId)).get();
-        //                             if (orderDoc.exists) {
-        //                                 const [updation, messageSending] = quickReplyActions.get(buttonText)
-        //                                 await updation(orderDoc);
-        //                                 await messageSending(orderDoc.data(), shopDoc.data());
-        //                             }
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     } catch (error) {
-        //         console.error('Error updating customStatus:', error);
-        //     }
-        // }
+        // Handle incoming messages (button clicks, text messages, etc.)
+        if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
+            try {
+                if (message.type === 'button') {
+                    console.log('🔘 Quick reply received');
+                    if (originalMessageId) {
+                        const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
+                        if (messageDoc.exists) {
+                            const messageData = messageDoc.data();
+                            const shopName = messageData?.shopName;
+                            const orderName = messageData?.orderName;
+                            const orderId = messageData?.orderId;
+                            if (shopName && orderName) {
+                                const shopDoc = await db.collection('accounts').doc(shopName).get();
+                                if (shopDoc.exists) {
+                                    const orderDoc = await shopDoc.ref.collection('orders').doc(String(orderId)).get();
+                                    if (orderDoc.exists) {
+                                        const [updation, messageSending] = quickReplyActions.get(buttonText)
+                                        await updation(orderDoc);
+                                        await messageSending(orderDoc.data(), shopDoc.data());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating customStatus:', error);
+            }
+        }
 
-        // // Handle status updates
-        // if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
-        //     const statuses = body.entry[0].changes[0].value.statuses;
-        //     for (const status of statuses) {
-        //         try {
-        //             const newStatus = status.status;
-        //             if (['sent', 'delivered', 'read'].includes(newStatus)) {
-        //                 const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
-        //                 if (messageDoc.exists) {
-        //                     await messageDoc.ref.update({
-        //                         messageStatus: newStatus,
-        //                         [`${newStatus}At`]: FieldValue.serverTimestamp(),
-        //                     })
-        //                 }
-        //             }
-        //         } catch (error) {
-        //             console.error('Error updating message status:', error);
-        //         }
-        //     }
-        // }
-        const messageData = await request.json();
-        console.log(JSON.stringify(messageData, null, 2));
+        // Handle status updates
+        if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
+            const statuses = body.entry[0].changes[0].value.statuses;
+            for (const status of statuses) {
+                try {
+                    const newStatus = status.status;
+                    if (['sent', 'delivered', 'read'].includes(newStatus)) {
+                        const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
+                        if (messageDoc.exists) {
+                            await messageDoc.ref.update({
+                                messageStatus: newStatus,
+                                [`${newStatus}At`]: FieldValue.serverTimestamp(),
+                            })
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error updating message status:', error);
+                }
+            }
+        }
 
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {

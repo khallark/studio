@@ -11,45 +11,10 @@ function normalizePhoneNumber(phone: string): string {
     return digitsOnly.slice(-10);
 }
 
-interface Order {
-  shopName: string;
-  name: string;
-  createdAt: Date;
-  raw: {
-    customer?: {
-      first_name?: string;
-      last_name?: string;
-      phone?: string;
-    };
-    shipping_address?: {
-      name?: string;
-      phone?: string;
-    };
-    billing_address?: {
-      name?: string;
-      phone?: string;
-    };
-    line_items?: Array<{
-      product_id: number;
-      variant_id: number;
-      title: string;
-      quantity: number;
-      price: string;
-    }>;
-  };
-}
-
-interface Shop {
-  shopName: string;
-  accessToken: string;
-  whatsappPhoneNumberId: string;
-  whatsappAccessToken: string;
-}
-
 /**
  * Get product image from Shopify
  */
-async function getProductImage(shop: Shop, productId: number): Promise<string> {
+async function getProductImage(shop: any, productId: any): Promise<string> {
   try {
     const response = await fetch(
       `https://${shop.shopName}/admin/api/2024-10/products/${productId}.json`,
@@ -80,7 +45,7 @@ async function getProductImage(shop: Shop, productId: number): Promise<string> {
 /**
  * Extract customer name from order
  */
-function getCustomerName(order: Order): string {
+function getCustomerName(order: any): string {
   return (
     order.raw.shipping_address?.name ||
     order.raw.billing_address?.name ||
@@ -92,7 +57,7 @@ function getCustomerName(order: Order): string {
 /**
  * Extract phone number from order
  */
-function getCustomerPhone(order: Order): string {
+function getCustomerPhone(order: any): string {
   const phone = 
     order.raw.shipping_address?.phone ||
     order.raw.billing_address?.phone ||
@@ -117,8 +82,8 @@ function formatDate(date: Date): string {
  * Send WhatsApp order notification
  */
 export async function sendNewOrderWhatsAppMessage(
-  shop: Shop,
-  order: Order,
+  shop: any,
+  order: any,
 ) {
   try {
     const customerName = String("91" + normalizePhoneNumber(getCustomerName(order)));
@@ -199,12 +164,13 @@ export async function sendNewOrderWhatsAppMessage(
     }
 
     const result = await response.json();
-    const messageId = result.messages[0].shopName;
+    const messageId = result.messages[0].id;
     const sentTo = result.contacts[0].input;
 
     const messageDoc = {
       orderName: orderName,
-      orderId: order.shopName,
+      orderId: order.orderId,
+      shopName: shop.shopName,
       sentAt: FieldValue.serverTimestamp(),
       messageStatus: 'sent',
       sentTo: sentTo,
@@ -212,15 +178,15 @@ export async function sendNewOrderWhatsAppMessage(
     };
 
     await db
-      .collection('accounts')
-      .doc(shop.shopName)
       .collection('whatsapp_messages')
       .doc(messageId)
       .set(messageDoc);
 
     await db
+      .collection('accounts')
+      .doc(shop.shopName)
       .collection('orders')
-      .doc(order.shopName)
+      .doc(String(order.orderId))
       .update({
         whatsapp_messages: FieldValue.arrayUnion(messageId),
       });
@@ -244,8 +210,8 @@ export async function sendNewOrderWhatsAppMessage(
  * Send WhatsApp order confirmation message
  */
 export async function sendConfirmOrderWhatsAppMessage(
-  shop: Shop,
-  order: Order,
+  shop: any,
+  order: any,
 ) {
   try {
     const customerName = String("91" + normalizePhoneNumber(getCustomerName(order)));
@@ -303,12 +269,13 @@ export async function sendConfirmOrderWhatsAppMessage(
     }
 
     const result = await response.json();
-    const messageId = result.messages[0].shopName;
+    const messageId = result.messages[0].id;
     const sentTo = result.contacts[0].input;
 
     const messageDoc = {
       orderName: orderName,
-      orderId: order.shopName,
+      orderId: order.orderId,
+      shopName: shop.shopName,
       sentAt: FieldValue.serverTimestamp(),
       messageStatus: 'sent',
       sentTo: sentTo,
@@ -316,15 +283,15 @@ export async function sendConfirmOrderWhatsAppMessage(
     };
 
     await db
-      .collection('accounts')
-      .doc(shop.shopName)
       .collection('whatsapp_messages')
       .doc(messageId)
       .set(messageDoc);
 
     await db
+      .collection('accounts')
+      .doc(shop.shopName)
       .collection('orders')
-      .doc(order.shopName)
+      .doc(String(order.orderId))
       .update({
         whatsapp_messages: FieldValue.arrayUnion(messageId),
       });
@@ -346,8 +313,8 @@ export async function sendConfirmOrderWhatsAppMessage(
  * Send WhatsApp order cancellation message
  */
 export async function sendCancelOrderWhatsAppMessage(
-  shop: Shop,
-  order: Order,
+  shop: any,
+  order: any,
 ) {
   try {
     const customerName = String("91" + normalizePhoneNumber(getCustomerName(order)));
@@ -405,12 +372,13 @@ export async function sendCancelOrderWhatsAppMessage(
     }
 
     const result = await response.json();
-    const messageId = result.messages[0].shopName;
+    const messageId = result.messages[0].id;
     const sentTo = result.contacts[0].input;
 
     const messageDoc = {
       orderName: orderName,
-      orderId: order.shopName,
+      orderId: order.orderId,
+      shopName: shop.shopName,
       sentAt: FieldValue.serverTimestamp(),
       messageStatus: 'sent',
       sentTo: sentTo,
@@ -418,15 +386,15 @@ export async function sendCancelOrderWhatsAppMessage(
     };
 
     await db
-      .collection('accounts')
-      .doc(shop.shopName)
       .collection('whatsapp_messages')
       .doc(messageId)
       .set(messageDoc);
 
     await db
+      .collection('accounts')
+      .doc(shop.shopName)
       .collection('orders')
-      .doc(order.shopName)
+      .doc(String(order.orderId))
       .update({
         whatsapp_messages: FieldValue.arrayUnion(messageId),
       });

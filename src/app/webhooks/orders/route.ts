@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -70,254 +71,254 @@ function normalizePhoneNumber(phoneNumber: string): string {
   }
 }
 
-function getOrderValueForVariable(variableIndex: number, orderData: any): string {
-  // Map variable indices to order data
-  // This mapping should match what you used when creating the template
-  switch (variableIndex) {
-    case 1:
-      return orderData?.customer?.first_name ||
-        orderData?.shipping_address?.first_name ||
-        orderData?.billing_address?.first_name ||
-        'Customer';
-    case 2:
-      return String(orderData?.name).substring(1) || String(orderData?.id);
-    case 3:
-      return `${orderData?.currency || ''} ${orderData?.total_price || '0'}`;
-    case 4:
-      return orderData?.customer?.email || '';
-    case 5:
-      return orderData?.shipping_address?.address1 || '';
-    case 6:
-      return orderData?.customer?.phone || '';
-    case 7:
-      return orderData?.created_at ? new Date(orderData.created_at).toLocaleDateString() : '';
-    default:
-      return `Variable ${variableIndex}`;
-  }
-}
+// function getOrderValueForVariable(variableIndex: number, orderData: any): string {
+//   // Map variable indices to order data
+//   // This mapping should match what you used when creating the template
+//   switch (variableIndex) {
+//     case 1:
+//       return orderData?.customer?.first_name ||
+//         orderData?.shipping_address?.first_name ||
+//         orderData?.billing_address?.first_name ||
+//         'Customer';
+//     case 2:
+//       return String(orderData?.name).substring(1) || String(orderData?.id);
+//     case 3:
+//       return `${orderData?.currency || ''} ${orderData?.total_price || '0'}`;
+//     case 4:
+//       return orderData?.customer?.email || '';
+//     case 5:
+//       return orderData?.shipping_address?.address1 || '';
+//     case 6:
+//       return orderData?.customer?.phone || '';
+//     case 7:
+//       return orderData?.created_at ? new Date(orderData.created_at).toLocaleDateString() : '';
+//     default:
+//       return `Variable ${variableIndex}`;
+//   }
+// }
 
-function extractVariablesFromText(text: string): number[] {
-  if (!text) return [];
-  const variableRegex = /\{\{(\d+)\}\}/g;
-  const matches = [...text.matchAll(variableRegex)];
-  return matches.map(match => parseInt(match[1])).sort((a, b) => a - b);
-}
+// function extractVariablesFromText(text: string): number[] {
+//   if (!text) return [];
+//   const variableRegex = /\{\{(\d+)\}\}/g;
+//   const matches = [...text.matchAll(variableRegex)];
+//   return matches.map(match => parseInt(match[1])).sort((a, b) => a - b);
+// }
 
-function buildDynamicMessagePayload(templateData: any, orderData: any, customerPhone: string) {
-  const template = templateData.data;
+// function buildDynamicMessagePayload(templateData: any, orderData: any, customerPhone: string) {
+//   const template = templateData.data;
 
-  // Base payload
-  const messagePayload: any = {
-    countryCode: '+91',
-    phoneNumber: normalizePhoneNumber(customerPhone),
-    callbackData: `order_${orderData.id}`,
-    type: 'Template',
-    template: {
-      name: template.name,
-      languageCode: template.language || 'en',
-    }
-  };
+//   // Base payload
+//   const messagePayload: any = {
+//     countryCode: '+91',
+//     phoneNumber: normalizePhoneNumber(customerPhone),
+//     callbackData: `order_${orderData.id}`,
+//     type: 'Template',
+//     template: {
+//       name: template.name,
+//       languageCode: template.language || 'en',
+//     }
+//   };
 
-  // Extract variables from template body
-  const bodyVariables = extractVariablesFromText(template.body);
-  if (bodyVariables.length > 0) {
-    messagePayload.template.bodyValues = bodyVariables.map(varIndex => {
-      return getOrderValueForVariable(varIndex, orderData);
-    });
-  }
+//   // Extract variables from template body
+//   const bodyVariables = extractVariablesFromText(template.body);
+//   if (bodyVariables.length > 0) {
+//     messagePayload.template.bodyValues = bodyVariables.map(varIndex => {
+//       return getOrderValueForVariable(varIndex, orderData);
+//     });
+//   }
 
-  // Handle header dynamically
-  // if (template.header_format && template.header_format !== 'NONE') {
-  //   if (template.header_format === 'TEXT' && template.header) {
-  //     const headerVariables = extractVariablesFromText(template.header);
-  //     if (headerVariables.length > 0) {
-  //       messagePayload.template.headerValues = headerVariables.map(varIndex => {
-  //         return getOrderValueForVariable(varIndex, orderData);
-  //       });
-  //     }
-  //   } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
-  //     // For media headers, use the file URL from template
-  //     if (template.header_handle_file_url) {
-  //       messagePayload.template.headerValues = [template.header_handle_file_url];
-  //     }
-  //   }
-  // }
-  // Handle header dynamically
-  if (template.header_format && template.header_format !== 'NONE') {
-    if (template.header_format === 'TEXT' && template.header) {
-      const headerVariables = extractVariablesFromText(template.header);
-      if (headerVariables.length > 0) {
-        messagePayload.template.headerValues = headerVariables.map(varIndex => {
-          return getOrderValueForVariable(varIndex, orderData);
-        });
-      } else {
-        // Include static header text
-        messagePayload.template.headerValues = [template.header];
-      }
-    } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
-      if (template.header_handle_file_url) {
-        messagePayload.template.headerValues = [template.header_handle_file_url];
-      }
-    }
-  }
+//   // Handle header dynamically
+//   // if (template.header_format && template.header_format !== 'NONE') {
+//   //   if (template.header_format === 'TEXT' && template.header) {
+//   //     const headerVariables = extractVariablesFromText(template.header);
+//   //     if (headerVariables.length > 0) {
+//   //       messagePayload.template.headerValues = headerVariables.map(varIndex => {
+//   //         return getOrderValueForVariable(varIndex, orderData);
+//   //       });
+//   //     }
+//   //   } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
+//   //     // For media headers, use the file URL from template
+//   //     if (template.header_handle_file_url) {
+//   //       messagePayload.template.headerValues = [template.header_handle_file_url];
+//   //     }
+//   //   }
+//   // }
+//   // Handle header dynamically
+//   if (template.header_format && template.header_format !== 'NONE') {
+//     if (template.header_format === 'TEXT' && template.header) {
+//       const headerVariables = extractVariablesFromText(template.header);
+//       if (headerVariables.length > 0) {
+//         messagePayload.template.headerValues = headerVariables.map(varIndex => {
+//           return getOrderValueForVariable(varIndex, orderData);
+//         });
+//       } else {
+//         // Include static header text
+//         messagePayload.template.headerValues = [template.header];
+//       }
+//     } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.header_format)) {
+//       if (template.header_handle_file_url) {
+//         messagePayload.template.headerValues = [template.header_handle_file_url];
+//       }
+//     }
+//   }
 
-  // Handle buttons dynamically
-  if (template.buttons) {
-    console.log('Raw buttons data:', template.buttons);
+//   // Handle buttons dynamically
+//   if (template.buttons) {
+//     console.log('Raw buttons data:', template.buttons);
     
-    let buttons;
-    try {
-      // First parse to get the JSON string
-      let buttonsString = template.buttons;
-      if (typeof buttonsString === 'string') {
-        buttonsString = JSON.parse(buttonsString); // First parse: removes outer quotes
-      }
+//     let buttons;
+//     try {
+//       // First parse to get the JSON string
+//       let buttonsString = template.buttons;
+//       if (typeof buttonsString === 'string') {
+//         buttonsString = JSON.parse(buttonsString); // First parse: removes outer quotes
+//       }
       
-      // Second parse to get the actual array
-      if (typeof buttonsString === 'string') {
-        buttons = JSON.parse(buttonsString); // Second parse: gets the array
-      } else {
-        buttons = buttonsString; // Already parsed
-      }
+//       // Second parse to get the actual array
+//       if (typeof buttonsString === 'string') {
+//         buttons = JSON.parse(buttonsString); // Second parse: gets the array
+//       } else {
+//         buttons = buttonsString; // Already parsed
+//       }
       
-      console.log('Final parsed buttons:', buttons);
+//       console.log('Final parsed buttons:', buttons);
       
-      // Only proceed if buttons is actually an array
-      if (Array.isArray(buttons)) {
-        const buttonValues: any = {};
+//       // Only proceed if buttons is actually an array
+//       if (Array.isArray(buttons)) {
+//         const buttonValues: any = {};
         
-        buttons.forEach((button: any, index: number) => {
-          if (button.type === 'URL' && button.url) {
-            const urlVariables = extractVariablesFromText(button.url);
-            if (urlVariables.length > 0) {
-              buttonValues[`${index}_url`] = urlVariables.map(varIndex => {
-                return getOrderValueForVariable(varIndex, orderData);
-              });
-            }
-          }
-        });
+//         buttons.forEach((button: any, index: number) => {
+//           if (button.type === 'URL' && button.url) {
+//             const urlVariables = extractVariablesFromText(button.url);
+//             if (urlVariables.length > 0) {
+//               buttonValues[`${index}_url`] = urlVariables.map(varIndex => {
+//                 return getOrderValueForVariable(varIndex, orderData);
+//               });
+//             }
+//           }
+//         });
         
-        if (Object.keys(buttonValues).length > 0) {
-          messagePayload.template.buttonValues = buttonValues;
-        }
-      } else {
-        console.log('Buttons is not an array after parsing, skipping button processing');
-      }
-    } catch (parseError) {
-      console.log('Failed to parse buttons:', parseError);
-    }
-  }
+//         if (Object.keys(buttonValues).length > 0) {
+//           messagePayload.template.buttonValues = buttonValues;
+//         }
+//       } else {
+//         console.log('Buttons is not an array after parsing, skipping button processing');
+//       }
+//     } catch (parseError) {
+//       console.log('Failed to parse buttons:', parseError);
+//     }
+//   }
 
-  return messagePayload;
-}
+//   return messagePayload;
+// }
 
-async function sendNewOrderWhatsAppMessage(shopDomain: string, orderData: any) {
-  try {
-    console.log(`Attempting to send WhatsApp message for new order ${orderData.id} in shop ${shopDomain}`);
+// async function sendNewOrderWhatsAppMessage(shopDomain: string, orderData: any) {
+//   try {
+//     console.log(`Attempting to send WhatsApp message for new order ${orderData.id} in shop ${shopDomain}`);
 
-    // Get account data
-    const accountRef = db.collection('accounts').doc(shopDomain);
-    const accountDoc = await accountRef.get();
+//     // Get account data
+//     const accountRef = db.collection('accounts').doc(shopDomain);
+//     const accountDoc = await accountRef.get();
 
-    if (!accountDoc.exists) {
-      console.log(`Account not found for shop: ${shopDomain}`);
-      return;
-    }
+//     if (!accountDoc.exists) {
+//       console.log(`Account not found for shop: ${shopDomain}`);
+//       return;
+//     }
 
-    const accountData = accountDoc.data();
+//     const accountData = accountDoc.data();
 
-    // Check if Interakt is configured
-    const interaktKeys = accountData?.integrations?.communication?.interakt;
-    if (!interaktKeys?.apiKey) {
-      console.log(`Interakt not configured for shop: ${shopDomain}`);
-      return;
-    }
+//     // Check if Interakt is configured
+//     const interaktKeys = accountData?.integrations?.communication?.interakt;
+//     if (!interaktKeys?.apiKey) {
+//       console.log(`Interakt not configured for shop: ${shopDomain}`);
+//       return;
+//     }
 
-    // Get the active template for "New" category
-    const categorySettingsRef = accountRef
-      .collection('communications')
-      .doc('interakt')
-      .collection('settings')
-      .doc('category_settings');
+//     // Get the active template for "New" category
+//     const categorySettingsRef = accountRef
+//       .collection('communications')
+//       .doc('interakt')
+//       .collection('settings')
+//       .doc('category_settings');
 
-    const categoryDoc = await categorySettingsRef.get();
-    const activeTemplateId = categoryDoc.exists ? categoryDoc.data()?.activeTemplateForNew : null;
+//     const categoryDoc = await categorySettingsRef.get();
+//     const activeTemplateId = categoryDoc.exists ? categoryDoc.data()?.activeTemplateForNew : null;
 
-    if (!activeTemplateId) {
-      console.log(`No active template assigned to "New" category for shop: ${shopDomain}`);
-      return;
-    }
+//     if (!activeTemplateId) {
+//       console.log(`No active template assigned to "New" category for shop: ${shopDomain}`);
+//       return;
+//     }
 
-    // Get the template details
-    const templateRef = accountRef
-      .collection('communications')
-      .doc('interakt')
-      .collection('templates')
-      .doc(activeTemplateId);
+//     // Get the template details
+//     const templateRef = accountRef
+//       .collection('communications')
+//       .doc('interakt')
+//       .collection('templates')
+//       .doc(activeTemplateId);
 
-    const templateDoc = await templateRef.get();
-    if (!templateDoc.exists) {
-      console.log(`Template ${activeTemplateId} not found for shop: ${shopDomain}`);
-      return;
-    }
+//     const templateDoc = await templateRef.get();
+//     if (!templateDoc.exists) {
+//       console.log(`Template ${activeTemplateId} not found for shop: ${shopDomain}`);
+//       return;
+//     }
 
-    const templateData = templateDoc.data();
+//     const templateData = templateDoc.data();
 
-    // Check if template is approved
-    if (templateData?.data?.approval_status !== 'APPROVED') {
-      console.log(`Template ${activeTemplateId} is not approved (status: ${templateData?.data?.approval_status})`);
-      return;
-    }
+//     // Check if template is approved
+//     if (templateData?.data?.approval_status !== 'APPROVED') {
+//       console.log(`Template ${activeTemplateId} is not approved (status: ${templateData?.data?.approval_status})`);
+//       return;
+//     }
 
-    // Check if customer has phone number
-    const customerPhone = orderData?.shipping_address?.phone ||
-                          orderData?.billing_address?.phone ||
-                          orderData?.customer.phone || '';
+//     // Check if customer has phone number
+//     const customerPhone = orderData?.shipping_address?.phone ||
+//                           orderData?.billing_address?.phone ||
+//                           orderData?.customer.phone || '';
     
-    if (!customerPhone) {
-      console.log(`No phone number found for customer in order ${orderData.id}`);
-      return;
-    }
+//     if (!customerPhone) {
+//       console.log(`No phone number found for customer in order ${orderData.id}`);
+//       return;
+//     }
 
-    // Build message payload for Interakt
-    const messagePayload = buildDynamicMessagePayload(templateData, orderData, customerPhone)
+//     // Build message payload for Interakt
+//     const messagePayload = buildDynamicMessagePayload(templateData, orderData, customerPhone)
 
-    // Send message via Interakt API
-    const messageResponse = await fetch('https://api.interakt.ai/v1/public/message/', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${interaktKeys.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messagePayload)
-    });
+//     // Send message via Interakt API
+//     const messageResponse = await fetch('https://api.interakt.ai/v1/public/message/', {
+//       method: 'POST',
+//       headers: {
+//         'Authorization': `Basic ${interaktKeys.apiKey}`,
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify(messagePayload)
+//     });
 
-    if (!messageResponse.ok) {
-      const errorData = await messageResponse.text();
-      console.error(`Failed to send WhatsApp message for order ${orderData.id}: ${messageResponse.status} - ${errorData}`);
-      return;
-    }
+//     if (!messageResponse.ok) {
+//       const errorData = await messageResponse.text();
+//       console.error(`Failed to send WhatsApp message for order ${orderData.id}: ${messageResponse.status} - ${errorData}`);
+//       return;
+//     }
 
-    const messageResult = await messageResponse.json();
-    console.log(`Successfully sent WhatsApp message for order ${orderData.id}. Message ID: ${messageResult.messageId || 'Unknown'}`);
+//     const messageResult = await messageResponse.json();
+//     console.log(`Successfully sent WhatsApp message for order ${orderData.id}. Message ID: ${messageResult.messageId || 'Unknown'}`);
 
-    // Log the message sending in the order document
-    const orderRef = accountRef.collection('orders').doc(String(orderData.id));
-    await orderRef.update({
-      whatsappMessage: {
-        sentAt: FieldValue.serverTimestamp(),
-        templateId: activeTemplateId,
-        templateName: templateData.data.name,
-        messageId: messageResult.messageId,
-        status: 'sent',
-        phoneNumber: customerPhone
-      }
-    });
+//     // Log the message sending in the order document
+//     const orderRef = accountRef.collection('orders').doc(String(orderData.id));
+//     await orderRef.update({
+//       whatsappMessage: {
+//         sentAt: FieldValue.serverTimestamp(),
+//         templateId: activeTemplateId,
+//         templateName: templateData.data.name,
+//         messageId: messageResult.messageId,
+//         status: 'sent',
+//         phoneNumber: customerPhone
+//       }
+//     });
 
-  } catch (error) {
-    console.error(`Error sending WhatsApp message for order ${orderData.id}:`, error);
-  }
-}
+//   } catch (error) {
+//     console.error(`Error sending WhatsApp message for order ${orderData.id}:`, error);
+//   }
+// }
 
 async function captureShopifyCreditPayment(shopDomain: string, orderId: string) {
   try {
@@ -482,6 +483,24 @@ export async function POST(req: NextRequest) {
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
+
+    if(created) {
+      const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
+      const cleanPhone = normalizePhoneNumber(customerPhone);
+      if(customerPhone && cleanPhone === '9779752241') {
+        const shopDoc = (await accountRef.get()).data() as any;
+        console.log('Trying to send message');
+        await sendNewOrderWhatsAppMessage(shopDoc, {
+          orderId: dataToSave.orderId,
+          createdAt: dataToSave.createdAt,
+          name: dataToSave.name,
+          raw: orderData
+        })
+        
+      } else {
+        console.log('Skipping sending the message.');
+      }
+    }
 
     // if(created) {
     //   console.log('Trying to send whatspass message');

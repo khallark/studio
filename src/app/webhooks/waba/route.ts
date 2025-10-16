@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
                                         await updation(orderDoc);
                                         const orderData = orderDoc.data() as any;
                                         const shopData = shopDoc.data() as any;
-                                        await messageSending(orderData, shopData);
+                                        await messageSending(shopData, orderData);
                                     }
                                 }
                             }

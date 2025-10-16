@@ -31,13 +31,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const message = body.entry[0].changes[0].value.messages[0];
-        const buttonText = message.button.text;
-        const originalMessageId = message.context?.id;
-
+        
         // Handle incoming messages (button clicks, text messages, etc.)
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
             try {
+                const message = body.entry[0].changes[0].value.messages[0];
+                const buttonText = message.button.text;
+                const originalMessageId = message.context?.id;
                 if (message.type === 'button') {
                     console.log('🔘 Quick reply received');
                     if (originalMessageId) {
@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
                                     if (orderDoc.exists) {
                                         const [updation, messageSending] = quickReplyActions.get(buttonText)
                                         await updation(orderDoc);
-                                        await messageSending(orderDoc.data(), shopDoc.data());
+                                        const orderData = orderDoc.data();
+                                        const shopData = shopDoc.data();
+                                        await messageSending(orderData, shopData);
                                     }
                                 }
                             }
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
             const statuses = body.entry[0].changes[0].value.statuses;
             for (const status of statuses) {
                 try {
+                    const originalMessageId = status.id
                     const newStatus = status.status;
                     if (['sent', 'delivered', 'read'].includes(newStatus)) {
                         const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();

@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         //     }
         // }
         const messageData = await request.json();
-        console.log(messageData)
+        console.log(JSON.parse(JSON.stringify(messageData)))
 
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {

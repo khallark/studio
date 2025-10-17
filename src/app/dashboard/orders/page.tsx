@@ -72,6 +72,7 @@ import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 import { BookReturnDialog } from '@/components/book-return-dialog';
 import { StartQcDialog } from '@/components/start-qc-dialog';
 import { AvailabilityDialog } from '@/components/availability-dialog';
+import { GeneratePODialog } from '@/components/generate-po-dialog'
 
 type CustomStatus = 
   | 'New' 
@@ -212,6 +213,8 @@ export default function OrdersPage() {
   const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
   
   const [isDownloadingProductsExcel, setIsDownloadingProductsExcel] = useState(false);
+
+  const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
   
   // State for item availability checklist
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
@@ -1297,6 +1300,9 @@ export default function OrdersPage() {
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsGeneratePODialogOpen(true)}>
+                    Generate Purchase Order
+                  </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
                       {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                       {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
@@ -1888,7 +1894,16 @@ export default function OrdersPage() {
             confirmedOrders={filteredOrders.filter(o => o.customStatus === 'Confirmed')}
         />
     )}
-
+    
+    {isGeneratePODialogOpen && userData?.activeAccountId && user && (
+        <GeneratePODialog
+            isOpen={isGeneratePODialogOpen}
+            onClose={() => setIsGeneratePODialogOpen(false)}
+            confirmedOrders={filteredOrders.filter(o => o.customStatus === 'Confirmed')}
+            shopId={userData.activeAccountId}
+            user={user}
+        />
+    )}
 
     <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
       <DialogContent className="max-w-4xl">

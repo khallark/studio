@@ -51,14 +51,14 @@ export async function POST(req: NextRequest) {
       if (order.raw?.line_items) {
         order.raw.line_items.forEach((item: any) => {
           if (item.vendor === vendor) {
-            const name = item.name || item.title || 'Unknown Item';
+            const sku = item.sku || 'N/A';
             const qty = item.quantity || 0;
 
-            if (itemsMap.has(name)) {
-              const existing = itemsMap.get(name)!;
+            if (itemsMap.has(sku)) {
+              const existing = itemsMap.get(sku)!;
               existing.quantity += qty;
             } else {
-              itemsMap.set(name, { name, quantity: qty });
+              itemsMap.set(sku, { name: sku, quantity: qty });
             }
           }
         });
@@ -185,8 +185,9 @@ export async function POST(req: NextRequest) {
     });
     
     const pdfBytes = await pdfDoc.save();
+    const buffer = Buffer.from(pdfBytes);
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

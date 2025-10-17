@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import PDFDocument from 'pdfkit';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -76,86 +76,117 @@ export async function POST(req: NextRequest) {
 
     const totalPcs = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const chunks: Buffer[] = [];
-
-    doc.on('data', (chunk: any) => chunks.push(chunk));
-
-    doc.rect(50, 50, doc.page.width - 100, 40).fillAndStroke('#4472C4', '#000000');
-    doc.fillColor('#FFFFFF').fontSize(20);
-    doc.text('Purchase Order', 50, 63, { align: 'center', width: doc.page.width - 100 });
-
-    doc.fillColor('#000000');
-
-    const tableTop = 110;
-    const col1X = 50;
-    const col2X = 300;
+    // Create PDF with pdf-lib
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    let page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+    const { width, height } = page.getSize();
+    
+    const margin = 50;
+    const tableWidth = width - (margin * 2);
+    
+    // Blue header
+    page.drawRectangle({
+      x: margin,
+      y: height - 90,
+      width: tableWidth,
+      height: 40,
+      color: rgb(0.267, 0.447, 0.769), // #4472C4
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
+    });
+    
+    page.drawText('Purchase Order', {
+      x: margin + tableWidth / 2 - boldFont.widthOfTextAtSize('Purchase Order', 20) / 2,
+      y: height - 77,
+      size: 20,
+      font: boldFont,
+      color: rgb(1, 1, 1),
+    });
+    
+    // Info table
+    const tableTop = height - 110;
     const rowHeight = 25;
-
-    doc.strokeColor('#000000').lineWidth(1);
-
-    doc.rect(col1X, tableTop, 250, rowHeight).stroke();
-    doc.rect(col2X, tableTop, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.fontSize(12).text('Po. No.', col1X + 5, tableTop + 7);
-    doc.text(`Ghamand-${poNumber}`, col2X + 5, tableTop + 7);
-
-    doc.rect(col1X, tableTop + rowHeight, 250, rowHeight).stroke();
-    doc.rect(col2X, tableTop + rowHeight, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.text('Date', col1X + 5, tableTop + rowHeight + 7);
-    doc.text(new Date().toLocaleDateString('en-GB'), col2X + 5, tableTop + rowHeight + 7);
-
-    doc.rect(col1X, tableTop + rowHeight * 2, 250, rowHeight).stroke();
-    doc.rect(col2X, tableTop + rowHeight * 2, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.text('Total Pcs', col1X + 5, tableTop + rowHeight * 2 + 7);
-    doc.text(totalPcs.toString(), col2X + 5, tableTop + rowHeight * 2 + 7);
-
-    const signRowTop = tableTop + rowHeight * 3;
-    doc.rect(col1X, signRowTop, doc.page.width - 100, rowHeight).stroke();
-    doc.text('Sign.', doc.page.width - 100, signRowTop + 7, { align: 'right' });
-
-    const itemsTableTop = signRowTop + rowHeight + 10;
+    const col1Width = 250;
+    const col2Width = tableWidth - col1Width;
+    
+    // Po. No. row
+    page.drawRectangle({ x: margin, y: tableTop - rowHeight, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawText('Po. No.', { x: margin + 5, y: tableTop - rowHeight + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText(`Ghamand-${poNumber}`, { x: margin + col1Width + 5, y: tableTop - rowHeight + 7, size: 12, font: font, color: rgb(0, 0, 0) });
+    
+    // Date row
+    page.drawRectangle({ x: margin, y: tableTop - rowHeight * 2, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight * 2, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawText('Date', { x: margin + 5, y: tableTop - rowHeight * 2 + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText(new Date().toLocaleDateString('en-GB'), { x: margin + col1Width + 5, y: tableTop - rowHeight * 2 + 7, size: 12, font: font, color: rgb(0, 0, 0) });
+    
+    // Total Pcs row
+    page.drawRectangle({ x: margin, y: tableTop - rowHeight * 3, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight * 3, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawText('Total Pcs', { x: margin + 5, y: tableTop - rowHeight * 3 + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText(totalPcs.toString(), { x: margin + col1Width + 5, y: tableTop - rowHeight * 3 + 7, size: 12, font: font, color: rgb(0, 0, 0) });
+    
+    // Sign row
+    const signRowY = tableTop - rowHeight * 4;
+    page.drawRectangle({ x: margin, y: signRowY, width: tableWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    const signText = 'Sign.';
+    const signTextWidth = boldFont.widthOfTextAtSize(signText, 12);
+    page.drawText(signText, { x: width - margin - signTextWidth - 5, y: signRowY + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    
+    // Items table header
+    const itemsTableTop = signRowY - 10;
     const srNoWidth = 60;
-    const itemNameWidth = doc.page.width - 100 - srNoWidth - 80;
     const qtyWidth = 80;
-
-    doc.rect(col1X, itemsTableTop, srNoWidth, rowHeight).stroke();
-    doc.rect(col1X + srNoWidth, itemsTableTop, itemNameWidth, rowHeight).stroke();
-    doc.rect(col1X + srNoWidth + itemNameWidth, itemsTableTop, qtyWidth, rowHeight).stroke();
-
-    doc.fillColor('#000000').fontSize(11);
-    doc.text('Sr. No.', col1X + 5, itemsTableTop + 7, { width: srNoWidth - 10 });
-    doc.text('Item Name', col1X + srNoWidth + 5, itemsTableTop + 7, { width: itemNameWidth - 10 });
-    doc.text('Qty', col1X + srNoWidth + itemNameWidth + 5, itemsTableTop + 7, { width: qtyWidth - 10 });
-
-    let currentY = itemsTableTop + rowHeight;
-    doc.fontSize(10);
-
+    const itemNameWidth = tableWidth - srNoWidth - qtyWidth;
+    
+    page.drawRectangle({ x: margin, y: itemsTableTop - rowHeight, width: srNoWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawRectangle({ x: margin + srNoWidth, y: itemsTableTop - rowHeight, width: itemNameWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawRectangle({ x: margin + srNoWidth + itemNameWidth, y: itemsTableTop - rowHeight, width: qtyWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    
+    page.drawText('Sr. No.', { x: margin + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText('Item Name', { x: margin + srNoWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText('Qty', { x: margin + srNoWidth + itemNameWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
+    
+    // Items rows
+    let currentY = itemsTableTop - rowHeight;
+    
     items.forEach((item, index) => {
-      if (currentY + rowHeight > doc.page.height - 50) {
-        doc.addPage();
-        currentY = 50;
+      if (currentY - rowHeight < margin) {
+        page = pdfDoc.addPage([595.28, 841.89]);
+        currentY = height - margin;
       }
-
-      doc.rect(col1X, currentY, srNoWidth, rowHeight).stroke();
-      doc.rect(col1X + srNoWidth, currentY, itemNameWidth, rowHeight).stroke();
-      doc.rect(col1X + srNoWidth + itemNameWidth, currentY, qtyWidth, rowHeight).stroke();
-
-      doc.text((index + 1).toString(), col1X + 5, currentY + 7, { width: srNoWidth - 10 });
-      doc.text(item.name, col1X + srNoWidth + 5, currentY + 7, { width: itemNameWidth - 10 });
-      doc.text(item.quantity.toString(), col1X + srNoWidth + itemNameWidth + 5, currentY + 7, { width: qtyWidth - 10 });
-
-      currentY += rowHeight;
+      
+      currentY -= rowHeight;
+      
+      page.drawRectangle({ x: margin, y: currentY, width: srNoWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+      page.drawRectangle({ x: margin + srNoWidth, y: currentY, width: itemNameWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+      page.drawRectangle({ x: margin + srNoWidth + itemNameWidth, y: currentY, width: qtyWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+      
+      page.drawText((index + 1).toString(), { x: margin + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
+      
+      // Truncate long item names
+      let itemName = item.name;
+      const maxWidth = itemNameWidth - 10;
+      let textWidth = font.widthOfTextAtSize(itemName, 10);
+      if (textWidth > maxWidth) {
+        while (textWidth > maxWidth && itemName.length > 0) {
+          itemName = itemName.slice(0, -1);
+          textWidth = font.widthOfTextAtSize(itemName + '...', 10);
+        }
+        itemName = itemName + '...';
+      }
+      
+      page.drawText(itemName, { x: margin + srNoWidth + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
+      page.drawText(item.quantity.toString(), { x: margin + srNoWidth + itemNameWidth + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
     });
+    
+    const pdfBytes = await pdfDoc.save();
 
-    doc.end();
-
-    await new Promise<void>((resolve) => {
-      doc.on('end', () => resolve());
-    });
-
-    const pdfBuffer = Buffer.concat(chunks);
-
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

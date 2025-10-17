@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     doc.on('data', (chunk: any) => chunks.push(chunk));
 
     doc.rect(50, 50, doc.page.width - 100, 40).fillAndStroke('#4472C4', '#000000');
-    doc.fillColor('#FFFFFF').fontSize(20).font('Helvetica-Bold');
+    doc.fillColor('#FFFFFF').fontSize(20);
     doc.text('Purchase Order', 50, 63, { align: 'center', width: doc.page.width - 100 });
 
     doc.fillColor('#000000');
@@ -96,22 +96,22 @@ export async function POST(req: NextRequest) {
 
     doc.rect(col1X, tableTop, 250, rowHeight).stroke();
     doc.rect(col2X, tableTop, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.fontSize(12).font('Helvetica-Bold').text('Po. No.', col1X + 5, tableTop + 7);
-    doc.font('Helvetica').text(`Ghamand-${poNumber}`, col2X + 5, tableTop + 7);
+    doc.fontSize(12).text('Po. No.', col1X + 5, tableTop + 7);
+    doc.text(`Ghamand-${poNumber}`, col2X + 5, tableTop + 7);
 
     doc.rect(col1X, tableTop + rowHeight, 250, rowHeight).stroke();
     doc.rect(col2X, tableTop + rowHeight, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.font('Helvetica-Bold').text('Date', col1X + 5, tableTop + rowHeight + 7);
-    doc.font('Helvetica').text(new Date().toLocaleDateString('en-GB'), col2X + 5, tableTop + rowHeight + 7);
+    doc.text('Date', col1X + 5, tableTop + rowHeight + 7);
+    doc.text(new Date().toLocaleDateString('en-GB'), col2X + 5, tableTop + rowHeight + 7);
 
     doc.rect(col1X, tableTop + rowHeight * 2, 250, rowHeight).stroke();
     doc.rect(col2X, tableTop + rowHeight * 2, doc.page.width - col2X - 50, rowHeight).stroke();
-    doc.font('Helvetica-Bold').text('Total Pcs', col1X + 5, tableTop + rowHeight * 2 + 7);
-    doc.font('Helvetica').text(totalPcs.toString(), col2X + 5, tableTop + rowHeight * 2 + 7);
+    doc.text('Total Pcs', col1X + 5, tableTop + rowHeight * 2 + 7);
+    doc.text(totalPcs.toString(), col2X + 5, tableTop + rowHeight * 2 + 7);
 
     const signRowTop = tableTop + rowHeight * 3;
     doc.rect(col1X, signRowTop, doc.page.width - 100, rowHeight).stroke();
-    doc.font('Helvetica-Bold').text('Sign.', doc.page.width - 100, signRowTop + 7, { align: 'right' });
+    doc.text('Sign.', doc.page.width - 100, signRowTop + 7, { align: 'right' });
 
     const itemsTableTop = signRowTop + rowHeight + 10;
     const srNoWidth = 60;
@@ -122,13 +122,13 @@ export async function POST(req: NextRequest) {
     doc.rect(col1X + srNoWidth, itemsTableTop, itemNameWidth, rowHeight).stroke();
     doc.rect(col1X + srNoWidth + itemNameWidth, itemsTableTop, qtyWidth, rowHeight).stroke();
 
-    doc.fillColor('#000000').font('Helvetica-Bold').fontSize(11);
+    doc.fillColor('#000000').fontSize(11);
     doc.text('Sr. No.', col1X + 5, itemsTableTop + 7, { width: srNoWidth - 10 });
     doc.text('Item Name', col1X + srNoWidth + 5, itemsTableTop + 7, { width: itemNameWidth - 10 });
     doc.text('Qty', col1X + srNoWidth + itemNameWidth + 5, itemsTableTop + 7, { width: qtyWidth - 10 });
 
     let currentY = itemsTableTop + rowHeight;
-    doc.font('Helvetica').fontSize(10);
+    doc.fontSize(10);
 
     items.forEach((item, index) => {
       if (currentY + rowHeight > doc.page.height - 50) {

@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     page.drawRectangle({ x: margin, y: tableTop - rowHeight, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
     page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
     page.drawText('Po. No.', { x: margin + 5, y: tableTop - rowHeight + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText(`Ghamand-${poNumber}`, { x: margin + col1Width + 5, y: tableTop - rowHeight + 7, size: 12, font: font, color: rgb(0, 0, 0) });
+    page.drawText(`${vendor}-${poNumber}`, { x: margin + col1Width + 5, y: tableTop - rowHeight + 7, size: 12, font: font, color: rgb(0, 0, 0) });
     
     // Date row
     page.drawRectangle({ x: margin, y: tableTop - rowHeight * 2, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     page.drawRectangle({ x: margin + srNoWidth + itemNameWidth, y: itemsTableTop - rowHeight, width: qtyWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
     
     page.drawText('Sr. No.', { x: margin + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText('Item Name', { x: margin + srNoWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
+    page.drawText('Item SKU', { x: margin + srNoWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
     page.drawText('Qty', { x: margin + srNoWidth + itemNameWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
     
     // Items rows

@@ -694,7 +694,8 @@ export default function OrdersPage() {
             (activeTab === "All Orders" && order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
             customerName.toLowerCase().includes(lowercasedQuery) ||
             (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
-            (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery))
+            (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery)) ||
+            (String(order.orderId).toLowerCase().includes(lowercasedQuery))
           );
           return invertSearch ? !match : match;
         });

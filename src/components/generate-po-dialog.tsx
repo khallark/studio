@@ -27,12 +27,12 @@ interface Order {
 interface GeneratePODialogProps {
   isOpen: boolean;
   onClose: () => void;
-  confirmedOrders: Order[];
+  selectedOrders: Order[];
   shopId: string;
   user: any;
 }
 
-export function GeneratePODialog({ isOpen, onClose, confirmedOrders, shopId, user }: GeneratePODialogProps) {
+export function GeneratePODialog({ isOpen, onClose, selectedOrders, shopId, user }: GeneratePODialogProps) {
   const [selectedVendor, setSelectedVendor] = useState<string>('');
   const [poNumber, setPoNumber] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -40,7 +40,7 @@ export function GeneratePODialog({ isOpen, onClose, confirmedOrders, shopId, use
 
   const uniqueVendors = useMemo(() => {
     const vendorSet = new Set<string>();
-    confirmedOrders.forEach(order => {
+    selectedOrders.forEach(order => {
       order.raw?.line_items?.forEach((item: any) => {
         if (item.vendor) {
           vendorSet.add(item.vendor);
@@ -48,7 +48,7 @@ export function GeneratePODialog({ isOpen, onClose, confirmedOrders, shopId, use
       });
     });
     return Array.from(vendorSet).sort();
-  }, [confirmedOrders]);
+  }, [selectedOrders]);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +89,7 @@ export function GeneratePODialog({ isOpen, onClose, confirmedOrders, shopId, use
           shop: shopId,
           vendor: selectedVendor,
           poNumber: poNumber.trim(),
+          orderIds: selectedOrders.map(o => o.id),
         }),
       });
 

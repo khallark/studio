@@ -1296,12 +1296,12 @@ export default function OrdersPage() {
                   <Button variant="outline" size="sm" onClick={() => setIsAvailabilityDialogOpen(true)}>
                       Perform Items availability
                   </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
+                    Generate Purchase Order
+                  </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setIsGeneratePODialogOpen(true)}>
-                    Generate Purchase Order
                   </Button>
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
                       {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
@@ -1322,6 +1322,9 @@ export default function OrdersPage() {
                       <ScanBarcode className="mr-2 h-4 w-4" />
                       AWB Bulk Selection
                   </Button>
+                  <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
+                    Generate Purchase Order
+                  </Button>                  
                   <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
                     {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
@@ -1899,7 +1902,7 @@ export default function OrdersPage() {
         <GeneratePODialog
             isOpen={isGeneratePODialogOpen}
             onClose={() => setIsGeneratePODialogOpen(false)}
-            confirmedOrders={filteredOrders.filter(o => o.customStatus === 'Confirmed')}
+            selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
             shopId={userData.activeAccountId}
             user={user}
         />

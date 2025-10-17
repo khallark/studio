@@ -19,11 +19,11 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, vendor, poNumber } = await req.json();
+    const { shop, vendor, poNumber, orderIds } = await req.json();
 
-    if (!shop || !vendor || !poNumber) {
+    if (!shop || !vendor || !poNumber || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(
-        { error: 'Shop, vendor, and poNumber are required' },
+        { error: 'Shop, vendor, poNumber, and orderIds are required' },
         { status: 400 }
       );
     }
@@ -37,15 +37,23 @@ export async function POST(req: NextRequest) {
     }
 
     const accountRef = db.collection('accounts').doc(shop);
-    const ordersSnapshot = await accountRef
-      .collection('orders')
-      .where('customStatus', '==', 'Confirmed')
-      .get();
+    const ordersColRef = accountRef.collection('orders');
+    
+    // Firestore 'in' query has a limit of 30 values. We need to chunk them.
+    const chunks: string[][] = [];
+    for (let i = 0; i < orderIds.length; i += 30) {
+      chunks.push(orderIds.slice(i, i + 30));
+    }
+
+    let allDocs: any[] = [];
+    for (const chunk of chunks) {
+      const snapshot = await ordersColRef.where('__name__', 'in', chunk).get();
+      snapshot.forEach((doc: any) => allDocs.push({ id: doc.id, ...doc.data() }));
+    }
 
     const itemsMap = new Map<string, { name: string; quantity: number }>();
 
-    ordersSnapshot.forEach((doc) => {
-      const order = doc.data();
+    allDocs.forEach((order) => {
       if (order.isDeleted) return;
       
       if (order.raw?.line_items) {

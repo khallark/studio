@@ -310,6 +310,8 @@ export async function POST(req: NextRequest) {
     await orderRef.set({
       awb_reverse: String(awb),
       customStatus: 'DTO Booked',
+      courier_reverse: "Delhivery",
+      courierReverseProvider: "Delhivery",
       lastStatusUpdate: FieldValue.serverTimestamp(),
       customStatusesLogs: FieldValue.arrayUnion(log)
     }, { merge: true });

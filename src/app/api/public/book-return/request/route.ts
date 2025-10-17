@@ -227,20 +227,55 @@ export async function POST(req: NextRequest) {
 
 async function checkDeliveryStatus(storeRef: any, orderData: any): Promise<string | null> {
     try {
-        // Get API key from store
+        // Determine courier from order data
+        const courierProvider = orderData.courierProvider || 
+                               (orderData.courier?.split(':')[0]?.trim());
+        
+        if (!courierProvider) {
+            throw new Error('Courier provider not found in order');
+        }
+
+        // Get AWB
+        const awb = orderData.awb;
+        if (!awb) {
+            throw new Error('No tracking number available');
+        }
+
+        // Route to appropriate courier API
+        switch (courierProvider.toLowerCase()) {
+            case 'delhivery':
+                return await checkDelhiveryStatus(storeRef, awb);
+            
+            case 'shiprocket':
+                return await checkShiprocketStatus(storeRef, awb);
+            
+            case 'xpressbees':
+                return await checkXpressbeesStatus(storeRef, awb);
+            
+            default:
+                console.warn(`Unsupported courier provider: ${courierProvider}`);
+                return null;
+        }
+    } catch (error) {
+        console.error('Delivery status check failed:', error);
+        throw error;
+    }
+}
+
+// ============================================================================
+// DELHIVERY STATUS CHECK
+// ============================================================================
+async function checkDelhiveryStatus(storeRef: any, awb: string): Promise<string | null> {
+    try {
         const storeDoc = await storeRef.get();
         const apiKey = storeDoc.data()?.integrations?.couriers?.delhivery?.apiKey;
         
         if (!apiKey) {
-            throw new Error('Delivery tracking not configured');
-        }
-
-        if (!orderData.awb) {
-            throw new Error('No tracking number available');
+            throw new Error('Delhivery API key not configured');
         }
 
         // Call Delhivery tracking API
-        const trackingUrl = `https://track.delhivery.com/api/v1/packages/json/?waybill=${orderData.awb}`;
+        const trackingUrl = `https://track.delhivery.com/api/v1/packages/json/?waybill=${awb}`;
         const response = await fetch(trackingUrl, {
             headers: {
                 'Authorization': `Token ${apiKey}`,
@@ -249,7 +284,7 @@ async function checkDeliveryStatus(storeRef: any, orderData: any): Promise<strin
         });
 
         if (!response.ok) {
-            throw new Error(`Tracking API error: ${response.status}`);
+            throw new Error(`Delhivery API error: ${response.status}`);
         }
 
         const trackingData: TrackingResponse = await response.json();
@@ -263,19 +298,16 @@ async function checkDeliveryStatus(storeRef: any, orderData: any): Promise<strin
             throw new Error('No status information available');
         }
 
-        // Map delivery status to internal status
-        return mapDeliveryStatus(shipmentStatus);
-
+        return mapDelhiveryStatus(shipmentStatus);
     } catch (error) {
-        console.error('Delivery status check failed:', error);
+        console.error('Delhivery status check failed:', error);
         throw error;
     }
 }
 
-function mapDeliveryStatus(status: DeliveryStatus): string | null {
+function mapDelhiveryStatus(status: DeliveryStatus): string | null {
     const { Status, StatusType } = status;
 
-    // Map delivery statuses to internal statuses
     const statusMap: Record<string, string | null> = {
         'In Transit_UD': 'In Transit',
         'Pending_UD': 'In Transit',
@@ -292,4 +324,162 @@ function mapDeliveryStatus(status: DeliveryStatus): string | null {
 
     const key = `${Status}_${StatusType}`;
     return statusMap[key] || null;
+}
+
+// ============================================================================
+// SHIPROCKET STATUS CHECK
+// ============================================================================
+async function checkShiprocketStatus(storeRef: any, awb: string): Promise<string | null> {
+    try {
+        const storeDoc = await storeRef.get();
+        const shiprocketCfg = storeDoc.data()?.integrations?.couriers?.shiprocket || {};
+        const apiKey = shiprocketCfg?.accessToken || 
+                      shiprocketCfg?.token || 
+                      shiprocketCfg?.apiKey || 
+                      shiprocketCfg?.bearer;
+        
+        if (!apiKey) {
+            throw new Error('Shiprocket API key not configured');
+        }
+
+        // Call Shiprocket tracking API
+        const trackingUrl = `https://apiv2.shiprocket.in/v1/external/courier/track/awb/${awb}`;
+        const response = await fetch(trackingUrl, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Accept': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Shiprocket API error: ${response.status}`);
+        }
+
+        const trackingData = await response.json();
+        
+        // Shiprocket response structure: { tracking_data: { shipment_track: [...] } }
+        const shipmentTrack = trackingData?.tracking_data?.shipment_track;
+        if (!Array.isArray(shipmentTrack) || shipmentTrack.length === 0) {
+            throw new Error('No tracking data available');
+        }
+
+        const currentStatus = shipmentTrack[0]?.current_status;
+        if (!currentStatus) {
+            throw new Error('No current status available');
+        }
+
+        return mapShiprocketStatus(currentStatus);
+    } catch (error) {
+        console.error('Shiprocket status check failed:', error);
+        throw error;
+    }
+}
+
+function mapShiprocketStatus(currentStatus: string): string | null {
+    const statusMap: Record<string, string> = {
+        'In Transit': 'In Transit',
+        'In Transit-EN-ROUTE': 'In Transit',
+        'Out for Delivery': 'Out For Delivery',
+        'Delivered': 'Delivered',
+        'RTO IN INTRANSIT': 'RTO In Transit',
+    };
+
+    return statusMap[currentStatus] || null;
+}
+
+// ============================================================================
+// XPRESSBEES STATUS CHECK
+// ============================================================================
+async function getXpressbeesToken(email: string, password: string): Promise<string | null> {
+    try {
+        const response = await fetch("https://shipment.xpressbees.com/api/users/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            body: JSON.stringify({ email, password }),
+        });
+
+        if (!response.ok) {
+            console.error(`Xpressbees login failed: ${response.status}`);
+            return null;
+        }
+
+        const data = await response.json();
+        if (data?.status && data?.data) {
+            return data.data; // The JWT token
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Xpressbees login error:", error);
+        return null;
+    }
+}
+
+async function checkXpressbeesStatus(storeRef: any, awb: string): Promise<string | null> {
+    try {
+        const storeDoc = await storeRef.get();
+        const xpressbeesCfg = storeDoc.data()?.integrations?.couriers?.xpressbees || {};
+        const email = xpressbeesCfg?.email;
+        const password = xpressbeesCfg?.password;
+        
+        if (!email || !password) {
+            throw new Error('Xpressbees credentials not configured');
+        }
+
+        // Generate fresh token
+        const apiKey = await getXpressbeesToken(email, password);
+        if (!apiKey) {
+            throw new Error('Failed to generate Xpressbees token');
+        }
+
+        // Call Xpressbees tracking API
+        const trackingUrl = `https://shipment.xpressbees.com/api/shipments2/track/${awb}`;
+        const response = await fetch(trackingUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Xpressbees API error: ${response.status}`);
+        }
+
+        const trackingData = await response.json();
+        
+        // Xpressbees response structure: { status: true, data: { status: "..." } }
+        if (!trackingData?.status || !trackingData?.data) {
+            throw new Error('No tracking data available');
+        }
+
+        const currentStatus = trackingData.data.status !== 'rto' 
+            ? trackingData.data.status 
+            : trackingData.data.history?.[0]?.status_code;
+            
+        if (!currentStatus) {
+            throw new Error('No current status available');
+        }
+
+        return mapXpressbeesStatus(currentStatus);
+    } catch (error) {
+        console.error('Xpressbees status check failed:', error);
+        throw error;
+    }
+}
+
+function mapXpressbeesStatus(currentStatus: string): string | null {
+    const statusMap: Record<string, string> = {
+        'in transit': 'In Transit',
+        'out for delivery': 'Out For Delivery',
+        'delivered': 'Delivered',
+        'RT-IT': 'RTO In Transit',
+        'RT-DL': 'RTO Delivered',
+    };
+
+    return statusMap[currentStatus] || null;
 }

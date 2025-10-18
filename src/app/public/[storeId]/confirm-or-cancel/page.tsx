@@ -371,13 +371,13 @@ export default function ConfirmOrCancelPage() {
                         <p className="font-medium text-xs sm:text-sm">{item.name}</p>
                         <p className="text-[10px] sm:text-xs text-muted-foreground">Quantity: {item.quantity}</p>
                       </div>
-                      <p className="text-xs sm:text-sm font-semibold">₹{item.price}</p>
+                      <p className="text-xs sm:text-sm font-semibold font-mono">₹{item.price}</p>
                     </div>
                   ))}
                   <Separator />
                   <div className="flex justify-between items-center font-bold">
                     <p className="text-sm sm:text-base">Total</p>
-                    <p className="text-sm sm:text-base">₹{order.raw?.total_price || '0.00'}</p>
+                    <p className="text-sm sm:text-base font-mono">₹{order.raw?.total_price || '0.00'}</p>
                   </div>
                 </div>
               </div>

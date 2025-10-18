@@ -6,7 +6,7 @@ import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage } from 
 import { db } from '@/lib/firebase-admin';
 
 const quickReplyActions = new Map<string, any>([
-    ["Confirm my order", [updateToConfirmed, sendConfirmOrderWhatsAppMessage]],
+    ["Confirm my order now", [updateToConfirmed, sendConfirmOrderWhatsAppMessage]],
     ["Request for Cancellation", [updateToCancallationRequested, sendCancelOrderWhatsAppMessage]]
 ]);
 

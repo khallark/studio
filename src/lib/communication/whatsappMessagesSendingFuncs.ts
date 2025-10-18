@@ -89,7 +89,12 @@ export async function sendNewOrderWhatsAppMessage(
         const customerName = getCustomerName(order)
         const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
         const orderName = order.name;
-        const orderDate = formatDate(order.createdAt);
+        const totalPrice = String(order?.raw?.total_price);
+        
+        // Format line items into string with line breaks
+        const productsList = order.raw.line_items
+            ?.map((item: any) => `${item.name} x ${item.quantity}`)
+            .join(',') || 'No items';
 
         if (!customerPhone) {
             console.error('No phone number found for order:', orderName);
@@ -137,7 +142,11 @@ export async function sendNewOrderWhatsAppMessage(
                             },
                             {
                                 type: 'text',
-                                text: orderDate,
+                                text: totalPrice,
+                            },
+                            {
+                                type: 'text',
+                                text: productsList,
                             },
                         ],
                     },

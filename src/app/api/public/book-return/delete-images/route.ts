@@ -1,7 +1,7 @@
 // src/app/api/public/book-return/delete-images/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { validateCustomerSession } from "@/lib/validateCustomerSession";
+import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {

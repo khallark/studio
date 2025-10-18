@@ -149,6 +149,22 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/update-tags',
         destination: '/api/shopify/orders/update-tags/route',
       },
+      {
+        source: '/api/public/confirm-or-cancel/start-session',
+        destination: '/api/public/confirm-or-cancel/start-session/route'
+      },
+      {
+        source: '/api/public/confirm-or-cancel/order',
+        destination: '/api/public/confirm-or-cancel/order/route'
+      },
+      {
+        source: '/api/public/confirm-or-cancel/confirm-order',
+        destination: '/api/public/confirm-or-cancel/confirm-order/route'
+      },
+      {
+        source: '/api/public/confirm-or-cancel/cancel-order',
+        destination: '/api/public/confirm-or-cancel/cancel-order/route'
+      }
     ]
   },
 };

@@ -1,7 +1,7 @@
 // src/app/api/public/book-return/upload-image/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { validateCustomerSession } from "@/lib/validateCustomerSession";
+import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage, db } from "@/lib/firebase-admin";
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from "firebase-admin/firestore";

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, storage } from "@/lib/firebase-admin";
-import { validateCustomerSession } from "@/lib/validateCustomerSession";
+import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 export async function POST(req: NextRequest) {

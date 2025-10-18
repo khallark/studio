@@ -1,7 +1,7 @@
 // src/app/api/public/book-return/order/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
-import { validateCustomerSession } from "@/lib/validateCustomerSession";
+import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 
 // Helper to normalize phone numbers for comparison
 function normalizePhoneNumber(phone: string): string {

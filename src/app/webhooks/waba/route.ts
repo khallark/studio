@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
             try {
                 const message = body.entry[0].changes[0].value.messages[0];
-                const buttonText = message.button.text;
                 const originalMessageId = message.context?.id;
                 if (message.type === 'button') {
                     console.log('🔘 Quick reply received');
+                    const buttonText = message.button.text;
                     if (originalMessageId) {
                         const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
                         if (messageDoc.exists) {

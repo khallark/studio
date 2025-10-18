@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
             .collection('accounts')
             .doc(storeId)
             .collection('orders')
-            .where('name', '==', `#OWR-MT${orderNumber}`)
+            .where('name', '==', `${orderNumber}`)
             .limit(1)
             .get();
 

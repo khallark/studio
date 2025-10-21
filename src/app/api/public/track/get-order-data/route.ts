@@ -24,13 +24,14 @@ export async function GET(request: NextRequest) {
         }
 
         // Fetch order document
-        const orderDoc = await shopDoc.ref.collection('orders').doc(order).get();
-        if (!orderDoc.exists) {
+        const orderDocQuery = await shopDoc.ref.collection('orders').where('name', '==', order).limit(1).get();
+        if(orderDocQuery.empty) {
             return NextResponse.json(
                 { error: 'Order not found' },
                 { status: 404 }
             );
         }
+        const orderDoc = orderDocQuery.docs[0];
 
         const orderData = orderDoc.data();
         

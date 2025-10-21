@@ -164,6 +164,10 @@ const nextConfig: NextConfig = {
       {
         source: '/api/public/confirm-or-cancel/cancel-order',
         destination: '/api/public/confirm-or-cancel/cancel-order/route'
+      },
+      {
+        source: '/api/track/get-order-data',
+        destination: '/api/track/get-order-data/route'
       }
     ]
   },

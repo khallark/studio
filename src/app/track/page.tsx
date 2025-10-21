@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, Package, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebase-admin';
 
 interface OrderData {
     awb?: string;
@@ -47,22 +46,17 @@ export default function TrackingRedirect() {
     };
 
     const fetchOrderData = async (shopName: string, orderName: string): Promise<OrderData> => {
-        try {
-            if (!shopName || !orderName) {
-                throw new Error('Invalid shop or order name');
-            }
-            const shopDoc = await db.collection('accounts').doc(shopName).get();
-            if (!shopDoc.exists) {
-                throw new Error('Shop not found');
-            }
-            const orderDoc = await shopDoc.ref.collection('orders').doc(orderName).get();
-            if (!orderDoc.exists) {
-                throw new Error('Order not found');
-            }
-            return orderDoc.data() as OrderData;
-        } catch (error) {
-            throw error;
+        const response = await fetch(
+            `/api/track/get-order-data?shop=${encodeURIComponent(shopName)}&order=${encodeURIComponent(orderName)}`
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch order data');
         }
+
+        const data = await response.json();
+        return data;
     };
 
     const handleTracking = async (): Promise<void> => {
@@ -78,7 +72,7 @@ export default function TrackingRedirect() {
 
             setMessage('Fetching order details...');
 
-            // Fetch order data
+            // Fetch order data from API
             const orderData = await fetchOrderData(shop, order);
 
             if (!orderData) {

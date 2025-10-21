@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const shop = searchParams.get('shop');
         const order = searchParams.get('order');
-
+        console.log('Received request for shop:', shop, 'order:', order);
         if (!shop || !order) {
             return NextResponse.json(
                 { error: 'Missing required parameters. Both shop and order are required.' },

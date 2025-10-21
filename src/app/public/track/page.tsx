@@ -47,7 +47,7 @@ export default function TrackingRedirect() {
 
     const fetchOrderData = async (shopName: string, orderName: string): Promise<OrderData> => {
         const response = await fetch(
-            `/api/track/get-order-data?shop=${encodeURIComponent(shopName)}&order=${encodeURIComponent(orderName)}`
+            `/api/public/track/get-order-data?shop=${encodeURIComponent(shopName)}&order=${encodeURIComponent(orderName)}`
         );
 
         if (!response.ok) {

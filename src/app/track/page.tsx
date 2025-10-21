@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { AlertCircle, Package, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase-admin';

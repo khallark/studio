@@ -1140,12 +1140,17 @@ export default function OrdersPage() {
       case 'Delivered':
       case 'DTO Requested':
         return (
-          <DropdownMenuItem onClick={() => {
-            setOrderForReturn(order);
-            setIsReturnDialogOpen(true);
-          }}>
-            Book Return
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem onClick={() => {
+              setOrderForReturn(order);
+              setIsReturnDialogOpen(true);
+            }}>
+              Book Return
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>
+              Back to Delivered
+            </DropdownMenuItem>
+          </>
         );
       case 'DTO Booked':
         return (

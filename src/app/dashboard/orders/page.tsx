@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -120,6 +118,7 @@ interface Order {
   courier_reverse?: string;
   isDeleted?: boolean; // Tombstone flag
   tags_confirmed?: string[];
+  tags_rtoInTransit?: string[];
   customStatusesLogs?: CustomStatusLog[];
   booked_return_reason?: string;
   booked_return_images?: string[];
@@ -200,6 +199,7 @@ export default function OrdersPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [courierFilter, setCourierFilter] = useState<string>('all');
   const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
   
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -733,6 +733,25 @@ export default function OrdersPage() {
       }
     }
     
+    // Filter by RTO In Transit tags on 'RTO In Transit' tab
+    if (activeTab === 'RTO In Transit' && rtoInTransitFilter !== 'all') {
+      if (rtoInTransitFilter === 're-attempt') {
+        filtered = filtered.filter(order => 
+          order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Re-attempt'
+        );
+      } else if (rtoInTransitFilter === 'refused') {
+        filtered = filtered.filter(order => 
+          order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Refused'
+        );
+      } else if (rtoInTransitFilter === 'no-reply') {
+        filtered = filtered.filter(order => 
+          !order.tags_rtoInTransit || 
+          order.tags_rtoInTransit.length === 0 ||
+          (!order.tags_rtoInTransit.includes('Re-attempt') && !order.tags_rtoInTransit.includes('Refused'))
+        );
+      }
+    }
+    
     // Finally, apply sorting
     filtered.sort((a, b) => {
       let valA, valB;
@@ -756,7 +775,7 @@ export default function OrdersPage() {
 
 
     return filtered;
-  }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, invertSearch, sortKey, sortDirection]);
+  }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, invertSearch, sortKey, sortDirection]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -769,6 +788,26 @@ export default function OrdersPage() {
     const unavailable = confirmedOrders.length - available;
 
     return { available, unavailable };
+  }, [orders]);
+
+  const rtoInTransitCounts = useMemo(() => {
+    const rtoInTransitOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'RTO In Transit');
+    
+    const reAttempt = rtoInTransitOrders.filter(order => 
+      order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Re-attempt'
+    ).length;
+    
+    const refused = rtoInTransitOrders.filter(order => 
+      order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Refused'
+    ).length;
+    
+    const noReply = rtoInTransitOrders.filter(order => 
+      !order.tags_rtoInTransit || 
+      order.tags_rtoInTransit.length === 0 ||
+      (!order.tags_rtoInTransit.includes('Re-attempt') && !order.tags_rtoInTransit.includes('Refused'))
+    ).length;
+
+    return { reAttempt, refused, noReply };
   }, [orders]);
 
 
@@ -802,7 +841,7 @@ export default function OrdersPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedOrders([]);
-  }, [activeTab, dateRange, courierFilter, availabilityFilter]);
+  }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter]);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -1502,6 +1541,19 @@ export default function OrdersPage() {
                             </SelectContent>
                         </Select>
                     )}
+                    {activeTab === 'RTO In Transit' && (
+                        <Select value={rtoInTransitFilter} onValueChange={(value) => setRtoInTransitFilter(value as any)}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectValue placeholder="Filter by status..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All ({rtoInTransitCounts.reAttempt + rtoInTransitCounts.refused + rtoInTransitCounts.noReply})</SelectItem>
+                                <SelectItem value="re-attempt">Re-attempt ({rtoInTransitCounts.reAttempt})</SelectItem>
+                                <SelectItem value="refused">Refused ({rtoInTransitCounts.refused})</SelectItem>
+                                <SelectItem value="no-reply">No Reply ({rtoInTransitCounts.noReply})</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
                 </div>
             </CardHeader>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
@@ -2070,7 +2122,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
-
-
-    

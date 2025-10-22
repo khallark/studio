@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
                                 messageStatus: newStatus,
                                 [`${newStatus}At`]: FieldValue.serverTimestamp(),
                             })
+                            console.log(`✅ Message ${originalMessageId} status updated to ${newStatus}`);
                         }
                     }
                 } catch (error) {

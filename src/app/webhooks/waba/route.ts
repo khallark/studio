@@ -2,14 +2,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
-import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
+import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
 
 const quickReplyActions = new Map<string, any>([
     ["Confirm my order now", [updateToConfirmed, sendConfirmOrderWhatsAppMessage]],
     ["Request for Cancellation", [updateToCancallationRequested, sendCancelOrderWhatsAppMessage]],
-    ["I don't want to return it", [handleDontWantToReturn, sendDTORequestedCancelledWhatsAppMessage]]
-]);
+    ["I don't want to return it", [handleDontWantToReturn, sendDTORequestedCancelledWhatsAppMessage]],
+    ["I want this order", [handleRTOInTransitPositive, sendRTOInTransitIWantThisOrderWhatsAppMessage]],
+    ["I don't want this order", [handleRTOInTransitNegative, sendRTOInTransitIDontWantThisOrderWhatsAppMessage]],
+])
 
 // GET - Webhook verification
 export async function GET(request: NextRequest) {
@@ -197,6 +199,56 @@ async function handleDontWantToReturn(orderDoc: DocumentSnapshot): Promise<Boole
         return true;
     } catch (error) {
         console.error('Error handling do not want to return action:', error);
+        return false;
+    }
+}
+
+// handle I want this order action
+async function handleRTOInTransitPositive(orderDoc: DocumentSnapshot): Promise<Boolean> {
+    try {
+        const orderData = orderDoc.data();
+        if(orderData?.customStatus !== 'RTO In Transit') {
+            console.warn(`⚠️ Order ${orderDoc.data()?.name ?? '{Unknown}'} is not in "RTO In-Transit" status. This action can be performed only on such orders.`)
+            return false;
+        }
+        const log = {
+            status: 'RTO In Transit Positive Confirmation',
+            createdAt: Timestamp.now(),
+            remarks: 'Customer indicated they want this order via Whatsapp',
+        };
+        await orderDoc.ref.update({
+            customStatusesLogs: FieldValue.arrayUnion(log),
+            tags_rtoInTransit: ['Re-attempt'],
+        });
+        console.log(`Customer wants this order for ${orderDoc.data()?.name ?? '{Unknown}'}`);
+        return true;
+    } catch (error) {
+        console.error('Error handling want this order action:', error);
+        return false;
+    }
+}
+
+// handle I don't want this order action
+async function handleRTOInTransitNegative(orderDoc: DocumentSnapshot): Promise<Boolean> {
+    try {
+        const orderData = orderDoc.data();
+        if(orderData?.customStatus !== 'RTO In Transit') {
+            console.warn(`⚠️ Order ${orderDoc.data()?.name ?? '{Unknown}'} is not in "RTO In-Transit" status. This action can be performed only on such orders.`)
+            return false;
+        }
+        const log = {
+            status: 'RTO In Transit Negative Confirmation',
+            createdAt: Timestamp.now(),
+            remarks: 'Customer indicated they do not want this order via Whatsapp',
+        };
+        await orderDoc.ref.update({
+            customStatusesLogs: FieldValue.arrayUnion(log),
+            tags_rtoInTransit: ['Refused'],
+        });
+        console.log(`Customer does not want this order for ${orderDoc.data()?.name ?? '{Unknown}'}`);
+        return true;
+    } catch (error) {
+        console.error('Error handling do not want this order action:', error);
         return false;
     }
 }

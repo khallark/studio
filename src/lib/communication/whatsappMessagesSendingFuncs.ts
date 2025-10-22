@@ -342,7 +342,7 @@ export async function sendCancelOrderWhatsAppMessage(
             to: customerPhone,
             type: 'template',
             template: {
-                name: 'cancel_order_1',
+                name: 'cancel_order_2',
                 language: {
                     code: 'en',
                 },
@@ -420,506 +420,6 @@ export async function sendCancelOrderWhatsAppMessage(
         };
     } catch (error) {
         console.error('Error sending cancellation message:', error);
-        return null;
-    }
-}
-
-/**
- * Send WhatsApp order dispatched notification
- */
-export async function sendDispatchedOrderWhatsAppMessage(
-    shop: any,
-    order: any,
-) {
-    try {
-        const customerName = getCustomerName(order)
-        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
-        const orderName = order.name;
-        const orderAWB = String(order?.awb) ?? "NOT AVAILABLE"
-        const orderCourierProvider = String(order?.courierProvider ?? order.courier);
-        const shopName = encodeURIComponent(shop.shopName);
-        const queryString = `?shop=${shopName}&order=${encodeURIComponent(orderName)}`;
-
-        if (!customerPhone) {
-            console.error('No phone number found for order:', orderName);
-            return null;
-        }
-
-        const payload = {
-            messaging_product: 'whatsapp',
-            to: customerPhone,
-            type: 'template',
-            template: {
-                name: 'dipatched_order_1',
-                language: {
-                    code: 'en',
-                },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: customerName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderAWB,
-                            },
-                            {
-                                type: 'text',
-                                text: orderCourierProvider,
-                            },
-                        ],
-                    },
-                    {
-                        type: 'button',
-                        sub_type: 'url',
-                        index: '0',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: queryString, // "?shop=onewhorules&order=%23OWR-MT2342"
-                            },
-                        ],
-                    },
-                ],
-            },
-        };
-
-        const response = await fetch(
-            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('WhatsApp API error:', error);
-            return null;
-        }
-
-        const result = await response.json();
-        const messageId = result.messages[0].id;
-        const sentTo = result.contacts[0].input;
-
-        const messageDoc = {
-            orderName: orderName,
-            forStatus: "Dispatched",
-            orderId: order.orderId,
-            shopName: shop.shopName,
-            sentAt: FieldValue.serverTimestamp(),
-            messageStatus: 'sent',
-            sentTo: sentTo,
-            messageId: messageId,
-        };
-
-        await db
-            .collection('whatsapp_messages')
-            .doc(messageId)
-            .set(messageDoc);
-
-        await db
-            .collection('accounts')
-            .doc(shop.shopName)
-            .collection('orders')
-            .doc(String(order.orderId))
-            .update({
-                whatsapp_messages: FieldValue.arrayUnion(messageId),
-            });
-
-        console.log(`✅ WhatsApp message sent for order ${orderName}`);
-        console.log(`   Message ID: ${messageId}`);
-        console.log(`   Sent to: ${sentTo}`);
-
-        return {
-            success: true,
-            messageId,
-            sentTo,
-        };
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        return null;
-    }
-}
-
-/**
- * Send WhatsApp order in transit notification
- */
-export async function sendInTransitOrderWhatsAppMessage(
-    shop: any,
-    order: any,
-) {
-    try {
-        const customerName = getCustomerName(order)
-        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
-        const orderName = order.name;
-        const orderAWB = String(order?.awb) ?? "NOT AVAILABLE"
-        const orderCourierProvider = String(order?.courierProvider ?? order.courier);
-        const shopName = encodeURIComponent(shop.shopName);
-        const queryString = `?shop=${shopName}&order=${encodeURIComponent(orderName)}`;
-
-        if (!customerPhone) {
-            console.error('No phone number found for order:', orderName);
-            return null;
-        }
-        
-        const payload = {
-            messaging_product: 'whatsapp',
-            to: customerPhone,
-            type: 'template',
-            template: {
-                name: 'intransit_order_1',
-                language: {
-                    code: 'en',
-                },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: customerName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderAWB,
-                            },
-                            {
-                                type: 'text',
-                                text: orderCourierProvider,
-                            },
-                        ],
-                    },
-                    {
-                        type: 'button',
-                        sub_type: 'url',
-                        index: '0',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: queryString, // "?shop=onewhorules&order=%23OWR-MT2342"
-                            },
-                        ],
-                    },
-                ],
-            },
-        };
-
-        const response = await fetch(
-            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('WhatsApp API error:', error);
-            return null;
-        }
-
-        const result = await response.json();
-        const messageId = result.messages[0].id;
-        const sentTo = result.contacts[0].input;
-
-        const messageDoc = {
-            orderName: orderName,
-            forStatus: "In Transit",
-            orderId: order.orderId,
-            shopName: shop.shopName,
-            sentAt: FieldValue.serverTimestamp(),
-            messageStatus: 'sent',
-            sentTo: sentTo,
-            messageId: messageId,
-        };
-
-        await db
-            .collection('whatsapp_messages')
-            .doc(messageId)
-            .set(messageDoc);
-
-        await db
-            .collection('accounts')
-            .doc(shop.shopName)
-            .collection('orders')
-            .doc(String(order.orderId))
-            .update({
-                whatsapp_messages: FieldValue.arrayUnion(messageId),
-            });
-
-        console.log(`✅ WhatsApp message sent for order ${orderName}`);
-        console.log(`   Message ID: ${messageId}`);
-        console.log(`   Sent to: ${sentTo}`);
-
-        return {
-            success: true,
-            messageId,
-            sentTo,
-        };
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        return null;
-    }
-}
-
-/**
- * Send WhatsApp order out for delivery notification
- */
-export async function sendOutForDeliveryOrderWhatsAppMessage(
-    shop: any,
-    order: any,
-) {
-    try {
-        const customerName = getCustomerName(order)
-        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
-        const orderName = order.name;
-        const orderAWB = String(order?.awb) ?? "NOT AVAILABLE"
-        const orderCourierProvider = String(order?.courierProvider ?? order.courier);
-        const shopName = encodeURIComponent(shop.shopName);
-        const queryString = `?shop=${shopName}&order=${encodeURIComponent(orderName)}`;
-
-        if (!customerPhone) {
-            console.error('No phone number found for order:', orderName);
-            return null;
-        }
-        
-        const payload = {
-            messaging_product: 'whatsapp',
-            to: customerPhone,
-            type: 'template',
-            template: {
-                name: 'outfordelivery_order_1',
-                language: {
-                    code: 'en',
-                },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: customerName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderAWB,
-                            },
-                            {
-                                type: 'text',
-                                text: orderCourierProvider,
-                            },
-                        ],
-                    },
-                    {
-                        type: 'button',
-                        sub_type: 'url',
-                        index: '0',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: queryString, // "?shop=onewhorules&order=%23OWR-MT2342"
-                            },
-                        ],
-                    },
-                ],
-            },
-        };
-
-        const response = await fetch(
-            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('WhatsApp API error:', error);
-            return null;
-        }
-
-        const result = await response.json();
-        const messageId = result.messages[0].id;
-        const sentTo = result.contacts[0].input;
-
-        const messageDoc = {
-            orderName: orderName,
-            forStatus: "Out For Delivery",
-            orderId: order.orderId,
-            shopName: shop.shopName,
-            sentAt: FieldValue.serverTimestamp(),
-            messageStatus: 'sent',
-            sentTo: sentTo,
-            messageId: messageId,
-        };
-
-        await db
-            .collection('whatsapp_messages')
-            .doc(messageId)
-            .set(messageDoc);
-
-        await db
-            .collection('accounts')
-            .doc(shop.shopName)
-            .collection('orders')
-            .doc(String(order.orderId))
-            .update({
-                whatsapp_messages: FieldValue.arrayUnion(messageId),
-            });
-
-        console.log(`✅ WhatsApp message sent for order ${orderName}`);
-        console.log(`   Message ID: ${messageId}`);
-        console.log(`   Sent to: ${sentTo}`);
-
-        return {
-            success: true,
-            messageId,
-            sentTo,
-        };
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        return null;
-    }
-}
-
-/**
- * Send WhatsApp order delivered notification
- */
-export async function sendDeliveredOrderWhatsAppMessage(
-    shop: any,
-    order: any,
-) {
-    try {
-        const customerName = getCustomerName(order)
-        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
-        const orderName = order.name;
-        const deliveredDate = order.lastStatusUpdate.toDate 
-            ? formatDate(order.lastStatusUpdate.toDate())  // Firestore Timestamp
-            : formatDate(new Date(order.lastStatusUpdate)); // Already a Date/number
-
-        if (!customerPhone) {
-            console.error('No phone number found for order:', orderName);
-            return null;
-        }
-        
-        const payload = {
-            messaging_product: 'whatsapp',
-            to: customerPhone,
-            type: 'template',
-            template: {
-                name: 'delivered_order_1',
-                language: {
-                    code: 'en',
-                },
-                components: [
-                    {
-                        type: 'body',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: customerName,
-                            },
-                            {
-                                type: 'text',
-                                text: orderName,
-                            },
-                            {
-                                type: 'text',
-                                text: deliveredDate
-                            }
-                        ],
-                    },
-                ],
-            },
-        };
-
-        const response = await fetch(
-            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('WhatsApp API error:', error);
-            return null;
-        }
-
-        const result = await response.json();
-        const messageId = result.messages[0].id;
-        const sentTo = result.contacts[0].input;
-
-        const messageDoc = {
-            orderName: orderName,
-            forStatus: "Delivered",
-            orderId: order.orderId,
-            shopName: shop.shopName,
-            sentAt: FieldValue.serverTimestamp(),
-            messageStatus: 'sent',
-            sentTo: sentTo,
-            messageId: messageId,
-        };
-
-        await db
-            .collection('whatsapp_messages')
-            .doc(messageId)
-            .set(messageDoc);
-
-        await db
-            .collection('accounts')
-            .doc(shop.shopName)
-            .collection('orders')
-            .doc(String(order.orderId))
-            .update({
-                whatsapp_messages: FieldValue.arrayUnion(messageId),
-            });
-
-        console.log(`✅ WhatsApp message sent for order ${orderName}`);
-        console.log(`   Message ID: ${messageId}`);
-        console.log(`   Sent to: ${sentTo}`);
-
-        return {
-            success: true,
-            messageId,
-            sentTo,
-        };
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
         return null;
     }
 }
@@ -1053,6 +553,218 @@ export async function sendDTORequestedCancelledWhatsAppMessage(
             type: 'template',
             template: {
                 name: 'dtorequestedcancelled_order_1',
+                language: {
+                    code: 'en',
+                },
+                components: [
+                    {
+                        type: 'body',
+                        parameters: [
+                            {
+                                type: 'text',
+                                text: customerName,
+                            },
+                            {
+                                type: 'text',
+                                text: orderName,
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        const response = await fetch(
+            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('WhatsApp API error:', error);
+            return null;
+        }
+
+        const result = await response.json();
+        const messageId = result.messages[0].id;
+        const sentTo = result.contacts[0].input;
+
+        const messageDoc = {
+            orderName: orderName,
+            forStatus: "DTO Requested to Delivered",
+            orderId: order.orderId,
+            shopName: shop.shopName,
+            sentAt: FieldValue.serverTimestamp(),
+            messageStatus: 'sent',
+            sentTo: sentTo,
+            messageId: messageId,
+        };
+
+        await db
+            .collection('whatsapp_messages')
+            .doc(messageId)
+            .set(messageDoc);
+
+        await db
+            .collection('accounts')
+            .doc(shop.shopName)
+            .collection('orders')
+            .doc(String(order.orderId))
+            .update({
+                whatsapp_messages: FieldValue.arrayUnion(messageId),
+            });
+
+        console.log(`✅ WhatsApp message sent for order ${orderName}`);
+        console.log(`   Message ID: ${messageId}`);
+        console.log(`   Sent to: ${sentTo}`);
+
+        return {
+            success: true,
+            messageId,
+            sentTo,
+        };
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        return null;
+    }
+}
+
+/**
+ * Send WhatsApp order delivered after RTO notification
+ * */
+export async function sendRTOInTransitIWantThisOrderWhatsAppMessage(
+    shop: any,
+    order: any,
+) {
+    try {
+        const customerName = getCustomerName(order)
+        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
+        const orderName = order.name;
+
+        if (!customerPhone) {
+            console.error('No phone number found for order:', orderName);
+            return null;
+        }
+        
+        const payload = {
+            messaging_product: 'whatsapp',
+            to: customerPhone,
+            type: 'template',
+            template: {
+                name: 'rtointransit_positive_order_2',
+                language: {
+                    code: 'en',
+                },
+                components: [
+                    {
+                        type: 'body',
+                        parameters: [
+                            {
+                                type: 'text',
+                                text: customerName,
+                            },
+                            {
+                                type: 'text',
+                                text: orderName,
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        const response = await fetch(
+            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${shop.whatsappAccessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('WhatsApp API error:', error);
+            return null;
+        }
+
+        const result = await response.json();
+        const messageId = result.messages[0].id;
+        const sentTo = result.contacts[0].input;
+
+        const messageDoc = {
+            orderName: orderName,
+            forStatus: "DTO Requested to Delivered",
+            orderId: order.orderId,
+            shopName: shop.shopName,
+            sentAt: FieldValue.serverTimestamp(),
+            messageStatus: 'sent',
+            sentTo: sentTo,
+            messageId: messageId,
+        };
+
+        await db
+            .collection('whatsapp_messages')
+            .doc(messageId)
+            .set(messageDoc);
+
+        await db
+            .collection('accounts')
+            .doc(shop.shopName)
+            .collection('orders')
+            .doc(String(order.orderId))
+            .update({
+                whatsapp_messages: FieldValue.arrayUnion(messageId),
+            });
+
+        console.log(`✅ WhatsApp message sent for order ${orderName}`);
+        console.log(`   Message ID: ${messageId}`);
+        console.log(`   Sent to: ${sentTo}`);
+
+        return {
+            success: true,
+            messageId,
+            sentTo,
+        };
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        return null;
+    }
+}
+
+/**
+ * Send WhatsApp order delivered after RTO notification
+ * */
+export async function sendRTOInTransitIDontWantThisOrderWhatsAppMessage(
+    shop: any,
+    order: any,
+) {
+    try {
+        const customerName = getCustomerName(order)
+        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
+        const orderName = order.name;
+
+        if (!customerPhone) {
+            console.error('No phone number found for order:', orderName);
+            return null;
+        }
+        
+        const payload = {
+            messaging_product: 'whatsapp',
+            to: customerPhone,
+            type: 'template',
+            template: {
+                name: 'rtointransit_negative_order_2',
                 language: {
                     code: 'en',
                 },

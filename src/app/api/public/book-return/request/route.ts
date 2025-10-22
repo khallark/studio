@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { sendDTORequestedOrderWhatsAppMessage } from "@/lib/communication/whatsappMessagesSendingFuncs";
 
 // Constants
 const DELIVERABLE_STATUSES = ["Delivered", "DTO Requested"];
@@ -136,6 +137,8 @@ export async function POST(req: NextRequest) {
                 customStatusesLogs: FieldValue.arrayUnion(logEntry)
             });
 
+
+
             return NextResponse.json({
                 success: true,
                 message: "Your return request has been submitted successfully."
@@ -161,6 +164,13 @@ export async function POST(req: NextRequest) {
                             remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
                         })
                     });
+
+                    const shopData = (await storeRef.get()).data() as any;
+                    const orderDataUpdated = (await orderRef.get()).data() as any;
+                    await sendDTORequestedOrderWhatsAppMessage(
+                        shopData,
+                        orderDataUpdated
+                    );
 
                     return NextResponse.json({
                         success: true,

@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="PO-${vendor}-${poNumber}-${vendor}.pdf"`,
+        'Content-Disposition': `attachment; filename="PO-${vendor}-${poNumber}.pdf"`,
       },
     });
   } catch (error) {

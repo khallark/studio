@@ -2,12 +2,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
-import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
+import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
 
 const quickReplyActions = new Map<string, any>([
     ["Confirm my order now", [updateToConfirmed, sendConfirmOrderWhatsAppMessage]],
-    ["Request for Cancellation", [updateToCancallationRequested, sendCancelOrderWhatsAppMessage]]
+    ["Request for Cancellation", [updateToCancallationRequested, sendCancelOrderWhatsAppMessage]],
+    ["I don't want to return it", [handleDontWantToReturn, sendDTORequestedCancelledWhatsAppMessage]]
 ]);
 
 // GET - Webhook verification
@@ -170,6 +171,32 @@ async function updateToCancallationRequested(orderDoc: DocumentSnapshot): Promis
         return true;
     } catch (error) {
         console.error('Error handling cancel order:', error);
+        return false;
+    }
+}
+
+// handle don't want to return action
+async function handleDontWantToReturn(orderDoc: DocumentSnapshot): Promise<Boolean> {
+    try {
+        const orderData = orderDoc.data();
+        if(orderData?.customStatus !== 'DTO Requested') {
+            console.warn(`⚠️ Order ${orderDoc.data()?.name ?? '{Unknown}'} is not in "DTO Requested" status. This action can be performed only on such orders.`)
+            return false;
+        }
+        const log = {
+            status: 'Delivered',
+            createdAt: Timestamp.now(),
+            remarks: 'Customer indicated they do not want to return the order via Whatsapp',
+        };
+        await orderDoc.ref.update({
+            customStatus: 'Delivered',
+            returnCancelledByCustomerAt: FieldValue.serverTimestamp(),
+            customStatusesLogs: FieldValue.arrayUnion(log),
+        });
+        console.log(`Return cancelled by customer for order ${orderDoc.data()?.name ?? '{Unknown}'}`);
+        return true;
+    } catch (error) {
+        console.error('Error handling do not want to return action:', error);
         return false;
     }
 }

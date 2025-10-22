@@ -91,9 +91,10 @@ export async function POST(request: NextRequest) {
                             
                             // Type guard - at this point we know newStatus is one of the valid keys
                             const typedNewStatus = newStatus as 'sent' | 'delivered' | 'read';
+                            const typedCurrentStatus = currentStatus as 'sent' | 'delivered' | 'read' | undefined;
                             
                             // Only update if new status is higher than current status
-                            if (!currentStatus || statusLevel[typedNewStatus] > statusLevel[typedNewStatus]) {
+                            if (!currentStatus || statusLevel[typedNewStatus] > statusLevel[typedCurrentStatus!]) {
                                 await messageDoc.ref.update({
                                     messageStatus: newStatus,
                                     [`${newStatus}At`]: FieldValue.serverTimestamp(),

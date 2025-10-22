@@ -80,11 +80,28 @@ export async function POST(request: NextRequest) {
                     if (['sent', 'delivered', 'read'].includes(newStatus)) {
                         const messageDoc = await db.collection('whatsapp_messages').doc(originalMessageId).get();
                         if (messageDoc.exists) {
-                            await messageDoc.ref.update({
-                                messageStatus: newStatus,
-                                [`${newStatus}At`]: FieldValue.serverTimestamp(),
-                            })
-                            console.log(`✅ Message ${originalMessageId} status updated to ${newStatus}`);
+                            const currentStatus = messageDoc.data()?.messageStatus;
+                            
+                            // Define status hierarchy to prevent downgrades
+                            const statusLevel: Record<'sent' | 'delivered' | 'read', number> = { 
+                                sent: 1, 
+                                delivered: 2, 
+                                read: 3 
+                            };
+                            
+                            // Type guard - at this point we know newStatus is one of the valid keys
+                            const typedNewStatus = newStatus as 'sent' | 'delivered' | 'read';
+                            
+                            // Only update if new status is higher than current status
+                            if (!currentStatus || statusLevel[typedNewStatus] > statusLevel[typedNewStatus]) {
+                                await messageDoc.ref.update({
+                                    messageStatus: newStatus,
+                                    [`${newStatus}At`]: FieldValue.serverTimestamp(),
+                                })
+                                console.log(`✅ Message ${originalMessageId} status updated to ${newStatus}`);
+                            } else {
+                                console.log(`⏭️ Skipping status update for ${originalMessageId}: ${newStatus} -> current status ${currentStatus} is already higher`);
+                            }
                         }
                     }
                 } catch (error) {

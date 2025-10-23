@@ -827,7 +827,7 @@ export async function sendRTOInTransitIWantThisOrderWhatsAppMessage(
 
         const messageDoc = {
             orderName: orderName,
-            forStatus: "DTO Requested to Delivered",
+            forStatus: "RTO In Transit Positive Confirmation",
             orderId: order.orderId,
             shopName: shop.shopName,
             sentAt: FieldValue.serverTimestamp(),
@@ -933,7 +933,7 @@ export async function sendRTOInTransitIDontWantThisOrderWhatsAppMessage(
 
         const messageDoc = {
             orderName: orderName,
-            forStatus: "DTO Requested to Delivered",
+            forStatus: "RTO In Transit Negative Confirmation",
             orderId: order.orderId,
             shopName: shop.shopName,
             sentAt: FieldValue.serverTimestamp(),

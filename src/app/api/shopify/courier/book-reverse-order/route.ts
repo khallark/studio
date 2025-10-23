@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { sendDTOBookedOrderWhatsAppMessage } from '../../../../../lib/communication/whatsappMessagesSendingFuncs';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -133,7 +134,13 @@ export async function POST(req: NextRequest) {
     // Read account & API key
     const accountRef = db.collection('accounts').doc(shop);
     const accountSnap = await accountRef.get();
-    const accountData = accountSnap.data() || {};
+    const accountData = accountSnap.data() as any;
+    if (!accountSnap.exists || !accountData) {
+      return NextResponse.json({
+        ok: false,
+        reason: 'Account Not found'
+      }, { status: 404 });
+    }
     const delhiveryApiKey =
       accountData?.integrations?.couriers?.delhivery?.apiKey as string | undefined;
     if (!delhiveryApiKey) {
@@ -317,6 +324,9 @@ export async function POST(req: NextRequest) {
     }, { merge: true });
 
     console.log(payload)
+    
+    await sendDTOBookedOrderWhatsAppMessage(accountData, orderData);
+
     return NextResponse.json(
     {
         ok: true,

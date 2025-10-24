@@ -69,7 +69,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             // Add integrated couriers
             if (integrations.delhivery) courierOptions.push('Delhivery');
             if (integrations.shiprocket) courierOptions.push('Shiprocket');
-            if (integrations.xpressbees) courierOptions.push('Xpressbees');
+            // if (integrations.xpressbees) courierOptions.push('Xpressbees');
           }
           
           setAvailableCouriers(courierOptions);

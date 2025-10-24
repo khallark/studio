@@ -79,6 +79,7 @@ const mergePriorityList = (savedList: CourierSetting[], couriers: CourierIntegra
     // Get all integrated couriers
     const integrated = Object.keys(couriers).filter(k => 
         !['priorityEnabled', 'priorityList'].includes(k) && 
+        k !== 'xpressbees' &&
         couriers?.[k as keyof typeof couriers]
     );
     

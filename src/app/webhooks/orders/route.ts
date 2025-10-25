@@ -117,19 +117,23 @@ export async function POST(req: NextRequest) {
     const topic      = rawTopic.trim().toLowerCase(); // normalize once
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
 
-    if(shopDomain === 'mxiiub-wh.myshopify.com') {
-      switch (topic) {
-        case 'orders/create':
-          db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
-            created: FieldValue.increment(1),
-          }, { merge: true })
-          break;
-        case 'orders/updated':
-          db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
-            updated: FieldValue.increment(1),
-          }, { merge: true })
-          break;
+    try {
+      if(shopDomain === 'mxiiub-wh.myshopify.com') {
+        switch (topic) {
+          case 'orders/create':
+            db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
+              created: FieldValue.increment(1),
+            }, { merge: true })
+            break;
+          case 'orders/updated':
+            db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
+              updated: FieldValue.increment(1),
+            }, { merge: true })
+            break;
+        }
       }
+    } catch (error) {
+      console.error('Webhook ghamand error:', error)
     }
 
     if (!process.env.SHOPIFY_API_SECRET) {

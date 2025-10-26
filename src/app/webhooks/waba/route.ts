@@ -40,18 +40,20 @@ export async function POST(request: NextRequest) {
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
             console.log('📨 Processing button clicks...');
             await handleButtonClicks(body.entry[0].changes[0].value.messages);
+            console.log('✅ Webhook processed: Quick Reply Button');
         }
 
         // Handle status updates with batching
         if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
             console.log('📊 Processing status updates...');
             // Fire and forget for status updates
-            handleStatusUpdates(body.entry[0].changes[0].value.statuses).catch(error => {
+            handleStatusUpdates(body.entry[0].changes[0].value.statuses)
+            .catch(error => {
                 console.error('❌ Status update error:', error);
             });
+            console.log('✅ Webhook processed: Message Status Update');
         }
 
-        console.log('✅ Webhook processed');
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {
         console.error('❌ Error processing webhook:', error);

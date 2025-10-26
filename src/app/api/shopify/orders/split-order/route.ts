@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth as adminAuth, db } from '@/lib/firebase-admin';
+import { auth as adminAuth } from '@/lib/firebase-admin';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -23,17 +23,17 @@ export async function POST(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     // ----- Input -----
-    const { shop, orderIds } = (await req.json()) as {
+    const { shop, orderId } = (await req.json()) as {
       shop: string;
-      orderIds: string[];
+      orderId: string;
     }
 
-    if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
-      return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
+    if (!shop || !orderId) {
+      return NextResponse.json({ error: 'Shop and orderId are required' }, { status: 400 });
     }
 
     // // Ask Firebase Function to enqueue Cloud Tasks (one per job)
-    const url = process.env.ENQUEUE_FUNCTION_URL_2!;
+    const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
     if (!url || !secret) {
       return NextResponse.json({ error: 'Server not configured (FIREBASE_FUNCTIONS_BASE/TASKS_SECRET)' }, { status: 500 });
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'X-Api-Key': secret,
       },
-      body: JSON.stringify({ shop, orderIds, requestedBy: userId }),
+      body: JSON.stringify({ shop, orderId }),
     });
 
     const json = await resp.json();

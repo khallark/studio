@@ -181,6 +181,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/revert-to-delivered/route',
       },
       {
+        source: '/api/shopify/orders/split-order',
+        destination: '/api/shopify/orders/split-order/route',
+      },
+      {
         source: '/proxy/api/checkout/customer',
         destination: '/proxy/api/checkout/customer/route',
       },

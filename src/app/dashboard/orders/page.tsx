@@ -474,6 +474,55 @@ export default function OrdersPage() {
     }
   }, [userData, user, toast]);
 
+  const handleOrderSplit = useCallback(async (orderId: string) => {
+    if (!userData?.activeAccountId || !user || !orderId) return;
+
+    setIsBulkUpdating(true);
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/split-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          shop: userData.activeAccountId,
+          orderId,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok && response.status !== 207) {
+        throw new Error(result.details || 'Failed to dispatch orders.');
+      }
+      
+      toast({
+        title: 'Order splitting Process Started',
+        description: result.message,
+      });
+      
+      if (result.errors && result.errors.length > 0) {
+        // Optionally show another toast for errors
+        toast({
+          title: 'Order Splitting Failed',
+          description: `Something wrong happened, check the function logs.`,
+          variant: 'destructive',
+        });
+        console.error('Order Split failure:', result.error);
+      }
+
+    } catch (error) {
+      console.error('Order split error:', error);
+      toast({
+        title: 'Order Splitting Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }, [userData, user, toast]);
 
   const handleReturnBooking = useCallback(async (orderIds: string[]) => {
     if (!userData?.activeAccountId || !user || orderIds.length === 0) return;
@@ -1143,6 +1192,9 @@ export default function OrdersPage() {
           <>
             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
               Confirm
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
+              Split this order
             </DropdownMenuItem>
           </>
         );

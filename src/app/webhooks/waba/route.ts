@@ -79,8 +79,8 @@ async function handleIncomingMessages(messages: any[]) {
             const originalMessageId = message.context?.id;
             
             if (message.type === 'button' && originalMessageId) {
-                console.log('📘 Quick reply received');
                 const buttonText = message.button.text;
+                console.log(`📘 Quick reply received: "${buttonText}"`);
                 
                 // Get message doc with timeout
                 const messageDoc = await withTimeout(

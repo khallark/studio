@@ -42,19 +42,25 @@ export async function POST(request: NextRequest) {
         // Handle incoming messages (button clicks, text messages, etc.)
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
             console.log('📨 Processing button clicks...');
-            // Fire and forget - NO await
-            handleButtonClicks(body.entry[0].changes[0].value.messages)
-                .then(() => console.log('✅ Button clicks handled'))
-                .catch(error => console.error('❌ Button click error:', error));
+            // Fire and forget - don't await, let it run in background
+            try {
+                await handleButtonClicks(body.entry[0].changes[0].value.messages)
+                console.log('✅ Button clicks handled')
+            } catch (error) {
+                console.error('❌ Button click error:', error);
+            }
         }
 
         // Handle status updates with batching
         if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
             console.log('📊 Processing status updates...');
-            // Fire and forget - NO await
-            handleStatusUpdates(body.entry[0].changes[0].value.statuses)
-                .then(() => console.log('✅ Status updates handled'))
-                .catch(error => console.error('❌ Status update error:', error));
+            // Fire and forget - don't await, let it run in background
+            try {
+                await handleStatusUpdates(body.entry[0].changes[0].value.statuses)
+                console.log('✅ Status updates handled')
+            } catch (error) {
+                console.error('❌ Status update error:', error);
+            }
         }
         
         return NextResponse.json({ status: 'ok' }, { status: 200 });

@@ -5,6 +5,9 @@ import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestor
 import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
 
+// Fire-and-forget pattern: Webhook responds immediately and processes async
+// This prevents timeout issues on starter plans with 45-50 second limits
+
 const quickReplyActions = new Map<string, any>([
     ["Confirm my order now", [updateToConfirmed, sendConfirmOrderWhatsAppMessage]],
     ["Request for Cancellation", [updateToCancallationRequested, sendCancelOrderWhatsAppMessage]],
@@ -39,21 +42,21 @@ export async function POST(request: NextRequest) {
         // Handle incoming messages (button clicks, text messages, etc.)
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
             console.log('📨 Processing button clicks...');
-            await handleButtonClicks(body.entry[0].changes[0].value.messages);
-            console.log('✅ Webhook processed: Quick Reply Button');
+            // Fire and forget - NO await
+            handleButtonClicks(body.entry[0].changes[0].value.messages)
+                .then(() => console.log('✅ Button clicks handled'))
+                .catch(error => console.error('❌ Button click error:', error));
         }
 
         // Handle status updates with batching
         if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
             console.log('📊 Processing status updates...');
-            // Fire and forget for status updates
+            // Fire and forget - NO await
             handleStatusUpdates(body.entry[0].changes[0].value.statuses)
-            .catch(error => {
-                console.error('❌ Status update error:', error);
-            });
-            console.log('✅ Webhook processed: Message Status Update');
+                .then(() => console.log('✅ Status updates handled'))
+                .catch(error => console.error('❌ Status update error:', error));
         }
-
+        
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {
         console.error('❌ Error processing webhook:', error);

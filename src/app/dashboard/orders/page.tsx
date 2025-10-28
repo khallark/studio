@@ -1590,7 +1590,7 @@ export default function OrdersPage() {
                                 <SelectValue placeholder="Filter by availability..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Items ({availabilityCounts.available + availabilityCounts.unavailable })</SelectItem>
+                                <SelectItem value="all">All Items ({availabilityCounts.pending + availabilityCounts.available + availabilityCounts.unavailable })</SelectItem>
                                 <SelectItem value="pending">Pending({availabilityCounts.pending})</SelectItem>
                                 <SelectItem value="available">Available ({availabilityCounts.available})</SelectItem>
                                 <SelectItem value="unavailable">Unavailable ({availabilityCounts.unavailable})</SelectItem>

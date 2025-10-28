@@ -58,7 +58,7 @@ export function AvailabilityDialog({
   const [orders, setOrders] = useState<Order[]>([]);
   const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
   const [processingOrder, setProcessingOrder] = useState<string | null>(null);
-  const [processingAction, setProcessingAction] = useState<'Available' | 'Unavailable' | null>(null); // Add this
+  const [processingAction, setProcessingAction] = useState<'Available' | 'Unavailable' | 'Pending' | null>(null); // Add this
 
   useEffect(() => {
     if (isOpen) {
@@ -84,26 +84,19 @@ export function AvailabilityDialog({
     });
   };
 
-  const handleAction = async (order: Order, action: 'Available' | 'Unavailable' | 'Ignore') => {
-    if (action === 'Ignore') {
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
-      return;
-    }
-
+  const handleAction = async (order: Order, action: 'Available' | 'Unavailable' | 'Pending') => {
     setProcessingOrder(order.id);
     setProcessingAction(action);
-    const tagAction = action === 'Available' ? 'add' : 'remove';
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/shopify/orders/update-tags', {
+      const response = await fetch('/api/shopify/orders/update-confirmed-orders-availability-tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           shop: shopId,
           orderId: order.id,
-          tag: 'Available',
-          action: tagAction,
+          tag: action,
         }),
       });
 
@@ -142,7 +135,7 @@ export function AvailabilityDialog({
                 const allItemsSelected =
                   order.raw.line_items.length > 0 &&
                   (itemSelection[order.id]?.size ?? 0) === order.raw.line_items.length;
-                const isCurrentlyAvailable = order.tags_confirmed?.includes('Available');
+                const availabilityStatus = order.tags_confirmed?.[0] as 'Available' | 'Unavailable' | 'Pending';
 
                 return (
                   <motion.div
@@ -152,9 +145,11 @@ export function AvailabilityDialog({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{
                         opacity: 0,
-                        x: processingOrder === order.id
-                            ? (processingAction === 'Available' ? 300 : -300)  // Use the action taken
-                            : 0,
+                        x: (() => {
+                          if(processingAction === 'Available') return 300;
+                          if(processingAction === 'Unavailable') return -300;
+                          return 0;
+                        })(),
                         scale: processingOrder !== order.id ? 0.8 : 1,
                         transition: { duration: 0.3 }
                     }}
@@ -162,11 +157,18 @@ export function AvailabilityDialog({
                   >
                     <div className="p-4 bg-card flex justify-between items-center">
                       <h3 className="font-semibold">{order.name}</h3>
-                      {isCurrentlyAvailable ? (
-                        <Badge variant="success">Available</Badge>
-                      ) : (
-                        <Badge variant="secondary">Unavailable</Badge>
-                      )}
+                      {(() => {
+                        switch(availabilityStatus) {
+                          case 'Available': 
+                            return <Badge variant="success">Available</Badge>;
+                          case 'Unavailable':
+                            return <Badge variant="secondary">Unavailable</Badge>;
+                          case 'Pending':
+                            return <Badge variant="secondary">Pending</Badge>;
+                          default:
+                            return <Badge variant="secondary">Pending</Badge>;
+                        }
+                      })()}
                     </div>
                     <div className="p-4 space-y-3">
                       <div className="space-y-2">
@@ -204,12 +206,12 @@ export function AvailabilityDialog({
                           Unavailable
                         </Button>
                         <Button
-                          onClick={() => handleAction(order, 'Ignore')}
+                          onClick={() => handleAction(order, 'Pending')}
                           disabled={processingOrder === order.id}
                           variant="outline"
                           className="flex-1"
                         >
-                          Ignore
+                          Pending
                         </Button>
                       </div>
                     </div>

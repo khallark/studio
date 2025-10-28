@@ -146,8 +146,8 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/courier/bulk-book-return/route',
       },
       {
-        source: '/api/shopify/orders/update-tags',
-        destination: '/api/shopify/orders/update-tags/route',
+        source: '/api/shopify/orders/update-confirmed-orders-availability-tag',
+        destination: '/api/shopify/orders/update-confirmed-orders-availability-tag/route',
       },
       {
         source: '/api/public/confirm-or-cancel/start-session',

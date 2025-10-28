@@ -169,8 +169,8 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/courier/update-priority/route',
       },
       {
-        source: '/api/shopify/orders/update-tags',
-        destination: '/api/shopify/orders/update-tags/route',
+        source: '/api/shopify/orders/update-confirmed-orders-availability-tag',
+        destination: '/api/shopify/orders/update-confirmed-orders-availability-tag/route',
       },
       {
         source: '/api/shopify/orders/revert-to-confirmed',

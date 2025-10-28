@@ -198,7 +198,7 @@ export default function OrdersPage() {
   const [invertSearch, setInvertSearch] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [courierFilter, setCourierFilter] = useState<string>('all');
-  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'pending' | 'available' | 'unavailable'>('all');
   const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
   
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
@@ -253,7 +253,7 @@ export default function OrdersPage() {
         setIsUpdatingAvailability(order.id);
         try {
             const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/update-tags', {
+            const response = await fetch('/api/shopify/orders/update-confirmed-orders-availability-tag', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -778,7 +778,9 @@ export default function OrdersPage() {
       if (availabilityFilter === 'available') {
         filtered = filtered.filter(order => order.tags_confirmed?.includes('Available'));
       } else if (availabilityFilter === 'unavailable') {
-        filtered = filtered.filter(order => !order.tags_confirmed?.includes('Available'));
+        filtered = filtered.filter(order => order.tags_confirmed?.includes('Unavailable'));
+      } else {
+        filtered = filtered.filter(order => !order.tags_confirmed || order.tags_confirmed?.includes('Pending'));
       }
     }
     
@@ -834,9 +836,10 @@ export default function OrdersPage() {
     const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');
     
     const available = confirmedOrders.filter(order => order.tags_confirmed?.includes('Available')).length;
-    const unavailable = confirmedOrders.length - available;
+    const unavailable = confirmedOrders.filter(order => order.tags_confirmed?.includes('Unavailable')).length;
+    const pending = confirmedOrders.filter(order => !order.tags_confirmed || order.tags_confirmed?.includes('Pending')).length;
 
-    return { available, unavailable };
+    return { pending, available, unavailable };
   }, [orders]);
 
   const rtoInTransitCounts = useMemo(() => {
@@ -1588,6 +1591,7 @@ export default function OrdersPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Items ({availabilityCounts.available + availabilityCounts.unavailable})</SelectItem>
+                                <SelectItem value="pending">Pending({availabilityCounts.pending})</SelectItem>
                                 <SelectItem value="available">Available ({availabilityCounts.available})</SelectItem>
                                 <SelectItem value="unavailable">Unavailable ({availabilityCounts.unavailable})</SelectItem>
                             </SelectContent>
@@ -1833,7 +1837,7 @@ export default function OrdersPage() {
                                                                 </div>
                                                             ))}
                                                         </div>
-                                                        <Button
+                                                        {/* <Button
                                                             className="w-full"
                                                             onClick={() => handleAvailabilityToggle(order)}
                                                             disabled={
@@ -1843,7 +1847,7 @@ export default function OrdersPage() {
                                                         >
                                                             {isUpdatingAvailability === order.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                                             {order.tags_confirmed?.includes('Available') ? 'Make Unavailable' : 'Make Available'}
-                                                        </Button>
+                                                        </Button> */}
                                                     </div>
                                                 </PopoverContent>
                                             </Popover>

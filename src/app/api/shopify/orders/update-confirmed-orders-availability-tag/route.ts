@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     await db.runTransaction(async (transaction) => {
         const orderDoc = await transaction.get(orderRef);
         const tags_confirmed = orderDoc.data()?.tags_confirmed;
-        const arr = tags_confirmed && Array.isArray(tags_confirmed) ? tags_confirmed : [];
+        const arr = tags_confirmed && Array.isArray(tags_confirmed) ? tags_confirmed.slice(1) : [];
         
         transaction.update(orderRef, {
             tags_confirmed: [tag, ...arr],

@@ -135,7 +135,13 @@ export function AvailabilityDialog({
                 const allItemsSelected =
                   order.raw.line_items.length > 0 &&
                   (itemSelection[order.id]?.size ?? 0) === order.raw.line_items.length;
-                const availabilityStatus = order.tags_confirmed?.[0] as 'Available' | 'Unavailable' | 'Pending';
+                const arr = order.tags_confirmed;
+                const availabilityStatus = !arr
+                ? 'Pending'
+                : (!Array.isArray(arr)
+                  ? 'Pending'
+                  : arr.length === 0 ? 'Pending' : arr[0]
+                ) as 'Available' | 'Unavailable' | 'Pending';
 
                 return (
                   <motion.div

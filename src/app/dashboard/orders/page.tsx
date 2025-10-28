@@ -780,7 +780,7 @@ export default function OrdersPage() {
       } else if (availabilityFilter === 'unavailable') {
         filtered = filtered.filter(order => order.tags_confirmed?.includes('Unavailable'));
       } else {
-        filtered = filtered.filter(order => !order.tags_confirmed || order.tags_confirmed?.includes('Pending'));
+        filtered = filtered.filter(order => !order.tags_confirmed || (Array.isArray(order.tags_confirmed) && order.tags_confirmed.length === 0) || order.tags_confirmed?.includes('Pending'));
       }
     }
     
@@ -837,7 +837,7 @@ export default function OrdersPage() {
     
     const available = confirmedOrders.filter(order => order.tags_confirmed?.includes('Available')).length;
     const unavailable = confirmedOrders.filter(order => order.tags_confirmed?.includes('Unavailable')).length;
-    const pending = confirmedOrders.filter(order => !order.tags_confirmed || order.tags_confirmed?.includes('Pending')).length;
+    const pending = confirmedOrders.filter(order => !order.tags_confirmed || (Array.isArray(order.tags_confirmed) && order.tags_confirmed.length === 0) || order.tags_confirmed?.includes('Pending')).length;
 
     return { pending, available, unavailable };
   }, [orders]);
@@ -1590,7 +1590,7 @@ export default function OrdersPage() {
                                 <SelectValue placeholder="Filter by availability..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Items ({availabilityCounts.available + availabilityCounts.unavailable})</SelectItem>
+                                <SelectItem value="all">All Items ({availabilityCounts.available + availabilityCounts.unavailable })</SelectItem>
                                 <SelectItem value="pending">Pending({availabilityCounts.pending})</SelectItem>
                                 <SelectItem value="available">Available ({availabilityCounts.available})</SelectItem>
                                 <SelectItem value="unavailable">Unavailable ({availabilityCounts.unavailable})</SelectItem>

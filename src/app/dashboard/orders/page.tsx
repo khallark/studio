@@ -71,6 +71,7 @@ import { BookReturnDialog } from '@/components/book-return-dialog';
 import { StartQcDialog } from '@/components/start-qc-dialog';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { GeneratePODialog } from '@/components/generate-po-dialog'
+import { FieldValue } from 'firebase-admin/firestore';
 
 type CustomStatus = 
   | 'New' 
@@ -105,6 +106,7 @@ interface Order {
   orderId: number;
   name: string;
   createdAt: string;
+  lastStatusUpdate: Timestamp;
   email: string;
   totalPrice: number;
   currency: string;
@@ -200,7 +202,7 @@ export default function OrdersPage() {
   const [courierFilter, setCourierFilter] = useState<string>('all');
   const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'pending' | 'available' | 'unavailable'>('all');
   const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
-  
+
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
@@ -721,7 +723,7 @@ export default function OrdersPage() {
         filtered = filtered.filter(order => !order.raw?.cancelled_at);
 
         if (activeTab !== 'All Orders') {
-            filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab);
+            filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab).sort((a, b) => b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis());
         }
     }
 

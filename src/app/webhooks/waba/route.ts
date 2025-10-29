@@ -410,7 +410,8 @@ async function handleTextMessages(messages: any[]) {
                         headers: {
                             'X-Api-Key': process.env.ENQUEUE_FUNCTION_SECRET || '',
                             'Content-Type': 'application/json'
-                        }
+                        },
+                        body: JSON.stringify({ phone: from })
                     });
                     console.log('✅ PDF generation triggered');
                 } catch (error) {

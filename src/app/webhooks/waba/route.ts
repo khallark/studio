@@ -62,6 +62,17 @@ export async function POST(request: NextRequest) {
                 console.error('❌ Status update error:', error);
             }
         }
+
+        // ✅ ADD THIS NEW BLOCK HERE
+        if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
+            console.log('💬 Processing text messages...');
+            try {
+                await handleTextMessages(body.entry[0].changes[0].value.messages)
+                console.log('✅ Text messages handled')
+            } catch (error) {
+                console.error('❌ Text message error:', error);
+            }
+        }
         
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {
@@ -371,5 +382,46 @@ async function handleRTOInTransitNegative(orderDoc: DocumentSnapshot): Promise<B
     } catch (error) {
         console.error('❌ Error handling RTO negative:', error);
         return false;
+    }
+}
+
+// Handle text messages
+async function handleTextMessages(messages: any[]) {
+    for (const message of messages) {
+        // Only process text messages
+        if (message.type !== 'text') {
+            continue;
+        }
+
+        try {
+            const textBody = message.text.body.toLowerCase().trim();
+            const from = message.from; // Phone number
+
+            
+            // Check if message is "send pdf again"
+            if (textBody === 'send pdf again') {
+                console.log(`💬 Text from ${from}: "${textBody}"`);
+                console.log('📄 User requested PDF resend');
+                
+                // Trigger PDF generation function
+                try {
+                    await fetch('https://asia-south1-orderflow-jnig7.cloudfunctions.net/generateUnavailableStockReportOnRequest', {
+                        method: 'POST',
+                        headers: {
+                            'X-Api-Key': process.env.ENQUEUE_FUNCTION_SECRET || '',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    console.log('✅ PDF generation triggered');
+                } catch (error) {
+                    console.error('❌ Error triggering PDF generation:', error);
+                }
+
+                console.log('✅ Confirmed Delayed orders PDF resend logic executed');
+            }
+
+        } catch (error) {
+            console.error('❌ Error handling text message:', error);
+        }
     }
 }

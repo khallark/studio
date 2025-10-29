@@ -723,9 +723,7 @@ export default function OrdersPage() {
         filtered = filtered.filter(order => !order.raw?.cancelled_at);
 
         if (activeTab !== 'All Orders') {
-            if(activeTab === "RTO Delivered" )
-              filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab).sort((a, b) => b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis());
-            else filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab);
+          filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab);
         }
     }
 
@@ -811,6 +809,10 @@ export default function OrdersPage() {
     filtered.sort((a, b) => {
       let valA, valB;
       
+      if(activeTab === 'RTO Delivered') {
+        return b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis();
+      }
+
       if (sortKey === 'createdAt') {
           valA = new Date(a.createdAt).getTime();
           valB = new Date(b.createdAt).getTime();

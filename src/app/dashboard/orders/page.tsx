@@ -723,7 +723,9 @@ export default function OrdersPage() {
         filtered = filtered.filter(order => !order.raw?.cancelled_at);
 
         if (activeTab !== 'All Orders') {
-            filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab).sort((a, b) => b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis());
+            if(activeTab === "RTO Delivered" )
+              filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab).sort((a, b) => b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis());
+            else filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab);
         }
     }
 

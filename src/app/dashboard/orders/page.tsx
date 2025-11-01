@@ -755,7 +755,7 @@ export default function OrdersPage() {
               if(!line_items) return false;
               for(let i = 0; i < line_items.length; ++i) {
                 if(line_items[i].vendor &&
-                  String(line_items[i].vendor).toLowerCase() === lowercasedQuery
+                  String(line_items[i].vendor).toLowerCase().includes(lowercasedQuery)
                 ) return true;
                 // if(line_items[i].name &&
                 //   String(line_items[i].name).toLowerCase() === lowercasedQuery

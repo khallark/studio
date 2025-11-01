@@ -749,7 +749,26 @@ export default function OrdersPage() {
             customerName.toLowerCase().includes(lowercasedQuery) ||
             (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
             (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery)) ||
-            (String(order.orderId).toLowerCase().includes(lowercasedQuery))
+            (String(order.orderId).toLowerCase().includes(lowercasedQuery)) ||
+            (() => {
+              const line_items = order.raw.line_items;
+              if(!line_items) return false;
+              for(let i = 0; i < line_items.length; ++i) {
+                if(line_items[i].vendor &&
+                  String(line_items[i].vendor).toLowerCase() === lowercasedQuery
+                ) return true;
+                // if(line_items[i].name &&
+                //   String(line_items[i].name).toLowerCase() === lowercasedQuery
+                // ) return true;
+                // if(line_items[i].title &&
+                //   String(line_items[i].title).toLowerCase() === lowercasedQuery
+                // ) return true;
+                // if(line_items[i].sku &&
+                //   String(line_items[i].sku).toLowerCase() === lowercasedQuery
+                // ) return true;
+              }
+              return false;
+            })()
           );
           return invertSearch ? !match : match;
         });

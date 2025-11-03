@@ -1236,6 +1236,9 @@ export default function OrdersPage() {
             }}>
               Assign AWB
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
+              Split this order
+            </DropdownMenuItem>
           </>
         );
       case 'Ready To Dispatch':

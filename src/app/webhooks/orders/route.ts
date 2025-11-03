@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
     if(created) {
       const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
       const cleanPhone = normalizePhoneNumber(customerPhone);
-      if(!String(orderData.tags).toLocaleLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
+      if(!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
         const shopDoc = (await accountRef.get()).data() as any;
         console.log('Trying to send message');
         sendNewOrderWhatsAppMessage(shopDoc, {

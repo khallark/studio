@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Reorder } from "framer-motion"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface CourierSetting {
   name: string;
@@ -66,18 +66,15 @@ type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
 const mergePriorityList = (savedList: CourierSetting[] | undefined, couriers: CourierIntegrations | undefined): CourierSetting[] => {
     if (!couriers) return [];
     
-    // Get all integrated couriers
     const integrated = Object.keys(couriers).filter(k => 
         !['priorityEnabled', 'priorityList'].includes(k) && 
         couriers?.[k as keyof typeof couriers]
     );
     
-    // Start with saved list items that are still integrated
     const orderedList = (savedList || [])
         .filter(item => integrated.includes(item.name))
-        .map(item => ({ ...item })); // Create new objects to avoid reference issues
+        .map(item => ({ ...item }));
     
-    // Add newly integrated couriers that aren't in the saved list
     const newIntegrated = integrated
         .filter(name => !(savedList || []).some(s => s.name === name))
         .map(name => ({ name, mode: 'Surface' as const }));
@@ -93,6 +90,7 @@ export default function AppsSettingsPage() {
   const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [deletingCourier, setDeletingCourier] = useState<string | null>(null);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
 
   const [delhiveryApiKey, setDelhiveryApiKey] = useState('');
   const [isEditingDelhivery, setIsEditingDelhivery] = useState(false);
@@ -116,52 +114,79 @@ export default function AppsSettingsPage() {
     document.title = "Settings - Apps";
   }, []);
 
-  const fetchData = async () => {
-    if (!user) return;
+  // 1. Get Active Account ID
+  useEffect(() => {
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      const unsub = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+          setActiveAccountId(doc.data().activeAccountId);
+        } else {
+          setActiveAccountId(null);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user]);
+
+  // 2. Get Member Role
+  useEffect(() => {
+    if (user && activeAccountId) {
+      const memberRef = doc(db, 'accounts', activeAccountId, 'members', user.uid);
+      const unsub = onSnapshot(memberRef, (doc) => {
+        if (doc.exists()) {
+          setMemberRole(doc.data().role as MemberRole);
+        } else {
+          setMemberRole(null);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user, activeAccountId]);
+
+
+  // 3. Get Settings Data based on Role
+  useEffect(() => {
+    if (!activeAccountId || !memberRole) {
+      if (!userLoading) setDataLoading(false);
+      return;
+    }
+    
     setDataLoading(true);
 
-    try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/settings/get-details', {
-            headers: { 'Authorization': `Bearer ${idToken}` }
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch settings');
-        }
-        
-        setMemberRole(data.role);
-        setSettingsData(data.settings);
-        const integrations = data.settings?.integrations;
-        
-        setDelhiveryApiKey(integrations?.couriers?.delhivery?.apiKey || '');
-        
-        const couriers = integrations?.couriers;
-        setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-        const mergedList = mergePriorityList(couriers?.priorityList, couriers);
-        setCourierPriorityList(mergedList);
+    const docRef = memberRole === 'Vendor' 
+        ? doc(db, 'accounts', activeAccountId, 'members', user!.uid)
+        : doc(db, 'accounts', activeAccountId);
 
-    } catch (error) {
+    const unsub = onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data() as SettingsData;
+            setSettingsData(data);
+            const couriers = data.integrations?.couriers;
+            
+            setDelhiveryApiKey(couriers?.delhivery?.apiKey || '');
+            setCourierPriorityEnabled(couriers?.priorityEnabled || false);
+            const mergedList = mergePriorityList(couriers?.priorityList, couriers);
+            setCourierPriorityList(mergedList);
+
+        } else {
+            setSettingsData(null);
+        }
+        setDataLoading(false);
+    }, (error) => {
+        console.error("Error fetching settings:", error);
         toast({
             title: 'Error Loading Settings',
-            description: error instanceof Error ? error.message : 'Could not load your settings data.',
+            description: error.message,
             variant: 'destructive',
         });
-        setSettingsData(null);
-    } finally {
         setDataLoading(false);
-    }
-  }
+    });
 
-  useEffect(() => {
-    if (!userLoading && user) {
-        fetchData();
-    } else if (!userLoading && !user) {
-        setDataLoading(false);
-    }
-  }, [user, userLoading]);
+    return () => unsub();
+  }, [activeAccountId, memberRole, user, toast, userLoading]);
+
+
 
   const updatePrioritySettings = async (enabled: boolean, list: CourierSetting[]) => {
       if (!user) return;
@@ -176,7 +201,6 @@ export default function AppsSettingsPage() {
           const result = await response.json();
           if (!response.ok) throw new Error(result.details || 'Failed to update priority settings');
           toast({ title: 'Priority Settings Updated' });
-          fetchData(); // Refetch
       } catch (error) {
           toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
       } finally {
@@ -198,7 +222,6 @@ export default function AppsSettingsPage() {
             if (!response.ok) throw new Error(result.details || 'Failed to remove integration');
 
             toast({ title: 'Integration Removed', description: `${courierName} has been disconnected.` });
-            fetchData();
         } catch (error) {
             toast({ title: 'Removal Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
         } finally {
@@ -240,7 +263,6 @@ export default function AppsSettingsPage() {
 
           toast({ title: 'API Key Saved', description: 'Delhivery integration has been updated.' });
           setIsEditingDelhivery(false);
-          fetchData(); // Refetch
       } catch (error) {
           toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
       } finally {
@@ -276,7 +298,6 @@ export default function AppsSettingsPage() {
         setIsEditingShiprocket(false);
         setShiprocketEmail('');
         setShiprocketPassword('');
-        fetchData();
     } catch (error) {
         toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
     } finally {
@@ -312,7 +333,6 @@ export default function AppsSettingsPage() {
         setIsEditingXpressbees(false);
         setXpressbeesEmail('');
         setXpressbeesPassword('');
-        fetchData();
     } catch (error) {
         toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
     } finally {
@@ -382,40 +402,42 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     </div>
-                    <div className="border-t bg-muted/50 p-6">
-                        <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
-                        {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
-                        <Reorder.Group axis="y" values={courierPriorityList} onReorder={(list) => {
-                            setCourierPriorityList(list);
-                            updatePrioritySettings(courierPriorityEnabled, list);
-                        }} className="space-y-2">
-                        {courierPriorityList.map((courier) => (
-                            <Reorder.Item 
-                                key={courier.name} 
-                                value={courier} 
-                                className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
-                            >
-                                <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                {courier.name !== 'shiprocket' && (
-                                    <Select 
-                                        value={courier.mode} 
-                                        onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
-                                        disabled={isReadOnly}
-                                    >
-                                        <SelectTrigger className="w-[120px] h-8">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Surface">Surface</SelectItem>
-                                            <SelectItem value="Express">Express</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            </Reorder.Item>
-                        ))}
-                        </Reorder.Group>
-                    </div>
+                    {courierPriorityList.length > 0 && (
+                        <div className="border-t bg-muted/50 p-6">
+                            <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
+                            {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
+                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={(list) => {
+                                setCourierPriorityList(list);
+                                updatePrioritySettings(courierPriorityEnabled, list);
+                            }} className="space-y-2">
+                            {courierPriorityList.map((courier) => (
+                                <Reorder.Item 
+                                    key={courier.name} 
+                                    value={courier} 
+                                    className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
+                                >
+                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                    <span className="font-medium capitalize flex-1">{courier.name}</span>
+                                    {courier.name !== 'shiprocket' && (
+                                        <Select 
+                                            value={courier.mode} 
+                                            onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                            disabled={isReadOnly}
+                                        >
+                                            <SelectTrigger className="w-[120px] h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Surface">Surface</SelectItem>
+                                                <SelectItem value="Express">Express</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </Reorder.Item>
+                            ))}
+                            </Reorder.Group>
+                        </div>
+                    )}
                     {/* Delhivery */}
                     <div className="border-t p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">

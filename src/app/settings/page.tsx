@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -16,10 +15,11 @@ import { Separator } from '@/components/ui/separator';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface CompanyAddress {
   address: string;
@@ -53,7 +53,6 @@ export default function SettingsPage() {
   const [user, userLoading] = useAuthState(auth);
   const { toast } = useToast();
 
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const [displayedData, setDisplayedData] = useState<SettingsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,50 +66,80 @@ export default function SettingsPage() {
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [isTogglingService, setIsTogglingService] = useState(false);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+
 
   useEffect(() => {
     document.title = "Settings - Store Details";
   });
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
+  // 1. Get Active Account ID
+  useEffect(() => {
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      const unsub = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+          setActiveAccountId(doc.data().activeAccountId);
+        } else {
+          setActiveAccountId(null);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user]);
+
+  // 2. Get Member Role
+  useEffect(() => {
+    if (user && activeAccountId) {
+      const memberRef = doc(db, 'accounts', activeAccountId, 'members', user.uid);
+      const unsub = onSnapshot(memberRef, (doc) => {
+        if (doc.exists()) {
+          setMemberRole(doc.data().role as MemberRole);
+        } else {
+          setMemberRole(null);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user, activeAccountId]);
+
+  // 3. Get Settings Data based on Role
+  useEffect(() => {
+    if (!activeAccountId || !memberRole) {
+      if (!userLoading) setLoading(false);
+      return;
+    }
+    
     setLoading(true);
 
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/settings/get-details', {
-        headers: { 'Authorization': `Bearer ${idToken}` }
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch settings');
-      }
-      
-      setMemberRole(data.role);
-      setDisplayedData(data.settings);
-      setAddressForm(data.settings.companyAddress || { address: '', pincode: '', city: '', state: '', country: '' });
-      setContactForm(data.settings.primaryContact || { name: '', phone: '', email: '' });
+    const docRef = memberRole === 'Vendor' 
+        ? doc(db, 'accounts', activeAccountId, 'members', user!.uid)
+        : doc(db, 'accounts', activeAccountId);
 
-    } catch (error) {
-      toast({
-        title: 'Error Loading Settings',
-        description: error instanceof Error ? error.message : 'Could not load your settings data.',
-        variant: 'destructive',
-      });
-      setMemberRole(null);
-      setDisplayedData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, toast]);
+    const unsub = onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data() as SettingsData;
+            setDisplayedData(data);
+            setAddressForm(data.companyAddress || { address: '', pincode: '', city: '', state: '', country: '' });
+            setContactForm(data.primaryContact || { name: '', phone: '', email: '' });
+        } else {
+            setDisplayedData(null);
+        }
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching settings:", error);
+        toast({
+            title: 'Error Loading Settings',
+            description: error.message,
+            variant: 'destructive',
+        });
+        setLoading(false);
+    });
 
-  useEffect(() => {
-    if (!userLoading) {
-      fetchData();
-    }
-  }, [user, userLoading, fetchData]);
+    return () => unsub();
+
+  }, [activeAccountId, memberRole, user, toast, userLoading]);
+
   
   const hasAddress = !!displayedData?.companyAddress?.address;
   const hasContact = !!displayedData?.primaryContact?.name;
@@ -122,21 +151,15 @@ export default function SettingsPage() {
     
     try {
         const idToken = await user.getIdToken();
-        // The API now correctly determines where to save based on the user's role.
         const response = await fetch('/api/shopify/account/update-address', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-            body: JSON.stringify({ 
-                // The API gets the active shop from the user's token.
-                shop: 'unused', // This value is now ignored by the API but kept for structure
-                address: addressForm,
-             }),
+            body: JSON.stringify({ address: addressForm }),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.details || 'Failed to save address');
         toast({ title: 'Address Saved', description: 'Your company address has been updated.' });
         setIsEditingAddress(false);
-        fetchData(); // Refetch data after saving
     } catch (error) {
         toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
     } finally {
@@ -152,16 +175,12 @@ export default function SettingsPage() {
         const response = await fetch('/api/shopify/account/update-contact', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-            body: JSON.stringify({ 
-                shop: 'unused',
-                contact: contactForm 
-            }),
+            body: JSON.stringify({ contact: contactForm }),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.details || 'Failed to save contact');
         toast({ title: 'Contact Saved', description: 'Your primary contact has been updated.' });
         setIsEditingContact(false);
-        fetchData(); // Refetch data
     } catch (error) {
         toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
     } finally {
@@ -177,7 +196,7 @@ export default function SettingsPage() {
             const response = await fetch('/api/shopify/account/toggle-service', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                body: JSON.stringify({ shop: 'unused', serviceName, isEnabled }),
+                body: JSON.stringify({ serviceName, isEnabled }),
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || 'Failed to toggle service');
@@ -185,7 +204,6 @@ export default function SettingsPage() {
                 title: 'Service Updated',
                 description: `'Booking a return' page has been ${isEnabled ? 'enabled' : 'disabled'}.`
             });
-            fetchData(); // Refetch
         } catch (error) {
             toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
         } finally {
@@ -232,7 +250,7 @@ export default function SettingsPage() {
           <CardDescription>Manage your company address and primary contact information.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!displayedData ? (
+          {!activeAccountId ? (
             <div className="text-center py-10 text-muted-foreground">
               Please connect a Shopify store to manage its details.
             </div>

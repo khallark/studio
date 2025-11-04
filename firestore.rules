@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // =============================================
+    // Users Collection
+    // =============================================
+    // - Users can read their own document.
+    // - Users can update their own document.
+    // - New users can create their own document during signup.
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // =============================================
+    // Accounts Collection
+    // =============================================
+    match /accounts/{accountId} {
+       allow read: if request.auth != null && 
+                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+       allow write: if false; // Handled by server-side logic only
+
+        // =============================================
+        // Members Subcollection
+        // =============================================
+        match /members/{memberId} {
+            // 1. A user can read their own member document.
+            // 2. An Admin/SuperAdmin can read any member document in the account.
+            allow read: if request.auth != null &&
+                        (request.auth.uid == memberId || 
+                         get(/databases/$(database)/documents/accounts/$(accountId)/members/$(request.auth.uid)).data.role in ['Admin', 'SuperAdmin']);
+            
+            // Writes are still server-side only for security.
+            allow write: if false;
+
+            // --- Vendor-specific subcollections ---
+            match /pickupLocations/{locationId} {
+                allow read, write: if request.auth != null && request.auth.uid == memberId;
+            }
+        }
+        
+        // =============================================
+        // Orders Subcollection
+        // =============================================
+        match /orders/{orderId} {
+            allow read: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+        }
+        
+        match /logs/{logId} {
+      			allow read: if request.auth != null && 
+      									get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+    		}
+        
+        match /pickupLocations/{pickupLocationsId} {
+        		allow read: if request.auth != null && 
+      									get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            // Allow server-side logic only, except for vendors managing their own above.
+            allow write: if false; 
+        }
+        
+        match /communications/{commId=**} {
+            allow read: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+        }
+        
+        match /unused_awbs/{unused_awbs_id} {
+        		allow read: if request.auth != null && 
+      									get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+        }
+        
+        match /shipment_batches/{shipment_batches_id} {
+        		allow read: if request.auth != null && 
+      									get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+            
+            match /jobs/{jobId} {
+              allow read: if request.auth != null && 
+                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeAccountId == accountId;
+              allow write: if false; // Handled by server-side logic only
+            }
+        }
+        
+        match /book_return_batches/{book_return_batches_id} {
+        		allow read: if request.auth != null && 
+      									get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accounts.hasAny([accountId]);
+            allow write: if false; // Handled by server-side logic only
+            
+            match /jobs/{jobId} {
+              allow read: if request.auth != null && 
+                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeAccountId == accountId;
+              allow write: if false; // Handled by server-side logic only
+            }
+        }
+    }
+    
+    // =============================================
+    // Public Collections
+    // =============================================
+    // - These collections are used for temporary sessions like joining a shop.
+    // - They are readable by anyone with the link (ID) but writable only from server.
+    match /join-a-shop/{sessionId} {
+        allow read: if true;
+        allow write: if false; // Only server can create/update
+    }
+  }
+}

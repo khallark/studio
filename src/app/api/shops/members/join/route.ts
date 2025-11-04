@@ -57,6 +57,13 @@ export async function POST(req: NextRequest) {
             if (!shopId || !role) {
                 throw new Error('Invitation is missing required information.');
             }
+
+            // Check if user is already a member of this shop
+            const userRef = db.collection('users').doc(userId);
+            const userDoc = await transaction.get(userRef);
+            if (userDoc.exists && userDoc.data()?.accounts?.includes(shopId)) {
+                throw new Error('You are already a member of this shop.');
+            }
             
             // Add user to the account's members subcollection
             const memberRef = db.collection('accounts').doc(shopId).collection('members').doc(userId);
@@ -74,7 +81,6 @@ export async function POST(req: NextRequest) {
             });
             
             // **NEW**: Update the user's document to add the new shop
-            const userRef = db.collection('users').doc(userId);
             transaction.update(userRef, {
                 accounts: FieldValue.arrayUnion(shopId),
                 activeAccountId: shopId,

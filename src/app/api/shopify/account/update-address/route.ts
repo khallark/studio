@@ -26,25 +26,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop and address data are required' }, { status: 400 });
     }
     
-    // Optional: Add more specific validation for address fields if needed
-
     const userId = await getUserIdFromToken(req);
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
-    
-    // Further validation could check if this user is allowed to edit this shop
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
-        return NextResponse.json({ error: 'Forbidden: User is not authorized to edit this shop.' }, { status: 403 });
+
+    // Determine user's role for this shop
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+
+    if (!memberDoc.exists) {
+        return NextResponse.json({ error: 'Forbidden: You are not a member of this shop.' }, { status: 403 });
     }
 
-    const accountRef = db.collection('accounts').doc(shop);
+    const memberData = memberDoc.data();
+    const userRole = memberData?.role;
     
-    await accountRef.update({
-      companyAddress: address,
-      lastUpdatedAt: FieldValue.serverTimestamp(),
-    });
+    // Vendors have their own isolated settings
+    if (userRole === 'Vendor') {
+        await memberRef.update({
+            companyAddress: address,
+            lastUpdatedAt: FieldValue.serverTimestamp(),
+        });
+    } else {
+        // SuperAdmins and Admins edit the main account document
+        const accountRef = db.collection('accounts').doc(shop);
+        await accountRef.update({
+            companyAddress: address,
+            lastUpdatedAt: FieldValue.serverTimestamp(),
+        });
+    }
 
     return NextResponse.json({ message: 'Company address successfully updated.' });
   } catch (error) {

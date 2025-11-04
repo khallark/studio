@@ -165,6 +165,11 @@ export default function AppsSettingsPage() {
         const mergedList = mergePriorityList(couriers?.priorityList, couriers);
         setCourierPriorityList(mergedList);
 
+        // Get active account ID
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+        setActiveAccountId(userDoc.data()?.activeAccountId || null);
+
     } catch (error) {
         toast({
             title: 'Error Loading Settings',
@@ -230,7 +235,6 @@ export default function AppsSettingsPage() {
                   'Authorization': `Bearer ${idToken}`
               },
               body: JSON.stringify({
-                  shop: 'unused',
                   courierName: 'delhivery',
                   apiKey: delhiveryApiKey,
               })
@@ -265,7 +269,6 @@ export default function AppsSettingsPage() {
                 'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-                shop: 'unused',
                 email: shiprocketEmail,
                 password: shiprocketPassword,
             })
@@ -302,7 +305,6 @@ export default function AppsSettingsPage() {
                 'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-                shop: 'unused',
                 email: xpressbeesEmail,
                 password: xpressbeesPassword,
             })
@@ -354,7 +356,6 @@ export default function AppsSettingsPage() {
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          shop: 'unused',
           key: keyToSave,
           value: valueToSave,
         }),
@@ -429,31 +430,29 @@ export default function AppsSettingsPage() {
             <section>
                 <h2 className="text-lg font-semibold mb-4 text-primary">Courier Services</h2>
                  <div className="rounded-lg border">
-                    {memberRole !== 'Vendor' && (
-                        <div className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-xl font-semibold">Courier Priority</h3>
-                                    <p className="text-sm text-muted-foreground">Enable and set the priority of your couriers.</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="courier-priority-switch" className="text-sm">
-                                    {courierPriorityEnabled ? 'Enabled' : 'Disabled'}
-                                    </Label>
-                                    <Switch
-                                    id="courier-priority-switch"
-                                    checked={courierPriorityEnabled}
-                                    onCheckedChange={(checked) => {
-                                        setCourierPriorityEnabled(checked);
-                                        updatePrioritySettings(checked, courierPriorityList);
-                                    }}
-                                    disabled={isSubmittingPriority || isReadOnly || courierPriorityList.length === 0}
-                                    />
-                                </div>
+                    <div className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-semibold">Courier Priority</h3>
+                                <p className="text-sm text-muted-foreground">Enable and set the priority of your couriers.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="courier-priority-switch" className="text-sm">
+                                {courierPriorityEnabled ? 'Enabled' : 'Disabled'}
+                                </Label>
+                                <Switch
+                                id="courier-priority-switch"
+                                checked={courierPriorityEnabled}
+                                onCheckedChange={(checked) => {
+                                    setCourierPriorityEnabled(checked);
+                                    updatePrioritySettings(checked, courierPriorityList);
+                                }}
+                                disabled={isSubmittingPriority || isReadOnly || courierPriorityList.length === 0}
+                                />
                             </div>
                         </div>
-                    )}
-                     {courierPriorityEnabled && memberRole !== 'Vendor' && (
+                    </div>
+                     {courierPriorityEnabled && (
                         <div className="border-t bg-muted/50 p-6">
                             <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
                              {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}

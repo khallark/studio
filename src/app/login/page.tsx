@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,9 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginComponent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -200,5 +201,17 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginComponent />
+    </Suspense>
   );
 }

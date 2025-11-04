@@ -38,14 +38,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Enabled status and priorityList are required' }, { status: 400 });
     }
 
-    const memberDoc = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    if (!memberDoc.exists || memberDoc.data()?.role === 'Vendor') {
-        return NextResponse.json({ error: 'Forbidden: User is not authorized to change priority settings.' }, { status: 403 });
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+    if (!memberDoc.exists) {
+        return NextResponse.json({ error: 'Forbidden: User is not a member of this shop.' }, { status: 403 });
     }
+    const memberRole = memberDoc.data()?.role;
 
-    const accountRef = db.collection('accounts').doc(shop);
+    let targetRef;
+    if (memberRole === 'Vendor') {
+        targetRef = memberRef;
+    } else {
+        targetRef = db.collection('accounts').doc(shop);
+    }
     
-    await accountRef.set({
+    await targetRef.set({
       integrations: {
         couriers: {
           priorityEnabled: enabled,

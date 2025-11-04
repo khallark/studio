@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, History, ChevronDown, MoveRight, MessageCircle } from 'lucide-react';
+import { Home, Package, Settings, History, ChevronDown, MoveRight, MessageCircle, UserPlus } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -176,11 +176,11 @@ export default function DashboardLayout({
         // Refresh Xpressbees
         if (couriers?.xpressbees?.apiKey && couriers.xpressbees.lastUpdatedAt) {
           const lastUpdated = (couriers.xpressbees.lastUpdatedAt as Timestamp).toDate();
-          const oneHourAgo = new Date();
-          oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+          const fiveHoursAgo = new Date();
+          fiveHoursAgo.setHours(fiveHoursAgo.getHours() - 5);
 
-          if (lastUpdated < oneHourAgo) {
-            console.log('Xpressbees token is older than 1 hour. Refreshing...');
+          if (lastUpdated < fiveHoursAgo) {
+            console.log('Xpressbees token is older than 5 hours. Refreshing...');
             try {
               const idToken = await user.getIdToken();
               await fetch('/api/integrations/xpressbees/refresh-token', {
@@ -275,6 +275,26 @@ export default function DashboardLayout({
                                 </SidebarMenuSubButton>
                                 <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/orders/awb-processing'}>
                                     <Link href="/dashboard/orders/awb-processing">AWB Processing</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </Collapsible>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <Collapsible>
+                        <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith('/dashboard/members')}>
+                                <div className="flex items-center gap-2">
+                                <UserPlus />
+                                Members
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                            </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/members/invite'}>
+                                    <Link href="/dashboard/members/invite">Invite Member</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSub>
                         </CollapsibleContent>

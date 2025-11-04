@@ -1,4 +1,5 @@
 
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -208,6 +209,14 @@ const nextConfig: NextConfig = {
         source: '/proxy/api/checkout/verify-otp',
         destination: '/proxy/api/checkout/verify-otp/route',
       },
+      {
+        source: '/api/shops/members/create-invite',
+        destination: '/api/shops/members/create-invite/route',
+      },
+      {
+        source: '/api/shops/members/join',
+        destination: '/api/shops/members/join/route',
+      }
     ]
   },
 };

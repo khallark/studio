@@ -216,6 +216,14 @@ const nextConfig: NextConfig = {
       {
         source: '/api/shops/members/join',
         destination: '/api/shops/members/join/route',
+      },
+       {
+        source: '/api/public/join-shop/:sessionId',
+        destination: '/api/public/join-shop/:sessionId/route',
+      },
+      {
+        source: '/api/settings/get-details',
+        destination: '/api/settings/get-details/route',
       }
     ]
   },

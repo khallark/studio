@@ -20,15 +20,21 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, address } = await req.json();
-
-    if (!shop || !address) {
-      return NextResponse.json({ error: 'Shop and address data are required' }, { status: 400 });
-    }
+    const { address } = await req.json();
     
     const userId = await getUserIdFromToken(req);
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
+    }
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    const shop = userDoc.data()?.activeAccountId;
+
+    if (!shop) {
+        return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
+    }
+    if (!address) {
+      return NextResponse.json({ error: 'Address data is required' }, { status: 400 });
     }
 
     // Determine user's role for this shop
@@ -48,13 +54,16 @@ export async function POST(req: NextRequest) {
             companyAddress: address,
             lastUpdatedAt: FieldValue.serverTimestamp(),
         });
-    } else {
+    } else if (userRole === 'SuperAdmin' || userRole === 'Admin') {
         // SuperAdmins and Admins edit the main account document
         const accountRef = db.collection('accounts').doc(shop);
         await accountRef.update({
             companyAddress: address,
             lastUpdatedAt: FieldValue.serverTimestamp(),
         });
+    } else {
+        // Staff members are read-only
+        return NextResponse.json({ error: 'Forbidden: You do not have permission to edit settings.' }, { status: 403 });
     }
 
     return NextResponse.json({ message: 'Company address successfully updated.' });

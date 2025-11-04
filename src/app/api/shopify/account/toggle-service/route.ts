@@ -22,30 +22,40 @@ const VALID_SERVICES = ['bookReturnPage'];
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, serviceName, isEnabled } = await req.json();
-
-    if (!shop || !serviceName || isEnabled === undefined) {
-      return NextResponse.json({ error: 'Shop, serviceName, and isEnabled are required' }, { status: 400 });
-    }
-
-    if (!VALID_SERVICES.includes(serviceName)) {
-      return NextResponse.json({ error: 'Invalid service name provided' }, { status: 400 });
-    }
+    const { serviceName, isEnabled } = await req.json();
 
     const userId = await getUserIdFromToken(req);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
 
-    // Verify user authorization for the shop
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
+    const shop = userDoc.data()?.activeAccountId;
+
+    if (!shop) {
+        return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
+    }
+
+    if (!serviceName || isEnabled === undefined) {
+      return NextResponse.json({ error: 'serviceName, and isEnabled are required' }, { status: 400 });
+    }
+
+    if (!VALID_SERVICES.includes(serviceName)) {
+      return NextResponse.json({ error: 'Invalid service name provided' }, { status: 400 });
+    }
+
+    // Verify user authorization for the shop
+    const memberDoc = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    if (!memberDoc.exists) {
       return NextResponse.json({ error: 'Forbidden: User is not authorized to modify this shop.' }, { status: 403 });
+    }
+    const memberRole = memberDoc.data()?.role;
+    if(memberRole === 'Vendor' || memberRole === 'Staff') {
+        return NextResponse.json({ error: 'Forbidden: Insufficient permissions.' }, { status: 403 });
     }
     
     const accountRef = db.collection('accounts').doc(shop);
     
-    // Using dot notation to update a nested field
     const updatePath = `customerServices.${serviceName}.enabled`;
     
     await accountRef.set({

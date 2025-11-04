@@ -34,7 +34,7 @@ import { Label } from '@/components/ui/label';
 import { PlusCircle, MapPin, Edit, Trash2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, onSnapshot, DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -51,9 +51,13 @@ interface UserData {
   activeAccountId: string | null;
 }
 
+type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
+
+
 export default function PickupLocationsPage() {
   const [user, userLoading] = useAuthState(auth);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const { toast } = useToast();
 
   const [locations, setLocations] = useState<Location[]>([]);
@@ -79,9 +83,17 @@ export default function PickupLocationsPage() {
         const userRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userRef);
         if (userDoc.exists()) {
-          setUserData(userDoc.data() as UserData);
-        } else {
-          setLoading(false);
+          const uData = userDoc.data() as UserData;
+          setUserData(uData);
+
+          if (uData.activeAccountId) {
+            const memberRef = doc(db, 'accounts', uData.activeAccountId, 'members', user.uid);
+            const memberDoc = await getDoc(memberRef);
+            if (memberDoc.exists()) {
+              setMemberRole(memberDoc.data().role);
+            }
+          }
+
         }
       }
     };
@@ -91,9 +103,15 @@ export default function PickupLocationsPage() {
   }, [user, userLoading]);
 
   useEffect(() => {
-    if (userData?.activeAccountId) {
+    if (userData?.activeAccountId && memberRole && user) {
       setLoading(true);
-      const locationsRef = collection(db, 'accounts', userData.activeAccountId, 'pickupLocations');
+      
+      let locationsRef;
+      if (memberRole === 'Vendor') {
+          locationsRef = collection(db, 'accounts', userData.activeAccountId, 'members', user.uid, 'pickupLocations');
+      } else {
+          locationsRef = collection(db, 'accounts', userData.activeAccountId, 'pickupLocations');
+      }
       
       const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
         const fetchedLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Location));
@@ -110,10 +128,10 @@ export default function PickupLocationsPage() {
       });
 
       return () => unsubscribe();
-    } else if (!userLoading && userData === null) {
+    } else if (!userLoading && (userData === null || memberRole === null)) {
       setLoading(false);
     }
-  }, [userData, toast, userLoading]);
+  }, [userData, memberRole, user, toast, userLoading]);
   
   useEffect(() => {
     if (editingLocation) {
@@ -231,10 +249,12 @@ export default function PickupLocationsPage() {
               <CardTitle className="text-2xl font-headline">Pickup Locations</CardTitle>
               <CardDescription>Manage where customers can pick up their orders.</CardDescription>
             </div>
-            <Button disabled={!userData?.activeAccountId} onClick={() => handleOpenDialog()}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add New Location
-            </Button>
+             {memberRole !== 'Staff' && (
+                <Button disabled={!userData?.activeAccountId} onClick={() => handleOpenDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add New Location
+                </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -267,6 +287,7 @@ export default function PickupLocationsPage() {
                       </p>
                     </div>
                   </div>
+                   {memberRole !== 'Staff' && (
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(location)}>
                       <Edit className="h-4 w-4" />
@@ -293,6 +314,7 @@ export default function PickupLocationsPage() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+                  )}
                 </div>
               ))}
             </div>

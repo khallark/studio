@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -47,11 +47,6 @@ interface CourierSetting {
   mode: 'Surface' | 'Express';
 }
 
-interface UserData {
-  activeAccountId: string | null;
-  accounts: string[];
-}
-
 interface CourierIntegrations {
     delhivery?: { apiKey: string; };
     shiprocket?: { email: string; apiKey: string; };
@@ -60,26 +55,29 @@ interface CourierIntegrations {
     priorityList?: CourierSetting[];
 }
 
-interface AccountData {
-    integrations?: {
-        couriers?: CourierIntegrations,
-        communication?: {
-          interakt?: {
-            apiKey?: string;
-            webhookKey?: string;
-          }
-        }
+interface CommunicationIntegrations {
+    interakt?: {
+        apiKey?: string;
+        webhookKey?: string;
     }
 }
 
+interface SettingsData {
+    integrations?: {
+        couriers?: CourierIntegrations,
+        communication?: CommunicationIntegrations
+    }
+}
+
+type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
+
 // Helper function to merge priority list while preserving order
-const mergePriorityList = (savedList: CourierSetting[], couriers: CourierIntegrations | undefined): CourierSetting[] => {
+const mergePriorityList = (savedList: CourierSetting[] | undefined, couriers: CourierIntegrations | undefined): CourierSetting[] => {
     if (!couriers) return [];
     
     // Get all integrated couriers
     const integrated = Object.keys(couriers).filter(k => 
         !['priorityEnabled', 'priorityList'].includes(k) && 
-        k !== 'xpressbees' &&
         couriers?.[k as keyof typeof couriers]
     );
     
@@ -90,18 +88,18 @@ const mergePriorityList = (savedList: CourierSetting[], couriers: CourierIntegra
     
     // Add newly integrated couriers that aren't in the saved list
     const newIntegrated = integrated
-        .filter(name => !savedList?.some(s => s.name === name))
+        .filter(name => !(savedList || []).some(s => s.name === name))
         .map(name => ({ name, mode: 'Surface' as const }));
     
     return [...orderedList, ...newIntegrated];
 };
 
 export default function AppsSettingsPage() {
-  const [user, loading] = useAuthState(auth);
+  const [user, userLoading] = useAuthState(auth);
   const { toast } = useToast();
 
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [accountData, setAccountData] = useState<AccountData | null>(null);
+  const [settingsData, setSettingsData] = useState<SettingsData | null>(null);
+  const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
 
   const [delhiveryApiKey, setDelhiveryApiKey] = useState('');
@@ -130,31 +128,77 @@ export default function AppsSettingsPage() {
   const [courierPriorityList, setCourierPriorityList] = useState<CourierSetting[]>([]);
   const [isSubmittingPriority, setIsSubmittingPriority] = useState(false);
 
-
   const [appUrl, setAppUrl] = useState('');
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Settings - Apps";
-  })
-
-  useEffect(() => {
-    // This will only run on the client side
     setAppUrl(window.location.origin);
   }, []);
 
+  const fetchData = async () => {
+    if (!user) return;
+    setDataLoading(true);
+
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/settings/get-details', {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch settings');
+        }
+        
+        setMemberRole(data.role);
+        setSettingsData(data.settings);
+        const integrations = data.settings?.integrations;
+        
+        setDelhiveryApiKey(integrations?.couriers?.delhivery?.apiKey || '');
+        setInteraktApiKey(integrations?.communication?.interakt?.apiKey || '');
+        setInteraktWebhookKey(integrations?.communication?.interakt?.webhookKey || '');
+        
+        const couriers = integrations?.couriers;
+        setCourierPriorityEnabled(couriers?.priorityEnabled || false);
+        const mergedList = mergePriorityList(couriers?.priorityList, couriers);
+        setCourierPriorityList(mergedList);
+
+    } catch (error) {
+        toast({
+            title: 'Error Loading Settings',
+            description: error instanceof Error ? error.message : 'Could not load your settings data.',
+            variant: 'destructive',
+        });
+        setSettingsData(null);
+    } finally {
+        setDataLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!userLoading && user) {
+        fetchData();
+    } else if (!userLoading && !user) {
+        setDataLoading(false);
+    }
+  }, [user, userLoading]);
+
   const updatePrioritySettings = async (enabled: boolean, list: CourierSetting[]) => {
-      if (!userData?.activeAccountId || !user) return;
+      if (!user) return;
       setIsSubmittingPriority(true);
       try {
           const idToken = await user.getIdToken();
           const response = await fetch('/api/integrations/courier/update-priority', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}`},
-              body: JSON.stringify({ shop: userData.activeAccountId, enabled, priorityList: list })
+              body: JSON.stringify({ shop: 'unused', enabled, priorityList: list })
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.details || 'Failed to update priority settings');
           toast({ title: 'Priority Settings Updated' });
+          fetchData(); // Refetch
       } catch (error) {
           toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
       } finally {
@@ -169,85 +213,9 @@ export default function AppsSettingsPage() {
       setCourierPriorityList(newList);
       updatePrioritySettings(courierPriorityEnabled, newList);
   };
-
-
-  useEffect(() => {
-    if (loading) return;
-
-    const fetchInitialData = async () => {
-        if (user) {
-            const userRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
-            if (userDoc.exists()) {
-                const fetchedUserData = userDoc.data() as UserData;
-                setUserData(fetchedUserData);
-                
-                if (fetchedUserData.activeAccountId) {
-                    const accountRef = doc(db, 'accounts', fetchedUserData.activeAccountId);
-                    const accountDoc = await getDoc(accountRef);
-                    if (accountDoc.exists()) {
-                        const accData = accountDoc.data() as AccountData;
-                        setAccountData(accData);
-                        setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
-                        setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
-                        setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
-                        
-                        const couriers = accData.integrations?.couriers;
-                        setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                        
-                        // Use the helper function for consistent ordering
-                        const mergedList = mergePriorityList(couriers?.priorityList || [], couriers);
-                        setCourierPriorityList(mergedList);
-                    }
-                }
-            }
-        }
-        setDataLoading(false);
-    };
-    
-    fetchInitialData();
-
-    if (user && userData?.activeAccountId) {
-        const accountRef = doc(db, 'accounts', userData.activeAccountId);
-        const unsubscribe = onSnapshot(accountRef, (doc) => {
-            if (doc.exists()) {
-                const accData = doc.data() as AccountData;
-                setAccountData(accData);
-                if (!isEditingDelhivery) setDelhiveryApiKey(accData.integrations?.couriers?.delhivery?.apiKey || '');
-                if (!isEditingInteraktApi) setInteraktApiKey(accData.integrations?.communication?.interakt?.apiKey || '');
-                if (!isEditingInteraktWebhook) setInteraktWebhookKey(accData.integrations?.communication?.interakt?.webhookKey || '');
-
-                const couriers = accData.integrations?.couriers;
-                setCourierPriorityEnabled(couriers?.priorityEnabled || false);
-                
-                // Use the helper function for consistent ordering
-                const mergedList = mergePriorityList(couriers?.priorityList || [], couriers);
-                setCourierPriorityList(mergedList);
-            }
-        });
-        return () => unsubscribe();
-    }
-
-  }, [user, loading, userData?.activeAccountId, isEditingDelhivery, isEditingInteraktApi, isEditingInteraktWebhook]);
-
-  const hasConnectedStore = userData?.activeAccountId;
-  const hasDelhiveryKey = !!accountData?.integrations?.couriers?.delhivery?.apiKey;
-  const hasShiprocketCreds = !!accountData?.integrations?.couriers?.shiprocket?.apiKey;
-  const hasXpressbeesCreds = !!accountData?.integrations?.couriers?.xpressbees?.apiKey;
-  const hasInteraktApiKey = !!accountData?.integrations?.communication?.interakt?.apiKey;
-  const hasInteraktWebhookKey = !!accountData?.integrations?.communication?.interakt?.webhookKey;
-
-  const handleDisconnect = () => {
-    toast({
-      title: "Store Disconnected",
-      description: "Your Shopify store has been disconnected.",
-    });
-    setUserData(prev => prev ? { ...prev, activeAccountId: null } : null);
-    setAccountData(null);
-  };
   
   const handleSaveDelhiveryKey = async () => {
-      if (!userData?.activeAccountId || !user || !delhiveryApiKey) {
+      if (!user || !delhiveryApiKey) {
           toast({ title: "API Key is required", variant: "destructive"});
           return;
       };
@@ -262,7 +230,7 @@ export default function AppsSettingsPage() {
                   'Authorization': `Bearer ${idToken}`
               },
               body: JSON.stringify({
-                  shop: userData.activeAccountId,
+                  shop: 'unused',
                   courierName: 'delhivery',
                   apiKey: delhiveryApiKey,
               })
@@ -273,6 +241,7 @@ export default function AppsSettingsPage() {
 
           toast({ title: 'API Key Saved', description: 'Delhivery integration has been updated.' });
           setIsEditingDelhivery(false);
+          fetchData(); // Refetch
       } catch (error) {
           toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
       } finally {
@@ -281,7 +250,7 @@ export default function AppsSettingsPage() {
   };
 
   const handleSaveShiprocketCreds = async () => {
-    if (!userData?.activeAccountId || !user || !shiprocketEmail || !shiprocketPassword) {
+    if (!user || !shiprocketEmail || !shiprocketPassword) {
         toast({ title: "Email and Password are required", variant: "destructive"});
         return;
     };
@@ -296,7 +265,7 @@ export default function AppsSettingsPage() {
                 'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-                shop: userData.activeAccountId,
+                shop: 'unused',
                 email: shiprocketEmail,
                 password: shiprocketPassword,
             })
@@ -309,15 +278,16 @@ export default function AppsSettingsPage() {
         setIsEditingShiprocket(false);
         setShiprocketEmail('');
         setShiprocketPassword('');
+        fetchData();
     } catch (error) {
         toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
     } finally {
         setIsSubmittingShiprocket(false);
     }
   };
-
-  const handleSaveXpressbeesCreds = async () => {
-    if (!userData?.activeAccountId || !user || !xpressbeesEmail || !xpressbeesPassword) {
+  
+    const handleSaveXpressbeesCreds = async () => {
+    if (!user || !xpressbeesEmail || !xpressbeesPassword) {
         toast({ title: "Email and Password are required", variant: "destructive"});
         return;
     };
@@ -332,7 +302,7 @@ export default function AppsSettingsPage() {
                 'Authorization': `Bearer ${idToken}`
             },
             body: JSON.stringify({
-                shop: userData.activeAccountId,
+                shop: 'unused',
                 email: xpressbeesEmail,
                 password: xpressbeesPassword,
             })
@@ -345,6 +315,7 @@ export default function AppsSettingsPage() {
         setIsEditingXpressbees(false);
         setXpressbeesEmail('');
         setXpressbeesPassword('');
+        fetchData();
     } catch (error) {
         toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
     } finally {
@@ -353,7 +324,7 @@ export default function AppsSettingsPage() {
   };
 
   const handleSaveInterakt = async (type: 'apiKey' | 'webhookKey') => {
-    if (!userData?.activeAccountId || !user) return;
+    if (!user) return;
 
     let keyToSave: string, valueToSave: string;
     if (type === 'apiKey') {
@@ -383,7 +354,7 @@ export default function AppsSettingsPage() {
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          shop: userData.activeAccountId,
+          shop: 'unused',
           key: keyToSave,
           value: valueToSave,
         }),
@@ -396,6 +367,7 @@ export default function AppsSettingsPage() {
       
       if (type === 'apiKey') setIsEditingInteraktApi(false);
       else setIsEditingInteraktWebhook(false);
+      fetchData();
 
     } catch (error) {
       toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
@@ -412,7 +384,38 @@ export default function AppsSettingsPage() {
       toast({ title: 'Failed to copy', description: 'Could not copy text to clipboard.', variant: 'destructive' });
     });
   };
+  
+  const hasConnectedStore = !!settingsData;
+  const isReadOnly = memberRole === 'Staff';
+  const hasDelhiveryKey = !!settingsData?.integrations?.couriers?.delhivery?.apiKey;
+  const hasShiprocketCreds = !!settingsData?.integrations?.couriers?.shiprocket?.apiKey;
+  const hasXpressbeesCreds = !!settingsData?.integrations?.couriers?.xpressbees?.apiKey;
+  const hasInteraktApiKey = !!settingsData?.integrations?.communication?.interakt?.apiKey;
+  const hasInteraktWebhookKey = !!settingsData?.integrations?.communication?.interakt?.webhookKey;
 
+  const renderSkeleton = () => (
+    <Card className="w-full max-w-4xl">
+        <CardHeader>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+        </CardHeader>
+        <CardContent className="space-y-8">
+            <Skeleton className="h-24 w-full" />
+            <Separator />
+            <Skeleton className="h-48 w-full" />
+            <Separator />
+            <Skeleton className="h-48 w-full" />
+        </CardContent>
+    </Card>
+  )
+
+  if (dataLoading || userLoading) {
+      return (
+        <div className="flex justify-center items-start h-full p-4 md:p-6">
+            {renderSkeleton()}
+        </div>
+      )
+  }
 
   return (
     <TooltipProvider>
@@ -423,101 +426,34 @@ export default function AppsSettingsPage() {
           <CardDescription>Manage your connected applications, courier services, and communication channels.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
-            {/* Apps Section */}
             <section>
-                <h2 className="text-lg font-semibold mb-4 text-primary">Connected Apps</h2>
-                <div className="rounded-lg border p-6">
-                    {dataLoading ? (
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                        <Skeleton className="w-16 h-16 rounded-md" />
-                        <div className="space-y-2">
-                            <Skeleton className="h-6 w-24" />
-                            <Skeleton className="h-4 w-48" />
-                        </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                        <Skeleton className="h-10 w-28" />
-                        </div>
-                    </div>
-                    ) : (
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <Image src="https://picsum.photos/seed/shopify/64/64" alt="Shopify Logo" width={64} height={64} className="rounded-md" data-ai-hint="shopify logo" />
-                        <div>
-                            <h3 className="text-xl font-semibold">Shopify</h3>
-                            <p className="text-sm text-muted-foreground">Sync your orders and products from Shopify.</p>
-                        </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                        {hasConnectedStore ? (
-                            <>
-                            <Badge variant="default">Connected</Badge>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                <Button variant="destructive">Disconnect</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                    This will disconnect your Shopify store. You will need to reconnect to continue syncing orders.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDisconnect}>
-                                    Yes, Disconnect
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            </>
-                        ) : (
-                            <>
-                            <Badge variant="secondary">Not Connected</Badge>
-                            <Button asChild>
-                                <Link href="/dashboard/connect">Connect</Link>
-                            </Button>
-                            </>
-                        )}
-                        </div>
-                    </div>
-                    )}
-                </div>
-            </section>
-
-            <Separator />
-            
-            {/* Courier Integrations Section */}
-            <section>
-                 <h2 className="text-lg font-semibold mb-4 text-primary">Courier Services</h2>
+                <h2 className="text-lg font-semibold mb-4 text-primary">Courier Services</h2>
                  <div className="rounded-lg border">
-                    {/* Courier Priority */}
-                    <div className="p-6">
-                         <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xl font-semibold">Courier Priority</h3>
-                                <p className="text-sm text-muted-foreground">Enable and set the priority of your couriers.</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Label htmlFor="courier-priority-switch" className="text-sm">
-                                  {courierPriorityEnabled ? 'Enabled' : 'Disabled'}
-                                </Label>
-                                <Switch
-                                  id="courier-priority-switch"
-                                  checked={courierPriorityEnabled}
-                                  onCheckedChange={(checked) => {
-                                      setCourierPriorityEnabled(checked);
-                                      updatePrioritySettings(checked, courierPriorityList);
-                                  }}
-                                  disabled={isSubmittingPriority || courierPriorityList.length === 0}
-                                />
+                    {memberRole !== 'Vendor' && (
+                        <div className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-xl font-semibold">Courier Priority</h3>
+                                    <p className="text-sm text-muted-foreground">Enable and set the priority of your couriers.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="courier-priority-switch" className="text-sm">
+                                    {courierPriorityEnabled ? 'Enabled' : 'Disabled'}
+                                    </Label>
+                                    <Switch
+                                    id="courier-priority-switch"
+                                    checked={courierPriorityEnabled}
+                                    onCheckedChange={(checked) => {
+                                        setCourierPriorityEnabled(checked);
+                                        updatePrioritySettings(checked, courierPriorityList);
+                                    }}
+                                    disabled={isSubmittingPriority || isReadOnly || courierPriorityList.length === 0}
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                     {courierPriorityEnabled && (
+                    )}
+                     {courierPriorityEnabled && memberRole !== 'Vendor' && (
                         <div className="border-t bg-muted/50 p-6">
                             <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
                              {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
@@ -535,6 +471,7 @@ export default function AppsSettingsPage() {
                                         <Select 
                                             value={courier.mode} 
                                             onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                            disabled={isReadOnly}
                                         >
                                             <SelectTrigger className="w-[120px] h-8">
                                                 <SelectValue />
@@ -562,10 +499,10 @@ export default function AppsSettingsPage() {
                             {hasDelhiveryKey && !isEditingDelhivery ? (
                                 <>
                                     <Badge variant="default">Connected</Badge>
-                                    <Button variant="outline" onClick={() => setIsEditingDelhivery(true)}>Change Key</Button>
+                                    {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingDelhivery(true)}>Change Key</Button>}
                                 </>
                             ) : (
-                                 <Button variant="outline" onClick={() => setIsEditingDelhivery(true)} disabled={!hasConnectedStore}>
+                                 <Button variant="outline" onClick={() => setIsEditingDelhivery(true)} disabled={!hasConnectedStore || isReadOnly}>
                                     {hasConnectedStore ? 'Connect' : 'No Store'}
                                 </Button>
                             )}
@@ -607,10 +544,10 @@ export default function AppsSettingsPage() {
                             {hasShiprocketCreds && !isEditingShiprocket ? (
                                 <>
                                     <Badge variant="default">Connected</Badge>
-                                    <Button variant="outline" onClick={() => setIsEditingShiprocket(true)}>Change Credentials</Button>
+                                    {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingShiprocket(true)}>Change Credentials</Button>}
                                 </>
                             ) : (
-                                <Button variant="outline" onClick={() => setIsEditingShiprocket(true)} disabled={!hasConnectedStore}>
+                                <Button variant="outline" onClick={() => setIsEditingShiprocket(true)} disabled={!hasConnectedStore || isReadOnly}>
                                     {hasConnectedStore ? 'Connect' : 'No Store'}
                                 </Button>
                             )}
@@ -677,10 +614,10 @@ export default function AppsSettingsPage() {
                             {hasXpressbeesCreds && !isEditingXpressbees ? (
                                 <>
                                     <Badge variant="default">Connected</Badge>
-                                    <Button variant="outline" onClick={() => setIsEditingXpressbees(true)}>Change Credentials</Button>
+                                    {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingXpressbees(true)}>Change Credentials</Button>}
                                 </>
                             ) : (
-                                <Button variant="outline" onClick={() => setIsEditingXpressbees(true)} disabled={!hasConnectedStore}>
+                                <Button variant="outline" onClick={() => setIsEditingXpressbees(true)} disabled={!hasConnectedStore || isReadOnly}>
                                     {hasConnectedStore ? 'Connect' : 'No Store'}
                                 </Button>
                             )}
@@ -756,9 +693,9 @@ export default function AppsSettingsPage() {
                             </div>
                             <div className="flex items-center gap-4">
                                 {hasInteraktApiKey && !isEditingInteraktApi ? (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)}>Change Key</Button>
+                                    !isReadOnly && <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)}>Change Key</Button>
                                 ) : (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)} disabled={!hasConnectedStore}>
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)} disabled={!hasConnectedStore || isReadOnly}>
                                         {hasConnectedStore ? 'Set Key' : 'No Store'}
                                     </Button>
                                 )}
@@ -793,9 +730,9 @@ export default function AppsSettingsPage() {
                             </div>
                             <div className="flex items-center gap-4">
                                 {hasInteraktWebhookKey && !isEditingInteraktWebhook ? (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)}>Change Key</Button>
+                                    !isReadOnly && <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)}>Change Key</Button>
                                 ) : (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)} disabled={!hasConnectedStore}>
+                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)} disabled={!hasConnectedStore || isReadOnly}>
                                         {hasConnectedStore ? 'Set Key' : 'No Store'}
                                     </Button>
                                 )}
@@ -811,8 +748,8 @@ export default function AppsSettingsPage() {
                                   <div className="flex items-center gap-2">
                                     <span>Paste this URL in the "Webhook url" box:</span>
                                     <div className="flex items-center gap-1 rounded-md bg-background border px-2 py-1">
-                                      <code className="text-xs">{appUrl}/api/webhooks/interakt?shop={userData?.activeAccountId}</code>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(`${appUrl}/api/webhooks/interakt?shop=${encodeURIComponent(userData?.activeAccountId || "")}`)}>
+                                      <code className="text-xs">{appUrl}/api/webhooks/interakt?shop={activeAccountId}</code>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(`${appUrl}/api/webhooks/interakt?shop=${encodeURIComponent(activeAccountId || "")}`)}>
                                         <Copy className="h-3 w-3" />
                                       </Button>
                                     </div>

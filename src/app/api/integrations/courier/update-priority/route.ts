@@ -20,20 +20,27 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, enabled, priorityList } = await req.json();
+    const { enabled, priorityList } = await req.json();
 
-    if (!shop || enabled === undefined || !Array.isArray(priorityList)) {
-      return NextResponse.json({ error: 'Shop, enabled status, and priorityList are required' }, { status: 400 });
-    }
-    
     const userId = await getUserIdFromToken(req);
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
     
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
-        return NextResponse.json({ error: 'Forbidden: User is not authorized to edit this shop.' }, { status: 403 });
+    const shop = userDoc.data()?.activeAccountId;
+    
+    if (!shop) {
+        return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
+    }
+
+    if (enabled === undefined || !Array.isArray(priorityList)) {
+      return NextResponse.json({ error: 'Enabled status and priorityList are required' }, { status: 400 });
+    }
+
+    const memberDoc = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    if (!memberDoc.exists || memberDoc.data()?.role === 'Vendor') {
+        return NextResponse.json({ error: 'Forbidden: User is not authorized to change priority settings.' }, { status: 403 });
     }
 
     const accountRef = db.collection('accounts').doc(shop);

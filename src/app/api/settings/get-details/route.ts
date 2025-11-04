@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
       settingsData = {
         companyAddress: memberData.companyAddress || null,
         primaryContact: memberData.primaryContact || null,
-        // Vendors don't see main customer services
-        customerServices: {}, 
+        customerServices: {}, // Vendors don't see main customer services
+        integrations: memberData.integrations || {}, // Fetch integrations from member doc
       };
     } else {
       // SuperAdmin, Admin, and Staff see the main account settings
@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
           companyAddress: accountData.companyAddress || null,
           primaryContact: accountData.primaryContact || null,
           customerServices: accountData.customerServices || {},
+          integrations: accountData.integrations || {}, // Fetch integrations from account doc
         };
       }
     }

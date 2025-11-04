@@ -79,9 +79,7 @@ export async function POST(req: NextRequest) {
             apiKey: token,
             lastUpdatedAt: FieldValue.serverTimestamp(),
           },
-          // For vendors, this will be on their own doc. For others, it's on the account doc.
-          // This ensures vendors are automatically part of the courier pool for their own settings.
-          priorityList: FieldValue.arrayUnion("xpressbees") 
+          priorityList: FieldValue.arrayUnion({name: 'xpressbees', mode: 'Surface'}),
         }
       },
     }, { merge: true });

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -17,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Info, GripVertical, Loader2 } from 'lucide-react';
+import { Info, GripVertical, Loader2, Trash2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,6 +25,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Reorder } from "framer-motion"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { doc, getDoc } from 'firebase/firestore';
@@ -81,6 +91,7 @@ export default function AppsSettingsPage() {
   const [settingsData, setSettingsData] = useState<SettingsData | null>(null);
   const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [deletingCourier, setDeletingCourier] = useState<string | null>(null);
 
   const [delhiveryApiKey, setDelhiveryApiKey] = useState('');
   const [isEditingDelhivery, setIsEditingDelhivery] = useState(false);
@@ -159,7 +170,7 @@ export default function AppsSettingsPage() {
           const response = await fetch('/api/integrations/courier/update-priority', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}`},
-              body: JSON.stringify({ shop: 'unused', enabled, priorityList: list })
+              body: JSON.stringify({ enabled, priorityList: list.map(item => ({ name: item.name, mode: item.mode })) })
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.details || 'Failed to update priority settings');
@@ -171,6 +182,28 @@ export default function AppsSettingsPage() {
           setIsSubmittingPriority(false);
       }
   };
+  
+    const handleRemoveCourier = async (courierName: string) => {
+        if (!user) return;
+        setDeletingCourier(courierName);
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/integrations/courier/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}`},
+                body: JSON.stringify({ courierName })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to remove integration');
+
+            toast({ title: 'Integration Removed', description: `${courierName} has been disconnected.` });
+            fetchData();
+        } catch (error) {
+            toast({ title: 'Removal Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
+        } finally {
+            setDeletingCourier(null);
+        }
+    };
 
   const handlePriorityModeChange = (courierName: string, mode: 'Surface' | 'Express') => {
       const newList = courierPriorityList.map(item => 
@@ -348,38 +381,42 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     </div>
-                    <div className="border-t bg-muted/50 p-6">
-                        <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
-                         {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
-                        <Reorder.Group axis="y" values={courierPriorityList} onReorder={setCourierPriorityList} className="space-y-2">
-                        {courierPriorityList.map((courier) => (
-                            <Reorder.Item 
-                                key={courier.name} 
-                                value={courier} 
-                                className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
-                                onDragEnd={() => updatePrioritySettings(courierPriorityEnabled, courierPriorityList)}
-                            >
-                                <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                {courier.name !== 'shiprocket' && (
-                                    <Select 
-                                        value={courier.mode} 
-                                        onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
-                                        disabled={isReadOnly}
-                                    >
-                                        <SelectTrigger className="w-[120px] h-8">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Surface">Surface</SelectItem>
-                                            <SelectItem value="Express">Express</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            </Reorder.Item>
-                        ))}
-                        </Reorder.Group>
-                    </div>
+                    {memberRole !== 'Vendor' && (
+                        <div className="border-t bg-muted/50 p-6">
+                            <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
+                            {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
+                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={(list) => {
+                                setCourierPriorityList(list);
+                                updatePrioritySettings(courierPriorityEnabled, list);
+                            }} className="space-y-2">
+                            {courierPriorityList.map((courier) => (
+                                <Reorder.Item 
+                                    key={courier.name} 
+                                    value={courier} 
+                                    className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
+                                >
+                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                    <span className="font-medium capitalize flex-1">{courier.name}</span>
+                                    {courier.name !== 'shiprocket' && (
+                                        <Select 
+                                            value={courier.mode} 
+                                            onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                            disabled={isReadOnly}
+                                        >
+                                            <SelectTrigger className="w-[120px] h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Surface">Surface</SelectItem>
+                                                <SelectItem value="Express">Express</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </Reorder.Item>
+                            ))}
+                            </Reorder.Group>
+                        </div>
+                    )}
                     {/* Delhivery */}
                     <div className="border-t p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -393,6 +430,25 @@ export default function AppsSettingsPage() {
                                 <>
                                     <Badge variant="default">Connected</Badge>
                                     {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingDelhivery(true)}>Change Key</Button>}
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" disabled={deletingCourier === 'delhivery' || isReadOnly}>
+                                                {deletingCourier === 'delhivery' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will disconnect your Delhivery integration and remove it from your priority list. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleRemoveCourier('delhivery')}>Remove</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </>
                             ) : (
                                  <Button variant="outline" onClick={() => setIsEditingDelhivery(true)} disabled={!hasConnectedStore || isReadOnly}>
@@ -438,6 +494,25 @@ export default function AppsSettingsPage() {
                                 <>
                                     <Badge variant="default">Connected</Badge>
                                     {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingShiprocket(true)}>Change Credentials</Button>}
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" disabled={deletingCourier === 'shiprocket' || isReadOnly}>
+                                                {deletingCourier === 'shiprocket' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will disconnect your Shiprocket integration and remove it from your priority list. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleRemoveCourier('shiprocket')}>Remove</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </>
                             ) : (
                                 <Button variant="outline" onClick={() => setIsEditingShiprocket(true)} disabled={!hasConnectedStore || isReadOnly}>
@@ -508,6 +583,25 @@ export default function AppsSettingsPage() {
                                 <>
                                     <Badge variant="default">Connected</Badge>
                                     {!isReadOnly && <Button variant="outline" onClick={() => setIsEditingXpressbees(true)}>Change Credentials</Button>}
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" disabled={deletingCourier === 'xpressbees' || isReadOnly}>
+                                                {deletingCourier === 'xpressbees' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will disconnect your Xpressbees integration and remove it from your priority list. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleRemoveCourier('xpressbees')}>Remove</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </>
                             ) : (
                                 <Button variant="outline" onClick={() => setIsEditingXpressbees(true)} disabled={!hasConnectedStore || isReadOnly}>

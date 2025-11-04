@@ -200,6 +200,10 @@ const nextConfig: NextConfig = {
       {
         source: '/api/settings/get-details',
         destination: '/api/settings/get-details/route',
+      },
+      {
+        source: '/api/integrations/courier/delete',
+        destination: '/api/integrations/courier/delete/route',
       }
     ]
   },

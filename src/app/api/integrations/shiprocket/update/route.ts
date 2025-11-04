@@ -79,7 +79,8 @@ export async function POST(req: NextRequest) {
             password, // Storing password directly is not recommended in production. Use a secret manager.
             apiKey: token,
             lastUpdatedAt: FieldValue.serverTimestamp(),
-          }
+          },
+          priorityList: FieldValue.arrayUnion({name: "shiprocket", mode: "Surface"}),
         }
       },
     }, { merge: true });

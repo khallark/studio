@@ -12,6 +12,7 @@ import { AlertTriangle, Copy, Loader2, Link as LinkIcon, CheckCircle } from 'luc
 import { useToast } from '@/hooks/use-toast';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
+import { Input } from '@/components/ui/input';
 
 type MemberRole = 'Admin' | 'Staff' | 'Vendor';
 
@@ -26,12 +27,14 @@ export default function InviteMemberPage() {
   const { toast } = useToast();
 
   const [role, setRole] = useState<MemberRole | null>(null);
+  const [vendorName, setVendorName] = useState('');
   const [permissions, setPermissions] = useState<Record<string, any>>({});
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   
   const handleRoleChange = (selectedRole: MemberRole) => {
     setRole(selectedRole);
+    setVendorName('');
     // Reset permissions when role changes
     if (selectedRole === 'Staff' || selectedRole === 'Vendor') {
       setPermissions({ viewableStatuses: [] });
@@ -61,6 +64,10 @@ export default function InviteMemberPage() {
       toast({ title: "Role not selected", description: "Please select a member role.", variant: "destructive" });
       return;
     }
+    if (role === 'Vendor' && !vendorName.trim()) {
+      toast({ title: "Vendor Name required", description: "Please enter a name for the vendor.", variant: "destructive" });
+      return;
+    }
 
     setIsCreatingLink(true);
     setGeneratedLink(null);
@@ -70,7 +77,7 @@ export default function InviteMemberPage() {
       const response = await fetch('/api/shops/members/create-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({ role, permissions })
+        body: JSON.stringify({ role, permissions, vendorName: role === 'Vendor' ? vendorName : undefined })
       });
 
       const result = await response.json();
@@ -126,6 +133,17 @@ export default function InviteMemberPage() {
             <section>
               <Label className="text-lg font-semibold">2. Set Permissions</Label>
               <div className="mt-4 p-4 border rounded-lg space-y-4">
+                {role === 'Vendor' && (
+                    <div className="space-y-2">
+                        <Label htmlFor="vendorName" className="font-medium">Vendor Name</Label>
+                        <Input 
+                            id="vendorName"
+                            placeholder="e.g., 'ABC Suppliers'"
+                            value={vendorName}
+                            onChange={(e) => setVendorName(e.target.value)}
+                        />
+                    </div>
+                )}
                 {role === 'Admin' && (
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">

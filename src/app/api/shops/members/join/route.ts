@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
                 throw new Error('This invitation link has expired.');
             }
 
-            const { shopId, role, permissions } = sessionData;
+            const { shopId, role, permissions, vendorName } = sessionData;
 
             if (!shopId || !role) {
                 throw new Error('Invitation is missing required information.');
@@ -68,16 +68,22 @@ export async function POST(req: NextRequest) {
             // Add user to the account's members subcollection
             const userProfile = await adminAuth.getUser(userId);
 
-            transaction.set(memberRef, {
+            const memberData: any = {
                 role: role,
                 permissions: permissions,
                 uid: userId,
                 email: userProfile.email,
-                displayName: userProfile.displayName || userProfile.email,
+                displayName: vendorName || userProfile.displayName || userProfile.email,
                 photoURL: userProfile.photoURL || null,
                 joinedAt: FieldValue.serverTimestamp(),
                 status: 'active', // can be used to suspend members later
-            });
+            };
+
+            if (role === 'Vendor' && vendorName) {
+                memberData.vendorName = vendorName;
+            }
+
+            transaction.set(memberRef, memberData);
             
             // **NEW**: Update the user's document to add the new shop
             const userRef = db.collection('users').doc(userId);

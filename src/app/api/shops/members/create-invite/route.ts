@@ -33,7 +33,7 @@ async function verifyUserPermissions(userId: string, shopId: string): Promise<bo
 
 export async function POST(req: NextRequest) {
     try {
-        const { role, permissions } = await req.json();
+        const { role, permissions, vendorName } = await req.json();
 
         // 1. Authentication & Authorization
         const userId = await getUserIdFromToken(req);
@@ -65,6 +65,9 @@ export async function POST(req: NextRequest) {
         if (!role || !validRoles.includes(role)) {
             return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 });
         }
+        if (role === 'Vendor' && (!vendorName || typeof vendorName !== 'string' || vendorName.trim().length === 0)) {
+            return NextResponse.json({ error: 'Vendor name is required for the Vendor role' }, { status: 400 });
+        }
         if (!permissions || typeof permissions !== 'object') {
              return NextResponse.json({ error: 'Invalid permissions object' }, { status: 400 });
         }
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
         const oneHourFromNow = new Date();
         oneHourFromNow.setHours(oneHourFromNow.getHours() + 1);
 
-        const sessionData = {
+        const sessionData: any = {
             shopId: shopId,
             shopName: shopDoc.data()?.shopName || shopId,
             role: role,
@@ -86,6 +89,10 @@ export async function POST(req: NextRequest) {
             createdBy: userId,
             used: false,
         };
+        
+        if (role === 'Vendor') {
+            sessionData.vendorName = vendorName.trim();
+        }
 
         await sessionRef.set(sessionData);
 

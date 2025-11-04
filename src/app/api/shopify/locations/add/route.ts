@@ -36,13 +36,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
     }
 
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
-        return NextResponse.json({ error: 'Forbidden: User is not authorized to modify this shop.' }, { status: 403 });
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+
+    if (!memberDoc.exists) {
+        return NextResponse.json({ error: 'Forbidden: You are not a member of this shop.' }, { status: 403 });
     }
-    
-    const accountRef = db.collection('accounts').doc(shop);
-    const locationsCollection = accountRef.collection('pickupLocations');
+    const memberData = memberDoc.data();
+    const userRole = memberData?.role;
+
+    let locationsCollection;
+    if (userRole === 'Vendor') {
+        locationsCollection = memberRef.collection('pickupLocations');
+    } else if (userRole === 'SuperAdmin' || userRole === 'Admin') {
+        const accountRef = db.collection('accounts').doc(shop);
+        locationsCollection = accountRef.collection('pickupLocations');
+    } else {
+        return NextResponse.json({ error: 'Forbidden: You do not have permission to add locations.' }, { status: 403 });
+    }
 
     await locationsCollection.add({
       ...location,

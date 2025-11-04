@@ -1,4 +1,5 @@
 
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -69,12 +70,20 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/shiprocket/update/route',
       },
       {
+        source: '/api/integrations/xpressbees/update',
+        destination: '/api/integrations/xpressbees/update/route',
+      },
+      {
         source: '/api/integrations/shiprocket/refresh-token',
         destination: '/api/integrations/shiprocket/refresh-token/route',
       },
       {
-        source: '/api/shopify/courier/download-failed-jobs',
-        destination: '/api/shopify/courier/download-failed-jobs/route',
+        source: '/api/integrations/xpressbees/refresh-token',
+        destination: '/api/integrations/xpressbees/refresh-token/route',
+      },
+      {
+        source: '/api/shopify/courier/download-jobs',
+        destination: '/api/shopify/courier/download-jobs/route',
       },
       {
         source: '/api/shopify/orders/download-slips',
@@ -120,10 +129,9 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/export-products',
         destination: '/api/shopify/orders/export-products/route',
       },
-
       {
-        source: '/api/shopify/orders/qc-test',
-        destination: '/api/shopify/orders/qc-test/route',
+        source: '/api/shopify/orders/generate-purchase-order',
+        destination: '/api/shopify/orders/generate-purchase-order/route',
       },
       {
         source: '/api/shopify/account/toggle-service',
@@ -142,35 +150,77 @@ const nextConfig: NextConfig = {
         destination: '/api/public/book-return/request/route',
       },
       {
-        source: '/api/shopify/courier/bulk-book-return',
-        destination: '/api/shopify/courier/bulk-book-return/route',
+        source: '/api/public/book-return/cancel-request',
+        destination: '/api/public/book-return/cancel-request/route',
+      },
+      {
+        source: '/api/public/book-return/upload-image',
+        destination: '/api/public/book-return/upload-image/route',
+      },
+      {
+        source: '/api/public/book-return/delete-images',
+        destination: '/api/public/book-return/delete-images/route',
+      },
+      {
+        source: '/api/integrations/courier/update-priority',
+        destination: '/api/integrations/courier/update-priority/route',
       },
       {
         source: '/api/shopify/orders/update-confirmed-orders-availability-tag',
         destination: '/api/shopify/orders/update-confirmed-orders-availability-tag/route',
       },
       {
-        source: '/api/public/confirm-or-cancel/start-session',
-        destination: '/api/public/confirm-or-cancel/start-session/route'
+        source: '/api/shopify/orders/revert-to-confirmed',
+        destination: '/api/shopify/orders/revert-to-confirmed/route',
       },
       {
-        source: '/api/public/confirm-or-cancel/order',
-        destination: '/api/public/confirm-or-cancel/order/route'
+        source: '/api/shopify/orders/revert-to-delivered',
+        destination: '/api/shopify/orders/revert-to-delivered/route',
       },
       {
-        source: '/api/public/confirm-or-cancel/confirm-order',
-        destination: '/api/public/confirm-or-cancel/confirm-order/route'
+        source: '/api/shopify/orders/split-order',
+        destination: '/api/shopify/orders/split-order/route',
       },
       {
-        source: '/api/public/confirm-or-cancel/cancel-order',
-        destination: '/api/public/confirm-or-cancel/cancel-order/route'
+        source: '/proxy/api/checkout/customer',
+        destination: '/proxy/api/checkout/customer/route',
       },
       {
-        source: '/api/public/track/get-order-data',
-        destination: '/api/public/track/get-order-data/route'
+        source: '/proxy/api/checkout/draft-session-creation',
+        destination: '/proxy/api/checkout/draft-session-creation/route',
+      },
+      {
+        source: '/proxy/api/checkout/order-create-cod',
+        destination: '/proxy/api/checkout/order-create-cod/route',
+      },
+      {
+        source: '/proxy/api/checkout/products-details',
+        destination: '/proxy/api/checkout/products-details/route',
+      },
+      {
+        source: '/proxy/api/checkout/send-otp',
+        destination: '/proxy/api/checkout/send-otp/route',
+      },
+      {
+        source: '/proxy/api/checkout/verify-otp',
+        destination: '/proxy/api/checkout/verify-otp/route',
+      },
+      {
+        source: '/api/shops/members/create-invite',
+        destination: '/api/shops/members/create-invite/route',
+      },
+      {
+        source: '/api/shops/members/join',
+        destination: '/api/shops/members/join/route',
+      },
+      {
+        source: '/api/public/join-shop/:sessionId',
+        destination: '/api/public/join-shop/:sessionId/route',
       }
     ]
   },
 };
 
 export default nextConfig;
+
+    

@@ -1,7 +1,8 @@
+
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,15 +21,21 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const redirectUrl = searchParams.get('redirect');
 
   useEffect(() => {
     document.title = "Majime - Login";
   })
+
+  const handleSuccessfulLogin = () => {
+      router.push(redirectUrl || '/dashboard');
+  };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -61,7 +68,7 @@ export default function LoginPage() {
         });
       }
 
-      router.push('/dashboard');
+      handleSuccessfulLogin();
     } catch (error) {
       console.error('Error during Google login:', error);
        toast({
@@ -85,7 +92,7 @@ export default function LoginPage() {
       await updateDoc(userRef, {
         lastLoginAt: serverTimestamp(),
       });
-      router.push('/dashboard');
+      handleSuccessfulLogin();
     } catch (err) {
       const authError = err as AuthError;
       console.error('Error signing in:', authError.code, authError.message);

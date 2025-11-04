@@ -5,7 +5,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check, UserPlus, XCircle, AlertTriangle } from 'lucide-react';
@@ -19,21 +18,20 @@ type SessionData = {
   shopName: string;
   role: 'Admin' | 'Staff' | 'Vendor';
   permissions: Record<string, any>;
-  expiresAt: { toDate: () => Date };
-  createdBy: string;
-  used: boolean;
 };
 
-type PageStatus = 'loading' | 'valid' | 'invalid' | 'expired' | 'used' | 'error' | 'joining' | 'joined';
+type PageStatus = 'loading' | 'valid' | 'invalid' | 'error' | 'joining' | 'joined';
 
 export default function JoinShopPage() {
-  const { sessionId } = useParams();
+  const { sessionId: rawSessionId } = useParams();
+  const sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
   const router = useRouter();
   const { toast } = useToast();
   const [user, loadingAuth] = useAuthState(auth);
 
   const [status, setStatus] = useState<PageStatus>('loading');
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('This invitation link is not valid.');
 
   useEffect(() => {
     document.title = "Join Shop";
@@ -45,23 +43,12 @@ export default function JoinShopPage() {
 
     const fetchSession = async () => {
       try {
-        const sessionRef = doc(db, 'join-a-shop', Array.isArray(sessionId) ? sessionId[0] : sessionId);
-        const sessionDoc = await getDoc(sessionRef);
+        const response = await fetch(`/api/public/join-shop/${sessionId}`);
+        const data = await response.json();
 
-        if (!sessionDoc.exists()) {
+        if (!response.ok) {
+          setErrorMessage(data.error || 'An error occurred.');
           setStatus('invalid');
-          return;
-        }
-
-        const data = sessionDoc.data() as SessionData;
-
-        if (data.used) {
-          setStatus('used');
-          return;
-        }
-
-        if (data.expiresAt.toDate() < new Date()) {
-          setStatus('expired');
           return;
         }
         
@@ -69,6 +56,7 @@ export default function JoinShopPage() {
         setStatus('valid');
       } catch (err) {
         console.error("Error fetching session:", err);
+        setErrorMessage('An internal server error occurred.');
         setStatus('error');
       }
     };
@@ -83,8 +71,7 @@ export default function JoinShopPage() {
             description: "You need to be logged in to join a shop.",
             variant: "destructive"
         });
-        // Optional: Redirect to login with a callback URL
-        // router.push(`/login?redirect=/join-shop/${sessionId}`);
+        router.push(`/login?redirect=/join-shop/${sessionId}`);
         return;
     }
     
@@ -100,7 +87,7 @@ export default function JoinShopPage() {
         const response = await fetch('/api/shops/members/join', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-            body: JSON.stringify({ sessionId: Array.isArray(sessionId) ? sessionId[0] : sessionId })
+            body: JSON.stringify({ sessionId })
         });
         
         const result = await response.json();
@@ -145,18 +132,13 @@ export default function JoinShopPage() {
           </>
         );
       case 'invalid':
-      case 'expired':
-      case 'used':
       case 'error':
         return (
           <>
             <XCircle className="h-12 w-12 text-destructive" />
             <CardTitle className="mt-6 text-2xl">Invitation Invalid</CardTitle>
             <CardDescription>
-              {status === 'invalid' && 'This invitation link is not valid.'}
-              {status === 'expired' && 'This invitation link has expired.'}
-              {status === 'used' && 'This invitation link has already been used.'}
-              {status === 'error' && 'An error occurred while verifying the invitation.'}
+              {errorMessage}
               <br />
               Please request a new link from the shop owner.
             </CardDescription>
@@ -187,7 +169,7 @@ export default function JoinShopPage() {
                                 <li>{sessionData.permissions.canChangeSettings ? 'Can change shop settings' : 'Read-only access to settings'}</li>
                             </>
                            ) : (
-                               <li>Can view orders with status: {sessionData.permissions.viewableStatuses?.join(', ') || 'None'}</li>
+                               <li>Can view orders with status: {(sessionData.permissions.viewableStatuses || []).join(', ') || 'None'}</li>
                            )}
                            <li>Full dashboard access based on the permissions above.</li>
                         </ul>
@@ -204,7 +186,7 @@ export default function JoinShopPage() {
                     {loadingAuth ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2 h-4 w-4" />}
                     Accept Invitation & Join Shop
                 </Button>
-                {!user && <p className="text-center text-sm text-muted-foreground">Please <a href="/login" className="underline">log in</a> or <a href="/signup" className="underline">sign up</a> to accept.</p>}
+                {!user && <p className="text-center text-sm text-muted-foreground">Please <a href={`/login?redirect=/join-shop/${sessionId}`} className="underline">log in</a> or <a href="/signup" className="underline">sign up</a> to accept.</p>}
             </CardContent>
           </>
         );

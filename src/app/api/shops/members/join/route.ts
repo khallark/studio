@@ -72,6 +72,13 @@ export async function POST(req: NextRequest) {
                 joinedAt: FieldValue.serverTimestamp(),
                 status: 'active', // can be used to suspend members later
             });
+            
+            // **NEW**: Update the user's document to add the new shop
+            const userRef = db.collection('users').doc(userId);
+            transaction.update(userRef, {
+                accounts: FieldValue.arrayUnion(shopId),
+                activeAccountId: shopId,
+            });
 
             // Mark the invitation as used
             transaction.update(sessionRef, { used: true });

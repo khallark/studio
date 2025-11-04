@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -381,42 +382,40 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     </div>
-                    {memberRole !== 'Vendor' && (
-                        <div className="border-t bg-muted/50 p-6">
-                            <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
-                            {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
-                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={(list) => {
-                                setCourierPriorityList(list);
-                                updatePrioritySettings(courierPriorityEnabled, list);
-                            }} className="space-y-2">
-                            {courierPriorityList.map((courier) => (
-                                <Reorder.Item 
-                                    key={courier.name} 
-                                    value={courier} 
-                                    className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
-                                >
-                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                    <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                    {courier.name !== 'shiprocket' && (
-                                        <Select 
-                                            value={courier.mode} 
-                                            onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
-                                            disabled={isReadOnly}
-                                        >
-                                            <SelectTrigger className="w-[120px] h-8">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Surface">Surface</SelectItem>
-                                                <SelectItem value="Express">Express</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </Reorder.Item>
-                            ))}
-                            </Reorder.Group>
-                        </div>
-                    )}
+                    <div className="border-t bg-muted/50 p-6">
+                        <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
+                        {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
+                        <Reorder.Group axis="y" values={courierPriorityList} onReorder={(list) => {
+                            setCourierPriorityList(list);
+                            updatePrioritySettings(courierPriorityEnabled, list);
+                        }} className="space-y-2">
+                        {courierPriorityList.map((courier) => (
+                            <Reorder.Item 
+                                key={courier.name} 
+                                value={courier} 
+                                className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
+                            >
+                                <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                <span className="font-medium capitalize flex-1">{courier.name}</span>
+                                {courier.name !== 'shiprocket' && (
+                                    <Select 
+                                        value={courier.mode} 
+                                        onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                        disabled={isReadOnly}
+                                    >
+                                        <SelectTrigger className="w-[120px] h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Surface">Surface</SelectItem>
+                                            <SelectItem value="Express">Express</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </Reorder.Item>
+                        ))}
+                        </Reorder.Group>
+                    </div>
                     {/* Delhivery */}
                     <div className="border-t p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">

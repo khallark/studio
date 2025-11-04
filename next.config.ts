@@ -97,30 +97,6 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/dispatch',
         destination: '/api/shopify/orders/dispatch/route',
       },
-      {
-        source: '/api/integrations/interakt/update',
-        destination: '/api/integrations/interakt/update/route',
-      },
-      {
-        source: '/api/webhooks/interakt',
-        destination: '/api/webhooks/interakt/route',
-      },
-      {
-        source: '/api/integrations/interakt/templates/update-category',
-        destination: '/api/integrations/interakt/templates/update-category/route',
-      },
-      {
-        source: '/api/integrations/interakt/templates/set-active',
-        destination: '/api/integrations/interakt/templates/set-active/route',
-      },
-      {
-        source: '/api/integrations/interakt/templates/create',
-        destination: '/api/integrations/interakt/templates/create/route',
-      },
-      {
-        source: '/api/integrations/interakt/media/upload',
-        destination: '/api/integrations/interakt/media/upload/route',
-      },
        {
         source: '/api/shopify/courier/update-shipped-statuses',
         destination: '/api/shopify/courier/update-shipped-statuses/route',

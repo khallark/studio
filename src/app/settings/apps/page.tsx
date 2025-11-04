@@ -13,24 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
-import Link from 'next/link';
-import Image from 'next/image';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Info, Copy, GripVertical, Loader2 } from 'lucide-react';
+import { Info, GripVertical, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -56,17 +43,9 @@ interface CourierIntegrations {
     priorityList?: CourierSetting[];
 }
 
-interface CommunicationIntegrations {
-    interakt?: {
-        apiKey?: string;
-        webhookKey?: string;
-    }
-}
-
 interface SettingsData {
     integrations?: {
         couriers?: CourierIntegrations,
-        communication?: CommunicationIntegrations
     }
 }
 
@@ -116,25 +95,13 @@ export default function AppsSettingsPage() {
   const [xpressbeesPassword, setXpressbeesPassword] = useState('');
   const [isEditingXpressbees, setIsEditingXpressbees] = useState(false);
   const [isSubmittingXpressbees, setIsSubmittingXpressbees] = useState(false);
-
-  const [interaktApiKey, setInteraktApiKey] = useState('');
-  const [isEditingInteraktApi, setIsEditingInteraktApi] = useState(false);
-  const [isSubmittingInteraktApi, setIsSubmittingInteraktApi] = useState(false);
-
-  const [interaktWebhookKey, setInteraktWebhookKey] = useState('');
-  const [isEditingInteraktWebhook, setIsEditingInteraktWebhook] = useState(false);
-  const [isSubmittingInteraktWebhook, setIsSubmittingInteraktWebhook] = useState(false);
   
   const [courierPriorityEnabled, setCourierPriorityEnabled] = useState(false);
   const [courierPriorityList, setCourierPriorityList] = useState<CourierSetting[]>([]);
   const [isSubmittingPriority, setIsSubmittingPriority] = useState(false);
 
-  const [appUrl, setAppUrl] = useState('');
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
-
   useEffect(() => {
     document.title = "Settings - Apps";
-    setAppUrl(window.location.origin);
   }, []);
 
   const fetchData = async () => {
@@ -158,18 +125,11 @@ export default function AppsSettingsPage() {
         const integrations = data.settings?.integrations;
         
         setDelhiveryApiKey(integrations?.couriers?.delhivery?.apiKey || '');
-        setInteraktApiKey(integrations?.communication?.interakt?.apiKey || '');
-        setInteraktWebhookKey(integrations?.communication?.interakt?.webhookKey || '');
         
         const couriers = integrations?.couriers;
         setCourierPriorityEnabled(couriers?.priorityEnabled || false);
         const mergedList = mergePriorityList(couriers?.priorityList, couriers);
         setCourierPriorityList(mergedList);
-
-        // Get active account ID
-        const userRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userRef);
-        setActiveAccountId(userDoc.data()?.activeAccountId || null);
 
     } catch (error) {
         toast({
@@ -326,74 +286,11 @@ export default function AppsSettingsPage() {
     }
   };
 
-  const handleSaveInterakt = async (type: 'apiKey' | 'webhookKey') => {
-    if (!user) return;
-
-    let keyToSave: string, valueToSave: string;
-    if (type === 'apiKey') {
-      if (!interaktApiKey) {
-        toast({ title: 'API Key is required', variant: 'destructive' });
-        return;
-      }
-      setIsSubmittingInteraktApi(true);
-      keyToSave = 'apiKey';
-      valueToSave = interaktApiKey;
-    } else {
-      if (!interaktWebhookKey) {
-        toast({ title: 'Webhook Key is required', variant: 'destructive' });
-        return;
-      }
-      setIsSubmittingInteraktWebhook(true);
-      keyToSave = 'webhookKey';
-      valueToSave = interaktWebhookKey;
-    }
-
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/integrations/interakt/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          key: keyToSave,
-          value: valueToSave,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.details || 'Failed to save Interakt key');
-
-      toast({ title: 'Interakt Key Saved', description: `Interakt ${type === 'apiKey' ? 'API Key' : 'Webhook Key'} has been updated.` });
-      
-      if (type === 'apiKey') setIsEditingInteraktApi(false);
-      else setIsEditingInteraktWebhook(false);
-      fetchData();
-
-    } catch (error) {
-      toast({ title: 'Save Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: "destructive" });
-    } finally {
-      if (type === 'apiKey') setIsSubmittingInteraktApi(false);
-      else setIsSubmittingInteraktWebhook(false);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Copied to clipboard!' });
-    }, (err) => {
-      toast({ title: 'Failed to copy', description: 'Could not copy text to clipboard.', variant: 'destructive' });
-    });
-  };
-  
   const hasConnectedStore = !!settingsData;
   const isReadOnly = memberRole === 'Staff';
   const hasDelhiveryKey = !!settingsData?.integrations?.couriers?.delhivery?.apiKey;
   const hasShiprocketCreds = !!settingsData?.integrations?.couriers?.shiprocket?.apiKey;
   const hasXpressbeesCreds = !!settingsData?.integrations?.couriers?.xpressbees?.apiKey;
-  const hasInteraktApiKey = !!settingsData?.integrations?.communication?.interakt?.apiKey;
-  const hasInteraktWebhookKey = !!settingsData?.integrations?.communication?.interakt?.webhookKey;
 
   const renderSkeleton = () => (
     <Card className="w-full max-w-4xl">
@@ -403,8 +300,6 @@ export default function AppsSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-8">
             <Skeleton className="h-24 w-full" />
-            <Separator />
-            <Skeleton className="h-48 w-full" />
             <Separator />
             <Skeleton className="h-48 w-full" />
         </CardContent>
@@ -425,7 +320,7 @@ export default function AppsSettingsPage() {
       <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Apps & Integrations</CardTitle>
-          <CardDescription>Manage your connected applications, courier services, and communication channels.</CardDescription>
+          <CardDescription>Manage your connected applications and courier services.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
             <section>
@@ -453,40 +348,38 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     </div>
-                     {courierPriorityEnabled && (
-                        <div className="border-t bg-muted/50 p-6">
-                            <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
-                             {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
-                            <Reorder.Group axis="y" values={courierPriorityList} onReorder={setCourierPriorityList} className="space-y-2">
-                            {courierPriorityList.map((courier) => (
-                                <Reorder.Item 
-                                    key={courier.name} 
-                                    value={courier} 
-                                    className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
-                                    onDragEnd={() => updatePrioritySettings(courierPriorityEnabled, courierPriorityList)}
-                                >
-                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                    <span className="font-medium capitalize flex-1">{courier.name}</span>
-                                    {courier.name !== 'shiprocket' && (
-                                        <Select 
-                                            value={courier.mode} 
-                                            onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
-                                            disabled={isReadOnly}
-                                        >
-                                            <SelectTrigger className="w-[120px] h-8">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Surface">Surface</SelectItem>
-                                                <SelectItem value="Express">Express</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                </Reorder.Item>
-                            ))}
-                            </Reorder.Group>
-                        </div>
-                    )}
+                    <div className="border-t bg-muted/50 p-6">
+                        <h4 className="font-medium mb-4">Drag to Reorder Priority</h4>
+                         {isSubmittingPriority && <Loader2 className="h-4 w-4 animate-spin my-2" />}
+                        <Reorder.Group axis="y" values={courierPriorityList} onReorder={setCourierPriorityList} className="space-y-2">
+                        {courierPriorityList.map((courier) => (
+                            <Reorder.Item 
+                                key={courier.name} 
+                                value={courier} 
+                                className="flex items-center gap-4 p-3 rounded-md bg-background border shadow-sm cursor-grab active:cursor-grabbing"
+                                onDragEnd={() => updatePrioritySettings(courierPriorityEnabled, courierPriorityList)}
+                            >
+                                <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                <span className="font-medium capitalize flex-1">{courier.name}</span>
+                                {courier.name !== 'shiprocket' && (
+                                    <Select 
+                                        value={courier.mode} 
+                                        onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
+                                        disabled={isReadOnly}
+                                    >
+                                        <SelectTrigger className="w-[120px] h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Surface">Surface</SelectItem>
+                                            <SelectItem value="Express">Express</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </Reorder.Item>
+                        ))}
+                        </Reorder.Group>
+                    </div>
                     {/* Delhivery */}
                     <div className="border-t p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -661,124 +554,6 @@ export default function AppsSettingsPage() {
                             </div>
                         </div>
                     )}
-                 </div>
-            </section>
-
-             <Separator />
-
-            {/* Communication Channels Section */}
-            <section>
-                 <h2 className="text-lg font-semibold mb-4 text-primary">Communication Channels</h2>
-                 <div className="rounded-lg border">
-                    {/* Interakt */}
-                    <div className="p-6 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div>
-                                <h3 className="text-xl font-semibold">Interakt</h3>
-                                <p className="text-sm text-muted-foreground">Connect with Interakt for WhatsApp communication.</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant={hasInteraktApiKey && hasInteraktWebhookKey ? 'default' : 'secondary'}>
-                            {hasInteraktApiKey && hasInteraktWebhookKey ? 'Connected' : 'Incomplete'}
-                          </Badge>
-                        </div>
-                    </div>
-                    {/* Interakt API Key */}
-                    <div className="border-t p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="font-semibold">API Secret Key</h4>
-                                <p className="text-sm text-muted-foreground">Used for sending messages and using Interakt APIs.</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                {hasInteraktApiKey && !isEditingInteraktApi ? (
-                                    !isReadOnly && <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)}>Change Key</Button>
-                                ) : (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktApi(true)} disabled={!hasConnectedStore || isReadOnly}>
-                                        {hasConnectedStore ? 'Set Key' : 'No Store'}
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                         {isEditingInteraktApi && (
-                            <div className="mt-4 flex items-end gap-4">
-                                <div className="grid gap-1.5 flex-1">
-                                    <Input 
-                                        type="password"
-                                        placeholder="Enter your Interakt API Secret Key"
-                                        value={interaktApiKey}
-                                        onChange={(e) => setInteraktApiKey(e.target.value)}
-                                        disabled={isSubmittingInteraktApi}
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                     <Button variant="secondary" onClick={() => setIsEditingInteraktApi(false)} disabled={isSubmittingInteraktApi}>Cancel</Button>
-                                     <Button onClick={() => handleSaveInterakt('apiKey')} disabled={isSubmittingInteraktApi}>
-                                        {isSubmittingInteraktApi ? 'Saving...' : 'Save Key'}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                     {/* Interakt Webhook Key */}
-                    <div className="border-t p-6">
-                         <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="font-semibold">Webhook Secret Key</h4>
-                                <p className="text-sm text-muted-foreground">Used for receiving incoming message events.</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                {hasInteraktWebhookKey && !isEditingInteraktWebhook ? (
-                                    !isReadOnly && <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)}>Change Key</Button>
-                                ) : (
-                                    <Button variant="outline" onClick={() => setIsEditingInteraktWebhook(true)} disabled={!hasConnectedStore || isReadOnly}>
-                                        {hasConnectedStore ? 'Set Key' : 'No Store'}
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                        {isEditingInteraktWebhook && (
-                          <div className="mt-4 space-y-6">
-                            <div>
-                              <h5 className="font-medium text-sm mb-2">Setup Instructions:</h5>
-                              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                                <li>Go to Interakt Dashboard &gt; Settings &gt; Developer Settings &gt; Configure &gt; Webhook.</li>
-                                <li>
-                                  <div className="flex items-center gap-2">
-                                    <span>Paste this URL in the "Webhook url" box:</span>
-                                    <div className="flex items-center gap-1 rounded-md bg-background border px-2 py-1">
-                                      <code className="text-xs">{appUrl}/api/webhooks/interakt?shop={activeAccountId}</code>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(`${appUrl}/api/webhooks/interakt?shop=${encodeURIComponent(activeAccountId || "")}`)}>
-                                        <Copy className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </li>
-                                <li>Copy the "Secret Key" provided by Interakt.</li>
-                                <li>Paste the Secret Key below and click Save.</li>
-                              </ol>
-                            </div>
-                            <div className="flex items-end gap-4">
-                                <div className="grid gap-1.5 flex-1">
-                                    <Input 
-                                        type="password"
-                                        placeholder="Paste your Interakt Webhook Secret Key"
-                                        value={interaktWebhookKey}
-                                        onChange={(e) => setInteraktWebhookKey(e.target.value)}
-                                        disabled={isSubmittingInteraktWebhook}
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                     <Button variant="secondary" onClick={() => setIsEditingInteraktWebhook(false)} disabled={isSubmittingInteraktWebhook}>Cancel</Button>
-                                     <Button onClick={() => handleSaveInterakt('webhookKey')} disabled={isSubmittingInteraktWebhook}>
-                                        {isSubmittingInteraktWebhook ? 'Saving...' : 'Save Key'}
-                                    </Button>
-                                </div>
-                            </div>
-                          </div>
-                        )}
-                    </div>
                  </div>
             </section>
         </CardContent>

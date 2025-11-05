@@ -42,6 +42,8 @@ import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
 import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
+import { useParams } from 'next/navigation';
+import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 
 type ShipmentBatch = {
   id: string;
@@ -68,15 +70,19 @@ interface Order {
 type BatchType = 'forward' | 'return';
 
 export default function AwbProcessingPage() {
+  // const [user] = useAuthState(auth);
+  const params = useParams();
+  const storeId = params?.storeId as string;
+  const { isAuthorized, memberRole, loading: authLoading, user } = useStoreAuthorization(storeId);
+  const { toast } = useToast();
+  const { processAwbAssignments } = useProcessingQueue();
+  
   const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
   const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
   const [isLowAwbAlertOpen, setIsLowAwbAlertOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Order[]>([]);
   const [batchType, setBatchType] = useState<BatchType>('forward');
-  const { processAwbAssignments } = useProcessingQueue();
-  const [user] = useAuthState(auth);
-  const { toast } = useToast();
 
   const [shopId, setShopId] = useState<string>('');
   const [batches, setBatches] = useState<ShipmentBatch[]>([]);

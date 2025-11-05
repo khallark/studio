@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
         
         // This is a placeholder for the real permission check
-        const isAuthorized = !member.exists || member.data()?.status !== 'active';
+        const isAuthorized = member.exists && member.data()?.status === 'active';
         if (!isAuthorized) {
              return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }

@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
     const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
     const member = await memberRef.get();
-    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    const isAuthorized = member.exists && member.data()?.status === 'active';
     if (!isAuthorized) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

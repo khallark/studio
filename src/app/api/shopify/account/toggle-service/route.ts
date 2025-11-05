@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
-    const memberDoc = await memberRef.get();
-    const isAuthorized = !memberDoc.exists || memberDoc.data()?.status !== 'active';
+    const member = await memberRef.get();
+    const isAuthorized = member.exists && member.data()?.status === 'active';
     if (!isAuthorized) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid service name provided' }, { status: 400 });
     }
     
-    const memberRole = memberDoc.data()?.role;
+    const memberRole = member.data()?.role;
     if(!memberRole) {
       return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
     }

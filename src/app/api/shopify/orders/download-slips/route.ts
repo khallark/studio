@@ -508,7 +508,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    const isAuthorized = member.exists && member.data()?.status === 'active';
     if (!isAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

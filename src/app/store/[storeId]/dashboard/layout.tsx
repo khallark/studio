@@ -102,7 +102,7 @@ export default function DashboardLayout({
             description: `Processing ${ordersToProcess.length} order(s) in the background.`,
             action: (
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={`/store/${storeId}/dashboard/orders/awb-processing`}>
+                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
                         View Progress
                         <MoveRight className="ml-2 h-4 w-4" />
                     </Link>
@@ -170,8 +170,8 @@ export default function DashboardLayout({
                 </SidebarHeader>
                 <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === `/store/${storeId}/dashboard`}>
-                    <Link href={`/store/${storeId}/dashboard`}>
+                    <SidebarMenuButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard`}>
+                    <Link href={`/store/${nonPrefixedStoreId}/dashboard`}>
                         <Home />
                         Dashboard
                     </Link>
@@ -180,7 +180,7 @@ export default function DashboardLayout({
                  <SidebarMenuItem>
                     <Collapsible>
                         <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${storeId}/dashboard/orders`)}>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/dashboard/orders`)}>
                                 <div className="flex items-center gap-2">
                                 <Package />
                                 Orders
@@ -190,11 +190,11 @@ export default function DashboardLayout({
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <SidebarMenuSub>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${storeId}/dashboard/orders`} className={cn(pathname === `/store/${storeId}/dashboard/orders/awb-processing` && 'text-muted-foreground')}>
-                                    <Link href={`/store/${storeId}/dashboard/orders`}>All Orders</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/orders`} className={cn(pathname === `/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing` && 'text-muted-foreground')}>
+                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders`}>All Orders</Link>
                                 </SidebarMenuSubButton>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${storeId}/dashboard/orders/awb-processing`}>
-                                    <Link href={`/store/${storeId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
+                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSub>
                         </CollapsibleContent>
@@ -203,7 +203,7 @@ export default function DashboardLayout({
                 <SidebarMenuItem>
                     <Collapsible>
                         <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${storeId}/dashboard/members`)}>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/dashboard/members`)}>
                                 <div className="flex items-center gap-2">
                                 <UserPlus />
                                 Members
@@ -213,8 +213,8 @@ export default function DashboardLayout({
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <SidebarMenuSub>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${storeId}/dashboard/members/invite`}>
-                                    <Link href={`/store/${storeId}/dashboard/members/invite`}>Invite Member</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/members/invite`}>
+                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/members/invite`}>Invite Member</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSub>
                         </CollapsibleContent>
@@ -225,8 +225,8 @@ export default function DashboardLayout({
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith(`/store/${storeId}/settings`)}>
-                        <Link href={`/store/${storeId}/settings`}>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/settings`)}>
+                        <Link href={`/store/${nonPrefixedStoreId}/settings`}>
                         <Settings />
                         Settings
                         </Link>

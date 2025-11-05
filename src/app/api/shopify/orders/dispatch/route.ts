@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
 
     const isAuthorized = !member.exists || member.data()?.status !== 'active';
     if (!isAuthorized) {
+      console.log(`Forbidden, ${member.exists}, ${member?.data()?.status}`)
       return NextResponse.json({ error: `Forbidden, ${member.exists}, ${member?.data()?.status}` }, { status: 403 });
     }
 

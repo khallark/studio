@@ -444,7 +444,7 @@ export default function OrdersPage() {
 
       const result = await response.json();
       if (!response.ok && response.status !== 207) {
-        throw new Error(result.details || 'Failed to dispatch orders.');
+        throw new Error(result.error || 'Failed to dispatch orders.');
       }
       
       toast({

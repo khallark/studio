@@ -220,14 +220,6 @@ export default function DashboardLayout({
                         </CollapsibleContent>
                     </Collapsible>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith(`/store/${storeId}/dashboard/logs`)}>
-                    <Link href={`/store/${storeId}/dashboard/logs`}>
-                        <History />
-                        Logs
-                    </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarContent>
             <SidebarFooter>

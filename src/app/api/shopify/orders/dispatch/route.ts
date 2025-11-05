@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const isAuthorized = !member.exists || member.data()?.status !== 'active';
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: `Forbidden, ${member.exists}, ${member?.data()?.status}` }, { status: 403 });
     }
 
     // // Ask Firebase Function to enqueue Cloud Tasks (one per job)

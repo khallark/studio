@@ -1,6 +1,6 @@
 
 
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -33,15 +33,15 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/callback',
         destination: '/api/shopify/callback/route',
       },
-       {
+      {
         source: '/api/webhooks/orders',
         destination: '/api/webhooks/orders/route',
       },
-       {
+      {
         source: '/api/shopify/locations/add',
         destination: '/api/shopify/locations/add/route',
       },
-       {
+      {
         source: '/api/shopify/locations/update',
         destination: '/api/shopify/locations/update/route',
       },
@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/bulk-update-status',
         destination: '/api/shopify/orders/bulk-update-status/route',
       },
-       {
+      {
         source: '/api/shopify/account/update-address',
         destination: '/api/shopify/account/update-address/route',
       },
@@ -97,7 +97,7 @@ const nextConfig: NextConfig = {
         source: '/api/shopify/orders/dispatch',
         destination: '/api/shopify/orders/dispatch/route',
       },
-       {
+      {
         source: '/api/shopify/courier/update-shipped-statuses',
         destination: '/api/shopify/courier/update-shipped-statuses/route',
       },
@@ -193,10 +193,6 @@ const nextConfig: NextConfig = {
         source: '/api/shops/members/join',
         destination: '/api/shops/members/join/route',
       },
-       {
-        source: '/api/public/join-shop/:sessionId',
-        destination: '/api/public/join-shop/:sessionId/route',
-      },
       {
         source: '/api/settings/get-details',
         destination: '/api/settings/get-details/route',
@@ -211,4 +207,4 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-    
+

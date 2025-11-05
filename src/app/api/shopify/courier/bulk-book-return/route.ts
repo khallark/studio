@@ -1,6 +1,6 @@
 // apps/web/src/app/api/returns/bulk-book/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { auth as adminAuth } from "@/lib/firebase-admin";
+import { auth as adminAuth, db } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
 
@@ -21,10 +21,6 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    // ----- Auth -----
-    const userId = await getUserIdFromToken(req);
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     // ----- Input -----
     const { shop, orderIds, pickupName, shippingMode } = (await req.json()) as {
       shop: string;
@@ -39,6 +35,24 @@ export async function POST(req: NextRequest) {
         { error: "missing params in the request body" },
         { status: 400 }
       );
+    }
+
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Ask Firebase Function to enqueue return Cloud Tasks (one per job)

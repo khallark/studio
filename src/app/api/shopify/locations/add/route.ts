@@ -26,29 +26,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop and location data are required' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+    const isAuthorized = !memberDoc.exists || memberDoc.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { name, address, city, postcode, country } = location;
     if (!name || !address || !city || !postcode || !country) {
         return NextResponse.json({ error: 'All location fields are required' }, { status: 400 });
     }
 
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
-
-    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
-    const memberDoc = await memberRef.get();
-
-    if (!memberDoc.exists) {
-        return NextResponse.json({ error: 'Forbidden: You are not a member of this shop.' }, { status: 403 });
-    }
     const memberData = memberDoc.data();
-    const userRole = memberData?.role;
+    const memberRole = memberData?.role;
+    if(!memberRole) {
+      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
+    }
 
     let locationsCollection;
-    if (userRole === 'Vendor') {
+    if (memberRole === 'Vendor') {
         locationsCollection = memberRef.collection('pickupLocations');
-    } else if (userRole === 'SuperAdmin' || userRole === 'Admin') {
+    } else if (memberRole === 'SuperAdmin' || memberRole === 'Admin') {
         const accountRef = db.collection('accounts').doc(shop);
         locationsCollection = accountRef.collection('pickupLocations');
     } else {

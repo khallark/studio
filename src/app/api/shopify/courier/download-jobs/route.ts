@@ -25,18 +25,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing params in payload' }, { status: 400 });
     }
 
-    if(typeof status !== 'string' || !['success', 'failed'].includes(status)) {
-      return NextResponse.json({ error: 'Wrong status value (only "success" or "failed")' }, { status: 400 });
+    
+    // ----- Auth -----
+    const shopRef = db.collection('accounts').doc(shop)
+    const shopDoc = await shopRef.get();
+    if (!shopDoc.exists) {
+      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
     }
-
     const userId = await getUserIdFromToken(req);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
-        return NextResponse.json({ error: 'Forbidden: User is not authorized to access this shop.' }, { status: 403 });
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+
+    if(typeof status !== 'string' || !['success', 'failed'].includes(status)) {
+      return NextResponse.json({ error: 'Wrong status value (only "success" or "failed")' }, { status: 400 });
     }
 
     // Fetch batch document to check courier type

@@ -44,6 +44,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
 import { useParams } from 'next/navigation';
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
+import { User } from 'firebase/auth';
 
 type ShipmentBatch = {
   id: string;
@@ -72,11 +73,12 @@ type BatchType = 'forward' | 'return';
 export default function AwbProcessingPage() {
   // const [user] = useAuthState(auth);
   const params = useParams();
-  const storeId = params?.storeId as string;
-  const { isAuthorized, memberRole, loading: authLoading, user } = useStoreAuthorization(storeId);
+  const nonPrefixedStoreId = params?.storeId as string;
+  const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
+
   const { toast } = useToast();
   const { processAwbAssignments } = useProcessingQueue();
-  
+
   const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
   const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
   const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
@@ -93,30 +95,18 @@ export default function AwbProcessingPage() {
   });
 
   useEffect(() => {
-    const run = async () => {
-      if (!user) return;
-      const uref = doc(db, 'users', user.uid);
-      const usnap = await getDoc(uref);
-      const data = usnap.data() as UserData | undefined;
-      const active = data?.activeAccountId || '—';
-      setShopId(active);
-    };
-    run().catch(console.error);
-  }, [user]);
-
-  useEffect(() => {
-    if (!shopId || shopId === '—') {
+    if (!storeId) {
       setBatches([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    
+
     // Select collection based on batch type
     const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
-    const ref = collection(db, 'accounts', shopId, collectionName);
+    const ref = collection(db, 'accounts', storeId, collectionName);
     const q = query(ref, orderBy('createdAt', 'desc'), limit(50));
-    
+
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -133,9 +123,9 @@ export default function AwbProcessingPage() {
         setLoading(false);
       },
     );
-    
+
     // Listen for AWB count
-    const awbsRef = collection(db, 'accounts', shopId, 'unused_awbs');
+    const awbsRef = collection(db, 'accounts', storeId, 'unused_awbs');
     const unsubscribeAwbs = onSnapshot(awbsRef, (snapshot) => {
       setUnusedAwbsCount(snapshot.size);
     });
@@ -144,7 +134,7 @@ export default function AwbProcessingPage() {
       unsub();
       unsubscribeAwbs();
     };
-  }, [shopId, batchType, toast]);
+  }, [storeId, batchType, toast]);
 
   const ongoing = useMemo(
     () => batches.filter((b) => b.status === 'running' || (b.success + b.failed) < b.total),
@@ -157,22 +147,36 @@ export default function AwbProcessingPage() {
 
   const handleAssignAwbClick = useCallback((ordersToProcess: Order[]) => {
     if (ordersToProcess.length === 0) {
-      toast({ 
-        title: 'No orders selected', 
-        description: 'Please select orders from the "Confirmed" tab to assign AWBs.', 
+      toast({
+        title: 'No orders selected',
+        description: 'Please select orders from the "Confirmed" tab to assign AWBs.',
         variant: 'destructive'
       });
       return;
     }
-    
+
     setSelectedOrders(ordersToProcess);
-    
+
     if (ordersToProcess.length > unusedAwbsCount) {
       setIsLowAwbAlertOpen(true);
     } else {
       setIsAwbDialogOpen(true);
     }
   }, [unusedAwbsCount, toast]);
+
+  // Show loading while checking authorization
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // If not authorized, hook handles redirect
+  if (!isAuthorized) {
+    return null;
+  }
 
   return (
     <>
@@ -187,7 +191,7 @@ export default function AwbProcessingPage() {
             Generate AWBs
           </Button>
         </div>
-        
+
         <div className="grid flex-1 min-h-0 gap-8 lg:grid-cols-3 p-4 md:p-6">
           <div className="lg:col-span-3 h-full min-h-0">
             <Card className="flex h-full min-h-0 flex-col">
@@ -199,7 +203,7 @@ export default function AwbProcessingPage() {
                     </CardTitle>
                     <CardDescription>
                       Ongoing runs and recent completions for{' '}
-                      <span className="font-medium">{shopId}</span>.
+                      <span className="font-medium">{storeId}</span>.
                     </CardDescription>
                   </div>
                   <Select value={batchType} onValueChange={(value: BatchType) => setBatchType(value)}>
@@ -215,7 +219,7 @@ export default function AwbProcessingPage() {
               </CardHeader>
               <CardContent className="flex-1 min-h-0 overflow-hidden">
                 <ScrollArea className="h-full">
-                  {!shopId || shopId === '—' ? (
+                  {!storeId ? (
                     <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg">
                       <p className="text-muted-foreground">No active store selected.</p>
                       <p className="text-sm text-muted-foreground">
@@ -232,7 +236,7 @@ export default function AwbProcessingPage() {
                     <div className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg">
                       <p className="text-muted-foreground">No records yet.</p>
                       <p className="text-sm text-muted-foreground">
-                        {batchType === 'forward' 
+                        {batchType === 'forward'
                           ? 'Start an assignment from the Orders page to see it here.'
                           : 'Start a return assignment from the Orders page to see it here.'}
                       </p>
@@ -244,8 +248,9 @@ export default function AwbProcessingPage() {
                           <h4 className="font-semibold">Ongoing</h4>
                           {ongoing.map((b) => (
                             <BatchRow
+                              user={user}
                               key={b.id}
-                              shopId={shopId}
+                              storeId={storeId}
                               batch={b}
                               batchType={batchType}
                               handleAssignAwbClick={handleAssignAwbClick}
@@ -259,8 +264,9 @@ export default function AwbProcessingPage() {
                           <h4 className="font-semibold">Completed</h4>
                           {completed.map((b) => (
                             <BatchRow
+                              user={user}
                               key={b.id}
-                              shopId={shopId}
+                              storeId={storeId}
                               batch={b}
                               batchType={batchType}
                               handleAssignAwbClick={handleAssignAwbClick}
@@ -302,9 +308,9 @@ export default function AwbProcessingPage() {
         onClose={() => setIsAwbDialogOpen(false)}
         orders={selectedOrders}
         onConfirm={(courier, pickupName, shippingMode) => {
-          processAwbAssignments(selectedOrders.map(o => ({id: o.id, name: o.name})), courier, pickupName, shippingMode);
+          processAwbAssignments(selectedOrders.map(o => ({ id: o.id, name: o.name })), courier, pickupName, shippingMode);
         }}
-        shopId={shopId || ''}
+        shopId={storeId || ''}
       />
 
       <GenerateAwbDialog
@@ -315,18 +321,19 @@ export default function AwbProcessingPage() {
   );
 }
 
-function BatchRow({ 
-  shopId, 
-  batch, 
+function BatchRow({
+  user,
+  storeId,
+  batch,
   batchType,
-  handleAssignAwbClick 
-}: { 
-  shopId: string; 
+  handleAssignAwbClick
+}: {
+  user: User | null | undefined
+  storeId: string;
   batch: ShipmentBatch;
   batchType: BatchType;
   handleAssignAwbClick: (ordersToProcess: Order[]) => void;
 }) {
-  const [user] = useAuthState(auth);
   const { toast } = useToast();
   const [isDownloadingSuccess, setIsDownloadingSuccess] = useState(false);
   const [isDownloadingFailed, setIsDownloadingFailed] = useState(false);
@@ -337,33 +344,30 @@ function BatchRow({
   const completed = !running && batch?.failed === 0;
 
   const retryFailedAwbAssignments = useCallback(async (batchId: string) => {
+    if(!storeId) {
+      toast({ title: "Shop not found Error", description: "The shop does not exist.", variant: "destructive" });
+      return;
+    }
+
     if (!user) {
       toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
-    
-    const userRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userRef);
-    if (!userDoc.exists() || !userDoc.data()?.activeAccountId) {
-      toast({ title: "No Active Store", description: "Could not find an active store to process orders for.", variant: "destructive" });
-      return;
-    }
-    const activeShopId = userDoc.data()?.activeAccountId;
 
     setIsRetrying(true);
 
     try {
       // Select collection based on batch type
       const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
-      const batchRef = doc(db, 'accounts', activeShopId, collectionName, batchId);
+      const batchRef = doc(db, 'accounts', storeId, collectionName, batchId);
       const batchDoc = await getDoc(batchRef);
-      
+
       if (!batchDoc.exists()) {
         throw new Error('Batch not found');
       }
 
       // Get all failed jobs from the batch's jobs subcollection
-      const jobsRef = collection(db, 'accounts', activeShopId, collectionName, batchId, 'jobs');
+      const jobsRef = collection(db, 'accounts', storeId, collectionName, batchId, 'jobs');
       const failedJobsQuery = query(jobsRef, where('status', '==', 'failed'));
       const failedJobsSnapshot = await getDocs(failedJobsQuery);
 
@@ -404,25 +408,34 @@ function BatchRow({
   };
 
   const handleDownloadFailed = useCallback(async (batchId: string) => {
-    if (!shopId || !user) return;
+    if(!storeId) {
+      toast({ title: "Shop not found Error", description: "The shop does not exist.", variant: "destructive" });
+      return;
+    }
+
+    if (!user) {
+      toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+
     setIsDownloadingFailed(true);
     toast({ title: 'Generating Report', description: 'Your download will begin shortly.' });
 
     try {
       const idToken = await user.getIdToken();
       const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
-      
+
       const response = await fetch('/api/shopify/courier/download-jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ 
-          shop: shopId, 
-          batchId, 
+        body: JSON.stringify({
+          shop: storeId,
+          batchId,
           status: "failed",
-          collectionName 
+          collectionName
         }),
       });
 
@@ -451,28 +464,37 @@ function BatchRow({
     } finally {
       setIsDownloadingFailed(false);
     }
-  }, [shopId, user, toast, batchType]);
+  }, [storeId, user, toast, batchType]);
 
   const handleDownloadSuccess = useCallback(async (batchId: string) => {
-    if (!shopId || !user) return;
+    if(!storeId) {
+      toast({ title: "Shop not found Error", description: "The shop does not exist.", variant: "destructive" });
+      return;
+    }
+
+    if (!user) {
+      toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+    
     setIsDownloadingSuccess(true);
     toast({ title: 'Generating Report', description: 'Your download will begin shortly.' });
 
     try {
       const idToken = await user.getIdToken();
       const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
-      
+
       const response = await fetch('/api/shopify/courier/download-jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ 
-          shop: shopId, 
-          batchId, 
+        body: JSON.stringify({
+          shop: storeId,
+          batchId,
           status: "success",
-          collectionName 
+          collectionName
         }),
       });
 
@@ -501,7 +523,7 @@ function BatchRow({
     } finally {
       setIsDownloadingSuccess(false);
     }
-  }, [shopId, user, toast, batchType]);
+  }, [storeId, user, toast, batchType]);
 
   return (
     <div className="border rounded-lg p-4 transition-colors hover:bg-muted/50">
@@ -528,13 +550,13 @@ function BatchRow({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4 mt-3 sm:mt-0">
           {batch.success > 0 && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => handleDownloadSuccess(batch.id)} 
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleDownloadSuccess(batch.id)}
               disabled={isDownloadingSuccess}
             >
               <Download className="mr-2 h-4 w-4" />

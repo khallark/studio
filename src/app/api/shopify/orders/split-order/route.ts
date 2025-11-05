@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth as adminAuth } from '@/lib/firebase-admin';
+import { auth as adminAuth, db } from '@/lib/firebase-admin';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -18,10 +18,6 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    // ----- Auth -----
-    const userId = await getUserIdFromToken(req);
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
     // ----- Input -----
     const { shop, orderId } = (await req.json()) as {
       shop: string;
@@ -32,7 +28,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop and orderId are required' }, { status: 400 });
     }
 
-    // // Ask Firebase Function to enqueue Cloud Tasks (one per job)
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    
+    // Ask Firebase Function to enqueue Cloud Tasks (one per job)
     const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
     if (!url || !secret) {

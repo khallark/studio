@@ -55,9 +55,9 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const params = useParams();
   const { toast } = useToast();
-  const storeId = params?.storeId as string;
+  const nonPrefixedStoreId = params?.storeId as string;
 
-  const { isAuthorized, memberRole, loading, user } = useStoreAuthorization(storeId);
+  const { isAuthorized, memberRole, loading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
 

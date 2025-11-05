@@ -33,31 +33,28 @@ async function verifyUserPermissions(userId: string, shopId: string): Promise<bo
 
 export async function POST(req: NextRequest) {
     try {
-        const { role, permissions, vendorName } = await req.json();
+        const { shop, role, permissions, vendorName } = await req.json();
+        if(!shop) {
+            return NextResponse.json({ error: 'shop field is required' }, { status: 404 });
+        }
+
+        const shopDoc = await db.collection('accounts').doc(shop).get();
+        if(!shopDoc.exists) {
+            return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+        }
 
         // 1. Authentication & Authorization
         const userId = await getUserIdFromToken(req);
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
-        const userRef = db.collection('users').doc(userId);
-        const userDoc = await userRef.get();
-        const shopId = userDoc.data()?.activeAccountId;
-
-        if (!shopId) {
-            return NextResponse.json({ error: 'User does not have an active shop' }, { status: 400 });
-        }
+        
+        const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
         
         // This is a placeholder for the real permission check
-        const isAuthorized = await verifyUserPermissions(userId, shopId);
+        const isAuthorized = !member.exists || member.data()?.status !== 'active';
         if (!isAuthorized) {
              return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        const shopDoc = await db.collection('accounts').doc(shopId).get();
-        if (!shopDoc.exists) {
-            return NextResponse.json({ error: 'Shop not found' }, { status: 404 });
         }
 
         // 2. Validate input
@@ -80,8 +77,8 @@ export async function POST(req: NextRequest) {
         oneHourFromNow.setHours(oneHourFromNow.getHours() + 1);
 
         const sessionData: any = {
-            shopId: shopId,
-            shopName: shopDoc.data()?.shopName || shopId,
+            shopId: shop,
+            shopName: shopDoc.data()?.shopName || shop,
             role: role,
             permissions: permissions,
             createdAt: FieldValue.serverTimestamp(),

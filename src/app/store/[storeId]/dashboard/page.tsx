@@ -17,12 +17,12 @@ import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 
 export default function Dashboard() {
   const params = useParams();
-  const storeId = params?.storeId as string;
-  const { isAuthorized, memberRole, loading: authLoading, user } = useStoreAuthorization(storeId);
+  const nonPrefixedStoreId = params?.storeId as string;
+  const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
 
   useEffect(() => {
     document.title = "Dashboard";
-  })
+  }, [])
 
   // Show loading while checking authorization
   if (authLoading) {
@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -64,7 +64,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">New Customers</CardTitle>
-             <span className="text-muted-foreground">😊</span>
+            <span className="text-muted-foreground">😊</span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">+573</div>
@@ -73,14 +73,14 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-             <span className="text-muted-foreground">🚚</span>
+            <span className="text-muted-foreground">🚚</span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">42</div>
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="flex flex-1 items-center justify-center rounded-lg border bg-card shadow-sm min-h-[400px]">
         <div className="flex flex-col items-center gap-2 text-center p-4">
           <h3 className="text-2xl font-bold tracking-tight font-headline">

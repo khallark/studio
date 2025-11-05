@@ -18,10 +18,6 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    // ----- Auth -----
-    const userId = await getUserIdFromToken(req);
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
     // ----- Input -----
     const { shop, orderIds } = (await req.json()) as {
       shop: string;
@@ -30,6 +26,24 @@ export async function POST(req: NextRequest) {
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
+    }
+
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if (!shopDoc.exists) {
+      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // // Ask Firebase Function to enqueue Cloud Tasks (one per job)

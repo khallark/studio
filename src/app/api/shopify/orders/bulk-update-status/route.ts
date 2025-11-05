@@ -27,6 +27,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop, a non-empty array of orderIds, and status are required' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const validStatuses = [
         'Confirmed',
         'Closed',
@@ -36,10 +54,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
     }
 
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
     const userRecord = await adminAuth.getUser(userId);
     const userRefData = {
         uid: userId,
@@ -49,10 +63,6 @@ export async function POST(req: NextRequest) {
 
     const accountRef = db.collection('accounts').doc(shop);
     const ordersColRef = accountRef.collection('orders');
-    const logsColRef = accountRef.collection('logs');
-    
-    // Use a server-generated JS Date for array unions
-    const now = new Date();
 
     await db.runTransaction(async (transaction) => {
         // We don't fetch the old status for bulk updates to keep it simple and performant.
@@ -88,20 +98,6 @@ export async function POST(req: NextRequest) {
                 customStatusesLogs: FieldValue.arrayUnion(log), // Append to order's log array
             });
         });
-
-        // Add a single log entry for the bulk action to the main log collection
-        const bulkLogEntry = {
-            type: 'USER_ACTION',
-            action: 'BULK_UPDATE_ORDER_STATUS',
-            timestamp: FieldValue.serverTimestamp(), // This is fine, not in an array
-            details: {
-                orderIds: orderIds,
-                count: orderIds.length,
-                newStatus: status,
-            },
-            user: userRefData,
-        };
-        transaction.set(logsColRef.doc(), bulkLogEntry);
     });
 
     return NextResponse.json({ message: `${orderIds.length} order(s) successfully updated to ${status}` });

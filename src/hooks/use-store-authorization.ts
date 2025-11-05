@@ -1,12 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { MemberRole } from '@/contexts/store-context';
+import { prefixmyshopifycom } from '@/lib/prefix-myshopifycom';
+import { User } from 'firebase/auth';
+
+// Export the role type so it can be used elsewhere
+export type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
+
+// Export the context type
+export interface StoreContextType {
+  storeId: string;
+  user: User | null;
+  memberRole: MemberRole | null;
+}
 
 export function useStoreAuthorization(storeId: string) {
   const [user, userLoading] = useAuthState(auth);
@@ -14,6 +25,12 @@ export function useStoreAuthorization(storeId: string) {
   const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+
+  // Compute the prefixed storeId once
+  const prefixedStoreId = useMemo(() => 
+    storeId ? prefixmyshopifycom(storeId) : '', 
+    [storeId]
+  );
 
   useEffect(() => {
     async function checkAuthorization() {
@@ -36,8 +53,8 @@ export function useStoreAuthorization(storeId: string) {
       }
 
       try {
-        // Check if store exists
-        const storeRef = doc(db, 'accounts', storeId);
+        // Use the memoized prefixedStoreId
+        const storeRef = doc(db, 'accounts', prefixedStoreId);
         const storeDoc = await getDoc(storeRef);
 
         if (!storeDoc.exists()) {
@@ -52,7 +69,7 @@ export function useStoreAuthorization(storeId: string) {
         }
 
         // Check if user is a member of this store
-        const memberRef = doc(db, 'accounts', storeId, 'members', user.uid);
+        const memberRef = doc(db, 'accounts', prefixedStoreId, 'members', user.uid);
         const memberDoc = await getDoc(memberRef);
 
         if (!memberDoc.exists()) {
@@ -82,12 +99,13 @@ export function useStoreAuthorization(storeId: string) {
     }
 
     checkAuthorization();
-  }, [user, userLoading, storeId, router, toast]);
+  }, [user, userLoading, storeId, prefixedStoreId, router, toast]);
 
   return {
     isAuthorized,
     memberRole,
     loading: userLoading || isAuthorized === null,
     user,
+    storeId: prefixedStoreId, // ✅ Return as 'storeId' (but it's the prefixed version)
   };
 }

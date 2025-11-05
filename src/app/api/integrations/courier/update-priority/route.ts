@@ -20,30 +20,37 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { enabled, priorityList } = await req.json();
+    const { shop, enabled, priorityList } = await req.json();
 
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
-    
-    const userDoc = await db.collection('users').doc(userId).get();
-    const shop = userDoc.data()?.activeAccountId;
-    
     if (!shop) {
         return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopRef = db.collection('accounts').doc(shop)
+    const shopDoc = await shopRef.get();
+    if (!shopDoc.exists) {
+      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const member = await memberRef.get();
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    
     if (enabled === undefined || !Array.isArray(priorityList)) {
       return NextResponse.json({ error: 'Enabled status and priorityList are required' }, { status: 400 });
     }
 
-    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
-    const memberDoc = await memberRef.get();
-    if (!memberDoc.exists) {
-        return NextResponse.json({ error: 'Forbidden: User is not a member of this shop.' }, { status: 403 });
+    const memberRole = member.data()?.role;
+    if(!memberRole) {
+      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
     }
-    const memberRole = memberDoc.data()?.role;
 
     let targetRef;
     if (memberRole === 'Vendor') {

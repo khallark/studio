@@ -22,18 +22,26 @@ const VALID_SERVICES = ['bookReturnPage'];
 
 export async function POST(req: NextRequest) {
   try {
-    const { serviceName, isEnabled } = await req.json();
-
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
-
-    const userDoc = await db.collection('users').doc(userId).get();
-    const shop = userDoc.data()?.activeAccountId;
+    const { shop, serviceName, isEnabled } = await req.json();
 
     if (!shop) {
         return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
+    }
+
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+    const isAuthorized = !memberDoc.exists || memberDoc.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (!serviceName || isEnabled === undefined) {
@@ -43,20 +51,16 @@ export async function POST(req: NextRequest) {
     if (!VALID_SERVICES.includes(serviceName)) {
       return NextResponse.json({ error: 'Invalid service name provided' }, { status: 400 });
     }
-
-    // Verify user authorization for the shop
-    const memberDoc = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    if (!memberDoc.exists) {
-      return NextResponse.json({ error: 'Forbidden: User is not authorized to modify this shop.' }, { status: 403 });
-    }
+    
     const memberRole = memberDoc.data()?.role;
+    if(!memberRole) {
+      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
+    }
     if(memberRole === 'Vendor' || memberRole === 'Staff') {
         return NextResponse.json({ error: 'Forbidden: Insufficient permissions.' }, { status: 403 });
     }
     
     const accountRef = db.collection('accounts').doc(shop);
-    
-    const updatePath = `customerServices.${serviceName}.enabled`;
     
     await accountRef.set({
       customerServices: {

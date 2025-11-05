@@ -28,6 +28,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop, orderId, and status are required' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    
     const validStatuses = [
         'Confirmed',
         'Closed',
@@ -37,10 +52,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
     }
 
-    const userId = await getUserIdFromToken(req);
-     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
     const userRecord = await adminAuth.getUser(userId);
     const userRefData = {
         uid: userId,
@@ -48,37 +59,12 @@ export async function POST(req: NextRequest) {
         displayName: userRecord.displayName || 'N/A'
     };
 
-
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
-    const logsColRef = db.collection('accounts').doc(shop).collection('logs');
-    const now = new Date(); // Use a standard JS Date for arrayUnion
     
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
         return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
     }
-    const orderData = orderSnap.data();
-    const oldStatus = orderData?.customStatus || 'N/A';
-    const orderName = orderData?.name || orderId; // Fallback to ID if name is not there
-
-    const logEntry = {
-        type: 'USER_ACTION',
-        action: 'UPDATE_ORDER_STATUS',
-        timestamp: now, // Use JS Date object here
-        details: {
-            orderId: orderId,
-            orderName: orderName,
-            newStatus: status,
-            oldStatus: oldStatus,
-        },
-        user: userRefData,
-    };
-    
-    // Create a separate log entry for the central collection that CAN use serverTimestamp
-    const centralLogEntry = {
-        ...logEntry,
-        timestamp: FieldValue.serverTimestamp(), // This is fine, not in an array
-    };
 
     const log = {
         status: status,
@@ -108,9 +94,6 @@ export async function POST(req: NextRequest) {
             lastUpdatedBy: userRefData,
             customStatusesLogs: FieldValue.arrayUnion(log), // Append log to order's log array
         });
-        
-        // Create a log in the central logs collection
-        transaction.set(logsColRef.doc(), centralLogEntry);
     });
 
     return NextResponse.json({ message: 'Order status successfully updated' });

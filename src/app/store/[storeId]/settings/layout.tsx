@@ -1,4 +1,5 @@
 // /store/[storeId]/settings/layout.tsx
+
 'use client';
 
 import Link from 'next/link';
@@ -33,7 +34,7 @@ export default function SettingsLayout({
   const params = useParams();
   const storeId = params?.storeId as string;
 
-  const { isAuthorized, loading, user } = useStoreAuthorization(storeId);
+  const { isAuthorized, loading: authLoading, user } = useStoreAuthorization(storeId);
 
   useEffect(() => {
     document.title = "Settings";
@@ -54,7 +55,7 @@ export default function SettingsLayout({
     return 'U';
   }
   
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-lg">Loading...</div>
@@ -62,7 +63,9 @@ export default function SettingsLayout({
     );
   }
 
-  if (!isAuthorized) return null;
+  if (!isAuthorized) {
+    return null;
+  }
 
   const navItems = [
     { href: `/store/${storeId}/dashboard`, label: 'Back to Dashboard', icon: Home },

@@ -20,41 +20,45 @@ async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { contact } = await req.json();
-
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
-    }
-
-    const userDoc = await db.collection('users').doc(userId).get();
-    const shop = userDoc.data()?.activeAccountId;
+    const { shop, contact } = await req.json();
 
     if (!shop) {
         return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
     }
+
+    // ----- Auth -----
+    const shopDoc = await db.collection('accounts').doc(shop).get();
+    if(!shopDoc.exists) {
+        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
+    const userId = await getUserIdFromToken(req);
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
+    const memberDoc = await memberRef.get();
+    const isAuthorized = !memberDoc.exists || memberDoc.data()?.status !== 'active';
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (!contact) {
       return NextResponse.json({ error: 'Contact data is required' }, { status: 400 });
     }
 
-    // Determine user's role for this shop
-    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
-    const memberDoc = await memberRef.get();
-
-    if (!memberDoc.exists) {
-        return NextResponse.json({ error: 'Forbidden: You are not a member of this shop.' }, { status: 403 });
+    const memberData = memberDoc.data();
+    const memberRole = memberData?.role;
+    if(!memberRole) {
+      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
     }
 
-    const memberData = memberDoc.data();
-    const userRole = memberData?.role;
-
     // Vendors have their own isolated settings
-    if (userRole === 'Vendor') {
+    if (memberRole === 'Vendor') {
         await memberRef.update({
             primaryContact: contact,
             lastUpdatedAt: FieldValue.serverTimestamp(),
         });
-    } else if (userRole === 'SuperAdmin' || userRole === 'Admin') {
+    } else if (memberRole === 'SuperAdmin' || memberRole === 'Admin') {
         // SuperAdmins and Admins edit the main account document
         const accountRef = db.collection('accounts').doc(shop);
         await accountRef.update({

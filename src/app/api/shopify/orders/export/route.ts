@@ -38,13 +38,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopRef = db.collection('accounts').doc(shop)
+    const shopDoc = await shopRef.get();
+    if (!shopDoc.exists) {
+      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
     const userId = await getUserIdFromToken(req);
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: Could not identify user.' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const accountRef = db.collection('accounts').doc(shop);
-    const ordersColRef = accountRef.collection('orders');
+    const ordersColRef = shopRef.collection('orders');
     
     // Firestore 'in' query has a limit of 30 values. We need to chunk them.
     const chunks: string[][] = [];

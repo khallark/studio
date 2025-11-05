@@ -33,12 +33,12 @@ const S = (n: number) => Math.round(n * FONT_SCALE);
 
 // Helper to sanitize text for WinAnsi encoding
 function sanitizeText(text: string): string {
-    if (!text) return '';
-    // This regex matches characters outside the WinAnsi character set.
-    // It's a simplified approach. A more accurate one would be to check character codes.
-    // For pdf-lib's standard fonts, we need to ensure characters are within the subset it supports.
-    // Let's replace any character that is not a standard ASCII character.
-    return text.replace(/[^\x00-\x7F]/g, "?");
+  if (!text) return '';
+  // This regex matches characters outside the WinAnsi character set.
+  // It's a simplified approach. A more accurate one would be to check character codes.
+  // For pdf-lib's standard fonts, we need to ensure characters are within the subset it supports.
+  // Let's replace any character that is not a standard ASCII character.
+  return text.replace(/[^\x00-\x7F]/g, "?");
 }
 
 function ddmmyyyy(dateish: any): string {
@@ -134,11 +134,11 @@ async function createSlipPage(
   const page = pdfDoc.addPage([595, 842]); // A4 size
   const { width, height } = page.getSize();
   const { bold } = fonts; // Only using bold now
-  
+
   const margin = 30;
   const contentWidth = width - 2 * margin;
   let y = height - margin;
-  
+
   const drawSanitizedText = (text: string, options: any) => {
     const o = { ...options };
     if (typeof o.size === 'number') o.size = S(o.size); // scale requested size
@@ -207,11 +207,11 @@ async function createSlipPage(
       includetext: true,
       textxalign: 'center',
     });
-    
+
     const barcodeImage = await pdfDoc.embedPng(barcodeBuffer);
     const barcodeWidth = 260;
     const barcodeHeight = 60 + 20;
-    
+
     page.drawImage(barcodeImage, {
       x: (width - barcodeWidth) / 2,
       y,
@@ -256,8 +256,8 @@ async function createSlipPage(
   const _rightColMaxWidth = 140; // slightly less than 150 to ensure padding from border
 
   const paymentText = `${order.raw.payment_gateway_names.join(",").toLowerCase().includes("cod") ? "COD" : "Prepaid"} - ${order?.courier === 'Delhivery'
-      ? order?.shippingMode || "Surface/Express"
-      : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`;
+    ? order?.shippingMode || "Surface/Express"
+    : (String(order?.courier || '').split(':')[1] || 'Express').trim()}`;
 
   y = drawWrappedText(
     page,
@@ -394,15 +394,15 @@ async function createSlipPage(
   // Product items
   const lineItems = order.raw.line_items || [];
   y -= 20;
-  
+
   lineItems.forEach((item: any) => {
     xPos = margin + 10;
-    
+
     const productName = item.name || item.title || 'Product';
     const quantity = item.quantity || 1;
     const hsn = item.hsn || '6109';
     const total = (parseFloat(item.price) * quantity).toFixed(2);
-    const price = (Number(total) * (100/105)).toFixed(); // assuming 5% tax inclusive
+    const price = (Number(total) * (100 / 105)).toFixed(); // assuming 5% tax inclusive
     const taxAmount = Number(total) - Number(price);
 
     function truncateKeepTailAfterHyphen(name: string, max = 30): string {
@@ -446,7 +446,7 @@ async function createSlipPage(
       });
       xPos += colWidths[i];
     });
-    
+
     y -= 20;
   });
 
@@ -497,37 +497,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
     }
 
+    // ----- Auth -----
+    const shopRef = db.collection('accounts').doc(shop)
+    const shopDoc = await shopRef.get();
+    if (!shopDoc.exists) {
+      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
+    }
     const userId = await getUserIdFromToken(req);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const accountRef = db.collection('accounts').doc(shop);
-    const accountDoc = await accountRef.get();
-    if (!accountDoc.exists) {
-      return NextResponse.json({ error: 'Shop not found' }, { status: 404 });
+    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
+    const isAuthorized = !member.exists || member.data()?.status !== 'active';
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    const accountData = accountDoc.data() || {};
 
+    const shopData = shopDoc.data() || {};
     const sellerDetails = {
       name:
-        accountData?.companyName ||
-        accountData?.businessName ||
-        accountData?.primaryContact?.name ||
+        shopData?.companyName ||
+        shopData?.businessName ||
+        shopData?.primaryContact?.name ||
         'Majime Technologies', // sensible default
-      gst: accountData?.gstin || accountData?.gst || 'NOT_CONFIGURED',
+      gst: shopData?.gstin || shopData?.gst || 'NOT_CONFIGURED',
       returnAddress: [
-        accountData?.companyAddress?.address,
-        accountData?.companyAddress?.city,
-        accountData?.companyAddress?.state,
-        accountData?.companyAddress?.pincode,
-        accountData?.companyAddress?.country,
+        shopData?.companyAddress?.address,
+        shopData?.companyAddress?.city,
+        shopData?.companyAddress?.state,
+        shopData?.companyAddress?.pincode,
+        shopData?.companyAddress?.country,
       ]
         .filter(Boolean)
         .join(', '),
     };
 
-    const ordersColRef = accountRef.collection('orders');
+    const ordersColRef = shopRef.collection('orders');
     // The request sends Firestore document IDs, which are strings.
     const stringIds = orderIds.map(String);
 

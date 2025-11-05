@@ -75,6 +75,7 @@ import { GeneratePODialog } from '@/components/generate-po-dialog'
 import { FieldValue } from 'firebase-admin/firestore';
 import { useParams } from 'next/navigation';
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
+import { prefixmyshopifycom } from '@/lib/prefix-myshopifycom';
 
 type CustomStatus =
     | 'New'
@@ -173,8 +174,8 @@ type SortDirection = 'asc' | 'desc';
 
 export default function OrdersPage() {
     const params = useParams();
-    const storeId = params?.storeId as string;
-    const { isAuthorized, memberRole, loading: authLoading, user } = useStoreAuthorization(storeId);
+    const nonPrefixedStoreId = params?.storeId as string;
+    const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
 
     const { toast } = useToast();
     const { processAwbAssignments } = useProcessingQueue();
@@ -296,21 +297,7 @@ export default function OrdersPage() {
 
     useEffect(() => {
         document.title = "Dashboard - Orders";
-    })
-
-    // Show loading while checking authorization
-    if (authLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-lg">Loading...</div>
-            </div>
-        );
-    }
-
-    // If not authorized, hook handles redirect
-    if (!isAuthorized) {
-        return null;
-    }
+    }, [])
 
     useEffect(() => {
         if (storeId) {
@@ -394,7 +381,6 @@ export default function OrdersPage() {
         if (!storeId || !user) return;
 
         const endpoint = revertTo === 'Confirmed' ? '/api/shopify/orders/revert-to-confirmed' : '/api/shopify/orders/revert-to-delivered';
-        const toastTitle = `Reverting to ${revertTo}`;
 
         try {
             const idToken = await user.getIdToken();
@@ -1516,6 +1502,19 @@ export default function OrdersPage() {
         );
     };
 
+    // Show loading while checking authorization
+    if (authLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-lg">Loading...</div>
+            </div>
+        );
+    }
+
+    // If not authorized, hook handles redirect
+    if (!isAuthorized) {
+        return null;
+    }
 
     return (
         <>

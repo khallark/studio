@@ -35,51 +35,53 @@ export function useOrders(
 
             let q = query(ordersRef);
 
-            // Filter by status tab
-            if (activeTab === 'Cancelled') {
-                q = query(q, where('raw.cancelled_at', '!=', null));
-            } else if (activeTab !== 'All Orders') {
-                q = query(q, where('customStatus', '==', activeTab));
-            }
+            q = query(q, where('isDeleted', '!=', true));
 
-            // Date range filter (if specified)
-            if (filters.dateRange?.from) {
-                const toDate = filters.dateRange.to
-                    ? addDays(filters.dateRange.to, 1)
-                    : addDays(filters.dateRange.from, 1);
+            // // Filter by status tab
+            // if (activeTab === 'Cancelled') {
+            //     q = query(q, where('raw.cancelled_at', '!=', null));
+            // } else if (activeTab !== 'All Orders') {
+            //     q = query(q, where('customStatus', '==', activeTab));
+            // }
 
-                q = query(
-                    q,
-                    where('createdAt', '>=', filters.dateRange.from.toISOString()),
-                    where('createdAt', '<', toDate.toISOString())
-                );
-            }
+            // // Date range filter (if specified)
+            // if (filters.dateRange?.from) {
+            //     const toDate = filters.dateRange.to
+            //         ? addDays(filters.dateRange.to, 1)
+            //         : addDays(filters.dateRange.from, 1);
 
-            // Courier filter (only for shipped orders)
-            if (
-                !['New', 'Confirmed', 'Cancelled'].includes(activeTab) &&
-                filters.courierFilter &&
-                filters.courierFilter !== 'all'
-            ) {
-                if (filters.courierFilter === 'Delhivery') {
-                    q = query(q, where('courier', '==', filters.courierFilter));
-                } else if (filters.courierFilter === 'Shiprocket') {
-                    q = query(q, where('courierProvider', '==', 'Shiprocket'));
-                } else if (filters.courierFilter === 'Xpressbees') {
-                    q = query(q, where('courierProvider', '==', 'Xpressbees'));
-                }
-            }
+            //     q = query(
+            //         q,
+            //         where('createdAt', '>=', filters.dateRange.from.toISOString()),
+            //         where('createdAt', '<', toDate.toISOString())
+            //     );
+            // }
 
-            // Sorting
-            const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
-            const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
+            // // Courier filter (only for shipped orders)
+            // if (
+            //     !['New', 'Confirmed', 'Cancelled'].includes(activeTab) &&
+            //     filters.courierFilter &&
+            //     filters.courierFilter !== 'all'
+            // ) {
+            //     if (filters.courierFilter === 'Delhivery') {
+            //         q = query(q, where('courier', '==', filters.courierFilter));
+            //     } else if (filters.courierFilter === 'Shiprocket') {
+            //         q = query(q, where('courierProvider', '==', 'Shiprocket'));
+            //     } else if (filters.courierFilter === 'Xpressbees') {
+            //         q = query(q, where('courierProvider', '==', 'Xpressbees'));
+            //     }
+            // }
 
-            // Special case: RTO Delivered sorted by lastStatusUpdate
-            if (activeTab === 'RTO Delivered') {
-                q = query(q, orderBy('lastStatusUpdate', 'desc'));
-            } else {
-                q = query(q, orderBy(sortField, sortDir));
-            }
+            // // Sorting
+            // const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
+            // const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
+
+            // // Special case: RTO Delivered sorted by lastStatusUpdate
+            // if (activeTab === 'RTO Delivered') {
+            //     q = query(q, orderBy('lastStatusUpdate', 'desc'));
+            // } else {
+            //     q = query(q, orderBy(sortField, sortDir));
+            // }
 
             // Limit - fetch more than needed for client-side pagination
             // We'll fetch extra to handle client-side filters

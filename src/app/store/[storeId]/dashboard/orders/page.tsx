@@ -1034,12 +1034,7 @@ export default function OrdersPage() {
                                                 aria-label="Select all"
                                             />
                                         </TableHead>
-                                        <TableHead>
-                                            <Button variant="ghost" onClick={() => handleSort('name')} className="px-1">
-                                                Order ID
-                                                <ArrowUpDown className="ml-2 h-4 w-4" />
-                                            </Button>
-                                        </TableHead>
+                                        <TableHead>Order ID</TableHead>
                                         <TableHead>Date</TableHead>
                                         {activeTab === 'All Orders' && (
                                             <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>

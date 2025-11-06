@@ -37,7 +37,7 @@ export function useOrders(
 
             // Filter by status tab
             if (activeTab === 'Cancelled') {
-                q = query(q, where('raw.cancelled_at', '!=', null));
+                q = query(ordersRef, where('raw.cancelled_at', '!=', null));
                 console.log(1);
             } else if (activeTab !== 'All Orders') {
                 q = query(q, where('customStatus', '==', activeTab));

@@ -801,13 +801,13 @@ export default function OrdersPage() {
     // LOADING & AUTH CHECKS
     // ============================================================
 
-    if (authLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-lg">Loading...</div>
-            </div>
-        );
-    }
+    // if (authLoading) {
+    //     return (
+    //         <div className="flex items-center justify-center h-screen">
+    //             <div className="text-lg">Loading...</div>
+    //         </div>
+    //     );
+    // }
 
     if (!isAuthorized) {
         return null;
@@ -1067,7 +1067,7 @@ export default function OrdersPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {isLoading ? (
+                                    {authLoading || isLoading ? (
                                         Array.from({ length: rowsPerPage }).map((_, i) => (
                                             <TableRow key={i}>
                                                 <TableCell className="py-2 px-5"><Skeleton className="h-5 w-5" /></TableCell>

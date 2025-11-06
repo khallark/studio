@@ -1040,12 +1040,7 @@ export default function OrdersPage() {
                                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                                             </Button>
                                         </TableHead>
-                                        <TableHead>
-                                            <Button variant="ghost" onClick={() => handleSort('createdAt')} className="px-1">
-                                                Date
-                                                <ArrowUpDown className="ml-2 h-4 w-4" />
-                                            </Button>
-                                        </TableHead>
+                                        <TableHead>Date</TableHead>
                                         {activeTab === 'All Orders' && (
                                             <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
                                         )}

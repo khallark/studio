@@ -33,7 +33,7 @@ export function useOrders(
             // FIRESTORE QUERY - Server-side filtering
             // ============================================================
 
-            let q = query(ordersRef);
+            let q = query(ordersRef, where('raw.cancelled_at', '==', null));
 
             // Filter by status tab
             if (activeTab === 'Cancelled') {

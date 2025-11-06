@@ -64,7 +64,7 @@ export function useOrders(
                 filters.courierFilter !== 'all'
             ) {
                 if (filters.courierFilter === 'Delhivery') {
-                    q = query(q, where('courier', '==', filters.courierFilter));
+                    q = query(q, where('courierProvider', '==', 'Delhivery'));
                 } else if (filters.courierFilter === 'Shiprocket') {
                     q = query(q, where('courierProvider', '==', 'Shiprocket'));
                 } else if (filters.courierFilter === 'Xpressbees') {

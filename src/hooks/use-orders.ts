@@ -37,9 +37,9 @@ export function useOrders(
 
             // Filter by status tab
             if (activeTab === 'Cancelled') {
-                q = query(q, where('raw.cancelled_at', '!=', null));
+                q = query(ordersRef, where('raw.cancelled_at', '!=', null));
             } else if (activeTab !== 'All Orders') {
-                q = query(q, where('customStatus', '==', activeTab));
+                q = query(ordersRef, where('customStatus', '==', activeTab));
             }
 
             // Date range filter (if specified)

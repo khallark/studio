@@ -72,6 +72,17 @@ export function useOrders(
                 }
             }
 
+            // RTO In Transit filter (server-side for 're-attempt' and 'refused')
+            if (activeTab === 'RTO In Transit' && filters.rtoInTransitFilter !== 'all') {
+                if (filters.rtoInTransitFilter === 're-attempt') {
+                    q = query(q, where('tags_rtoInTransit', 'array-contains', 'Re-attempt'));
+                } else if (filters.rtoInTransitFilter === 'refused') {
+                    q = query(q, where('tags_rtoInTransit', 'array-contains', 'Refused'));
+                }
+                // Note: 'no-reply' will still be handled client-side below
+                // because Firestore doesn't support "not contains" queries efficiently
+            }
+
             // Sorting
             // const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
             // const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
@@ -175,32 +186,19 @@ export function useOrders(
                 }
             }
 
-            // RTO In Transit filter
+            // RTO In Transit filter - only 'no-reply' handled client-side
+            // ('re-attempt' and 'refused' are already filtered server-side above)
             if (
                 activeTab === 'RTO In Transit' &&
-                filters.rtoInTransitFilter !== 'all'
+                filters.rtoInTransitFilter === 'no-reply'
             ) {
-                if (filters.rtoInTransitFilter === 're-attempt') {
-                    orders = orders.filter(
-                        (order) =>
-                            order.tags_rtoInTransit?.length === 1 &&
-                            order.tags_rtoInTransit[0] === 'Re-attempt'
-                    );
-                } else if (filters.rtoInTransitFilter === 'refused') {
-                    orders = orders.filter(
-                        (order) =>
-                            order.tags_rtoInTransit?.length === 1 &&
-                            order.tags_rtoInTransit[0] === 'Refused'
-                    );
-                } else if (filters.rtoInTransitFilter === 'no-reply') {
-                    orders = orders.filter(
-                        (order) =>
-                            !order.tags_rtoInTransit ||
-                            order.tags_rtoInTransit.length === 0 ||
-                            (!order.tags_rtoInTransit.includes('Re-attempt') &&
-                                !order.tags_rtoInTransit.includes('Refused'))
-                    );
-                }
+                orders = orders.filter(
+                    (order) =>
+                        !order.tags_rtoInTransit ||
+                        order.tags_rtoInTransit.length === 0 ||
+                        (!order.tags_rtoInTransit.includes('Re-attempt') &&
+                            !order.tags_rtoInTransit.includes('Refused'))
+                );
             }
 
             // ============================================================

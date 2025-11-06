@@ -1,8 +1,8 @@
-// /store/[storeId]/dashboard/orders/page.tsx
-
+// app/store/[storeId]/dashboard/orders/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import {
     Table,
     TableBody,
@@ -11,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Badge, badgeVariants } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import {
     Card,
     CardContent,
@@ -25,7 +25,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -45,17 +44,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Trash2, Bot, User, MoveRight, Calendar as CalendarIcon, X, Loader2, ArrowUpDown, ScanBarcode, Clock } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp, where, getDocs } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
+import { Download, MoreHorizontal, Loader2, ArrowUpDown, ScanBarcode, Clock, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
-import Link from 'next/link';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -64,171 +59,255 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, addDays } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { DocumentSnapshot } from 'firebase/firestore';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AwbBulkSelectionDialog } from '@/components/awb-bulk-selection-dialog';
 import { BookReturnDialog } from '@/components/book-return-dialog';
 import { StartQcDialog } from '@/components/start-qc-dialog';
 import { AvailabilityDialog } from '@/components/availability-dialog';
-import { GeneratePODialog } from '@/components/generate-po-dialog'
-import { FieldValue } from 'firebase-admin/firestore';
-import { useParams } from 'next/navigation';
+import { GeneratePODialog } from '@/components/generate-po-dialog';
+
+// ============================================================
+// HOOKS & TYPES (NEW!)
+// ============================================================
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
-import { prefixmyshopifycom } from '@/lib/prefix-myshopifycom';
-
-type CustomStatus =
-    | 'New'
-    | 'Confirmed'
-    | 'Ready To Dispatch'
-    | 'Dispatched'
-    | 'In Transit'
-    | 'Out For Delivery'
-    | 'Delivered'
-    | 'RTO In Transit'
-    | 'RTO Delivered'
-    | 'DTO Requested'
-    | 'DTO Booked'
-    | 'DTO In Transit'
-    | 'DTO Delivered'
-    | 'Pending Refunds'
-    | 'Lost'
-    | 'Closed'
-    | 'RTO Closed'
-    | 'Cancellation Requested'
-    | 'Cancelled';
-
-
-interface CustomStatusLog {
-    status: string;
-    createdAt: Timestamp;
-    remarks: string;
-}
-
-interface Order {
-    id: string; // Firestore document ID
-    orderId: number;
-    name: string;
-    createdAt: string;
-    lastStatusUpdate: Timestamp;
-    email: string;
-    totalPrice: number;
-    currency: string;
-    financialStatus: string;
-    fulfillmentStatus: string;
-    customStatus: CustomStatus;
-    awb?: string;
-    awb_reverse?: string;
-    courier?: string;
-    courierProvider?: string;
-    courier_reverse?: string;
-    isDeleted?: boolean; // Tombstone flag
-    tags_confirmed?: string[];
-    tags_rtoInTransit?: string[];
-    customStatusesLogs?: CustomStatusLog[];
-    booked_return_reason?: string;
-    booked_return_images?: string[];
-    returnItemsVariantIds?: (string | number)[];
-    raw: {
-        cancelled_at: string | null;
-        customer?: {
-            name?: string;
-            first_name?: string;
-            last_name?: string;
-            phone?: string;
-        };
-        line_items: any[];
-        contact_email?: string;
-        billing_address?: {
-            name?: string;
-            first_name?: string;
-            last_name?: string;
-            phone?: string;
-            address1: string;
-            address2: string;
-            city: string;
-            province: string;
-            zip: string;
-            country: string;
-        };
-        shipping_address?: {
-            name?: string;
-            first_name?: string;
-            last_name?: string;
-            phone?: string;
-            address1: string;
-            address2: string;
-            city: string;
-            zip: string;
-            province: string;
-            country: string;
-        },
-        total_discounts?: number;
-        total_outstanding?: string;
-    }
-}
-
-type SortKey = 'name' | 'createdAt';
-type SortDirection = 'asc' | 'desc';
-
+import { useOrders } from '@/hooks/use-orders';
+import { useOrderCounts } from '@/hooks/use-order-counts';
+import { useAvailabilityCounts } from '@/hooks/use-availability-counts';
+import { useRtoInTransitCounts } from '@/hooks/use-rto-counts';
+import { useAwbCount } from '@/hooks/use-awb-count';
+import {
+    useUpdateOrderStatus,
+    useRevertOrderStatus,
+    useDispatchOrders,
+    useBulkUpdateStatus,
+    useOrderSplit,
+    useReturnBooking,
+    useDeleteOrder,
+    useDownloadSlips,
+    useDownloadExcel,
+    useDownloadProductsExcel,
+    useUpdateShippedStatuses,
+} from '@/hooks/use-order-mutations';
+import { Order, CustomStatus, SortKey, SortDirection } from '@/types/order';
 
 export default function OrdersPage() {
     const params = useParams();
     const nonPrefixedStoreId = params?.storeId as string;
-    const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
 
-    const { toast } = useToast();
+    // ============================================================
+    // AUTHORIZATION
+    // ============================================================
+    const {
+        isAuthorized,
+        memberRole,
+        loading: authLoading,
+        user,
+        storeId
+    } = useStoreAuthorization(nonPrefixedStoreId);
+
     const { processAwbAssignments } = useProcessingQueue();
 
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isBulkUpdating, setIsBulkUpdating] = useState(false);
-    const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
-    const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-    const [unusedAwbsCount, setUnusedAwbsCount] = useState(0);
-
+    // ============================================================
+    // UI STATE (Unchanged)
+    // ============================================================
     const [activeTab, setActiveTab] = useState<CustomStatus | 'All Orders'>('All Orders');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
-    const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
-    const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
-    const [isLowAwbAlertOpen, setIsLowAwbAlertOpen] = useState(false);
-    const [ordersForAwb, setOrdersForAwb] = useState<Order[]>([]);
-    const [isDownloadingSlips, setIsDownloadingSlips] = useState(false);
-
+    // Filter state
     const [searchQuery, setSearchQuery] = useState('');
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<string>('all');
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'pending' | 'available' | 'unavailable'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
-
     const [sortKey, setSortKey] = useState<SortKey>('createdAt');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+    // Dialog state
+    const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
+    const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
+    const [isLowAwbAlertOpen, setIsLowAwbAlertOpen] = useState(false);
+    const [ordersForAwb, setOrdersForAwb] = useState<Order[]>([]);
     const [isAwbBulkSelectOpen, setIsAwbBulkSelectOpen] = useState(false);
     const [awbBulkSelectStatus, setAwbBulkSelectStatus] = useState('');
-
-    const [isUpdatingShippedStatuses, setIsUpdatingShippedStatuses] = useState(false);
-
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
     const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
-
-    const [isDownloadingProductsExcel, setIsDownloadingProductsExcel] = useState(false);
-
+    const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
+    const [orderForQc, setOrderForQc] = useState<Order | null>(null);
+    const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
 
-    // State for item availability checklist
+    // Item selection for availability
     const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
     const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<string | null>(null);
 
-    const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
-    const [orderForQc, setOrderForQc] = useState<Order | null>(null);
+    // ============================================================
+    // DATA FETCHING WITH TANSTACK QUERY (NEW!)
+    // ============================================================
 
-    const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
+    // Fetch orders
+    const {
+        data: ordersData,
+        isLoading,
+        isFetching,
+        refetch: refetchOrders
+    } = useOrders(storeId, activeTab, currentPage, rowsPerPage, {
+        searchQuery,
+        invertSearch,
+        dateRange,
+        courierFilter,
+        availabilityFilter,
+        rtoInTransitFilter,
+        sortKey,
+        sortDirection,
+    });
 
+    const orders = ordersData?.orders || [];
+    const totalFilteredCount = ordersData?.totalCount || 0;
+
+    // Fetch counts
+    const { data: statusCounts } = useOrderCounts(storeId);
+    const { data: availabilityCounts } = useAvailabilityCounts(storeId);
+    const { data: rtoInTransitCounts } = useRtoInTransitCounts(storeId);
+    const { data: unusedAwbsCount = 0 } = useAwbCount(storeId);
+
+    // ============================================================
+    // MUTATIONS (NEW!)
+    // ============================================================
+
+    const updateStatus = useUpdateOrderStatus(storeId, user);
+    const revertStatus = useRevertOrderStatus(storeId, user);
+    const dispatchOrders = useDispatchOrders(storeId, user);
+    const bulkUpdate = useBulkUpdateStatus(storeId, user);
+    const splitOrder = useOrderSplit(storeId, user);
+    const bookReturn = useReturnBooking(storeId, user);
+    const deleteOrder = useDeleteOrder(storeId);
+    const downloadSlips = useDownloadSlips(storeId, user);
+    const downloadExcel = useDownloadExcel(storeId, user);
+    const downloadProductsExcel = useDownloadProductsExcel(storeId, user);
+    const updateShippedStatuses = useUpdateShippedStatuses(storeId, user);
+
+    // ============================================================
+    // MUTATION HANDLERS (Simplified!)
+    // ============================================================
+
+    const handleUpdateStatus = (orderId: string, status: CustomStatus) => {
+        updateStatus.mutate({ orderId, status });
+    };
+
+    const handleRevertStatus = (orderId: string, revertTo: 'Confirmed' | 'Delivered') => {
+        revertStatus.mutate({ orderId, revertTo });
+    };
+
+    const handleDispatch = (orderIds: string[]) => {
+        dispatchOrders.mutate(orderIds, {
+            onSuccess: () => setSelectedOrders([])
+        });
+    };
+
+    const handleBulkUpdateStatus = (status: CustomStatus) => {
+        if (status === 'Dispatched') {
+            handleDispatch(selectedOrders);
+            return;
+        }
+
+        if (status === 'DTO Requested') {
+            bookReturn.mutate(selectedOrders, {
+                onSuccess: () => setSelectedOrders([])
+            });
+            return;
+        }
+
+        bulkUpdate.mutate({ orderIds: selectedOrders, status }, {
+            onSuccess: () => setSelectedOrders([])
+        });
+    };
+
+    const handleOrderSplit = (orderId: string) => {
+        splitOrder.mutate(orderId);
+    };
+
+    const handleDownloadSlips = () => {
+        if (selectedOrders.length === 0) return;
+        const orderIdsWithAwb = orders
+            .filter(o => selectedOrders.includes(o.id) && o.awb)
+            .map(o => o.id);
+
+        if (orderIdsWithAwb.length === 0) {
+            // Toast handled by mutation hook
+            return;
+        }
+
+        downloadSlips.mutate(orderIdsWithAwb, {
+            onSuccess: () => setSelectedOrders([])
+        });
+    };
+
+    const handleDownloadExcel = () => {
+        if (selectedOrders.length === 0) return;
+        downloadExcel.mutate(selectedOrders, {
+            onSuccess: () => setSelectedOrders([])
+        });
+    };
+
+    const handleDownloadProductsExcel = () => {
+        if (selectedOrders.length === 0) return;
+        downloadProductsExcel.mutate(selectedOrders);
+    };
+
+    const handleUpdateShippedStatuses = () => {
+        if (selectedOrders.length === 0) return;
+        updateShippedStatuses.mutate(selectedOrders, {
+            onSuccess: () => setSelectedOrders([])
+        });
+    };
+
+    // ============================================================
+    // AWB HANDLING
+    // ============================================================
+
+    const handleAssignAwbClick = () => {
+        const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
+        if (ordersToProcess.length === 0) {
+            // Show error toast
+            return;
+        }
+        if (ordersToProcess.length > unusedAwbsCount) {
+            setIsLowAwbAlertOpen(true);
+        } else {
+            setOrdersForAwb(ordersToProcess);
+            setIsAwbDialogOpen(true);
+        }
+    };
+
+    const handleBulkSelectByAwb = (awbs: string[], customStatus: string) => {
+        if (!customStatus) return;
+
+        const statusAwbMap = new Map(
+            orders
+                .filter(o => o.customStatus === customStatus && o.awb)
+                .map(o => [o.awb!, o.id])
+        );
+
+        const foundOrderIds = awbs.reduce((acc, awb) => {
+            if (statusAwbMap.has(awb)) {
+                acc.add(statusAwbMap.get(awb)!);
+            }
+            return acc;
+        }, new Set<string>());
+
+        if (foundOrderIds.size > 0) {
+            setSelectedOrders(prev => Array.from(new Set([...prev, ...Array.from(foundOrderIds)])));
+        }
+    };
+
+    // ============================================================
+    // AVAILABILITY HANDLING
+    // ============================================================
 
     const handleItemCheck = (orderId: string, lineItemId: string | number) => {
         setItemSelection(prev => {
@@ -274,605 +353,58 @@ export default function OrdersPage() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || 'Failed to update availability');
 
-            toast({
-                title: 'Availability Updated',
-                description: `Order ${order.name} has been marked as ${action === 'add' ? 'Available' : 'Unavailable'}.`
-            });
-            // Reset checkbox state for this order after action
+            // Refetch orders after update
+            refetchOrders();
+
             setItemSelection(prev => {
                 const newState = { ...prev };
                 delete newState[order.id];
                 return newState;
             });
         } catch (error) {
-            toast({
-                title: 'Update Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
+            console.error('Availability update error:', error);
         } finally {
             setIsUpdatingAvailability(null);
         }
     };
 
+    // ============================================================
+    // EFFECTS
+    // ============================================================
+
     useEffect(() => {
         document.title = "Dashboard - Orders";
-    }, [])
+    }, []);
 
-    useEffect(() => {
-        if (storeId) {
-            setLoading(true);
-            const ordersRef = collection(db, 'accounts', storeId, 'orders');
-
-            // The base query doesn't need ordering here, as we'll sort client-side
-            const q = query(ordersRef);
-
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const fetchedOrders = snapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as Order))
-                    .filter(order => order.isDeleted !== true);
-
-                setOrders(fetchedOrders);
-                setLoading(false);
-            }, (error) => {
-                console.error("Error fetching orders:", error);
-                toast({
-                    title: "Error fetching orders",
-                    description: "Could not connect to the database. Please try again.",
-                    variant: "destructive",
-                });
-                setLoading(false);
-            });
-
-            // Listen for AWB count
-            const awbsRef = collection(db, 'accounts', storeId, 'unused_awbs');
-            const unsubscribeAwbs = onSnapshot(awbsRef, (snapshot) => {
-                setUnusedAwbsCount(snapshot.size);
-            });
-
-
-            return () => {
-                unsubscribe();
-                unsubscribeAwbs();
-            };
-        }
-    }, [storeId, toast]);
-
-    const handleAssignAwbClick = () => {
-        const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-        if (ordersToProcess.length === 0) {
-            toast({ title: 'No orders selected', description: 'Please select orders from the "Confirmed" tab to assign AWBs.', variant: 'destructive' });
-            return;
-        }
-        if (ordersToProcess.length > unusedAwbsCount) {
-            setIsLowAwbAlertOpen(true);
-        } else {
-            setOrdersForAwb(ordersToProcess);
-            setIsAwbDialogOpen(true);
-        }
-    };
-
-    const handleUpdateStatus = useCallback(async (orderId: string, status: CustomStatus) => {
-        if (!storeId || !user) return;
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/update-status', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ shop: storeId, orderId, status }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.details || 'Failed to update status');
-            toast({ title: 'Status Updated', description: `Order status changed to ${status}.` });
-        } catch (error) {
-            console.error('Status update error:', error);
-            toast({
-                title: 'Update Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        }
-    }, [storeId, toast, user]);
-
-    const handleRevertStatus = useCallback(async (orderId: string, revertTo: 'Confirmed' | 'Delivered') => {
-        if (!storeId || !user) return;
-
-        const endpoint = revertTo === 'Confirmed' ? '/api/shopify/orders/revert-to-confirmed' : '/api/shopify/orders/revert-to-delivered';
-
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ shop: storeId, orderId }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.details || `Failed to revert status to ${revertTo}`);
-            toast({ title: 'Status Reverted', description: `Order status changed back to ${revertTo}.` });
-        } catch (error) {
-            console.error('Status revert error:', error);
-            toast({
-                title: 'Revert Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        }
-    }, [storeId, toast, user]);
-
-
-    const handleDispatch = useCallback(async (orderIds: string[]) => {
-        if (!storeId || !user || orderIds.length === 0) return;
-
-        setIsBulkUpdating(true);
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/dispatch', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: orderIds,
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok && response.status !== 207) {
-                throw new Error(result.details || 'Failed to dispatch orders.');
-            }
-
-            toast({
-                title: 'Dispatch Process Started',
-                description: result.message,
-            });
-
-            if (result.errors && result.errors.length > 0) {
-                // Optionally show another toast for errors
-                toast({
-                    title: 'Some Dispatches Failed',
-                    description: `Check the console for details on ${result.errors.length} failed orders.`,
-                    variant: 'destructive',
-                });
-                console.error('Dispatch failures:', result.errors);
-            }
-
-            setSelectedOrders(prev => prev.filter(id => !orderIds.includes(id)));
-
-        } catch (error) {
-            console.error('Dispatch error:', error);
-            toast({
-                title: 'Dispatch Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsBulkUpdating(false);
-        }
-    }, [storeId, user, toast]);
-
-    const handleOrderSplit = useCallback(async (orderId: string) => {
-        if (!storeId || !user || !orderId) return;
-
-        setIsBulkUpdating(true);
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/split-order', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderId,
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok && response.status !== 207) {
-                throw new Error(result.details || 'Failed to dispatch orders.');
-            }
-
-            toast({
-                title: 'Order splitting Process Started',
-                description: result.message,
-            });
-
-            if (result.errors && result.errors.length > 0) {
-                // Optionally show another toast for errors
-                toast({
-                    title: 'Order Splitting Failed',
-                    description: `Something wrong happened, check the function logs.`,
-                    variant: 'destructive',
-                });
-                console.error('Order Split failure:', result.error);
-            }
-
-        } catch (error) {
-            console.error('Order split error:', error);
-            toast({
-                title: 'Order Splitting Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsBulkUpdating(false);
-        }
-    }, [storeId, user, toast]);
-
-    const handleReturnBooking = useCallback(async (orderIds: string[]) => {
-        if (!storeId || !user || orderIds.length === 0) return;
-
-        toast({
-            title: 'Processing orders',
-            description: 'Please wait...',
-        });
-
-        setIsBulkUpdating(true);
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/courier/bulk-book-return', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds,
-                    pickupName: "Majime Productions 2",
-                    shippingMode: "Surface",
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok && response.status !== 207) {
-                throw new Error(result.details || 'Failed to book return for orders.');
-            }
-
-            toast({
-                title: 'Return booking Process Started',
-                description: result.message,
-            });
-
-            if (result.errors && result.errors.length > 0) {
-                // Optionally show another toast for errors
-                toast({
-                    title: 'Some Bookings Failed',
-                    description: `Check the console for details on ${result.errors.length} failed orders.`,
-                    variant: 'destructive',
-                });
-                console.error('Return Booking failures:', result.errors);
-            }
-
-            setSelectedOrders(prev => prev.filter(id => !orderIds.includes(id)));
-
-        } catch (error) {
-            console.error('Return Booking error:', error);
-            toast({
-                title: 'Return Booking Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsBulkUpdating(false);
-        }
-    }, [storeId, user, toast]);
-
-    const handleBulkUpdateStatus = useCallback(async (status: CustomStatus) => {
-        if (!storeId || !user || selectedOrders.length === 0) return;
-
-        if (status === 'Dispatched') {
-            await handleDispatch(selectedOrders);
-            return;
-        }
-
-        if (status === 'DTO Requested') {
-            await handleReturnBooking(selectedOrders);
-            return;
-        }
-
-        setIsBulkUpdating(true);
-        const { dismiss } = toast({
-            title: 'Bulk Update in Progress',
-            description: `Updating ${selectedOrders.length} order(s) to "${status}". Please wait.`,
-        });
-
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/bulk-update-status', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: selectedOrders,
-                    status,
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.details || `Failed to update ${selectedOrders.length} orders.`);
-            }
-
-            dismiss();
-            toast({
-                title: 'Bulk Update Successful',
-                description: result.message,
-            });
-
-            setSelectedOrders([]);
-
-        } catch (error) {
-            dismiss();
-            toast({
-                title: 'Bulk Update Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsBulkUpdating(false);
-        }
-    }, [storeId, user, selectedOrders, toast, handleDispatch, handleReturnBooking]);
-
-
-    const handleDeleteOrder = useCallback(async (orderId: string) => {
-        if (!storeId) return;
-        try {
-            const response = await fetch('/api/shopify/orders/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shop: storeId, orderId }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.details || 'Failed to delete order');
-            toast({ title: 'Order Deletion Initiated', description: `Order will be removed shortly.` });
-        } catch (error) {
-            console.error('Delete order error:', error);
-            toast({
-                title: 'Delete Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        }
-    }, [storeId, toast]);
-
-    const statusCounts = useMemo(() => {
-        const initialCounts: Record<CustomStatus | 'All Orders', number> = {
-            'All Orders': 0,
-            'New': 0,
-            'Confirmed': 0,
-            'Ready To Dispatch': 0,
-            'Dispatched': 0,
-            'In Transit': 0,
-            'Out For Delivery': 0,
-            'Delivered': 0,
-            'RTO In Transit': 0,
-            'RTO Delivered': 0,
-            'DTO Requested': 0,
-            'DTO Booked': 0,
-            'DTO In Transit': 0,
-            'DTO Delivered': 0,
-            'Pending Refunds': 0,
-            'Lost': 0,
-            'Closed': 0,
-            'RTO Closed': 0,
-            'Cancellation Requested': 0,
-            'Cancelled': 0,
-        };
-
-        let allOrdersCount = 0;
-        const counts = orders.reduce((acc, order) => {
-            if (order.isDeleted) return acc;
-
-            const isShopifyCancelled = !!order.raw?.cancelled_at;
-
-            if (isShopifyCancelled) {
-                acc['Cancelled'] = (acc['Cancelled'] || 0) + 1;
-            } else {
-                allOrdersCount++;
-                const status = order.customStatus || 'New';
-                if (acc[status] !== undefined) {
-                    acc[status] = (acc[status] || 0) + 1;
-                }
-            }
-            return acc;
-        }, initialCounts as Record<string, number>);
-
-        counts['All Orders'] = allOrdersCount;
-        return counts as Record<CustomStatus | 'All Orders', number>;
-    }, [orders]);
-
-    const filteredOrders = useMemo(() => {
-        let filtered = orders.filter(order => !order.isDeleted);
-
-        // Filter by status tab first
-        if (activeTab === 'Cancelled') {
-            filtered = filtered.filter(order => !!order.raw?.cancelled_at);
-        } else {
-            // Exclude Shopify-cancelled orders from all other tabs
-            filtered = filtered.filter(order => !order.raw?.cancelled_at);
-
-            if (activeTab !== 'All Orders') {
-                filtered = filtered.filter(order => (order.customStatus || 'New') === activeTab);
-            }
-        }
-
-        // Then, filter by search query
-        if (searchQuery) {
-            const lowercasedQuery = searchQuery.toLowerCase().trim();
-            filtered = filtered.filter(order => {
-                const customerName =
-                    order.raw.shipping_address?.name ??
-                    order.raw.billing_address?.name ??
-                    order.raw.customer?.name ??
-                    `${order.raw.shipping_address?.first_name || ''} 
-            ${order.raw.shipping_address?.last_name || ''}`.trim() ??
-                    `${order.raw.billing_address?.first_name || ''} 
-            ${order.raw.billing_address?.last_name || ''}`.trim() ??
-                    `${order.raw.customer?.first_name || ''} 
-            ${order.raw.customer?.last_name || ''}`.trim() ??
-                    order.email ??
-                    "";
-                const match = (
-                    order.name.toLowerCase().includes(lowercasedQuery) ||
-                    (activeTab === "All Orders" && order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
-                    customerName.toLowerCase().includes(lowercasedQuery) ||
-                    (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
-                    (order.awb_reverse && order.awb_reverse.toLowerCase().includes(lowercasedQuery)) ||
-                    (String(order.orderId).toLowerCase().includes(lowercasedQuery)) ||
-                    (() => {
-                        const line_items = order.raw.line_items;
-                        if (!line_items) return false;
-                        for (let i = 0; i < line_items.length; ++i) {
-                            if (line_items[i].vendor &&
-                                String(line_items[i].vendor).toLowerCase().includes(lowercasedQuery)
-                            ) return true;
-                        }
-                        return false;
-                    })()
-                );
-                return invertSearch ? !match : match;
-            });
-        }
-
-        // Then, filter by date range
-        if (dateRange?.from) {
-            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(dateRange.from, 1);
-            filtered = filtered.filter(order => {
-                const orderDate = new Date(order.createdAt);
-                return orderDate >= dateRange.from! && orderDate < toDate;
-            });
-        }
-
-        // Then, filter by courier if on the 'Ready To Dispatch' tab
-        if (!['New', 'Confirmed', 'Cancelled'].includes(activeTab) && courierFilter !== 'all') {
-            if (courierFilter === 'Delhivery') {
-                filtered = filtered.filter(order => order.courier === courierFilter);
-            } else if (courierFilter === 'Shiprocket') {
-                filtered = filtered.filter(order => order.courierProvider === 'Shiprocket');
-            } else if (courierFilter === 'Xpressbees') {
-                filtered = filtered.filter(order => order.courierProvider === 'Xpressbees');
-            }
-        }
-
-        // Filter by availability on 'Confirmed' tab
-        if (activeTab === 'Confirmed' && availabilityFilter !== 'all') {
-            if (availabilityFilter === 'available') {
-                filtered = filtered.filter(order => order.tags_confirmed?.includes('Available'));
-            } else if (availabilityFilter === 'unavailable') {
-                filtered = filtered.filter(order => order.tags_confirmed?.includes('Unavailable'));
-            } else {
-                filtered = filtered.filter(order => !order.tags_confirmed || (Array.isArray(order.tags_confirmed) && order.tags_confirmed.length === 0) || order.tags_confirmed?.includes('Pending'));
-            }
-        }
-
-        // Filter by RTO In Transit tags on 'RTO In Transit' tab
-        if (activeTab === 'RTO In Transit' && rtoInTransitFilter !== 'all') {
-            if (rtoInTransitFilter === 're-attempt') {
-                filtered = filtered.filter(order =>
-                    order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Re-attempt'
-                );
-            } else if (rtoInTransitFilter === 'refused') {
-                filtered = filtered.filter(order =>
-                    order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Refused'
-                );
-            } else if (rtoInTransitFilter === 'no-reply') {
-                filtered = filtered.filter(order =>
-                    !order.tags_rtoInTransit ||
-                    order.tags_rtoInTransit.length === 0 ||
-                    (!order.tags_rtoInTransit.includes('Re-attempt') && !order.tags_rtoInTransit.includes('Refused'))
-                );
-            }
-        }
-
-        // Finally, apply sorting
-        filtered.sort((a, b) => {
-            let valA, valB;
-
-            if (activeTab === 'RTO Delivered') {
-                return b.lastStatusUpdate.toMillis() - a.lastStatusUpdate.toMillis();
-            }
-
-            if (sortKey === 'createdAt') {
-                valA = new Date(a.createdAt).getTime();
-                valB = new Date(b.createdAt).getTime();
-            } else { // 'name'
-                valA = a.name;
-                valB = b.name;
-            }
-
-            if (valA < valB) {
-                return sortDirection === 'asc' ? -1 : 1;
-            }
-            if (valA > valB) {
-                return sortDirection === 'asc' ? 1 : -1;
-            }
-            return 0;
-        });
-
-
-        return filtered;
-    }, [orders, activeTab, searchQuery, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, invertSearch, sortKey, sortDirection]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filteredOrders])
-
-    const availabilityCounts = useMemo(() => {
-        const confirmedOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'Confirmed');
-
-        const available = confirmedOrders.filter(order => order.tags_confirmed?.includes('Available')).length;
-        const unavailable = confirmedOrders.filter(order => order.tags_confirmed?.includes('Unavailable')).length;
-        const pending = confirmedOrders.filter(order => !order.tags_confirmed || (Array.isArray(order.tags_confirmed) && order.tags_confirmed.length === 0) || order.tags_confirmed?.includes('Pending')).length;
-
-        return { pending, available, unavailable };
-    }, [orders]);
-
-    const rtoInTransitCounts = useMemo(() => {
-        const rtoInTransitOrders = orders.filter(order => !order.isDeleted && !order.raw?.cancelled_at && (order.customStatus || 'New') === 'RTO In Transit');
-
-        const reAttempt = rtoInTransitOrders.filter(order =>
-            order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Re-attempt'
-        ).length;
-
-        const refused = rtoInTransitOrders.filter(order =>
-            order.tags_rtoInTransit?.length === 1 && order.tags_rtoInTransit[0] === 'Refused'
-        ).length;
-
-        const noReply = rtoInTransitOrders.filter(order =>
-            !order.tags_rtoInTransit ||
-            order.tags_rtoInTransit.length === 0 ||
-            (!order.tags_rtoInTransit.includes('Re-attempt') && !order.tags_rtoInTransit.includes('Refused'))
-        ).length;
-
-        return { reAttempt, refused, noReply };
-    }, [orders]);
-
-
-    const indexOfLastOrder = currentPage * rowsPerPage;
-    const indexOfFirstOrder = indexOfLastOrder - rowsPerPage;
-    const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
-    const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
-
-    // Initialize rowsPerPage from localStorage
     useEffect(() => {
         const savedRowsPerPage = localStorage.getItem('rowsPerPage');
         if (savedRowsPerPage) {
             setRowsPerPage(Number(savedRowsPerPage));
         }
     }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+        setSelectedOrders([]);
+    }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [rowsPerPage]);
+
+    // ============================================================
+    // PAGINATION
+    // ============================================================
+
+    const totalPages = Math.ceil(totalFilteredCount / rowsPerPage);
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
 
     const handleSetRowsPerPage = (value: string) => {
         const numValue = Number(value);
@@ -881,24 +413,43 @@ export default function OrdersPage() {
         localStorage.setItem('rowsPerPage', value);
     };
 
+    // ============================================================
+    // SELECTION
+    // ============================================================
 
-    useEffect(() => {
-        setCurrentPage(1);
-        // Do not clear selections on search query change
-        // setSelectedOrders([]);
-    }, [rowsPerPage]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-        setSelectedOrders([]);
-    }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter]);
-
-    const handleNextPage = () => {
-        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    const handleSelectOrder = (orderId: string) => {
+        setSelectedOrders(prev =>
+            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+        );
     };
-    const handlePreviousPage = () => {
-        if (currentPage > 1) setCurrentPage(currentPage - 1);
+
+    const handleSelectAll = (isChecked: boolean) => {
+        const currentPageIds = orders.map(o => o.id);
+        if (isChecked) {
+            setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
+        } else {
+            setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
+        }
     };
+
+    const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
+
+    // ============================================================
+    // SORTING
+    // ============================================================
+
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDirection('asc');
+        }
+    };
+
+    // ============================================================
+    // BADGE VARIANTS
+    // ============================================================
 
     const getFulfillmentBadgeVariant = (status: string | null) => {
         switch (status?.toLowerCase()) {
@@ -912,7 +463,7 @@ export default function OrdersPage() {
             default:
                 return 'destructive';
         }
-    }
+    };
 
     const getPaymentBadgeVariant = (status: string | null) => {
         switch (status?.toLowerCase()) {
@@ -924,11 +475,11 @@ export default function OrdersPage() {
             case 'partially_refunded':
                 return 'outline';
             case 'voided':
-                return 'destructive'
+                return 'destructive';
             default:
                 return 'secondary';
         }
-    }
+    };
 
     const getStatusBadgeVariant = (status: CustomStatus | string | null): "default" | "secondary" | "destructive" | "outline" | "success" => {
         switch (status) {
@@ -959,225 +510,11 @@ export default function OrdersPage() {
             default:
                 return 'secondary';
         }
-    }
-
-
-    const handleDownloadSlips = useCallback(async () => {
-        if (!storeId || !user || selectedOrders.length === 0) return;
-
-        setIsDownloadingSlips(true);
-        toast({ title: "Generating Slips", description: "Your PDF will begin downloading shortly. This may take a moment." });
-
-        try {
-            const ordersToDownload = orders.filter(o => selectedOrders.includes(o.id) && o.awb);
-            const orderIdsToDownload = ordersToDownload.map(o => o.id);
-
-            if (orderIdsToDownload.length === 0) {
-                toast({ title: "No AWBs found", description: "None of the selected orders have an AWB assigned.", variant: "destructive" });
-                return;
-            }
-
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/download-slips', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: orderIdsToDownload,
-                }),
-            });
-
-            if (!response.ok) {
-                let msg = "Failed to download slips";
-                try {
-                    const err = await response.json();
-                    msg = err?.details || err?.error || msg;
-                } catch {
-                    msg = await response.text().catch(() => msg);
-                }
-                throw new Error(msg);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `shipping-slips-${Date.now()}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-            setSelectedOrders([]);
-        } catch (error) {
-            console.error("Download slips error:", error);
-            toast({
-                title: "Download Failed",
-                description: error instanceof Error ? error.message : "An unknown error occurred.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsDownloadingSlips(false);
-        }
-    }, [storeId, user, selectedOrders, orders, toast]);
-
-    const handleDownloadExcel = useCallback(async () => {
-        if (!storeId || !user || selectedOrders.length === 0) return;
-
-        setIsDownloadingExcel(true);
-        toast({ title: "Generating Excel File", description: "Your download will begin automatically. Please wait." });
-
-        try {
-            const idToken = await user.getIdToken();
-
-            const response = await fetch('/api/shopify/orders/export', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: selectedOrders,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.details || 'Failed to generate Excel file.');
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-            setSelectedOrders([]);
-
-        } catch (error) {
-            console.error('Excel export error:', error);
-            toast({
-                title: 'Export Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsDownloadingExcel(false);
-        }
-    }, [storeId, user, selectedOrders, toast]);
-
-    const handleDownloadProductsExcel = useCallback(async () => {
-        if (!storeId || !user || selectedOrders.length === 0) return;
-
-        setIsDownloadingProductsExcel(true);
-        toast({ title: "Generating Products Excel", description: "Your file will download shortly." });
-
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/orders/export-products', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: selectedOrders,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.details || 'Failed to generate file.');
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `products-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-        } catch (error) {
-            console.error("Products Excel export error:", error);
-            toast({
-                title: 'Export Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsDownloadingProductsExcel(false);
-        }
-    }, [storeId, user, selectedOrders, toast]);
-
-
-    const handleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDirection('asc');
-        }
     };
 
-    const handleUpdateShippedStatuses = useCallback(async () => {
-        if (!storeId || !user || selectedOrders.length === 0) return;
-
-        setIsUpdatingShippedStatuses(true);
-        const { dismiss } = toast({
-            title: 'Updating...',
-            description: `Requesting latest statuses for ${selectedOrders.length} selected order(s).`,
-        });
-
-        try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/shopify/courier/update-shipped-statuses', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({
-                    shop: storeId,
-                    orderIds: selectedOrders,
-                }),
-            });
-
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to start status update process.');
-            }
-
-            dismiss();
-            toast({
-                title: 'Status Update Started',
-                description: 'The system will now fetch the latest tracking statuses in the background.',
-            });
-            setSelectedOrders([]);
-        } catch (error) {
-            console.error('Update Shipped Statuses error:', error);
-            dismiss();
-            toast({
-                title: 'Update Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsUpdatingShippedStatuses(false);
-        }
-    }, [storeId, user, toast, selectedOrders]);
-
+    // ============================================================
+    // ACTION ITEMS
+    // ============================================================
 
     const renderActionItems = (order: Order) => {
         const isShopifyCancelled = !!order.raw?.cancelled_at;
@@ -1226,7 +563,6 @@ export default function OrdersPage() {
                     </>
                 );
             case 'Dispatched':
-                return null;
             case 'In Transit':
             case 'RTO In Transit':
             case 'Out For Delivery':
@@ -1287,62 +623,11 @@ export default function OrdersPage() {
             default:
                 return null;
         }
-    }
-
-    const handleSelectOrder = (orderId: string) => {
-        setSelectedOrders(prev =>
-            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
-        );
     };
 
-    const handleSelectAll = (isChecked: boolean) => {
-        const currentPageIds = currentOrders.map(o => o.id);
-        if (isChecked) {
-            // Add current page's orders to selection, avoiding duplicates
-            setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
-        } else {
-            // Remove current page's orders from selection
-            setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
-        }
-    };
-
-    const handleBulkSelectByAwb = (awbs: string[], customStatus: string) => {
-        if (!customStatus) {
-            toast({
-                title: 'Internal Error',
-                description: `Please correct it`
-            });
-            return;
-        }
-        const readyToDispatchAwbs = new Map(
-            filteredOrders
-                .filter(o => o.customStatus === customStatus && o.awb)
-                .map(o => [o.awb!, o.id])
-        );
-
-        const foundOrderIds = awbs.reduce((acc, awb) => {
-            if (readyToDispatchAwbs.has(awb)) {
-                acc.add(readyToDispatchAwbs.get(awb)!);
-            }
-            return acc;
-        }, new Set<string>());
-
-        if (foundOrderIds.size > 0) {
-            setSelectedOrders(prev => Array.from(new Set([...prev, ...Array.from(foundOrderIds)])));
-            toast({
-                title: 'Orders Selected',
-                description: `${foundOrderIds.size} order(s) have been selected based on the scanned AWBs.`
-            });
-        } else {
-            toast({
-                title: 'No Orders Found',
-                description: 'None of the scanned AWBs matched orders in the "Ready to Dispatch" list.',
-                variant: 'destructive'
-            });
-        }
-    };
-
-    const areAllOnPageSelected = currentOrders.length > 0 && currentOrders.every(o => selectedOrders.includes(o.id));
+    // ============================================================
+    // BULK ACTION BUTTONS
+    // ============================================================
 
     const shippedStatuses: (CustomStatus | 'All Orders')[] = [
         'Dispatched', 'In Transit', 'Out For Delivery', 'RTO In Transit', 'DTO Booked', 'DTO In Transit'
@@ -1350,8 +635,18 @@ export default function OrdersPage() {
 
     const renderBulkActionButtons = () => {
         const isAnyOrderSelected = selectedOrders.length > 0;
-        const isDisabled = !isAnyOrderSelected || isBulkUpdating;
+        const isDisabled = !isAnyOrderSelected;
         const showUpdateShippedButton = shippedStatuses.includes(activeTab);
+
+        // Check if any mutation is loading
+        const isMutating =
+            updateStatus.isPending ||
+            bulkUpdate.isPending ||
+            dispatchOrders.isPending ||
+            downloadSlips.isPending ||
+            downloadExcel.isPending ||
+            downloadProductsExcel.isPending ||
+            updateShippedStatuses.isPending;
 
         return (
             <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -1360,9 +655,9 @@ export default function OrdersPage() {
                         variant="outline"
                         size="sm"
                         onClick={handleUpdateShippedStatuses}
-                        disabled={isDisabled || isUpdatingShippedStatuses}
+                        disabled={isDisabled || isMutating}
                     >
-                        {isUpdatingShippedStatuses ? (
+                        {updateShippedStatuses.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : null}
                         Update {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Shipped Statuses
@@ -1373,20 +668,20 @@ export default function OrdersPage() {
                     switch (activeTab) {
                         case 'All Orders':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                    {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                    {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                 </Button>
                             );
                         case 'New':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                        {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                                        {isBulkUpdating ? 'Confirming...' : 'Confirm'}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                                        {bulkUpdate.isPending ? 'Confirming...' : 'Confirm'}
                                     </Button>
                                 </>
                             );
@@ -1399,13 +694,13 @@ export default function OrdersPage() {
                                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                        {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingProductsExcel} onClick={handleDownloadProductsExcel}>
-                                        {isDownloadingProductsExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingProductsExcel ? 'Downloading...' : `Download Products Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadProductsExcel}>
+                                        {downloadProductsExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadProductsExcel.isPending ? 'Downloading...' : `Download Products Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
                                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                                         Assign AWBs
@@ -1425,25 +720,25 @@ export default function OrdersPage() {
                                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                        {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDownloadingSlips || isDisabled} onClick={handleDownloadSlips}>
-                                        {isDownloadingSlips ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingSlips ? 'Downloading...' : `Download Slips ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadSlips}>
+                                        {downloadSlips.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadSlips.isPending ? 'Downloading...' : `Download Slips ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                                        {isBulkUpdating ? 'Dispatching...' : `Dispatch ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                                        {dispatchOrders.isPending ? 'Dispatching...' : `Dispatch ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
                                 </>
                             );
                         case 'Delivered':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Closed')}>
-                                    {isBulkUpdating ? 'Closing...' : `Close Orders ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Closed')}>
+                                    {bulkUpdate.isPending ? 'Closing...' : `Close Orders ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                 </Button>
-                            )
+                            );
                         case 'RTO Delivered':
                             return (
                                 <>
@@ -1454,27 +749,27 @@ export default function OrdersPage() {
                                         <ScanBarcode className="mr-2 h-4 w-4" />
                                         AWB Bulk Selection
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                        {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
-                                        {isBulkUpdating ? 'RTO Closing...' : 'RTO Close'}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
+                                        {bulkUpdate.isPending ? 'RTO Closing...' : 'RTO Close'}
                                     </Button>
                                 </>
                             );
                         case 'DTO Requested':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
-                                        {isBulkUpdating ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
+                                        {bookReturn.isPending ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns`}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                        {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                     </Button>
                                 </>
-                            )
+                            );
                         case 'Cancelled':
                             return null;
                         case 'Dispatched':
@@ -1490,9 +785,9 @@ export default function OrdersPage() {
                         case 'RTO Closed':
                         case 'Cancellation Requested':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled || isDownloadingExcel} onClick={handleDownloadExcel}>
-                                    {isDownloadingExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                    {isDownloadingExcel ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
+                                    {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                    {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
                                 </Button>
                             );
                         default:
@@ -1502,7 +797,10 @@ export default function OrdersPage() {
         );
     };
 
-    // Show loading while checking authorization
+    // ============================================================
+    // LOADING & AUTH CHECKS
+    // ============================================================
+
     if (authLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -1511,14 +809,25 @@ export default function OrdersPage() {
         );
     }
 
-    // If not authorized, hook handles redirect
     if (!isAuthorized) {
         return null;
     }
 
+    // ============================================================
+    // RENDER
+    // ============================================================
+
     return (
         <>
             <main className="flex flex-col h-full">
+                {/* Background sync indicator */}
+                {isFetching && !isLoading && (
+                    <div className="fixed top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-md text-sm z-50 flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Syncing...
+                    </div>
+                )}
+
                 <div className="flex flex-col flex-1 min-h-0">
                     <CardHeader className="border-b p-4 md:p-6 shrink-0">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1526,6 +835,21 @@ export default function OrdersPage() {
                                 <CardTitle>Your Orders</CardTitle>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => refetchOrders()}
+                                    disabled={isFetching}
+                                >
+                                    {isFetching ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Refreshing...
+                                        </>
+                                    ) : (
+                                        'Refresh'
+                                    )}
+                                </Button>
                                 {renderBulkActionButtons()}
                             </div>
                         </div>
@@ -1553,7 +877,7 @@ export default function OrdersPage() {
                                                 !dateRange && "text-muted-foreground"
                                             )}
                                         >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            <Clock className="mr-2 h-4 w-4" />
                                             {dateRange?.from ? (
                                                 dateRange.to ? (
                                                     <>
@@ -1604,10 +928,12 @@ export default function OrdersPage() {
                                         <SelectValue placeholder="Filter by availability..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Items ({availabilityCounts.pending + availabilityCounts.available + availabilityCounts.unavailable})</SelectItem>
-                                        <SelectItem value="pending">Pending({availabilityCounts.pending})</SelectItem>
-                                        <SelectItem value="available">Available ({availabilityCounts.available})</SelectItem>
-                                        <SelectItem value="unavailable">Unavailable ({availabilityCounts.unavailable})</SelectItem>
+                                        <SelectItem value="all">
+                                            All Items ({(availabilityCounts?.pending || 0) + (availabilityCounts?.available || 0) + (availabilityCounts?.unavailable || 0)})
+                                        </SelectItem>
+                                        <SelectItem value="pending">Pending ({availabilityCounts?.pending || 0})</SelectItem>
+                                        <SelectItem value="available">Available ({availabilityCounts?.available || 0})</SelectItem>
+                                        <SelectItem value="unavailable">Unavailable ({availabilityCounts?.unavailable || 0})</SelectItem>
                                     </SelectContent>
                                 </Select>
                             )}
@@ -1617,82 +943,86 @@ export default function OrdersPage() {
                                         <SelectValue placeholder="Filter by status..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All ({rtoInTransitCounts.reAttempt + rtoInTransitCounts.refused + rtoInTransitCounts.noReply})</SelectItem>
-                                        <SelectItem value="re-attempt">Re-attempt ({rtoInTransitCounts.reAttempt})</SelectItem>
-                                        <SelectItem value="refused">Refused ({rtoInTransitCounts.refused})</SelectItem>
-                                        <SelectItem value="no-reply">No Reply ({rtoInTransitCounts.noReply})</SelectItem>
+                                        <SelectItem value="all">
+                                            All ({(rtoInTransitCounts?.reAttempt || 0) + (rtoInTransitCounts?.refused || 0) + (rtoInTransitCounts?.noReply || 0)})
+                                        </SelectItem>
+                                        <SelectItem value="re-attempt">Re-attempt ({rtoInTransitCounts?.reAttempt || 0})</SelectItem>
+                                        <SelectItem value="refused">Refused ({rtoInTransitCounts?.refused || 0})</SelectItem>
+                                        <SelectItem value="no-reply">No Reply ({rtoInTransitCounts?.noReply || 0})</SelectItem>
                                     </SelectContent>
                                 </Select>
                             )}
                         </div>
                     </CardHeader>
+
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
                         <div className="border-b border-gray-200 shrink-0 bg-white shadow-sm">
                             <div className="overflow-x-auto px-2 sm:px-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                                 <TabsList className="inline-flex h-auto rounded-none bg-transparent p-0 gap-0 min-w-max">
                                     <TabsTrigger value="All Orders" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        All ({statusCounts['All Orders'] || 0})
+                                        All ({statusCounts?.['All Orders'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="New" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        New ({statusCounts['New'] || 0})
+                                        New ({statusCounts?.['New'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Confirmed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Confirmed ({statusCounts['Confirmed'] || 0})
+                                        Confirmed ({statusCounts?.['Confirmed'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Ready To Dispatch" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Ready To Dispatch ({statusCounts['Ready To Dispatch'] || 0})
+                                        Ready To Dispatch ({statusCounts?.['Ready To Dispatch'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Dispatched" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Dispatched ({statusCounts['Dispatched'] || 0})
+                                        Dispatched ({statusCounts?.['Dispatched'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        In Transit ({statusCounts['In Transit'] || 0})
+                                        In Transit ({statusCounts?.['In Transit'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Out For Delivery" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Out For Delivery ({statusCounts['Out For Delivery'] || 0})
+                                        Out For Delivery ({statusCounts?.['Out For Delivery'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Delivered ({statusCounts['Delivered'] || 0})
+                                        Delivered ({statusCounts?.['Delivered'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="RTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        RTO In Transit ({statusCounts['RTO In Transit'] || 0})
+                                        RTO In Transit ({statusCounts?.['RTO In Transit'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="RTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        RTO Delivered ({statusCounts['RTO Delivered'] || 0})
+                                        RTO Delivered ({statusCounts?.['RTO Delivered'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="DTO Requested" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        DTO Requested ({statusCounts['DTO Requested'] || 0})
+                                        DTO Requested ({statusCounts?.['DTO Requested'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="DTO Booked" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        DTO Booked ({statusCounts['DTO Booked'] || 0})
+                                        DTO Booked ({statusCounts?.['DTO Booked'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="DTO In Transit" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        DTO In Transit ({statusCounts['DTO In Transit'] || 0})
+                                        DTO In Transit ({statusCounts?.['DTO In Transit'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="DTO Delivered" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        DTO Delivered ({statusCounts['DTO Delivered'] || 0})
+                                        DTO Delivered ({statusCounts?.['DTO Delivered'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Pending Refunds" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Pending Refunds ({statusCounts['Pending Refunds'] || 0})
+                                        Pending Refunds ({statusCounts?.['Pending Refunds'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Lost" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Lost ({statusCounts['Lost'] || 0})
+                                        Lost ({statusCounts?.['Lost'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Closed ({statusCounts['Closed'] || 0})
+                                        Closed ({statusCounts?.['Closed'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="RTO Closed" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        RTO Closed ({statusCounts['RTO Closed'] || 0})
+                                        RTO Closed ({statusCounts?.['RTO Closed'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Cancellation Requested" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Cancellation Requested ({statusCounts['Cancellation Requested'] || 0})
+                                        Cancellation Requested ({statusCounts?.['Cancellation Requested'] || 0})
                                     </TabsTrigger>
                                     <TabsTrigger value="Cancelled" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
-                                        Cancelled ({statusCounts['Cancelled'] || 0})
+                                        Cancelled ({statusCounts?.['Cancelled'] || 0})
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
                         </div>
+
                         <div className="relative flex-1 overflow-y-auto">
                             <Table>
                                 <TableHeader className="sticky top-0 bg-card z-10">
@@ -1716,18 +1046,15 @@ export default function OrdersPage() {
                                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                                             </Button>
                                         </TableHead>
-                                        {activeTab === 'All Orders'
-                                            ? <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
-                                            : <></>
-                                        }
-                                        {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
-                                            ? <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
-                                            : <></>
-                                        }
-                                        {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab)
-                                            ? <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
-                                            : <></>
-                                        }
+                                        {activeTab === 'All Orders' && (
+                                            <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
+                                        )}
+                                        {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
+                                            <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
+                                        )}
+                                        {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab) && (
+                                            <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
+                                        )}
                                         <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
                                         <TableHead className="text-right font-medium text-muted-foreground">Total</TableHead>
                                         <TableHead className="text-right font-medium text-muted-foreground">Outstanding</TableHead>
@@ -1740,14 +1067,19 @@ export default function OrdersPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {loading ? (
+                                    {isLoading ? (
                                         Array.from({ length: rowsPerPage }).map((_, i) => (
                                             <TableRow key={i}>
                                                 <TableCell className="py-2 px-5"><Skeleton className="h-5 w-5" /></TableCell>
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
-                                                <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
-                                                <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                                {activeTab === 'All Orders' && <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>}
+                                                {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
+                                                    <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                                )}
+                                                {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab) && (
+                                                    <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
+                                                )}
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
                                                 <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                                                 <TableCell className="text-right py-2"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
@@ -1757,19 +1089,17 @@ export default function OrdersPage() {
                                                 <TableCell className="py-2"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                             </TableRow>
                                         ))
-                                    ) : currentOrders.length > 0 ? (
-                                        currentOrders.map((order) => {
-
+                                    ) : orders.length > 0 ? (
+                                        orders.map((order) => {
                                             const customerName =
-                                                order.raw.shipping_address?.name ??
-                                                order.raw.billing_address?.name ??
-                                                order.raw.customer?.name ??
-                                                `${order.raw.shipping_address?.first_name || ''} 
-                                  ${order.raw.shipping_address?.last_name || ''}`.trim() ??
-                                                `${order.raw.billing_address?.first_name || ''} 
-                                  ${order.raw.billing_address?.last_name || ''}`.trim() ??
-                                                `${order.raw.customer?.first_name || ''} 
-                                  ${order.raw.customer?.last_name || ''}`.trim() ??
+                                                (
+                                                    order.raw.shipping_address?.name ??
+                                                    order.raw.billing_address?.name ??
+                                                    order.raw.customer?.name
+                                                ) ||
+                                                `${order.raw.shipping_address?.first_name || ''} ${order.raw.shipping_address?.last_name || ''}`.trim() ||
+                                                `${order.raw.billing_address?.first_name || ''} ${order.raw.billing_address?.last_name || ''}`.trim() ||
+                                                `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() ||
                                                 "";
 
                                             return (
@@ -1790,22 +1120,17 @@ export default function OrdersPage() {
                                                     <TableCell className="text-xs md:text-sm py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                                     {activeTab === 'All Orders' && (
                                                         <TableCell className="py-2">
-                                                            <Badge
-                                                                variant={getStatusBadgeVariant(order.customStatus)}
-                                                                className="capitalize text-xs"
-                                                            >
+                                                            <Badge variant={getStatusBadgeVariant(order.customStatus)} className="capitalize text-xs">
                                                                 {order.customStatus}
                                                             </Badge>
                                                         </TableCell>
                                                     )}
-                                                    {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab)
-                                                        ? <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
-                                                        : <></>
-                                                    }
-                                                    {activeTab.includes('DTO') && activeTab !== 'DTO Requested'
-                                                        ? <TableCell className="text-xs md:text-sm py-2">{order.awb_reverse || 'N/A'}</TableCell>
-                                                        : <></>
-                                                    }
+                                                    {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
+                                                        <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
+                                                    )}
+                                                    {activeTab.includes('DTO') && activeTab !== 'DTO Requested' && (
+                                                        <TableCell className="text-xs md:text-sm py-2">{order.awb_reverse || 'N/A'}</TableCell>
+                                                    )}
                                                     <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>
                                                     <TableCell className="text-right text-xs md:text-sm font-mono">
                                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
@@ -1873,7 +1198,7 @@ export default function OrdersPage() {
                                                         </DropdownMenu>
                                                     </TableCell>
                                                 </TableRow>
-                                            )
+                                            );
                                         })
                                     ) : (
                                         <TableRow>
@@ -1886,21 +1211,19 @@ export default function OrdersPage() {
                             </Table>
                         </div>
                     </Tabs>
+
                     <CardFooter className="p-4 border-t shrink-0">
                         <div className="flex items-center justify-between w-full">
                             <div className="text-xs text-muted-foreground">
                                 {selectedOrders.length > 0
-                                    ? `${selectedOrders.length} of ${filteredOrders.length} order(s) selected.`
-                                    : `Showing ${filteredOrders.length > 0 ? indexOfFirstOrder + 1 : 0}-${Math.min(indexOfLastOrder, filteredOrders.length)} of ${filteredOrders.length} orders`
+                                    ? `${selectedOrders.length} of ${totalFilteredCount} order(s) selected.`
+                                    : `Showing ${orders.length > 0 ? ((currentPage - 1) * rowsPerPage) + 1 : 0}-${Math.min(currentPage * rowsPerPage, totalFilteredCount)} of ${totalFilteredCount} orders`
                                 }
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-muted-foreground">Rows per page</span>
-                                    <Select
-                                        value={`${rowsPerPage}`}
-                                        onValueChange={handleSetRowsPerPage}
-                                    >
+                                    <Select value={`${rowsPerPage}`} onValueChange={handleSetRowsPerPage}>
                                         <SelectTrigger className="h-8 w-[70px]">
                                             <SelectValue placeholder={rowsPerPage} />
                                         </SelectTrigger>
@@ -1914,20 +1237,10 @@ export default function OrdersPage() {
                                     </Select>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handlePreviousPage}
-                                        disabled={currentPage === 1}
-                                    >
+                                    <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 1}>
                                         Previous
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleNextPage}
-                                        disabled={currentPage === totalPages || totalPages === 0}
-                                    >
+                                    <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0}>
                                         Next
                                     </Button>
                                 </div>
@@ -1937,6 +1250,7 @@ export default function OrdersPage() {
                 </div>
             </main>
 
+            {/* Dialogs */}
             <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -1960,8 +1274,8 @@ export default function OrdersPage() {
             <AwbBulkSelectionDialog
                 isOpen={isAwbBulkSelectOpen}
                 onClose={() => {
-                    setIsAwbBulkSelectOpen(false)
-                    setAwbBulkSelectStatus('')
+                    setIsAwbBulkSelectOpen(false);
+                    setAwbBulkSelectStatus('');
                 }}
                 onConfirm={handleBulkSelectByAwb}
                 customStatus={awbBulkSelectStatus}
@@ -2010,7 +1324,7 @@ export default function OrdersPage() {
                     onClose={() => setIsAvailabilityDialogOpen(false)}
                     user={user}
                     shopId={storeId}
-                    confirmedOrders={filteredOrders.filter(o => o.customStatus === 'Confirmed')}
+                    confirmedOrders={orders.filter(o => o.customStatus === 'Confirmed')}
                 />
             )}
 
@@ -2060,17 +1374,18 @@ export default function OrdersPage() {
                                         <div>
                                             <h4 className="font-semibold">Customer</h4>
                                             <p className="text-sm text-muted-foreground">
-                                                {viewingOrder.raw.shipping_address?.name ??
-                                                    viewingOrder.raw.billing_address?.name ??
-                                                    viewingOrder.raw.customer?.name ??
-                                                    `${viewingOrder.raw.shipping_address?.first_name || ''} 
-                        ${viewingOrder.raw.shipping_address?.last_name || ''}`.trim() ??
-                                                    `${viewingOrder.raw.billing_address?.first_name || ''} 
-                        ${viewingOrder.raw.billing_address?.last_name || ''}`.trim() ??
-                                                    `${viewingOrder.raw.customer?.first_name || ''} 
-                        ${viewingOrder.raw.customer?.last_name || ''}`.trim() ??
-                                                    viewingOrder.email ??
-                                                    "Not provided"}
+                                                {
+                                                    (
+                                                        viewingOrder.raw.shipping_address?.name ??
+                                                        viewingOrder.raw.billing_address?.name ??
+                                                        viewingOrder.raw.customer?.name
+                                                    ) ||
+                                                    `${viewingOrder.raw.shipping_address?.first_name || ''} ${viewingOrder.raw.shipping_address?.last_name || ''}`.trim() ||
+                                                    `${viewingOrder.raw.billing_address?.first_name || ''} ${viewingOrder.raw.billing_address?.last_name || ''}`.trim() ||
+                                                    `${viewingOrder.raw.customer?.first_name || ''} ${viewingOrder.raw.customer?.last_name || ''}`.trim() ||
+                                                    viewingOrder.email ||
+                                                    "Not provided"
+                                                }
                                             </p>
                                             <p className="text-sm text-muted-foreground">{viewingOrder.email}</p>
                                         </div>

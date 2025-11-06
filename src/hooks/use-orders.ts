@@ -223,7 +223,7 @@ export function useOrders(
         enabled: !!storeId, // Only run when storeId exists
         staleTime: 10 * 1000, // Data is fresh for 10 seconds
         gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-        refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+        refetchInterval: 60 * 1000, // Auto-refetch every 30 seconds
         refetchOnWindowFocus: true, // Refetch when user returns to tab
     });
 }

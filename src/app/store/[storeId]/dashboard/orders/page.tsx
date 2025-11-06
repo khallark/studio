@@ -822,7 +822,7 @@ export default function OrdersPage() {
             <main className="flex flex-col h-full">
                 {/* Background sync indicator */}
                 {isFetching && !isLoading && (
-                    <div className="fixed top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-md text-sm z-50 flex items-center gap-2">
+                    <div className="fixed bottom-4 self-center bg-blue-500 text-white px-3 py-1 rounded-md text-sm z-50 flex items-center gap-2">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Syncing...
                     </div>

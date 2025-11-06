@@ -73,8 +73,11 @@ export function useOrders(
             }
 
             // Sorting
-            const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
-            const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
+            // const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
+            // const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
+
+            const sortField = 'name';
+            const sortDir = 'desc';
 
             // Special case: RTO Delivered sorted by lastStatusUpdate
             if (activeTab === 'RTO Delivered') {

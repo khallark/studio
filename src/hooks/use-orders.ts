@@ -89,11 +89,17 @@ export function useOrders(
             q = query(q, limit(fetchLimit));
 
             // Execute Firestore query
-            const snapshot = await getDocs(q);
-            let orders = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as Order[];
+            let orders;
+            try {
+                const snapshot = await getDocs(q);
+                orders = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })) as Order[];
+            } catch (error) {
+                console.error(error);
+                return {};
+            }
 
             // ============================================================
             // CLIENT-SIDE FILTERING

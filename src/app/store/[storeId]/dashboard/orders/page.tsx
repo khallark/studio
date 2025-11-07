@@ -90,6 +90,7 @@ import {
     useUpdateShippedStatuses,
 } from '@/hooks/use-order-mutations';
 import { Order, CustomStatus, SortKey, SortDirection } from '@/types/order';
+import { useDebounce } from 'use-debounce';
 
 export default function OrdersPage() {
     const params = useParams();
@@ -119,6 +120,7 @@ export default function OrdersPage() {
 
     // Filter state
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<string>('all');
@@ -156,7 +158,7 @@ export default function OrdersPage() {
         isFetching,
         refetch: refetchOrders
     } = useOrders(storeId, activeTab, currentPage, rowsPerPage, {
-        searchQuery,
+        searchQuery: debouncedSearchQuery,
         invertSearch,
         dateRange,
         courierFilter,
@@ -569,6 +571,16 @@ export default function OrdersPage() {
             case 'DTO In Transit':
                 return null;
             case 'Delivered':
+                return (
+                    <>
+                        <DropdownMenuItem onClick={() => {
+                            setOrderForReturn(order);
+                            setIsReturnDialogOpen(true);
+                        }}>
+                            Book Return
+                        </DropdownMenuItem>
+                    </>
+                );
             case 'DTO Requested':
                 return (
                     <>

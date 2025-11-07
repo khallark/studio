@@ -30,6 +30,33 @@ export function useOrders(
             const ordersRef = collection(db, 'accounts', storeId, 'orders');
 
             // ============================================================
+            // DETERMINE SEARCH TYPE
+            // ============================================================
+
+            let searchType: 'none' | 'orderId' | 'awb' | 'clientSide' = 'none';
+            let searchValue = '';
+
+            if (filters.searchQuery) {
+                const query = filters.searchQuery.trim();
+
+                // Check if it's a number (likely order ID)
+                if (/^\d+$/.test(query)) {
+                    searchType = 'orderId';
+                    searchValue = query;
+                }
+                // Check if it looks like an AWB (alphanumeric, usually 10+ chars)
+                else if (/^[A-Z0-9]{10,}$/i.test(query)) {
+                    searchType = 'awb';
+                    searchValue = query.toUpperCase();
+                }
+                // Otherwise, client-side search
+                else {
+                    searchType = 'clientSide';
+                    searchValue = query.toLowerCase();
+                }
+            }
+
+            // ============================================================
             // FIRESTORE QUERY - Server-side filtering
             // ============================================================
 
@@ -42,6 +69,23 @@ export function useOrders(
             } else if (activeTab !== 'All Orders') {
                 q = query(q, where('customStatus', '==', activeTab));
                 console.log(2);
+            }
+
+            // ✅ SERVER-SIDE SEARCH
+            if (searchType === 'orderId') {
+                // Search by order ID (exact match)
+                q = query(q, where('orderId', '==', Number(searchValue)));
+
+            } else if (searchType === 'awb') {
+                // Search by AWB (prefix match for autocomplete)
+                q = query(
+                    q,
+                    where('awb', '>=', searchValue),
+                    where('awb', '<=', searchValue + '\uf8ff')
+                );
+            } else {
+                // For client-side search, fetch more results
+                // (we'll filter them client-side below)
             }
 
             // Date range filter (if specified)
@@ -86,7 +130,6 @@ export function useOrders(
             // Sorting
             // const sortField = filters.sortKey === 'name' ? 'name' : 'createdAt';
             // const sortDir = filters.sortDirection === 'asc' ? 'asc' : 'desc';
-
             const sortField = 'name';
             const sortDir = 'desc';
 
@@ -97,9 +140,10 @@ export function useOrders(
                 q = query(q, orderBy(sortField, sortDir));
             }
 
-            // Limit - fetch more than needed for client-side pagination
-            // We'll fetch extra to handle client-side filters
-            const fetchLimit = Math.max(rowsPerPage * 3, 100); // Fetch 3x or minimum 100
+            const fetchLimit = searchType === 'clientSide'
+                ? Math.max(rowsPerPage * 3, 100) // Fetch more for client-side filtering
+                : rowsPerPage * 2; // Fetch less for server-side search
+
             q = query(q, limit(fetchLimit));
 
             // Execute Firestore query
@@ -119,9 +163,8 @@ export function useOrders(
             // CLIENT-SIDE FILTERING
             // ============================================================
 
-            // Search filter
-            if (filters.searchQuery) {
-                const lowercasedQuery = filters.searchQuery.toLowerCase().trim();
+            // ✅ CLIENT-SIDE SEARCH (only if not handled server-side)
+            if (searchType === 'clientSide' && searchValue) {
                 orders = orders.filter((order) => {
                     const customerName =
                         (
@@ -129,21 +172,24 @@ export function useOrders(
                             order.raw.billing_address?.name ??
                             order.raw.customer?.name
                         ) ||
-                        `${order.raw.shipping_address?.first_name || ''} ${order.raw.shipping_address?.last_name || ''}`.trim() ||
-                        `${order.raw.billing_address?.first_name || ''} ${order.raw.billing_address?.last_name || ''}`.trim() ||
-                        `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() ||
+                        `${order.raw.shipping_address?.first_name || ''} ${order.raw.shipping_address?.last_name || ''
+                            }`.trim() ||
+                        `${order.raw.billing_address?.first_name || ''} ${order.raw.billing_address?.last_name || ''
+                            }`.trim() ||
+                        `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''
+                            }`.trim() ||
                         order.email ||
                         '';
 
                     const match =
-                        order.name.toLowerCase().includes(lowercasedQuery) ||
+                        order.name.toLowerCase().includes(searchValue) ||
                         (activeTab === 'All Orders' &&
-                            order.customStatus.toLowerCase().includes(lowercasedQuery)) ||
-                        customerName.toLowerCase().includes(lowercasedQuery) ||
-                        (order.awb && order.awb.toLowerCase().includes(lowercasedQuery)) ||
+                            order.customStatus.toLowerCase().includes(searchValue)) ||
+                        customerName.toLowerCase().includes(searchValue) ||
+                        (order.awb && order.awb.toLowerCase().includes(searchValue)) ||
                         (order.awb_reverse &&
-                            order.awb_reverse.toLowerCase().includes(lowercasedQuery)) ||
-                        String(order.orderId).toLowerCase().includes(lowercasedQuery) ||
+                            order.awb_reverse.toLowerCase().includes(searchValue)) ||
+                        String(order.orderId).toLowerCase().includes(searchValue) ||
                         (() => {
                             const line_items = order.raw.line_items;
                             if (!line_items) return false;
@@ -152,7 +198,7 @@ export function useOrders(
                                     line_items[i].vendor &&
                                     String(line_items[i].vendor)
                                         .toLowerCase()
-                                        .includes(lowercasedQuery)
+                                        .includes(searchValue)
                                 ) {
                                     return true;
                                 }

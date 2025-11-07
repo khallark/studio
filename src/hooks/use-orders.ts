@@ -146,13 +146,14 @@ export function useOrders(
                     ...doc.data(),
                 })) as Order[];
             } catch (error: any) {
-                // if()
-                // const resp = await fetch('/api/test', {
-                //     method: "POST",
-                //     body: JSON.stringify({ str: error })
-                // })
-                // console.log(resp.ok ? 'ok' : 'not ok');
-                console.error(error.message);
+                if(error.message.includes("The query requires an index.")) {
+                    const resp = await fetch('/api/test', {
+                        method: "POST",
+                        body: JSON.stringify({ str: error })
+                    });
+                    console.log(resp.ok ? 'ok' : 'not ok');
+                }
+                console.log('not need');
                 return {};
             }
 

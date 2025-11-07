@@ -149,7 +149,7 @@ export function useOrders(
                 if(error.message.includes("The query requires an index.")) {
                     const resp = await fetch('/api/test', {
                         method: "POST",
-                        body: JSON.stringify({ str: error })
+                        body: JSON.stringify({ str: error.message })
                     });
                     console.log(resp.ok ? 'ok' : 'not ok');
                 } else {

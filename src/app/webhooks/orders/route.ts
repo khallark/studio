@@ -1,3 +1,4 @@
+// webhook -> single order fetching and storing.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
@@ -44,18 +45,18 @@ async function logWebhookToCentralCollection(
 }
 
 function createOrderLogEntry(topic: string, orderData: any): any {
-    const now = new Date();
-    return {
-        type: 'WEBHOOK',
-        action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
-        timestamp: now, // Use JS Date object for arrayUnion
-        details: {
-            topic: topic,
-            orderId: String(orderData.id),
-            orderName: orderData.name,
-        },
-        user: { displayName: 'Shopify' } // System-generated action
-    };
+  const now = new Date();
+  return {
+    type: 'WEBHOOK',
+    action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
+    timestamp: now, // Use JS Date object for arrayUnion
+    details: {
+      topic: topic,
+      orderId: String(orderData.id),
+      orderName: orderData.name,
+    },
+    user: { displayName: 'Shopify' } // System-generated action
+  };
 }
 
 function normalizePhoneNumber(phoneNumber: string): string {
@@ -110,31 +111,34 @@ async function captureShopifyCreditPayment(shopDomain: string, orderId: string) 
   }
 }
 
+/**
+ * HELPER: Extracts unique vendor names from line items
+ */
+function extractVendors(lineItems: any[]): string[] {
+  if (!Array.isArray(lineItems) || lineItems.length === 0) {
+    return [];
+  }
+
+  const vendorSet = new Set<string>();
+
+  for (const item of lineItems) {
+    if (item.vendor && typeof item.vendor === "string") {
+      const trimmedVendor = item.vendor.trim();
+      if (trimmedVendor.length > 0) {
+        vendorSet.add(trimmedVendor);
+      }
+    }
+  }
+
+  return Array.from(vendorSet).sort(); // Sort for consistency
+}
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
-    const rawTopic   = req.headers.get('x-shopify-topic') || '';
-    const topic      = rawTopic.trim().toLowerCase(); // normalize once
+    const rawTopic = req.headers.get('x-shopify-topic') || '';
+    const topic = rawTopic.trim().toLowerCase(); // normalize once
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
-
-    // try {
-    //   if(shopDomain === 'mxiiub-wh.myshopify.com') {
-    //     switch (topic) {
-    //       case 'orders/create':
-    //         db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
-    //           created: FieldValue.increment(1),
-    //         }, { merge: true })
-    //         break;
-    //       case 'orders/updated':
-    //         db.collection('accounts').doc('mxiiub-wh.myshopify.com').set({
-    //           updated: FieldValue.increment(1),
-    //         }, { merge: true })
-    //         break;
-    //     }
-    //   }
-    // } catch (error) {
-    //   console.error('Webhook ghamand error:', error)
-    // }
 
     if (!process.env.SHOPIFY_API_SECRET) {
       console.error('SHOPIFY_API_SECRET is missing');
@@ -169,8 +173,11 @@ export async function POST(req: NextRequest) {
     }
 
     const accountRef = db.collection('accounts').doc(shopDomain);
-    const orderRef   = accountRef.collection('orders').doc(orderId);
+    const orderRef = accountRef.collection('orders').doc(orderId);
     const orderLogEntry = createOrderLogEntry(topic, orderData);
+
+    // ✅ Extract vendors from line items
+    const vendors = extractVendors(orderData.line_items || []);
 
     const dataToSave: { [key: string]: any } = {
       orderId: orderData.id,
@@ -182,6 +189,7 @@ export async function POST(req: NextRequest) {
       fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
       totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
       currency: orderData.currency,
+      vendors,
       raw: orderData,
       lastWebhookTopic: topic,
       receivedAt: FieldValue.serverTimestamp(),
@@ -244,20 +252,20 @@ export async function POST(req: NextRequest) {
           createdAt: Timestamp.now(),
           remarks: `This order was updated on shopify`
         };
-        tx.update(orderRef, { 
-            ...dataToSave, 
-            updatedByTopic: topic,
-            customStatusesLogs: FieldValue.arrayUnion(log),
+        tx.update(orderRef, {
+          ...dataToSave,
+          updatedByTopic: topic,
+          customStatusesLogs: FieldValue.arrayUnion(log),
         });
         console.log(`Updated order ${orderId} for ${shopDomain}`);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
 
-    if(created) {
+    if (created) {
       const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
       const cleanPhone = normalizePhoneNumber(customerPhone);
-      if(!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
+      if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
         const shopDoc = (await accountRef.get()).data() as any;
         console.log('Trying to send message');
         sendNewOrderWhatsAppMessage(shopDoc, {
@@ -266,7 +274,7 @@ export async function POST(req: NextRequest) {
           name: dataToSave.name,
           raw: orderData
         })
-        
+
       } else {
         console.log('No valid phone number found for order, skipping WhatsApp message sending. Phone:', customerPhone, 'Normalized:', cleanPhone);
       }

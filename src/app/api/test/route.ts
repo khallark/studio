@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         const { str } = await req.json();
 
         const coll = db.collection('indexing-errors').doc(genUniqueId());
-        coll.set({
+        await coll.set({
             str
         }, { merge: true });
 

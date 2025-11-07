@@ -152,8 +152,9 @@ export function useOrders(
                         body: JSON.stringify({ str: error })
                     });
                     console.log(resp.ok ? 'ok' : 'not ok');
+                } else {
+                    console.log('not need');
                 }
-                console.log('not need');
                 return {};
             }
 

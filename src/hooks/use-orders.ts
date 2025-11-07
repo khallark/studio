@@ -146,7 +146,11 @@ export function useOrders(
                     ...doc.data(),
                 })) as Order[];
             } catch (error) {
-                console.error(error);
+                const resp = await fetch('/api/test', {
+                    method: "POST",
+                    body: JSON.stringify({ str: error })
+                })
+                console.log(resp.ok ? 'ok' : 'not ok');
                 return {};
             }
 

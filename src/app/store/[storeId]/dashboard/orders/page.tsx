@@ -840,7 +840,7 @@ export default function OrdersPage() {
 
     if (authLoading) {
         return (
-            <main className="flex flex-col h-full">
+            <div className="flex items-center justify-center h-screen">
                 <div className="flex flex-col flex-1 min-h-0">
                     {/* Header Skeleton */}
                     <CardHeader className="border-b p-4 md:p-6 shrink-0">
@@ -1003,7 +1003,7 @@ export default function OrdersPage() {
                         </CardContent>
                     </Card>
                 </div>
-            </main>
+            </div>
         );
     }
 

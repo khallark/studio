@@ -4,7 +4,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { DateRange } from 'react-day-picker';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
 
@@ -126,6 +125,10 @@ export function useOrders(
                 }
                 // Note: 'no-reply' will still be handled client-side below
                 // because Firestore doesn't support "not contains" queries efficiently
+            }
+
+            if (filters.vendorName) {
+                q = query(q, where('vendors', 'array-contains', filters.vendorName));
             }
 
             // Sorting

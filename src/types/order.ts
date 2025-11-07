@@ -62,6 +62,7 @@ export interface Order {
   booked_return_reason?: string;
   booked_return_images?: string[];
   returnItemsVariantIds?: (string | number)[];
+  vendorName?: string;
   raw: {
     cancelled_at: string | null;
     customer?: {
@@ -110,6 +111,7 @@ export interface UseOrdersFilters {
   invertSearch?: boolean;
   dateRange?: DateRange;
   courierFilter?: string;
+  vendorName?: string;
   availabilityFilter?: 'all' | 'pending' | 'available' | 'unavailable';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
   sortKey?: 'name' | 'createdAt';

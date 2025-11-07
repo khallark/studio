@@ -91,6 +91,8 @@ import {
 } from '@/hooks/use-order-mutations';
 import { Order, CustomStatus, SortKey, SortDirection } from '@/types/order';
 import { useDebounce } from 'use-debounce';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function OrdersPage() {
     const params = useParams();
@@ -106,6 +108,28 @@ export default function OrdersPage() {
         user,
         storeId
     } = useStoreAuthorization(nonPrefixedStoreId);
+
+    const [vendorName, setVendorName] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        const fetchVendorName = async () => {
+            if (memberRole === 'Vendor' && storeId && user) {
+                try {
+                    const memberDoc = await getDoc(
+                        doc(db, 'accounts', storeId, 'members', user.uid)
+                    );
+                    if (memberDoc.exists()) {
+                        const memberData = memberDoc.data();
+                        setVendorName(memberData.vendorName);
+                    }
+                } catch (error) {
+                    console.error('Error fetching vendor name:', error);
+                }
+            }
+        };
+
+        fetchVendorName();
+    }, [memberRole, storeId, user]);
 
     const { processAwbAssignments } = useProcessingQueue();
 
@@ -166,6 +190,7 @@ export default function OrdersPage() {
         rtoInTransitFilter,
         sortKey,
         sortDirection,
+        vendorName: memberRole === 'Vendor' ? vendorName : undefined, // ✅ ADD THIS
     });
 
     const orders = ordersData?.orders || [];

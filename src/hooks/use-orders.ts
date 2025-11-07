@@ -33,16 +33,17 @@ export function useOrders(
             // DETERMINE SEARCH TYPE
             // ============================================================
 
-            let searchType: 'none' | 'orderId' | 'awb' | 'clientSide' = 'none';
+            let searchType: 'none' | 'name' | 'awb' | 'clientSide' = 'none';
             let searchValue = '';
 
             if (filters.searchQuery) {
                 const query = filters.searchQuery.trim();
 
-                // Check if it's a number (likely order ID)
-                if (/^\d+$/.test(query)) {
-                    searchType = 'orderId';
-                    searchValue = query;
+                // Check if it's an order name (starts with #, followed by optional prefix and number)
+                // Matches: #1001, #ABC-123, #TEST-456, etc.
+                if (/^#[\w-]+$/i.test(query)) {
+                    searchType = 'name';
+                    searchValue = query.toUpperCase(); // Normalize to uppercase for consistency
                 }
                 // Check if it looks like an AWB (alphanumeric, usually 10+ chars)
                 else if (/^[A-Z0-9]{10,}$/i.test(query)) {
@@ -72,9 +73,9 @@ export function useOrders(
             }
 
             // ✅ SERVER-SIDE SEARCH
-            if (searchType === 'orderId') {
+            if (searchType === 'name') {
                 // Search by order ID (exact match)
-                q = query(q, where('orderId', '==', Number(searchValue)));
+                q = query(q, where('name', '==', searchValue));
 
             } else if (searchType === 'awb') {
                 // Search by AWB (prefix match for autocomplete)

@@ -459,7 +459,7 @@ async function createSlipPage(
 
   y = drawWrappedText(
     page,
-    `Return Address: ${sellerDetails.returnAddress || 'Majime Productions, Udhyog Vihar Bhattian, Bahadarke Road, Ludhiana, Punjab, 141008'}`,
+    `Return Address: ${sellerDetails.returnAddress || 'Endora, Noida, Delhi, IN, 1100928'}`,
     xText,
     y,
     maxTextWidth,

@@ -2,7 +2,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
@@ -17,14 +17,29 @@ export function useOrderCounts(storeId: string | null) {
     queryKey: ['orderCounts', storeId],
 
     // Query function
-    queryFn: async () => {
+    queryFn: async (): Promise<StatusCounts> => {
       if (!storeId) throw new Error('No store ID provided');
 
+      // ✅ TRY TO READ FROM METADATA FIRST (FAST!)
+      try {
+        const metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
+        const metadataDoc = await getDoc(metadataRef);
+
+        if (metadataDoc.exists()) {
+          const data = metadataDoc.data();
+          console.log('✅ Loaded counts from metadata (fast path)');
+          return data.counts as StatusCounts;
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load from metadata, falling back to calculation:', error);
+      }
+
+      // ⚠️ FALLBACK: CALCULATE ON-THE-FLY (SLOWER)
+      // This only runs if metadata document doesn't exist yet
+      console.log('⚠️ Calculating counts from all orders (slow path)...');
+
       const ordersRef = collection(db, 'accounts', storeId, 'orders');
-      
-      // Fetch all non-deleted orders (we need counts for all statuses)
-      const q = query(ordersRef);
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(ordersRef);
 
       // Initialize counts
       const counts: StatusCounts = {
@@ -58,13 +73,11 @@ export function useOrderCounts(storeId: string | null) {
         const isShopifyCancelled = !!order.raw?.cancelled_at;
 
         if (isShopifyCancelled) {
-          // Shopify-cancelled orders go to "Cancelled" tab
           counts['Cancelled']++;
         } else {
-          // All other orders
           allOrdersCount++;
           const status = (order.customStatus || 'New') as CustomStatus;
-          
+
           if (counts[status] !== undefined) {
             counts[status]++;
           }
@@ -78,10 +91,10 @@ export function useOrderCounts(storeId: string | null) {
 
     // Query options
     enabled: !!storeId, // Only run when storeId exists
-    staleTime: 30 * 1000, // Counts are fresh for 30 seconds (don't change as frequently)
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-    refetchInterval: 60 * 1000, // Auto-refetch every minute (less aggressive than orders)
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    staleTime: 5 * 60 * 1000, // ✅ Changed: Counts fresh for 5 minutes (metadata is fast)
+    gcTime: 30 * 60 * 1000, // ✅ Changed: Keep in cache for 30 minutes
+    refetchInterval: 2 * 60 * 1000, // ✅ Changed: Auto-refetch every 2 minutes (less aggressive)
+    refetchOnWindowFocus: false, // ✅ Changed: Don't refetch on focus (metadata updates automatically)
   });
 }
 

@@ -145,12 +145,14 @@ export function useOrders(
                     id: doc.id,
                     ...doc.data(),
                 })) as Order[];
-            } catch (error) {
-                const resp = await fetch('/api/test', {
-                    method: "POST",
-                    body: JSON.stringify({ str: error })
-                })
-                console.log(resp.ok ? 'ok' : 'not ok');
+            } catch (error: any) {
+                // if()
+                // const resp = await fetch('/api/test', {
+                //     method: "POST",
+                //     body: JSON.stringify({ str: error })
+                // })
+                // console.log(resp.ok ? 'ok' : 'not ok');
+                console.error(error.message);
                 return {};
             }
 

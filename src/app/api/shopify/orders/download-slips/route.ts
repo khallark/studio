@@ -460,8 +460,8 @@ async function createSlipPage(
   y = drawWrappedText(
     page,
     // `Return Address: ${sellerDetails.returnAddress || 'Majime Productions, Udhyog Vihar Bhattian, Bahadarke Road, Ludhiana, Punjab, 141008'}`,
-    `Return Address: ${'Endora, 11/403-A, Laxmi Nagar, Delhi - 110092'}`,
-    // `Return Address: ${'Sai arpan apartment, Greater Thane, Maharashtra, IN, 42100'}`,
+    // `Return Address: ${'Endora, 11/403-A, Laxmi Nagar, Delhi - 110092'}`,
+    `Return Address: ${'Sai arpan apartment, Greater Thane, Maharashtra, IN, 42100'}`,
     xText,
     y,
     maxTextWidth,

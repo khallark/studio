@@ -2,21 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            return decodedToken.uid;
-        } catch (error) {
-            console.error('Error verifying auth token:', error);
-            return null;
-        }
-    }
-    return null;
-}
+import { authUserForStore } from '@/lib/authoriseUserForStore';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,26 +13,19 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopDoc = await db.collection('accounts').doc(shop).get();
-    if(!shopDoc.exists) {
-        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const memberRef = db.collection('accounts').doc(shop).collection('members').doc(userId);
-    const member = await memberRef.get();
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+        
+    if(!result.authorised) {
+        const { error, status } = result;
+        return NextResponse.json({ error }, { status });
     }
     
     if (!address) {
       return NextResponse.json({ error: 'Address data is required' }, { status: 400 });
     }
 
-    const memberData = member.data();
+    const { memberDoc } = result;
+    const memberData = memberDoc?.data();
     const memberRole = memberData?.role;
     if(!memberRole) {
       return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
@@ -54,7 +33,7 @@ export async function POST(req: NextRequest) {
     
     // Vendors have their own isolated settings
     if (memberRole === 'Vendor') {
-        await memberRef.update({
+        await memberDoc?.ref.update({
             companyAddress: address,
             lastUpdatedAt: FieldValue.serverTimestamp(),
         });

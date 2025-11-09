@@ -2,23 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, auth as adminAuth } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { authUserForStore } from "@/lib/authoriseUserForStore";
 
 export const runtime = "nodejs";
-
-/** Verify Firebase ID token from Authorization: Bearer <token> */
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-  try {
-    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-    const idToken = authHeader.slice("Bearer ".length).trim();
-    if (!idToken) return null;
-    const decoded = await adminAuth.verifyIdToken(idToken);
-    return decoded.uid || null;
-  } catch (err) {
-    console.error("Error verifying auth token:", err);
-    return null;
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,19 +15,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopRef = db.collection('accounts').doc(shop)
-    const shopDoc = await shopRef.get();
-    if (!shopDoc.exists) {
-      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+    
+    if(!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
     }
 
     // Ask Firebase Function to enqueue Cloud Tasks (one per job)
@@ -57,7 +35,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         "X-Api-Key": secret,
       },
-      body: JSON.stringify({shop, orderIds, requestedBy: userId}),
+      body: JSON.stringify({shop, orderIds, requestedBy: result.userId}),
     });
 
     const json = await resp.json();

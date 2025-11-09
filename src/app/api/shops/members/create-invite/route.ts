@@ -3,21 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomBytes } from 'crypto';
-
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            return decodedToken.uid;
-        } catch (error) {
-            console.error('Error verifying auth token:', error);
-            return null;
-        }
-    }
-    return null;
-}
+import { authUserForStore } from '@/lib/authoriseUserForStore';
 
 // TODO: In the future, check if the user is a SuperAdmin of the shop
 async function verifyUserPermissions(userId: string, shopId: string): Promise<boolean> {
@@ -43,18 +29,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
         }
 
-        // 1. Authentication & Authorization
-        const userId = await getUserIdFromToken(req);
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-        
-        const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-        
-        // This is a placeholder for the real permission check
-        const isAuthorized = member.exists && member.data()?.status === 'active';
-        if (!isAuthorized) {
-             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        // ----- Auth -----
+        const result = await authUserForStore({ shop, req });
+                
+        if(!result.authorised) {
+            const { error, status } = result;
+            return NextResponse.json({ error }, { status });
         }
 
         // 2. Validate input
@@ -83,7 +63,7 @@ export async function POST(req: NextRequest) {
             permissions: permissions,
             createdAt: FieldValue.serverTimestamp(),
             expiresAt: oneHourFromNow,
-            createdBy: userId,
+            createdBy: result.userId,
             used: false,
         };
         

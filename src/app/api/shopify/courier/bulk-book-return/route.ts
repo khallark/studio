@@ -1,23 +1,9 @@
 // apps/web/src/app/api/returns/bulk-book/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth as adminAuth, db } from "@/lib/firebase-admin";
+import { authUserForStore } from "@/lib/authoriseUserForStore";
 
 export const runtime = "nodejs";
-
-/** Verify Firebase ID token from Authorization: Bearer <token> */
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-  try {
-    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-    const idToken = authHeader.slice("Bearer ".length).trim();
-    if (!idToken) return null;
-    const decoded = await adminAuth.verifyIdToken(idToken);
-    return decoded.uid || null;
-  } catch (err) {
-    console.error("Error verifying auth token:", err);
-    return null;
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,21 +24,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopDoc = await db.collection('accounts').doc(shop).get();
-    if(!shopDoc.exists) {
-        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+
+    if(!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
     }
 
     // Ask Firebase Function to enqueue return Cloud Tasks (one per job)
@@ -76,7 +52,7 @@ export async function POST(req: NextRequest) {
         orderIds,
         pickupName,
         shippingMode,
-        requestedBy: userId,
+        requestedBy: result.userId,
       }),
     });
 

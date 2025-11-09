@@ -4,21 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            return decodedToken.uid;
-        } catch (error) {
-            console.error('Error verifying auth token:', error);
-            return null;
-        }
-    }
-    return null;
-}
+import { authUserForStore } from '@/lib/authoriseUserForStore';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,18 +15,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopDoc = await db.collection('accounts').doc(shop).get();
-    if(!shopDoc.exists) {
-        return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+            
+    if(!result.authorised) {
+        const { error, status } = result;
+        return NextResponse.json({ error }, { status });
     }
     
     const validStatuses = [
@@ -52,9 +31,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
     }
 
-    const userRecord = await adminAuth.getUser(userId);
+    const userRecord = await adminAuth.getUser(result.userId!);
     const userRefData = {
-        uid: userId,
+        uid: result.userId,
         email: userRecord.email || 'N/A',
         displayName: userRecord.displayName || 'N/A'
     };

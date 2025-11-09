@@ -4,25 +4,7 @@ import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
 import bwip from 'bwip-js';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-
-/* -------------------- Auth -------------------- */
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const idToken = authHeader.split('Bearer ')[1];
-    try {
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-      return decodedToken.uid;
-    } catch (error) {
-      console.error('Error verifying auth token:', error);
-      return null;
-    }
-  }
-  return null;
-}
-
-
-
+import { authUserForStore } from '@/lib/authoriseUserForStore';
 
 
 // --- Typography scale ---
@@ -500,22 +482,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopRef = db.collection('accounts').doc(shop)
-    const shopDoc = await shopRef.get();
-    if (!shopDoc.exists) {
-      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+        
+    if(!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
     }
 
-    const shopData = shopDoc.data() || {};
+    const { shopDoc } = result;
+    const shopData = shopDoc?.data() || {};
     const sellerDetails = {
       name:
         shopData?.companyName ||
@@ -534,7 +509,7 @@ export async function POST(req: NextRequest) {
         .join(', '),
     };
 
-    const ordersColRef = shopRef.collection('orders');
+    const ordersColRef = shopDoc?.ref.collection('orders');
     // The request sends Firestore document IDs, which are strings.
     const stringIds = orderIds.map(String);
 
@@ -547,8 +522,8 @@ export async function POST(req: NextRequest) {
     const allDocs: DocumentSnapshot[] = [];
     for (const chunk of chunks) {
       // Use where clause with documentId() to query by ID
-      const snapshot = await ordersColRef.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-      snapshot.forEach(doc => allDocs.push(doc));
+      const snapshot = await ordersColRef?.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+      snapshot?.forEach(doc => allDocs.push(doc));
     }
 
     // Re-sort the documents to match the original orderIds array from the frontend

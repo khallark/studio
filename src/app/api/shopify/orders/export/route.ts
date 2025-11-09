@@ -1,24 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import * as xlsx from 'xlsx';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            return decodedToken.uid;
-        } catch (error) {
-            console.error('Error verifying auth token:', error);
-            return null;
-        }
-    }
-    return null;
-}
+import { authUserForStore } from '@/lib/authoriseUserForStore';
 
 const formatAddress = (address: any): string => {
     if (!address) return 'N/A';
@@ -29,6 +14,13 @@ const formatAddress = (address: any): string => {
     return parts.filter(Boolean).join(', ');
 };
 
+const formatDate = (timestamp: any): string => {
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,22 +31,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const shopRef = db.collection('accounts').doc(shop)
-    const shopDoc = await shopRef.get();
-    if (!shopDoc.exists) {
-      return NextResponse.json({ error: 'Shop Not Found' }, { status: 401 });
-    }
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const member = await db.collection('accounts').doc(shop).collection('members').doc(userId).get();
-    const isAuthorized = member.exists && member.data()?.status === 'active';
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const result = await authUserForStore({ shop, req });
+        
+    if(!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
     }
 
-    const ordersColRef = shopRef.collection('orders');
+    const { shopDoc } = result;
+    const ordersColRef = shopDoc?.ref.collection('orders');
     
     // Firestore 'in' query has a limit of 30 values. We need to chunk them.
     const chunks: string[][] = [];
@@ -65,8 +50,8 @@ export async function POST(req: NextRequest) {
     let allDocs: DocumentSnapshot[] = [];
     for (const chunk of chunks) {
         // Use where clause with documentId() to query by ID
-        const snapshot = await ordersColRef.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-        snapshot.forEach(doc => allDocs.push(doc));
+        const snapshot = await ordersColRef?.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+        snapshot?.forEach(doc => allDocs.push(doc));
     }
     
     // Re-sort the documents to match the original orderIds array from the frontend
@@ -88,7 +73,7 @@ export async function POST(req: NextRequest) {
                 'AWB': order.awb ?? 'N/A',
                 'Return AWB': order.awb_reverse ?? 'N/A',
                 'Courier': order.courier ?? 'N/A',
-                'Order date': new Date(order.createdAt).toLocaleDateString(),
+                'Order date': formatDate(order.createdAt),
                 'Customer': customerName,
                 'Email': order.raw.customer?.email ||
                          order.raw?.contact_email ||
@@ -127,7 +112,7 @@ export async function POST(req: NextRequest) {
             'AWB': order.awb ?? 'N/A',
             'Return AWB': order.awb_reverse ?? 'N/A',
             'Courier': order.courier ?? 'N/A',
-                'Order date': new Date(order.createdAt).toLocaleDateString(),
+                'Order date': formatDate(order.createdAt),
                 'Customer': customerName,
                 'Email': order.raw.customer?.email ||
                          order.raw?.contact_email ||

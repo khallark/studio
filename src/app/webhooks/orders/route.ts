@@ -247,17 +247,36 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
-        const log = {
-          status: "Updated By Shopify",
-          createdAt: Timestamp.now(),
-          remarks: `This order was updated on shopify`
-        };
-        tx.update(orderRef, {
+        
+        // Check if the order was cancelled
+        const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
+        
+        let log;
+        let updateData: { [key: string]: any } = {
           ...dataToSave,
           updatedByTopic: topic,
-          customStatusesLogs: FieldValue.arrayUnion(log),
-        });
-        console.log(`Updated order ${orderId} for ${shopDomain}`);
+        };
+        
+        if (isCancelled) {
+          log = {
+            status: "Cancelled",
+            createdAt: Timestamp.now(),
+            remarks: `This order was cancelled on Shopify`
+          };
+          updateData.customStatus = 'Cancelled';
+          console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
+        } else {
+          log = {
+            status: "Updated By Shopify",
+            createdAt: Timestamp.now(),
+            remarks: `This order was updated on shopify`
+          };
+          console.log(`Updated order ${orderId} for ${shopDomain}`);
+        }
+        
+        updateData.customStatusesLogs = FieldValue.arrayUnion(log);
+        
+        tx.update(orderRef, updateData);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });

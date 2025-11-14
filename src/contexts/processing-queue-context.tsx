@@ -1,17 +1,22 @@
+// @/contexts/processing-queue-context.tsx
 
 'use client';
-
-import { ProcessingOrder } from '@/app/dashboard/layout';
 import React, { createContext, useContext, ReactNode } from 'react';
 
 interface OrderInfo {
   id: string;
   name: string;
+  storeId: string; // ✅ REQUIRED - each order must have storeId
 }
 
 interface ProcessingQueueContextType {
-  processAwbAssignments: (orders: OrderInfo[], courier: string, pickupName: string, shippingMode: string) => Promise<void>;
-  processingQueue: ProcessingOrder[];
+  businessId?: string;
+  processAwbAssignments: (
+    orders: OrderInfo[], 
+    courier: string, 
+    pickupName: string, 
+    shippingMode: string
+  ) => Promise<void>;
 }
 
 const ProcessingQueueContext = createContext<ProcessingQueueContextType | undefined>(undefined);
@@ -25,14 +30,23 @@ export function useProcessingQueue() {
 }
 
 interface ProcessingQueueProviderProps {
+  businessId?: string;
   children: ReactNode;
-  processAwbAssignments: (orders: OrderInfo[], courier: string, pickupName: string, shippingMode: string) => Promise<void>;
-  processingQueue: ProcessingOrder[];
+  processAwbAssignments: (
+    orders: OrderInfo[], 
+    courier: string, 
+    pickupName: string, 
+    shippingMode: string
+  ) => Promise<void>;
 }
 
-export function ProcessingQueueProvider({ children, processAwbAssignments, processingQueue }: ProcessingQueueProviderProps) {
+export function ProcessingQueueProvider({ 
+  businessId, 
+  children,
+  processAwbAssignments,
+}: ProcessingQueueProviderProps) {
   return (
-    <ProcessingQueueContext.Provider value={{ processAwbAssignments, processingQueue }}>
+    <ProcessingQueueContext.Provider value={{ businessId, processAwbAssignments }}>
       {children}
     </ProcessingQueueContext.Provider>
   );

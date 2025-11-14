@@ -243,6 +243,7 @@ export async function POST(req: NextRequest) {
     }
 
     const dataToSave: { [key: string]: any } = {
+      storeId: shopDomain,
       orderId: orderData.id,
       name: orderData.name,
       email: orderData.customer?.email ?? 'N/A',

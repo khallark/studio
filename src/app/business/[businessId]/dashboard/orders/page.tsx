@@ -1566,7 +1566,16 @@ export default function BusinessOrdersPage() {
                     orders={ordersForAwb}
                     onConfirm={(courier, pickupName, shippingMode) => {
                         const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-                        processAwbAssignments(ordersToProcess.map(o => ({ id: o.id, name: o.name })), courier, pickupName, shippingMode);
+                        processAwbAssignments(
+                            ordersToProcess.map(o => ({ 
+                                id: o.id, 
+                                name: o.name,
+                                storeId: o.storeId  // ✅ ADDED: Now includes storeId
+                            })), 
+                            courier, 
+                            pickupName, 
+                            shippingMode
+                        );
                         setSelectedOrders([]);
                     }}
                     shopId={ordersForAwb[0]?.storeId || ''}

@@ -611,6 +611,13 @@ export default function OrdersPage() {
                     </>
                 );
             case 'Dispatched':
+                return (
+                    <>
+                        <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>
+                            Back to Confirmed
+                        </DropdownMenuItem>
+                    </>
+                );
             case 'In Transit':
             case 'RTO In Transit':
             case 'Out For Delivery':

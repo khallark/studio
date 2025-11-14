@@ -200,17 +200,33 @@ export default function BusinessOrdersPage() {
     // Create mutation hooks for each selected order's store
     // Note: This is a simplified approach. For bulk operations across stores,
     // you might need to group by storeId and call mutations per store.
-    const updateStatus = (storeId: string) => useUpdateOrderStatus(businessId, storeId, user);
-    const revertStatus = (storeId: string) => useRevertOrderStatus(businessId, storeId, user);
-    const dispatchOrders = (storeId: string) => useDispatchOrders(businessId, storeId, user);
-    const bulkUpdate = (storeId: string) => useBulkUpdateStatus(businessId, storeId, user);
-    const splitOrder = (storeId: string) => useOrderSplit(businessId, storeId, user);
-    const bookReturn = (storeId: string) => useReturnBooking(businessId, storeId, user);
-    const deleteOrder = (storeId: string) => useDeleteOrder(businessId, storeId);
-    const downloadSlips = (storeId: string) => useDownloadSlips(businessId, storeId, user);
-    const downloadExcel = (storeId: string) => useDownloadExcel(businessId, storeId, user);
-    const downloadProductsExcel = (storeId: string) => useDownloadProductsExcel(businessId, storeId, user);
-    const updateShippedStatuses = (storeId: string) => useUpdateShippedStatuses(businessId, storeId, user);
+    // const updateStatus = (storeId: string) => useUpdateOrderStatus(businessId, storeId, user);
+    // const revertStatus = (storeId: string) => useRevertOrderStatus(businessId, storeId, user);
+    // const dispatchOrders = (storeId: string) => useDispatchOrders(businessId, storeId, user);
+    // const bulkUpdate = (storeId: string) => useBulkUpdateStatus(businessId, storeId, user);
+    // const splitOrder = (storeId: string) => useOrderSplit(businessId, storeId, user);
+    // const bookReturn = (storeId: string) => useReturnBooking(businessId, storeId, user);
+    // const deleteOrder = (storeId: string) => useDeleteOrder(businessId, storeId);
+    // const downloadSlips = (storeId: string) => useDownloadSlips(businessId, storeId, user);
+    // const downloadExcel = (storeId: string) => useDownloadExcel(businessId, storeId, user);
+    // const downloadProductsExcel = (storeId: string) => useDownloadProductsExcel(businessId, storeId, user);
+    // const updateShippedStatuses = (storeId: string) => useUpdateShippedStatuses(businessId, storeId, user);
+    const mutationMap = stores.reduce((acc, storeId) => {
+        acc[storeId] = {
+            updateStatus: useUpdateOrderStatus(businessId, storeId, user),
+            revertStatus: useRevertOrderStatus(businessId, storeId, user),
+            dispatchOrders: useDispatchOrders(businessId, storeId, user),
+            bulkUpdate: useBulkUpdateStatus(businessId, storeId, user),
+            splitOrder: useOrderSplit(businessId, storeId, user),
+            bookReturn: useReturnBooking(businessId, storeId, user),
+            deleteOrder: useDeleteOrder(businessId, storeId),
+            downloadSlips: useDownloadSlips(businessId, storeId, user),
+            downloadExcel: useDownloadExcel(businessId, storeId, user),
+            downloadProductsExcel: useDownloadProductsExcel(businessId, storeId, user),
+            updateShippedStatuses: useUpdateShippedStatuses(businessId, storeId, user),
+        };
+        return acc;
+    }, {} as Record<string, any>);
 
     // ============================================================
     // MUTATION HANDLERS
@@ -220,7 +236,7 @@ export default function BusinessOrdersPage() {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = updateStatus(storeId);
+        const mutation = mutationMap[storeId].updateStatus;
         mutation.mutate({ orderId, status });
     };
 
@@ -228,7 +244,7 @@ export default function BusinessOrdersPage() {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = revertStatus(storeId);
+        const mutation = mutationMap[storeId].revertStatus;
         mutation.mutate({ orderId, revertTo });
     };
 
@@ -251,7 +267,7 @@ export default function BusinessOrdersPage() {
 
         // Dispatch for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = dispatchOrders(storeId);
+            const mutation = mutationMap[storeId].dispatchOrders;
             mutation.mutate(storeOrderIds, {
                 onSuccess: () => {
                     completedStores++;
@@ -287,7 +303,7 @@ export default function BusinessOrdersPage() {
             const totalStores = ordersByStore.size;
 
             ordersByStore.forEach((storeOrderIds, storeId) => {
-                const mutation = bookReturn(storeId);
+                const mutation = mutationMap[storeId].bookReturn;
                 mutation.mutate(storeOrderIds, {
                     onSuccess: () => {
                         completedStores++;
@@ -317,7 +333,7 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = bulkUpdate(storeId);
+            const mutation = mutationMap[storeId].bulkUpdate;
             mutation.mutate({ orderIds: storeOrderIds, status }, {
                 onSuccess: () => {
                     completedStores++;
@@ -333,7 +349,7 @@ export default function BusinessOrdersPage() {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = splitOrder(storeId);
+        const mutation = mutationMap[storeId].splitOrder;
         mutation.mutate(orderId);
     };
 
@@ -359,7 +375,7 @@ export default function BusinessOrdersPage() {
 
         // Download for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadSlips(storeId);
+            const mutation = mutationMap[storeId].downloadSlips;
             mutation.mutate(storeOrderIds, {
                 onSuccess: () => {
                     completedStores++;
@@ -392,7 +408,7 @@ export default function BusinessOrdersPage() {
 
         // Download for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadExcel(storeId);
+            const mutation = mutationMap[storeId].downloadExcel;
             mutation.mutate(storeOrderIds, {
                 onSuccess: () => {
                     completedStores++;
@@ -424,7 +440,7 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadProductsExcel(storeId);
+            const mutation = mutationMap[storeId].downloadProductsExcel;
             mutation.mutate(storeOrderIds, {
                 onSuccess: () => {
                     completedStores++;
@@ -456,7 +472,7 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = updateShippedStatuses(storeId);
+            const mutation = mutationMap[storeId].updateShippedStatuses;
             mutation.mutate(storeOrderIds, {
                 onSuccess: () => {
                     completedStores++;
@@ -1567,13 +1583,13 @@ export default function BusinessOrdersPage() {
                     onConfirm={(courier, pickupName, shippingMode) => {
                         const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
                         processAwbAssignments(
-                            ordersToProcess.map(o => ({ 
-                                id: o.id, 
+                            ordersToProcess.map(o => ({
+                                id: o.id,
                                 name: o.name,
                                 storeId: o.storeId  // ✅ ADDED: Now includes storeId
-                            })), 
-                            courier, 
-                            pickupName, 
+                            })),
+                            courier,
+                            pickupName,
                             shippingMode
                         );
                         setSelectedOrders([]);

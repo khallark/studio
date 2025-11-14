@@ -59,12 +59,16 @@ export async function POST(req: NextRequest) {
                         continue;
                     }
 
+                    if(orderDoc.data()?.customStatus !== 'New') {
+                        console.warn(`Order ${orderId} is not New, only New orders cab be splitted`)
+                    }
+
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
                     
                     const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
                     if (!canProcess.authorised) {
-                        console.log(`Order ${orderId} not authorized for this business, skipping split`);
+                        console.error(`Order ${orderId} not authorized for this business, skipping split`);
                         continue;
                     }
 
@@ -92,6 +96,8 @@ export async function POST(req: NextRequest) {
                             console.log(`✓ Order ${orderId} split enqueued`);
                         }
                     }
+
+                    console.warn(`Order ${orderId} not eligible for splitting, skipping split`)
                 } catch (enqueueError) {
                     console.error(`Error enqueueing split for order ${orderId}:`, enqueueError);
                     // Continue with other orders - don't fail the whole batch

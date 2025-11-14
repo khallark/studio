@@ -133,6 +133,59 @@ function extractVendors(lineItems: any[]): string[] {
   return Array.from(vendorSet).sort(); // Sort for consistency
 }
 
+/**
+ * HELPER: Checks if an order is a split order by looking at note_attributes
+ */
+function isSplitOrder(orderData: any): boolean {
+  if (!Array.isArray(orderData.note_attributes) || orderData.note_attributes.length === 0) {
+    return false;
+  }
+
+  // Check for the presence of split order attributes
+  return orderData.note_attributes.some(
+    (attr: any) => attr.name === "_original_order_id" || attr.name === "_split_vendor"
+  );
+}
+
+/**
+ * HELPER: Extracts split order metadata from note_attributes
+ */
+function extractSplitMetadata(orderData: any): {
+  originalOrderId?: string;
+  originalOrderName?: string;
+  splitVendor?: string;
+  splitIndex?: string;
+  totalSplits?: string;
+} {
+  if (!Array.isArray(orderData.note_attributes)) {
+    return {};
+  }
+
+  const metadata: any = {};
+  
+  for (const attr of orderData.note_attributes) {
+    switch (attr.name) {
+      case "_original_order_id":
+        metadata.originalOrderId = attr.value;
+        break;
+      case "_original_order_name":
+        metadata.originalOrderName = attr.value;
+        break;
+      case "_split_vendor":
+        metadata.splitVendor = attr.value;
+        break;
+      case "_split_index":
+        metadata.splitIndex = attr.value;
+        break;
+      case "_total_splits":
+        metadata.totalSplits = attr.value;
+        break;
+    }
+  }
+
+  return metadata;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
@@ -179,6 +232,16 @@ export async function POST(req: NextRequest) {
     // ✅ Extract vendors from line items
     const vendors = extractVendors(orderData.line_items || []);
 
+    // ✅ Check if this is a split order
+    const isSplit = isSplitOrder(orderData);
+    const splitMetadata = isSplit ? extractSplitMetadata(orderData) : null;
+
+    if (isSplit) {
+      console.log(`Detected split order ${orderId} for vendor: ${splitMetadata?.splitVendor}`);
+      console.log(`  Original order: ${splitMetadata?.originalOrderName} (${splitMetadata?.originalOrderId})`);
+      console.log(`  Split: ${splitMetadata?.splitIndex}/${splitMetadata?.totalSplits}`);
+    }
+
     const dataToSave: { [key: string]: any } = {
       orderId: orderData.id,
       name: orderData.name,
@@ -194,6 +257,12 @@ export async function POST(req: NextRequest) {
       lastWebhookTopic: topic,
       receivedAt: FieldValue.serverTimestamp(),
     };
+
+    // ✅ Add split metadata if applicable
+    if (isSplit && splitMetadata) {
+      dataToSave.isSplitOrder = true;
+      dataToSave.splitMetadata = splitMetadata;
+    }
 
     let created = false;
 
@@ -224,19 +293,39 @@ export async function POST(req: NextRequest) {
       // 3) Create → only here do we create the doc
       if (topic === 'orders/create') {
         created = true;
-        const log = [{
-          status: "New",
-          createdAt: Timestamp.now(),
-          remarks: `This order was newly created on Shopify`
-        }];
+        
+        // ✅ Different handling for split orders
+        let log;
+        let customStatus;
+
+        if (isSplit) {
+          // Split order: Mark as Confirmed
+          customStatus = 'Confirmed';
+          log = [{
+            status: "Confirmed and Splitted",
+            createdAt: Timestamp.now(),
+            remarks: `This order was confirmed by the user and splitted successfully`
+          }];
+          console.log(`Created SPLIT order ${orderId} with status: Confirmed`);
+        } else {
+          // Normal order: Mark as New
+          customStatus = 'New';
+          log = [{
+            status: "New",
+            createdAt: Timestamp.now(),
+            remarks: `This order was newly created on Shopify`
+          }];
+          console.log(`Created order ${orderId} for ${shopDomain}`);
+        }
+
         tx.set(orderRef, {
           ...dataToSave,
-          customStatus: 'New',
+          customStatus,
           isDeleted: false,
           createdByTopic: topic,
           customStatusesLogs: log, // Initialize logs array
         });
-        console.log(`Created order ${orderId} for ${shopDomain}`);
+        
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
         return;
       }
@@ -247,24 +336,46 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
-        const log = {
-          status: "Updated By Shopify",
-          createdAt: Timestamp.now(),
-          remarks: `This order was updated on shopify`
-        };
-        tx.update(orderRef, {
+        
+        // Check if the order was cancelled
+        const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
+        
+        let log;
+        let updateData: { [key: string]: any } = {
           ...dataToSave,
           updatedByTopic: topic,
-          customStatusesLogs: FieldValue.arrayUnion(log),
-        });
-        console.log(`Updated order ${orderId} for ${shopDomain}`);
+        };
+        
+        if (isCancelled) {
+          log = {
+            status: "Cancelled",
+            createdAt: Timestamp.now(),
+            remarks: `This order was cancelled on Shopify`
+          };
+          updateData.customStatus = 'Cancelled';
+          console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
+        } else {
+          log = {
+            status: "Updated By Shopify",
+            createdAt: Timestamp.now(),
+            remarks: `This order was updated on shopify`
+          };
+          console.log(`Updated order ${orderId} for ${shopDomain}`);
+        }
+        
+        updateData.customStatusesLogs = FieldValue.arrayUnion(log);
+        
+        tx.update(orderRef, updateData);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
     });
 
-    if (created) {
-      const customerPhone = orderData?.shipping_address.phone || orderData?.shipping_address.phone || orderData?.customer.phone;
+    // ✅ Post-transaction side effects: Skip for split orders
+    if (created && !isSplit) {
+      // WhatsApp message: Only for non-split orders
+      const customerPhone = orderData?.shipping_address?.phone || orderData?.billing_address?.phone || orderData?.customer?.phone;
       const cleanPhone = normalizePhoneNumber(customerPhone);
+      
       if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
         const shopDoc = (await accountRef.get()).data() as any;
         console.log('Trying to send message');
@@ -273,21 +384,21 @@ export async function POST(req: NextRequest) {
           createdAt: dataToSave.createdAt,
           name: dataToSave.name,
           raw: orderData
-        })
-
+        });
       } else {
         console.log('No valid phone number found for order, skipping WhatsApp message sending. Phone:', customerPhone, 'Normalized:', cleanPhone);
       }
-    }
 
-    // Post-commit side effect: capture Shopify Credit (only for creates)
-    if (
-      created &&
-      Array.isArray(orderData.payment_gateway_names) &&
-      orderData.payment_gateway_names.includes('shopify_credit')
-    ) {
-      console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
-      await captureShopifyCreditPayment(shopDomain, orderId);
+      // Shopify Credit capture: Only for non-split orders
+      if (
+        Array.isArray(orderData.payment_gateway_names) &&
+        orderData.payment_gateway_names.includes('shopify_credit')
+      ) {
+        console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
+        await captureShopifyCreditPayment(shopDomain, orderId);
+      }
+    } else if (created && isSplit) {
+      console.log(`Split order ${orderId}: Skipping WhatsApp message and Shopify Credit capture`);
     }
 
     return new NextResponse(null, { status: 200 });

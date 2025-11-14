@@ -1,4 +1,4 @@
-// /store/[storeId]/dashboard/layout.tsx
+// app/business/[businessId]/store/[storeId]/dashboard/layout.tsx
 
 'use client';
 
@@ -29,7 +29,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
 import { auth, db } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, User } from 'firebase/auth';
 import { usePathname, useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useState, useCallback, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +37,17 @@ import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { doc, getDoc } from 'firebase/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
+
+// Create context for child pages
+interface StoreContextValue {
+  businessId: string;
+  storeId: string;
+  user: User | null;
+  member: any | null;
+  memberRole: any | null;
+}
 
 export interface ProcessingOrder {
     id: string;
@@ -55,9 +65,35 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const params = useParams();
   const { toast } = useToast();
+  
+  const businessId = params?.businessId as string;
   const nonPrefixedStoreId = params?.storeId as string;
 
-  const { isAuthorized, memberRole, loading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
+  // ============================================================
+  // AUTHORIZATION (TWO-LAYER)
+  // ============================================================
+  
+  // Business level authorization
+  const {
+    isAuthorized: isBusinessAuthorized,
+    stores: businessStores,
+    loading: businessLoading,
+    member: businessMember,
+  } = useBusinessAuthorization(businessId);
+
+  // Store level authorization
+  const { 
+    isAuthorized: isStoreAuthorized, 
+    memberRole, 
+    loading: storeLoading, 
+    user, 
+    storeId 
+  } = useStoreAuthorization(nonPrefixedStoreId);
+
+  // Combined auth state
+  const loading = businessLoading || storeLoading;
+  const isAuthorized = isBusinessAuthorized && isStoreAuthorized;
+  const storeInBusiness = businessStores.includes(nonPrefixedStoreId);
 
   const [processingQueue, setProcessingQueue] = useState<ProcessingOrder[]>([]);
 
@@ -102,7 +138,7 @@ export default function DashboardLayout({
             description: `Processing ${ordersToProcess.length} order(s) in the background.`,
             action: (
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
+                    <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
                         View Progress
                         <MoveRight className="ml-2 h-4 w-4" />
                     </Link>
@@ -120,7 +156,7 @@ export default function DashboardLayout({
         });
     }
 
-  }, [user, toast, storeId]);
+  }, [user, toast, storeId, businessId, nonPrefixedStoreId]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -136,6 +172,33 @@ export default function DashboardLayout({
     }
     return 'U';
   }
+
+  // ============================================================
+  // 404 PAGE COMPONENT
+  // ============================================================
+  const NotFoundPage = () => (
+    <div className="flex flex-col items-center justify-center h-screen">
+      <div className="text-center space-y-4">
+        <h1 className="text-6xl font-bold text-gray-300">404</h1>
+        <h2 className="text-2xl font-semibold text-gray-700">Page Not Found</h2>
+        <p className="text-gray-500 max-w-md">
+          {!isBusinessAuthorized 
+            ? "You don't have access to this business."
+            : !isStoreAuthorized
+            ? "You don't have access to this store."
+            : !storeInBusiness
+            ? "This store does not belong to the selected business."
+            : "The page you're looking for doesn't exist."
+          }
+        </p>
+        <Button onClick={() => router.push('/')}>Go Home</Button>
+      </div>
+    </div>
+  );
+  
+  // ============================================================
+  // LOADING & AUTH CHECKS
+  // ============================================================
   
   if (loading) {
     return (
@@ -145,17 +208,13 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthorized) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground mb-4">You do not have access to this store.</p>
-          <Button onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
-        </div>
-      </div>
-    );
+  if (!isAuthorized || !storeInBusiness) {
+    return <NotFoundPage />;
   }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
      <ProcessingQueueProvider 
@@ -170,8 +229,8 @@ export default function DashboardLayout({
                 </SidebarHeader>
                 <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard`}>
-                    <Link href={`/store/${nonPrefixedStoreId}/dashboard`}>
+                    <SidebarMenuButton asChild isActive={pathname === `/business/${businessId}/store/${nonPrefixedStoreId}/dashboard`}>
+                    <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard`}>
                         <Home />
                         Dashboard
                     </Link>
@@ -180,7 +239,7 @@ export default function DashboardLayout({
                  <SidebarMenuItem>
                     <Collapsible>
                         <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/dashboard/orders`)}>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders`)}>
                                 <div className="flex items-center gap-2">
                                 <Package />
                                 Orders
@@ -190,11 +249,11 @@ export default function DashboardLayout({
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <SidebarMenuSub>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/orders`} className={cn(pathname === `/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing` && 'text-muted-foreground')}>
-                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders`}>All Orders</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders`} className={cn(pathname === `/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing` && 'text-muted-foreground')}>
+                                    <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders`}>All Orders</Link>
                                 </SidebarMenuSubButton>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
-                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>
+                                    <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSub>
                         </CollapsibleContent>
@@ -203,7 +262,7 @@ export default function DashboardLayout({
                 <SidebarMenuItem>
                     <Collapsible>
                         <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/dashboard/members`)}>
+                            <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/members`)}>
                                 <div className="flex items-center gap-2">
                                 <UserPlus />
                                 Members
@@ -213,8 +272,8 @@ export default function DashboardLayout({
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <SidebarMenuSub>
-                                <SidebarMenuSubButton asChild isActive={pathname === `/store/${nonPrefixedStoreId}/dashboard/members/invite`}>
-                                    <Link href={`/store/${nonPrefixedStoreId}/dashboard/members/invite`}>Invite Member</Link>
+                                <SidebarMenuSubButton asChild isActive={pathname === `/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/members/invite`}>
+                                    <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/dashboard/members/invite`}>Invite Member</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSub>
                         </CollapsibleContent>
@@ -225,8 +284,8 @@ export default function DashboardLayout({
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith(`/store/${nonPrefixedStoreId}/settings`)}>
-                        <Link href={`/store/${nonPrefixedStoreId}/settings`}>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith(`/business/${businessId}/store/${nonPrefixedStoreId}/settings`)}>
+                        <Link href={`/business/${businessId}/store/${nonPrefixedStoreId}/settings`}>
                         <Settings />
                         Settings
                         </Link>

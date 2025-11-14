@@ -2,36 +2,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderId, tag } = await req.json();
+    const { businessId, shop, orderId, tag } = await req.json();
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     if (!shop || !orderId || !tag) {
       return NextResponse.json({ error: 'Shop, orderId, tag, and action are required' }, { status: 400 });
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    const businessData = result.businessDoc?.data();
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
-    
+
 
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
 
+    const orderData = (await orderRef.get()).data();
+
+    if (shop === SHARED_STORE_ID) {
+      const vendorName = businessData?.vendorName;
+      const vendors = orderData?.vendors;
+      const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+      if (!canProcess.authorised) {
+        const { error, status } = canProcess;
+        return NextResponse.json({ error }, { status });
+      }
+    }
+
     await db.runTransaction(async (transaction) => {
-        const orderDoc = await transaction.get(orderRef);
-        const tags_confirmed = orderDoc.data()?.tags_confirmed;
-        const arr = tags_confirmed && Array.isArray(tags_confirmed) ? tags_confirmed.slice(1) : [];
-        
-        transaction.update(orderRef, {
-            tags_confirmed: [tag, ...arr],
-            lastUpdatedAt: FieldValue.serverTimestamp(),
-        });
+      const orderDoc = await transaction.get(orderRef);
+      const tags_confirmed = orderDoc.data()?.tags_confirmed;
+      const arr = tags_confirmed && Array.isArray(tags_confirmed) ? tags_confirmed.slice(1) : [];
+
+      transaction.update(orderRef, {
+        tags_confirmed: [tag, ...arr],
+        lastUpdatedAt: FieldValue.serverTimestamp(),
+      });
     });
 
     return NextResponse.json({ message: `Tag '${tag}' successfully added to order.` });

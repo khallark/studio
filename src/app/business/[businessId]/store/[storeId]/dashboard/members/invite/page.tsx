@@ -1,3 +1,4 @@
+// app/business/[businessId]/store/[storeId]/dashboard/members/invite/page.tsx
 
 'use client';
 
@@ -14,6 +15,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
 import { Input } from '@/components/ui/input';
 import { useParams } from 'next/navigation';
+import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 
 type MemberRole = 'Admin' | 'Staff' | 'Vendor';
@@ -26,9 +28,35 @@ const allStatuses = [
 
 export default function InviteMemberPage() {
   const params = useParams();
+  const businessId = params?.businessId as string;
   const nonPrefixedStoreId = params?.storeId as string;
-  const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
+
   const { toast } = useToast();
+
+  // ============================================================
+  // AUTHORIZATION (TWO-LAYER)
+  // ============================================================
+  
+  // Business level authorization
+  const {
+    isAuthorized: isBusinessAuthorized,
+    stores: businessStores,
+    loading: businessLoading,
+  } = useBusinessAuthorization(businessId);
+
+  // Store level authorization
+  const { 
+    isAuthorized: isStoreAuthorized, 
+    memberRole, 
+    loading: storeLoading, 
+    user, 
+    storeId 
+  } = useStoreAuthorization(nonPrefixedStoreId);
+
+  // Combined auth state
+  const authLoading = businessLoading || storeLoading;
+  const isAuthorized = isBusinessAuthorized && isStoreAuthorized;
+  const storeInBusiness = businessStores.includes(nonPrefixedStoreId);
 
   const [role, setRole] = useState<MemberRole | null>(null);
   const [vendorName, setVendorName] = useState('');
@@ -115,7 +143,32 @@ export default function InviteMemberPage() {
     }
   };
 
-  // Show loading while checking authorization
+  // ============================================================
+  // 404 PAGE COMPONENT
+  // ============================================================
+  const NotFoundPage = () => (
+    <div className="flex flex-col items-center justify-center h-screen">
+      <div className="text-center space-y-4">
+        <h1 className="text-6xl font-bold text-gray-300">404</h1>
+        <h2 className="text-2xl font-semibold text-gray-700">Page Not Found</h2>
+        <p className="text-gray-500 max-w-md">
+          {!isBusinessAuthorized 
+            ? "You don't have access to this business."
+            : !isStoreAuthorized
+            ? "You don't have access to this store."
+            : !storeInBusiness
+            ? "This store does not belong to the selected business."
+            : "The page you're looking for doesn't exist."
+          }
+        </p>
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // LOADING & AUTH CHECKS
+  // ============================================================
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -124,10 +177,13 @@ export default function InviteMemberPage() {
     );
   }
 
-  // If not authorized, hook handles redirect
-  if (!isAuthorized) {
-    return null;
+  if (!isAuthorized || !storeInBusiness) {
+    return <NotFoundPage />;
   }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <main className="flex flex-1 flex-col p-4 md:p-6 items-center">

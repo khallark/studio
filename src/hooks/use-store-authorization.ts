@@ -1,111 +1,75 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { prefixmyshopifycom } from '@/lib/prefix-myshopifycom';
 import { User } from 'firebase/auth';
 
-// Export the role type so it can be used elsewhere
 export type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
 
-// Export the context type
 export interface StoreContextType {
   storeId: string;
   user: User | null;
-  memberRole: MemberRole | null;
+  member: any | null;
 }
 
 export function useStoreAuthorization(storeId: string) {
   const [user, userLoading] = useAuthState(auth);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
+  const [member, setMember] = useState<any | null>(null);
+  const [prefixedStoreId, setPrefixedStoreId] = useState<string>('');
   const router = useRouter();
   const { toast } = useToast();
-
-  // Compute the prefixed storeId once
-  const prefixedStoreId = useMemo(() => 
-    storeId ? prefixmyshopifycom(storeId) : '', 
-    [storeId]
-  );
 
   useEffect(() => {
     async function checkAuthorization() {
       if (userLoading) return;
 
       if (!user) {
-        router.push('/login');
+        setIsAuthorized(false);
         return;
       }
 
       if (!storeId || storeId === 'undefined') {
         setIsAuthorized(false);
-        toast({
-          title: 'Invalid Store',
-          description: 'The store ID is invalid.',
-          variant: 'destructive',
-        });
-        router.push('/');
         return;
       }
 
       try {
-        // Use the memoized prefixedStoreId
-        const storeRef = doc(db, 'accounts', prefixedStoreId);
-        const storeDoc = await getDoc(storeRef);
+        const token = await user.getIdToken();
 
-        if (!storeDoc.exists()) {
+        const response = await fetch(`/api/stores/${storeId}/auth`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
           setIsAuthorized(false);
-          toast({
-            title: 'Store Not Found',
-            description: 'The requested store does not exist.',
-            variant: 'destructive',
-          });
-          router.push('/');
           return;
         }
 
-        // Check if user is a member of this store
-        const memberRef = doc(db, 'accounts', prefixedStoreId, 'members', user.uid);
-        const memberDoc = await getDoc(memberRef);
-
-        if (!memberDoc.exists()) {
-          setIsAuthorized(false);
-          toast({
-            title: 'Access Denied',
-            description: 'You are not a member of this store.',
-            variant: 'destructive',
-          });
-          router.push('/');
-          return;
-        }
-
-        // User is authorized
+        const data = await response.json();
         setIsAuthorized(true);
-        setMemberRole(memberDoc.data()?.role || null);
+        setMember(data.member); // Store the full member object
+        setPrefixedStoreId(data.storeId);
       } catch (error) {
         console.error('Authorization check error:', error);
         setIsAuthorized(false);
-        toast({
-          title: 'Authorization Error',
-          description: 'An error occurred while checking your permissions.',
-          variant: 'destructive',
-        });
-        router.push('/');
       }
     }
 
     checkAuthorization();
-  }, [user, userLoading, storeId, prefixedStoreId, router, toast]);
+  }, [user, userLoading, storeId]);
 
   return {
     isAuthorized,
-    memberRole,
+    member, // Return full member object
+    memberRole: member?.role || null, // Still provide role for convenience
     loading: userLoading || isAuthorized === null,
     user,
-    storeId: prefixedStoreId, // ✅ Return as 'storeId' (but it's the prefixed version)
+    storeId: prefixedStoreId,
   };
 }

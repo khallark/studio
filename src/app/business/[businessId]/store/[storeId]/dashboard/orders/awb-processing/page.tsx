@@ -1,4 +1,4 @@
-// /dashboard/orders/awb-processing/page.tsx
+// app/business/[businessId]/store/[storeId]/dashboard/orders/awb-processing/page.tsx
 
 'use client';
 
@@ -43,6 +43,7 @@ import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
 import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
 import { useParams } from 'next/navigation';
+import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 import { User } from 'firebase/auth';
 
@@ -71,13 +72,37 @@ interface Order {
 type BatchType = 'forward' | 'return';
 
 export default function AwbProcessingPage() {
-  // const [user] = useAuthState(auth);
   const params = useParams();
+  const businessId = params?.businessId as string;
   const nonPrefixedStoreId = params?.storeId as string;
-  const { isAuthorized, memberRole, loading: authLoading, user, storeId } = useStoreAuthorization(nonPrefixedStoreId);
 
   const { toast } = useToast();
   const { processAwbAssignments } = useProcessingQueue();
+
+  // ============================================================
+  // AUTHORIZATION (TWO-LAYER)
+  // ============================================================
+  
+  // Business level authorization
+  const {
+    isAuthorized: isBusinessAuthorized,
+    stores: businessStores,
+    loading: businessLoading,
+  } = useBusinessAuthorization(businessId);
+
+  // Store level authorization
+  const { 
+    isAuthorized: isStoreAuthorized, 
+    memberRole, 
+    loading: storeLoading, 
+    user, 
+    storeId 
+  } = useStoreAuthorization(nonPrefixedStoreId);
+
+  // Combined auth state
+  const authLoading = businessLoading || storeLoading;
+  const isAuthorized = isBusinessAuthorized && isStoreAuthorized;
+  const storeInBusiness = businessStores.includes(nonPrefixedStoreId);
 
   const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
   const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -86,7 +111,6 @@ export default function AwbProcessingPage() {
   const [selectedOrders, setSelectedOrders] = useState<Order[]>([]);
   const [batchType, setBatchType] = useState<BatchType>('forward');
 
-  const [shopId, setShopId] = useState<string>('');
   const [batches, setBatches] = useState<ShipmentBatch[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -164,7 +188,32 @@ export default function AwbProcessingPage() {
     }
   }, [unusedAwbsCount, toast]);
 
-  // Show loading while checking authorization
+  // ============================================================
+  // 404 PAGE COMPONENT
+  // ============================================================
+  const NotFoundPage = () => (
+    <div className="flex flex-col items-center justify-center h-screen">
+      <div className="text-center space-y-4">
+        <h1 className="text-6xl font-bold text-gray-300">404</h1>
+        <h2 className="text-2xl font-semibold text-gray-700">Page Not Found</h2>
+        <p className="text-gray-500 max-w-md">
+          {!isBusinessAuthorized 
+            ? "You don't have access to this business."
+            : !isStoreAuthorized
+            ? "You don't have access to this store."
+            : !storeInBusiness
+            ? "This store does not belong to the selected business."
+            : "The page you're looking for doesn't exist."
+          }
+        </p>
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // LOADING & AUTH CHECKS
+  // ============================================================
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -173,10 +222,13 @@ export default function AwbProcessingPage() {
     );
   }
 
-  // If not authorized, hook handles redirect
-  if (!isAuthorized) {
-    return null;
+  if (!isAuthorized || !storeInBusiness) {
+    return <NotFoundPage />;
   }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <>
@@ -401,7 +453,7 @@ function BatchRow({
     } finally {
       setIsRetrying(false);
     }
-  }, [user, toast, handleAssignAwbClick, batchType]);
+  }, [user, toast, handleAssignAwbClick, batchType, storeId]);
 
   const handleRetryFailed = async () => {
     await retryFailedAwbAssignments(batch.id);

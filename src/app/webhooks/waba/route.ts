@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
 import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
+import { SHARED_STORE_ID } from '@/lib/authoriseUser';
 
 // Fire-and-forget pattern: Webhook responds immediately and processes async
 // This prevents timeout issues on starter plans with 45-50 second limits
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
                 console.error('❌ Text message error:', error);
             }
         }
-        
+
         return NextResponse.json({ status: 'ok' }, { status: 200 });
     } catch (error) {
         console.error('❌ Error processing webhook:', error);
@@ -264,6 +265,67 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
         });
 
         console.log(`✅ Order ${orderData?.name ?? '{Unknown}'} confirmed`);
+
+        // ============================================
+        // ✅ SPLIT ORDER LOGIC (ONLY for SHARED_STORE_ID)
+        // ============================================
+
+        // Extract shop from document path: accounts/{shop}/orders/{orderId}
+        const pathParts = orderDoc.ref.path.split('/');
+        const shop = pathParts[1]; // "accounts" is at index 0, shop at index 1
+
+        if (shop === SHARED_STORE_ID) {
+            const vendors = orderData?.vendors || [];
+            const orderId = orderData?.orderId || orderDoc.id;
+
+            // Check if order needs splitting (multiple vendors)
+            if (vendors && vendors.length > 1) {
+                console.log(`🔀 Order ${orderData?.name} has ${vendors.length} vendors - triggering split`);
+
+                // Call enqueue function
+                const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL;
+                const secret = process.env.ENQUEUE_FUNCTION_SECRET;
+
+                if (!url || !secret) {
+                    console.warn('⚠️ Split function not configured (missing ENQUEUE_ORDER_SPLIT_FUNCTION_URL or ENQUEUE_FUNCTION_SECRET)');
+                    return true; // Still return true since confirmation succeeded
+                }
+
+                try {
+                    console.log(`📤 Enqueueing split for order ${orderId}...`);
+
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Api-Key': secret,
+                        },
+                        body: JSON.stringify({
+                            shop,
+                            orderId,
+                        }),
+                    });
+
+                    if (!resp.ok) {
+                        const json = await resp.json();
+                        console.warn(`⚠️ Order split enqueue failed: ${json.error || resp.statusText}`);
+                    } else {
+                        const json = await resp.json();
+                        console.log(`✅ Order split enqueued! Batch: ${json.batchId}, Jobs: ${json.jobCount}`);
+                    }
+                } catch (enqueueError) {
+                    console.error('❌ Error enqueueing split:', enqueueError);
+                    // Don't fail the confirmation - splitting can be retried manually
+                }
+            } else if (vendors.length === 1) {
+                console.log(`✓ Order ${orderData?.name} is single-vendor (${vendors[0]}), no split needed`);
+            } else {
+                console.log(`✓ Order ${orderData?.name} has no vendor info, skipping split check`);
+            }
+        } else {
+            console.log(`✓ Shop ${shop} is not shared store, skipping split logic`);
+        }
+
         return true;
     } catch (error) {
         console.error('❌ Error confirming order:', error);
@@ -397,12 +459,12 @@ async function handleTextMessages(messages: any[]) {
             const textBody = message.text.body.toLowerCase().trim();
             const from = message.from; // Phone number
 
-            
+
             // Check if message is "send pdf again"
             if (textBody === 'send pdf again') {
                 console.log(`💬 Text from ${from}: "${textBody}"`);
                 console.log('📄 User requested PDF resend');
-                
+
                 // Trigger PDF generation function
                 try {
                     await fetch('https://asia-south1-orderflow-jnig7.cloudfunctions.net/generateUnavailableStockReportOnRequest', {

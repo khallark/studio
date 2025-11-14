@@ -1,23 +1,25 @@
 // apps/web/src/app/api/shipments/bulk-create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { db, auth as adminAuth } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
-import { authUserForStore } from "@/lib/authoriseUserForStore";
+import { authUserForBusinessAndStore } from "@/lib/authoriseUser";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderIds } = await req.json();
+    const { businessId, shop, orderIds } = await req.json();
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-    
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         "X-Api-Key": secret,
       },
-      body: JSON.stringify({shop, orderIds, requestedBy: result.userId}),
+      body: JSON.stringify({ shop, orderIds, requestedBy: result.userId }),
     });
 
     const json = await resp.json();

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth as adminAuth, db } from '@/lib/firebase-admin';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
     // ----- Input -----
-    const { shop, orderId } = (await req.json()) as {
+    const { businessId, shop, orderId } = (await req.json()) as {
+      businessId: string;
       shop: string;
       orderId: string;
+    }
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
     if (!shop || !orderId) {
@@ -15,13 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
-    
+
     // Ask Firebase Function to enqueue Cloud Tasks (one per job)
     const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'X-Api-Key': secret,
       },
-      body: JSON.stringify({ shop, orderId }),
+      body: JSON.stringify({ shop, orderId, requestedBy: result.userId }),
     });
 
     const json = await resp.json();

@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth, db } from '@/lib/firebase-admin';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
     // ----- Input -----
-    const { shop, orderIds } = (await req.json()) as {
+    const { businessId, shop, orderIds } = (await req.json()) as {
+      businessId: string;
       shop: string;
       orderIds: string[];
+    }
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
@@ -15,9 +20,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'X-Api-Key': secret,
       },
-      body: JSON.stringify({ shop, orderIds, requestedBy: result.userId }),
+      body: JSON.stringify({ businessId, shop, orderIds, requestedBy: result.userId }),
     });
 
     const json = await resp.json();

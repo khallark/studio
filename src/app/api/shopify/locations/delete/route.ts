@@ -1,20 +1,24 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, locationId } = await req.json();
+    const { businessId, shop, locationId } = await req.json();
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     if (!shop || !locationId) {
       return NextResponse.json({ error: 'Shop and locationId are required' }, { status: 400 });
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -22,20 +26,20 @@ export async function POST(req: NextRequest) {
     const { memberDoc } = result;
     const memberData = memberDoc?.data();
     const memberRole = memberData?.role;
-    if(!memberRole) {
-      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
+    if (!memberRole) {
+      return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
     }
 
     let locationRef;
     if (memberRole === 'Vendor') {
-        locationRef = memberDoc?.ref.collection('pickupLocations').doc(locationId);
+      locationRef = memberDoc?.ref.collection('pickupLocations').doc(locationId);
     } else if (memberRole === 'SuperAdmin' || memberRole === 'Admin') {
-        const accountRef = db.collection('accounts').doc(shop);
-        locationRef = accountRef.collection('pickupLocations').doc(locationId);
+      const accountRef = db.collection('accounts').doc(shop);
+      locationRef = accountRef.collection('pickupLocations').doc(locationId);
     } else {
-        return NextResponse.json({ error: 'Forbidden: You do not have permission to delete locations.' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: You do not have permission to delete locations.' }, { status: 403 });
     }
-    
+
     await locationRef?.delete();
 
     return NextResponse.json({ message: 'Pickup location successfully deleted.' });

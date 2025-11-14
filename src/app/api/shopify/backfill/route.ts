@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data()?.accounts.includes(shop)) {
+    if (!userDoc.exists || !userDoc.data()?.stores.includes(shop)) {
       return NextResponse.json({ error: 'Forbidden: User is not authorized for this shop.' }, { status: 403 });
     }
 

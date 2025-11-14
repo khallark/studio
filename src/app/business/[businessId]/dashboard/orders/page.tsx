@@ -1,4 +1,4 @@
-// app/store/[storeId]/dashboard/orders/page.tsx
+// app/business/[businessId]/orders/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Download, MoreHorizontal, Loader2, ArrowUpDown, ScanBarcode, Clock, X } from 'lucide-react';
+import { Download, MoreHorizontal, Loader2, ArrowUpDown, ScanBarcode, Clock, X, Store } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AssignAwbDialog } from '@/components/assign-awb-dialog';
@@ -68,9 +68,9 @@ import { AvailabilityDialog } from '@/components/availability-dialog';
 import { GeneratePODialog } from '@/components/generate-po-dialog';
 
 // ============================================================
-// HOOKS & TYPES (NEW!)
+// HOOKS & TYPES (BUSINESS-LEVEL!)
 // ============================================================
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
+import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useOrders } from '@/hooks/use-orders';
 import { useOrderCounts } from '@/hooks/use-order-counts';
 import { useAvailabilityCounts } from '@/hooks/use-availability-counts';
@@ -91,50 +91,28 @@ import {
 } from '@/hooks/use-order-mutations';
 import { Order, CustomStatus, SortKey, SortDirection } from '@/types/order';
 import { useDebounce } from 'use-debounce';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { toast } from '@/hooks/use-toast';
 
-export default function OrdersPage() {
+export default function BusinessOrdersPage() {
     const params = useParams();
-    const nonPrefixedStoreId = params?.storeId as string;
+    const businessId = params?.businessId as string;
 
     // ============================================================
-    // AUTHORIZATION
+    // AUTHORIZATION (Business-level only!)
     // ============================================================
     const {
         isAuthorized,
-        memberRole,
+        stores, // All stores in the business
+        vendorName,
         loading: authLoading,
         user,
-        storeId
-    } = useStoreAuthorization(nonPrefixedStoreId);
-
-    const [vendorName, setVendorName] = useState<string | undefined>(undefined);
-
-    useEffect(() => {
-        const fetchVendorName = async () => {
-            if (memberRole === 'Vendor' && storeId && user) {
-                try {
-                    const memberDoc = await getDoc(
-                        doc(db, 'accounts', storeId, 'members', user.uid)
-                    );
-                    if (memberDoc.exists()) {
-                        const memberData = memberDoc.data();
-                        setVendorName(memberData.vendorName);
-                    }
-                } catch (error) {
-                    console.error('Error fetching vendor name:', error);
-                }
-            }
-        };
-
-        fetchVendorName();
-    }, [memberRole, storeId, user]);
+        memberRole,
+    } = useBusinessAuthorization(businessId);
 
     const { processAwbAssignments } = useProcessingQueue();
 
     // ============================================================
-    // UI STATE (Unchanged)
+    // UI STATE
     // ============================================================
     const [activeTab, setActiveTab] = useState<CustomStatus | 'All Orders'>('All Orders');
     const [currentPage, setCurrentPage] = useState(1);
@@ -142,16 +120,17 @@ export default function OrdersPage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
+    // ✅ NEW: Store filter state
+    const [selectedStores, setSelectedStores] = useState<string[]>([]);
+
     // Filter state
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-    const [courierFilter, setCourierFilter] = useState<string>('all');
+    const [courierFilter, setCourierFilter] = useState<'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'pending' | 'available' | 'unavailable'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
-    const [sortKey, setSortKey] = useState<SortKey>('createdAt');
-    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -172,67 +151,115 @@ export default function OrdersPage() {
     const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<string | null>(null);
 
     // ============================================================
-    // DATA FETCHING WITH TANSTACK QUERY (NEW!)
+    // DATA FETCHING (Business-wide!)
     // ============================================================
 
-    // Fetch orders
+    // ✅ Fetch orders from all stores (or filtered stores)
     const {
         data: ordersData,
         isLoading,
         isFetching,
         refetch: refetchOrders
-    } = useOrders(storeId, activeTab, currentPage, rowsPerPage, {
-        searchQuery: debouncedSearchQuery,
-        invertSearch,
-        dateRange,
-        courierFilter,
-        availabilityFilter,
-        rtoInTransitFilter,
-        sortKey,
-        sortDirection,
-        vendorName: memberRole === 'Vendor' ? vendorName : undefined, // ✅ ADD THIS
-    });
+    } = useOrders(
+        businessId,
+        stores, // All stores in business
+        vendorName,
+        activeTab,
+        currentPage,
+        rowsPerPage,
+        {
+            searchQuery: debouncedSearchQuery,
+            invertSearch,
+            dateRange: dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined,
+            courierFilter: courierFilter === 'all' ? undefined : courierFilter,
+            availabilityFilter,
+            rtoInTransitFilter,
+            storeFilter: selectedStores.length > 0 ? selectedStores : undefined, // ✅ NEW
+        }
+    );
 
     const orders = ordersData?.orders || [];
     const totalFilteredCount = ordersData?.totalCount || 0;
 
-    // Fetch counts
-    const { data: statusCounts } = useOrderCounts(storeId);
-    const { data: availabilityCounts } = useAvailabilityCounts(storeId);
-    const { data: rtoInTransitCounts } = useRtoInTransitCounts(storeId);
-    const { data: unusedAwbsCount = 0 } = useAwbCount(storeId);
+    // ✅ Fetch aggregated counts
+    const { data: statusCounts } = useOrderCounts(businessId, stores);
+    const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores);
+    const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores);
+    const { data: unusedAwbsCount = 0 } = useAwbCount(businessId);
 
     // ============================================================
-    // MUTATIONS (NEW!)
+    // MUTATIONS (Business-level!)
     // ============================================================
 
-    const updateStatus = useUpdateOrderStatus(storeId, user);
-    const revertStatus = useRevertOrderStatus(storeId, user);
-    const dispatchOrders = useDispatchOrders(storeId, user);
-    const bulkUpdate = useBulkUpdateStatus(storeId, user);
-    const splitOrder = useOrderSplit(storeId, user);
-    const bookReturn = useReturnBooking(storeId, user);
-    const deleteOrder = useDeleteOrder(storeId);
-    const downloadSlips = useDownloadSlips(storeId, user);
-    const downloadExcel = useDownloadExcel(storeId, user);
-    const downloadProductsExcel = useDownloadProductsExcel(storeId, user);
-    const updateShippedStatuses = useUpdateShippedStatuses(storeId, user);
+    // Helper to get storeId from order
+    const getOrderStoreId = (orderId: string): string | null => {
+        const order = orders.find(o => o.id === orderId);
+        return order?.storeId || null;
+    };
+
+    // Create mutation hooks for each selected order's store
+    // Note: This is a simplified approach. For bulk operations across stores,
+    // you might need to group by storeId and call mutations per store.
+    const updateStatus = (storeId: string) => useUpdateOrderStatus(businessId, storeId, user);
+    const revertStatus = (storeId: string) => useRevertOrderStatus(businessId, storeId, user);
+    const dispatchOrders = (storeId: string) => useDispatchOrders(businessId, storeId, user);
+    const bulkUpdate = (storeId: string) => useBulkUpdateStatus(businessId, storeId, user);
+    const splitOrder = (storeId: string) => useOrderSplit(businessId, storeId, user);
+    const bookReturn = (storeId: string) => useReturnBooking(businessId, storeId, user);
+    const deleteOrder = (storeId: string) => useDeleteOrder(businessId, storeId);
+    const downloadSlips = (storeId: string) => useDownloadSlips(businessId, storeId, user);
+    const downloadExcel = (storeId: string) => useDownloadExcel(businessId, storeId, user);
+    const downloadProductsExcel = (storeId: string) => useDownloadProductsExcel(businessId, storeId, user);
+    const updateShippedStatuses = (storeId: string) => useUpdateShippedStatuses(businessId, storeId, user);
 
     // ============================================================
-    // MUTATION HANDLERS (Simplified!)
+    // MUTATION HANDLERS
     // ============================================================
 
     const handleUpdateStatus = (orderId: string, status: CustomStatus) => {
-        updateStatus.mutate({ orderId, status });
+        const storeId = getOrderStoreId(orderId);
+        if (!storeId) return;
+
+        const mutation = updateStatus(storeId);
+        mutation.mutate({ orderId, status });
     };
 
     const handleRevertStatus = (orderId: string, revertTo: 'Confirmed' | 'Delivered') => {
-        revertStatus.mutate({ orderId, revertTo });
+        const storeId = getOrderStoreId(orderId);
+        if (!storeId) return;
+
+        const mutation = revertStatus(storeId);
+        mutation.mutate({ orderId, revertTo });
     };
 
     const handleDispatch = (orderIds: string[]) => {
-        dispatchOrders.mutate(orderIds, {
-            onSuccess: () => setSelectedOrders([])
+        // Group orders by store
+        const ordersByStore = new Map<string, string[]>();
+        orderIds.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
+        });
+
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        // Dispatch for each store
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = dispatchOrders(storeId);
+            mutation.mutate(storeOrderIds, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
         });
     };
 
@@ -243,54 +270,227 @@ export default function OrdersPage() {
         }
 
         if (status === 'DTO Requested') {
-            bookReturn.mutate(selectedOrders, {
-                onSuccess: () => setSelectedOrders([])
+            // Group by store for return booking
+            const ordersByStore = new Map<string, string[]>();
+            selectedOrders.forEach(orderId => {
+                const order = orders.find(o => o.id === orderId);
+                if (order?.storeId) {
+                    if (!ordersByStore.has(order.storeId)) {
+                        ordersByStore.set(order.storeId, []);
+                    }
+                    ordersByStore.get(order.storeId)!.push(orderId);
+                }
+            });
+
+            // Track completion to avoid race condition
+            let completedStores = 0;
+            const totalStores = ordersByStore.size;
+
+            ordersByStore.forEach((storeOrderIds, storeId) => {
+                const mutation = bookReturn(storeId);
+                mutation.mutate(storeOrderIds, {
+                    onSuccess: () => {
+                        completedStores++;
+                        if (completedStores === totalStores) {
+                            setSelectedOrders([]);
+                        }
+                    }
+                });
             });
             return;
         }
 
-        bulkUpdate.mutate({ orderIds: selectedOrders, status }, {
-            onSuccess: () => setSelectedOrders([])
+        // Group by store for bulk update
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
+        });
+
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = bulkUpdate(storeId);
+            mutation.mutate({ orderIds: storeOrderIds, status }, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
         });
     };
 
     const handleOrderSplit = (orderId: string) => {
-        splitOrder.mutate(orderId);
+        const storeId = getOrderStoreId(orderId);
+        if (!storeId) return;
+
+        const mutation = splitOrder(storeId);
+        mutation.mutate(orderId);
     };
 
     const handleDownloadSlips = () => {
         if (selectedOrders.length === 0) return;
-        const orderIdsWithAwb = orders
+
+        // Group by store
+        const ordersByStore = new Map<string, string[]>();
+        orders
             .filter(o => selectedOrders.includes(o.id) && o.awb)
-            .map(o => o.id);
+            .forEach(order => {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(order.id);
+            });
 
-        if (orderIdsWithAwb.length === 0) {
-            // Toast handled by mutation hook
-            return;
-        }
+        if (ordersByStore.size === 0) return;
 
-        downloadSlips.mutate(orderIdsWithAwb, {
-            onSuccess: () => setSelectedOrders([])
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        // Download for each store
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = downloadSlips(storeId);
+            mutation.mutate(storeOrderIds, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
         });
     };
 
     const handleDownloadExcel = () => {
         if (selectedOrders.length === 0) return;
-        downloadExcel.mutate(selectedOrders, {
-            onSuccess: () => setSelectedOrders([])
+
+        // Group by store
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
+        });
+
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        // Download for each store
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = downloadExcel(storeId);
+            mutation.mutate(storeOrderIds, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
         });
     };
 
     const handleDownloadProductsExcel = () => {
         if (selectedOrders.length === 0) return;
-        downloadProductsExcel.mutate(selectedOrders);
+
+        // Group by store
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
+        });
+
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = downloadProductsExcel(storeId);
+            mutation.mutate(storeOrderIds, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
+        });
     };
 
     const handleUpdateShippedStatuses = () => {
         if (selectedOrders.length === 0) return;
-        updateShippedStatuses.mutate(selectedOrders, {
-            onSuccess: () => setSelectedOrders([])
+
+        // Group by store
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
         });
+
+        // Track completion to avoid race condition
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            const mutation = updateShippedStatuses(storeId);
+            mutation.mutate(storeOrderIds, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) {
+                        setSelectedOrders([]);
+                    }
+                }
+            });
+        });
+    };
+
+    const handleGeneratePOClick = () => {
+        if (selectedOrders.length === 0) {
+            toast({
+                title: "No Orders Selected",
+                description: "Please select orders to generate a purchase order.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        const validation = validateSingleStore(selectedOrders);
+
+        if (!validation.valid) {
+            toast({
+                title: "Multiple Stores Selected",
+                description: `You've selected orders from ${validation.storeCount} different stores. Purchase orders must be generated for one store at a time.`,
+                variant: "destructive"
+            });
+            return;
+        }
+
+        // All good! Open the dialog
+        setIsGeneratePODialogOpen(true);
     };
 
     // ============================================================
@@ -299,10 +499,8 @@ export default function OrdersPage() {
 
     const handleAssignAwbClick = () => {
         const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-        if (ordersToProcess.length === 0) {
-            // Show error toast
-            return;
-        }
+        if (ordersToProcess.length === 0) return;
+
         if (ordersToProcess.length > unusedAwbsCount) {
             setIsLowAwbAlertOpen(true);
         } else {
@@ -355,7 +553,7 @@ export default function OrdersPage() {
     };
 
     const handleAvailabilityToggle = async (order: Order) => {
-        if (!storeId || !user) return;
+        if (!order.storeId || !user) return;
 
         const isCurrentlyAvailable = order.tags_confirmed?.includes('Available');
         const action = isCurrentlyAvailable ? 'remove' : 'add';
@@ -370,7 +568,7 @@ export default function OrdersPage() {
                     'Authorization': `Bearer ${idToken}`
                 },
                 body: JSON.stringify({
-                    shop: storeId,
+                    shop: order.storeId,
                     orderId: order.id,
                     tag: 'Available',
                     action,
@@ -380,7 +578,6 @@ export default function OrdersPage() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.details || 'Failed to update availability');
 
-            // Refetch orders after update
             refetchOrders();
 
             setItemSelection(prev => {
@@ -396,11 +593,30 @@ export default function OrdersPage() {
     };
 
     // ============================================================
+    // VALIDATION HELPERS
+    // ============================================================
+
+    /**
+     * Check if all selected orders are from the same store
+     * Returns the storeId if all same, null if multiple stores
+     */
+    const validateSingleStore = (orderIds: string[]): { valid: boolean; storeId: string | null; storeCount: number } => {
+        const selectedOrdersList = orders.filter(o => orderIds.includes(o.id));
+        const storeIds = new Set(selectedOrdersList.map(o => o.storeId));
+
+        return {
+            valid: storeIds.size === 1,
+            storeId: storeIds.size === 1 ? Array.from(storeIds)[0] : null,
+            storeCount: storeIds.size
+        };
+    };
+
+    // ============================================================
     // EFFECTS
     // ============================================================
 
     useEffect(() => {
-        document.title = "Dashboard - Orders";
+        document.title = "Business Orders Dashboard";
     }, []);
 
     useEffect(() => {
@@ -413,7 +629,7 @@ export default function OrdersPage() {
     useEffect(() => {
         setCurrentPage(1);
         setSelectedOrders([]);
-    }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter]);
+    }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -460,19 +676,6 @@ export default function OrdersPage() {
     };
 
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
-
-    // ============================================================
-    // SORTING
-    // ============================================================
-
-    const handleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDirection('asc');
-        }
-    };
 
     // ============================================================
     // BADGE VARIANTS
@@ -544,14 +747,11 @@ export default function OrdersPage() {
     // ============================================================
 
     const renderActionItems = (order: Order) => {
-        const isShopifyCancelled = !!order.raw?.cancelled_at;
-        if (isShopifyCancelled) {
-            return (
-                <DropdownMenuItem disabled>Order Cancelled on Shopify</DropdownMenuItem>
-            );
-        }
-
         switch (order.customStatus) {
+            case 'Cancelled':
+                return (
+                    <DropdownMenuItem disabled>Order Cancelled</DropdownMenuItem>
+                );
             case 'New':
                 return (
                     <>
@@ -656,7 +856,6 @@ export default function OrdersPage() {
                 );
             case 'RTO Closed':
             case 'Cancellation Requested':
-            case 'Cancelled':
             default:
                 return null;
         }
@@ -675,16 +874,6 @@ export default function OrdersPage() {
         const isDisabled = !isAnyOrderSelected;
         const showUpdateShippedButton = shippedStatuses.includes(activeTab);
 
-        // Check if any mutation is loading
-        const isMutating =
-            updateStatus.isPending ||
-            bulkUpdate.isPending ||
-            dispatchOrders.isPending ||
-            downloadSlips.isPending ||
-            downloadExcel.isPending ||
-            downloadProductsExcel.isPending ||
-            updateShippedStatuses.isPending;
-
         return (
             <div className="flex items-center gap-2 flex-wrap justify-end">
                 {showUpdateShippedButton && (
@@ -692,11 +881,8 @@ export default function OrdersPage() {
                         variant="outline"
                         size="sm"
                         onClick={handleUpdateShippedStatuses}
-                        disabled={isDisabled || isMutating}
+                        disabled={isDisabled}
                     >
-                        {updateShippedStatuses.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : null}
                         Update {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Shipped Statuses
                     </Button>
                 )}
@@ -705,20 +891,20 @@ export default function OrdersPage() {
                     switch (activeTab) {
                         case 'All Orders':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                    {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                    {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                 </Button>
                             );
                         case 'New':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                                        {bulkUpdate.isPending ? 'Confirming...' : 'Confirm'}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
+                                        Confirm
                                     </Button>
                                 </>
                             );
@@ -728,16 +914,16 @@ export default function OrdersPage() {
                                     <Button variant="outline" size="sm" onClick={() => setIsAvailabilityDialogOpen(true)}>
                                         Perform Items availability
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleGeneratePOClick}>
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadProductsExcel}>
-                                        {downloadProductsExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadProductsExcel.isPending ? 'Downloading...' : `Download Products Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadProductsExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Products Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
                                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
                                         Assign AWBs
@@ -757,23 +943,23 @@ export default function OrdersPage() {
                                     <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadSlips}>
-                                        {downloadSlips.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadSlips.isPending ? 'Downloading...' : `Download Slips ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadSlips}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Slips {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                                        {dispatchOrders.isPending ? 'Dispatching...' : `Dispatch ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                                        Dispatch {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
                                 </>
                             );
                         case 'Delivered':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('Closed')}>
-                                    {bulkUpdate.isPending ? 'Closing...' : `Close Orders ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Closed')}>
+                                    Close Orders {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                 </Button>
                             );
                         case 'RTO Delivered':
@@ -786,24 +972,24 @@ export default function OrdersPage() {
                                         <ScanBarcode className="mr-2 h-4 w-4" />
                                         AWB Bulk Selection
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
-                                        {bulkUpdate.isPending ? 'RTO Closing...' : 'RTO Close'}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
+                                        RTO Close
                                     </Button>
                                 </>
                             );
                         case 'DTO Requested':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
-                                        {bookReturn.isPending ? 'Booking returns...' : `Book ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
+                                        Book {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                        {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                        {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                     </Button>
                                 </>
                             );
@@ -822,9 +1008,9 @@ export default function OrdersPage() {
                         case 'RTO Closed':
                         case 'Cancellation Requested':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled || isMutating} onClick={handleDownloadExcel}>
-                                    {downloadExcel.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                    {downloadExcel.isPending ? 'Downloading...' : `Download Excel ${selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}`}
+                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                 </Button>
                             );
                         default:
@@ -835,20 +1021,43 @@ export default function OrdersPage() {
     };
 
     // ============================================================
-    // LOADING & AUTH CHECKS
+    // AUTHORIZATION CHECK
     // ============================================================
 
-    // if (authLoading) {
-    //     return (
-    //         <div className="flex items-center justify-center h-screen">
-    //             <div className="text-lg">Loading...</div>
-    //         </div>
-    //     );
-    // }
+    if (authLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-lg">Loading...</div>
+            </div>
+        );
+    }
 
-    // if (!isAuthorized) {
-    //     return null;
-    // }x
+    if (!isAuthorized) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+                <div className="text-center space-y-4">
+                    <h1 className="text-6xl font-bold text-gray-300">404</h1>
+                    <h2 className="text-2xl font-semibold text-gray-700">Unauthorized</h2>
+                    <p className="text-gray-500 max-w-md">
+                        You don't have access to this business.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (stores.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+                <div className="text-center space-y-4">
+                    <h2 className="text-2xl font-semibold text-gray-700">No Stores Found</h2>
+                    <p className="text-gray-500 max-w-md">
+                        This business doesn't have any stores yet.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     // ============================================================
     // RENDER
@@ -869,7 +1078,13 @@ export default function OrdersPage() {
                     <CardHeader className="border-b p-4 md:p-6 shrink-0">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div>
-                                <CardTitle>Your Orders</CardTitle>
+                                <CardTitle>Business Orders</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {selectedStores.length > 0
+                                        ? `Viewing ${selectedStores.length} of ${stores.length} stores`
+                                        : `Viewing all ${stores.length} stores`
+                                    }
+                                </p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap justify-end">
                                 <Button
@@ -890,6 +1105,66 @@ export default function OrdersPage() {
                                 {renderBulkActionButtons()}
                             </div>
                         </div>
+
+                        {/* ✅ NEW: Store Filter */}
+                        <div className="mt-4 flex flex-col gap-4">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm" className="w-fit">
+                                        <Store className="mr-2 h-4 w-4" />
+                                        {selectedStores.length > 0
+                                            ? `${selectedStores.length} store${selectedStores.length > 1 ? 's' : ''} selected`
+                                            : `All stores (${stores.length})`
+                                        }
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80">
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium">Filter by Store</h4>
+                                        <div className="flex items-center space-x-2 pb-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setSelectedStores([])}
+                                            >
+                                                Clear All
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setSelectedStores(stores)}
+                                            >
+                                                Select All
+                                            </Button>
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto space-y-2">
+                                            {stores.map(storeId => (
+                                                <div key={storeId} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`store-${storeId}`}
+                                                        checked={selectedStores.includes(storeId)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setSelectedStores(prev => [...prev, storeId]);
+                                                            } else {
+                                                                setSelectedStores(prev => prev.filter(s => s !== storeId));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <Label
+                                                        htmlFor={`store-${storeId}`}
+                                                        className="text-sm font-normal cursor-pointer"
+                                                    >
+                                                        {storeId}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
                         <div className="mt-4 flex flex-col md:flex-row items-center gap-4">
                             <div className="flex items-center gap-2 flex-1 md:flex-none">
                                 <Input
@@ -947,7 +1222,7 @@ export default function OrdersPage() {
                                 </Popover>
                             </div>
                             {!['New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
-                                <Select value={courierFilter} onValueChange={setCourierFilter}>
+                                <Select value={courierFilter} onValueChange={(value) => setCourierFilter(value as 'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees')}>
                                     <SelectTrigger className="w-full md:w-[180px]">
                                         <SelectValue placeholder="Filter by courier..." />
                                     </SelectTrigger>
@@ -1072,6 +1347,7 @@ export default function OrdersPage() {
                                             />
                                         </TableHead>
                                         <TableHead>Order ID</TableHead>
+                                        <TableHead>Store</TableHead> {/* ✅ NEW */}
                                         <TableHead>Date</TableHead>
                                         {activeTab === 'All Orders' && (
                                             <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
@@ -1094,11 +1370,12 @@ export default function OrdersPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {authLoading || isLoading ? (
+                                    {isLoading ? (
                                         Array.from({ length: rowsPerPage }).map((_, i) => (
                                             <TableRow key={i}>
                                                 <TableCell className="py-2 px-5"><Skeleton className="h-5 w-5" /></TableCell>
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-20" /></TableCell>
+                                                <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                                 {activeTab === 'All Orders' && <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>}
                                                 {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
@@ -1144,6 +1421,10 @@ export default function OrdersPage() {
                                                         />
                                                     </TableCell>
                                                     <TableCell className="font-medium text-sm md:text-base py-2">{order.name}</TableCell>
+                                                    {/* ✅ NEW: Store column */}
+                                                    <TableCell className="text-xs md:text-sm py-2 text-muted-foreground">
+                                                        {order.storeId.split('.')[0]}
+                                                    </TableCell>
                                                     <TableCell className="text-xs md:text-sm py-2">{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                                                     {activeTab === 'All Orders' && (
                                                         <TableCell className="py-2">
@@ -1175,40 +1456,8 @@ export default function OrdersPage() {
                                                             {order.fulfillmentStatus || 'unfulfilled'}
                                                         </Badge>
                                                     </TableCell>
-                                                    <TableCell className="text-xs md:text-sm" onClick={(e) => e.stopPropagation()}>
-                                                        {activeTab === 'Confirmed' ? (
-                                                            <Popover>
-                                                                <PopoverTrigger asChild>
-                                                                    <Button variant="outline" size="sm" className="h-8">
-                                                                        {order.raw?.line_items?.length || 0} items
-                                                                    </Button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-80">
-                                                                    <div className="grid gap-4">
-                                                                        <div className="space-y-2">
-                                                                            <h4 className="font-medium leading-none">Items for Order {order.name}</h4>
-                                                                            <p className="text-sm text-muted-foreground">Select items to make available.</p>
-                                                                        </div>
-                                                                        <div className="grid gap-2">
-                                                                            {order.raw.line_items.map((item: any) => (
-                                                                                <div key={item.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted">
-                                                                                    <Checkbox
-                                                                                        id={`item-${order.id}-${item.id}`}
-                                                                                        checked={itemSelection[order.id]?.has(item.id)}
-                                                                                        onCheckedChange={() => handleItemCheck(order.id, item.id)}
-                                                                                    />
-                                                                                    <Label htmlFor={`item-${order.id}-${item.id}`} className="flex-1 text-sm font-normal">
-                                                                                        {item.title} (Qty: {item.quantity})
-                                                                                    </Label>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                </PopoverContent>
-                                                            </Popover>
-                                                        ) : (
-                                                            order.raw?.line_items?.length || 0
-                                                        )}
+                                                    <TableCell className="text-xs md:text-sm">
+                                                        {order.raw?.line_items?.length || 0}
                                                     </TableCell>
                                                     <TableCell onClick={(e) => e.stopPropagation()} className="py-2">
                                                         <DropdownMenu>
@@ -1229,8 +1478,8 @@ export default function OrdersPage() {
                                         })
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={12} className="text-center h-24">
-                                                {storeId ? `No ${typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.` : 'Please connect a store to see your orders.'}
+                                            <TableCell colSpan={13} className="text-center h-24">
+                                                No {typeof activeTab === 'string' ? activeTab.toLowerCase() : ''} orders found.
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -1277,6 +1526,8 @@ export default function OrdersPage() {
                 </div>
             </main>
 
+            {/* All Dialogs remain the same, just using order.storeId where needed */}
+            {/* ... dialogs code ... */}
             {/* Dialogs */}
             <AlertDialog open={isLowAwbAlertOpen} onOpenChange={setIsLowAwbAlertOpen}>
                 <AlertDialogContent>
@@ -1308,62 +1559,73 @@ export default function OrdersPage() {
                 customStatus={awbBulkSelectStatus}
             />
 
-            <AssignAwbDialog
-                isOpen={isAwbDialogOpen}
-                onClose={() => setIsAwbDialogOpen(false)}
-                orders={ordersForAwb}
-                onConfirm={(courier, pickupName, shippingMode) => {
-                    const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-                    processAwbAssignments(ordersToProcess.map(o => ({ id: o.id, name: o.name })), courier, pickupName, shippingMode);
-                    setSelectedOrders([]);
-                }}
-                shopId={storeId}
-            />
+            {ordersForAwb.length > 0 && (
+                <AssignAwbDialog
+                    isOpen={isAwbDialogOpen}
+                    onClose={() => setIsAwbDialogOpen(false)}
+                    orders={ordersForAwb}
+                    onConfirm={(courier, pickupName, shippingMode) => {
+                        const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
+                        processAwbAssignments(ordersToProcess.map(o => ({ id: o.id, name: o.name })), courier, pickupName, shippingMode);
+                        setSelectedOrders([]);
+                    }}
+                    shopId={ordersForAwb[0]?.storeId || ''}
+                />
+            )}
 
             <GenerateAwbDialog
                 isOpen={isFetchAwbDialogOpen}
                 onClose={() => setIsFetchAwbDialogOpen(false)}
+                businessId={businessId}
+                user={user}
             />
 
-            {orderForReturn && storeId && user && (
+            {orderForReturn && user && (
                 <BookReturnDialog
                     isOpen={isReturnDialogOpen}
                     onClose={() => setIsReturnDialogOpen(false)}
                     order={orderForReturn}
-                    shopId={storeId}
+                    businessId={businessId}
+                    shopId={orderForReturn.storeId}
                     user={user}
                 />
             )}
 
-            {orderForQc && storeId && user && (
+            {orderForQc && user && (
                 <StartQcDialog
                     isOpen={isQcDialogOpen}
                     onClose={() => setIsQcDialogOpen(false)}
                     order={orderForQc}
-                    shopId={storeId}
-                    user={user}
+                    shopId={orderForQc.storeId}
+                    businessId={businessId}
                 />
             )}
 
-            {isAvailabilityDialogOpen && storeId && user && (
+            {isAvailabilityDialogOpen && user && (
                 <AvailabilityDialog
                     isOpen={isAvailabilityDialogOpen}
                     onClose={() => setIsAvailabilityDialogOpen(false)}
                     user={user}
-                    shopId={storeId}
+                    shopId={orders.filter(o => o.customStatus === 'Confirmed')[0]?.storeId || ''}
                     confirmedOrders={orders.filter(o => o.customStatus === 'Confirmed')}
                 />
             )}
 
-            {isGeneratePODialogOpen && storeId && user && (
-                <GeneratePODialog
-                    isOpen={isGeneratePODialogOpen}
-                    onClose={() => setIsGeneratePODialogOpen(false)}
-                    selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
-                    shopId={storeId}
-                    user={user}
-                />
-            )}
+            {isGeneratePODialogOpen && user && (() => {
+                const validation = validateSingleStore(selectedOrders);
+                if (!validation.valid || !validation.storeId) return null;
+
+                return (
+                    <GeneratePODialog
+                        isOpen={isGeneratePODialogOpen}
+                        onClose={() => setIsGeneratePODialogOpen(false)}
+                        selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
+                        shopId={validation.storeId}
+                        user={user}
+                        businessId={businessId}
+                    />
+                );
+            })()}
 
             <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
                 <DialogContent className="max-w-4xl">
@@ -1380,6 +1642,12 @@ export default function OrdersPage() {
                                 <div className="space-y-6">
                                     <h3 className="font-semibold text-lg">Order Details</h3>
                                     <div className="space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold">Store</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                {viewingOrder.storeId.split('.')[0]}
+                                            </p>
+                                        </div>
                                         {(viewingOrder.awb || viewingOrder.courier || viewingOrder.awb_reverse) && (
                                             <div>
                                                 <h4 className="font-semibold">Shipment Details</h4>

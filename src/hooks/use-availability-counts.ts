@@ -5,46 +5,71 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export function useAvailabilityCounts(storeId: string | null) {
+export function useAvailabilityCounts(businessId: string | null, stores: string[]) {
   return useQuery({
-    queryKey: ['availabilityCounts', storeId],
+    queryKey: ['availabilityCounts', businessId, stores],
     
     queryFn: async () => {
-      if (!storeId) throw new Error('No store ID provided');
+      if (!businessId) throw new Error('No business ID provided');
+      if (!stores || stores.length === 0) {
+        return { pending: 0, available: 0, unavailable: 0 };
+      }
 
-      const ordersRef = collection(db, 'accounts', storeId, 'orders');
-      
-      // Fetch only "Confirmed" orders
-      const q = query(
-        ordersRef,
-        where('customStatus', '==', 'Confirmed')
-      );
-      
-      const snapshot = await getDocs(q);
+      let totalAvailable = 0;
+      let totalUnavailable = 0;
+      let totalPending = 0;
 
-      let available = 0;
-      let unavailable = 0;
-      let pending = 0;
-
-      snapshot.docs.forEach((doc) => {
-        const order = doc.data();
+      // Query each store in parallel
+      const storeQueries = stores.map(async (storeId) => {
+        const ordersRef = collection(db, 'accounts', storeId, 'orders');
         
-        // Skip Shopify-cancelled orders
-        if (order.raw?.cancelled_at) return;
+        const q = query(
+          ordersRef,
+          where('customStatus', '==', 'Confirmed')
+        );
+        
+        const snapshot = await getDocs(q);
 
-        if (order.tags_confirmed?.includes('Available')) {
-          available++;
-        } else if (order.tags_confirmed?.includes('Unavailable')) {
-          unavailable++;
-        } else {
-          pending++;
-        }
+        let available = 0;
+        let unavailable = 0;
+        let pending = 0;
+
+        snapshot.docs.forEach((doc) => {
+          const order = doc.data();
+          
+          // Skip Shopify-cancelled orders
+          if (order.raw?.cancelled_at) return;
+
+          if (order.tags_confirmed?.includes('Available')) {
+            available++;
+          } else if (order.tags_confirmed?.includes('Unavailable')) {
+            unavailable++;
+          } else {
+            pending++;
+          }
+        });
+
+        return { available, unavailable, pending };
       });
 
-      return { pending, available, unavailable };
+      // Wait for all stores
+      const results = await Promise.all(storeQueries);
+      
+      // Aggregate results
+      results.forEach(({ available, unavailable, pending }) => {
+        totalAvailable += available;
+        totalUnavailable += unavailable;
+        totalPending += pending;
+      });
+
+      return {
+        pending: totalPending,
+        available: totalAvailable,
+        unavailable: totalUnavailable,
+      };
     },
 
-    enabled: !!storeId,
+    enabled: !!businessId && stores.length > 0,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchInterval: 60 * 1000,

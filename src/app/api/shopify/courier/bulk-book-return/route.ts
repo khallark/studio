@@ -1,19 +1,23 @@
 // apps/web/src/app/api/returns/bulk-book/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { auth as adminAuth, db } from "@/lib/firebase-admin";
-import { authUserForStore } from "@/lib/authoriseUserForStore";
+import { authUserForBusinessAndStore } from "@/lib/authoriseUser";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     // ----- Input -----
-    const { shop, orderIds, pickupName, shippingMode } = (await req.json()) as {
+    const { businessId, shop, orderIds, pickupName, shippingMode } = (await req.json()) as {
+      businessId: string;
       shop: string;
       orderIds: string[];
       pickupName?: string;
       shippingMode?: string;
     };
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     // Note: No courier param - it's read from order.courier in the function
     if (!shop || !pickupName || !shippingMode || !Array.isArray(orderIds) || orderIds.length === 0) {
@@ -24,9 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
 
-    if(!result.authorised) {
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -48,6 +52,7 @@ export async function POST(req: NextRequest) {
         "X-Api-Key": secret,
       },
       body: JSON.stringify({
+        businessId,
         shop,
         orderIds,
         pickupName,

@@ -6,19 +6,24 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 // ============================================================
-// HOOK
+// BUSINESS-LEVEL AWB COUNT HOOK
 // ============================================================
 
-export function useAwbCount(storeId: string | null) {
+/**
+ * Fetches the count of unused AWBs at the BUSINESS level.
+ * AWBs are shared across all stores in a business.
+ */
+export function useAwbCount(businessId: string | null) {
   return useQuery({
     // Query key
-    queryKey: ['awbCount', storeId],
+    queryKey: ['awbCount', businessId],
 
     // Query function
     queryFn: async () => {
-      if (!storeId) throw new Error('No store ID provided');
+      if (!businessId) throw new Error('No business ID provided');
 
-      const awbsRef = collection(db, 'accounts', storeId, 'unused_awbs');
+      // ✅ Fetch from business level, not store level
+      const awbsRef = collection(db, 'users', businessId, 'unused_awbs');
       const snapshot = await getDocs(awbsRef);
 
       // Return the count of unused AWBs
@@ -26,7 +31,7 @@ export function useAwbCount(storeId: string | null) {
     },
 
     // Query options
-    enabled: !!storeId, // Only run when storeId exists
+    enabled: !!businessId, // Only run when businessId exists
     staleTime: 30 * 1000, // Fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchInterval: 60 * 1000, // Refetch every minute

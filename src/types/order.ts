@@ -41,6 +41,7 @@ export interface CustomStatusLog {
 export interface Order {
   id: string;
   orderId: number;
+  storeId: string;
   name: string;
   createdAt: string;
   lastStatusUpdate: Timestamp;
@@ -108,14 +109,16 @@ export interface Order {
 
 export interface UseOrdersFilters {
   searchQuery?: string;
-  invertSearch?: boolean;
-  dateRange?: DateRange;
-  courierFilter?: string;
-  vendorName?: string;
-  availabilityFilter?: 'all' | 'pending' | 'available' | 'unavailable';
+  dateRange?: {
+    from: Date;
+    to?: Date;
+  };
+  courierFilter?: 'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
+  availabilityFilter?: 'all' | 'available' | 'unavailable' | 'pending';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
-  sortKey?: 'name' | 'createdAt';
-  sortDirection?: 'asc' | 'desc';
+  vendorName?: string;
+  invertSearch?: boolean;
+  storeFilter?: string[]; // ✅ NEW: Array of store IDs to filter by
 }
 
 export type StatusCounts = Record<CustomStatus | 'All Orders', number>;

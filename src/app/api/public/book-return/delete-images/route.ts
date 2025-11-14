@@ -3,6 +3,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage } from "@/lib/firebase-admin";
+import { getBusinessIdForStore } from "@/lib/storage-helpers";
+
+const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,24 +19,48 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
+        const businessId = await getBusinessIdForStore(session.storeId);
+
         const bucket = storage.bucket();
+
+        // ✅ Determine paths to check
+        let foldersToCheck: string[] = [];
+        
+        if (session.storeId === SHARED_STORE_ID) {
+            // Shared store - check shared path
+            foldersToCheck.push(`return-images/shared/${session.storeId}/${orderId}/`);
+        } else if (businessId) {
+            // Regular store - check business path
+            foldersToCheck.push(`return-images/${businessId}/${session.storeId}/${orderId}/`);
+        }
+        
+        // Always check legacy path too
+        foldersToCheck.push(`return-images/${session.storeId}/${orderId}/`);
+        
         const folderPath = `return-images/${session.storeId}/${orderId}/`;
 
         try {
-            const [files] = await bucket.getFiles({ prefix: folderPath });
+            let allFiles: any[] = [];
             
-            if (files.length > 0) {
+            // Check all possible paths
+            for (const folderPath of foldersToCheck) {
+                const [files] = await bucket.getFiles({ prefix: folderPath });
+                allFiles = [...allFiles, ...files];
+            }
+            
+            if (allFiles.length > 0) {
                 await Promise.all(
-                    files.map(file => file.delete().catch(err => {
+                    allFiles.map(file => file.delete().catch((err: any) => {
                         console.warn(`Failed to delete file ${file.name}:`, err);
                     }))
                 );
-                console.log(`Deleted ${files.length} existing images from ${folderPath}`);
+                
+                console.log(`Deleted ${allFiles.length} images from ${foldersToCheck.length} locations`);
                 
                 return NextResponse.json({
                     success: true,
-                    deletedCount: files.length,
-                    message: `Successfully deleted ${files.length} existing images.`
+                    deletedCount: allFiles.length,
+                    message: `Successfully deleted ${allFiles.length} existing images.`
                 }, { status: 200 });
             } else {
                 return NextResponse.json({

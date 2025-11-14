@@ -2,37 +2,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 async function getXpressbeesToken(email: string, password: string): Promise<string> {
-    const response = await fetch('https://shipment.xpressbees.com/api/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-    });
+  const response = await fetch('https://shipment.xpressbees.com/api/users/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok || !data.data) {
-        console.error('Xpressbees auth failed:', data);
-        throw new Error(data.message || 'Incorrect email or password');
-    }
+  if (!response.ok || !data.data) {
+    console.error('Xpressbees auth failed:', data);
+    throw new Error(data.message || 'Incorrect email or password');
+  }
 
-    return data.data;
+  return data.data;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, email, password } = await req.json();
+    const { businessId, shop, email, password } = await req.json();
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     if (!shop) {
-        return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
+      return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -46,15 +50,15 @@ export async function POST(req: NextRequest) {
 
     const { memberDoc } = result;
     const memberRole = memberDoc?.data()?.role;
-    if(!memberRole) {
-      return NextResponse.json({error: 'No member role assigned, assign the member a role.'}, { status: 403});
+    if (!memberRole) {
+      return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
     }
-    
+
     let targetRef;
     if (memberRole === 'Vendor') {
-        targetRef = memberDoc?.ref;
+      targetRef = memberDoc?.ref;
     } else {
-        targetRef = db.collection('accounts').doc(shop);
+      targetRef = db.collection('accounts').doc(shop);
     }
 
     await targetRef.set({
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
             apiKey: token,
             lastUpdatedAt: FieldValue.serverTimestamp(),
           },
-          priorityList: FieldValue.arrayUnion({name: 'xpressbees', mode: 'Surface'}),
+          priorityList: FieldValue.arrayUnion({ name: 'xpressbees', mode: 'Surface' }),
         }
       },
     }, { merge: true });

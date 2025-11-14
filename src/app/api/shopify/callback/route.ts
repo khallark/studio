@@ -157,16 +157,10 @@ export async function GET(req: NextRequest) {
 
     if (userDoc.exists) {
       const userData = userDoc.data();
-      const isFirstAccount = !userData?.accounts || userData.accounts.length === 0;
       
       const updateData: { [key: string]: any } = {
-        accounts: FieldValue.arrayUnion(shop),
+        stores: FieldValue.arrayUnion(shop),
       };
-
-      if (isFirstAccount) {
-        updateData.primaryAccountId = shop;
-        updateData.activeAccountId = shop;
-      }
       
       await userRef.update(updateData);
     }

@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, auth as adminAuth } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { authUserForBusiness } from "@/lib/authoriseUser";
 
 export const runtime = "nodejs"; // required for firebase-admin
-
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const idToken = authHeader.split("Bearer ")[1];
-    try {
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-      return decodedToken.uid;
-    } catch (error) {
-      console.error("Error verifying auth token:", error);
-      return null;
-    }
-  }
-  return null;
-}
 
 function parseAwbs(raw: string): string[] {
   return raw
@@ -28,11 +14,19 @@ function parseAwbs(raw: string): string[] {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, count } = await req.json();
+    const { businessId, count } = await req.json();
 
-    if (!shop || count === undefined) {
+    if (!businessId || count === undefined) {
       return NextResponse.json({ error: "Shop and count are required" }, { status: 400 });
     }
+
+    const result = await authUserForBusiness({ businessId, req });
+
+    if (!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
+    }
+
     if (typeof count !== "number" || count < 0 || count > 500) {
       return NextResponse.json(
         { error: "Count must be a number between 0 and 500" },
@@ -44,29 +38,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ awbs: [], count: 0, added: 0, duplicates: 0 });
     }
 
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized: Could not identify user." },
-        { status: 401 }
-      );
-    }
+    const { businessDoc } = result;
 
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists || !Array.isArray(userDoc.data()?.accounts) || !userDoc.data()!.accounts.includes(shop)) {
-      return NextResponse.json(
-        { error: "Forbidden: User is not authorized for this shop." },
-        { status: 403 }
-      );
-    }
-
-    const accountRef = db.collection("accounts").doc(shop);
-    const accountDoc = await accountRef.get();
-    if (!accountDoc.exists) {
-      return NextResponse.json({ error: "Shop not found or not connected" }, { status: 404 });
-    }
-
-    const delhiveryApiKey = accountDoc.data()?.integrations?.couriers?.delhivery?.apiKey as
+    const delhiveryApiKey = businessDoc?.data()?.integrations?.couriers?.delhivery?.apiKey as
       | string
       | undefined;
     if (!delhiveryApiKey) {
@@ -104,42 +78,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-  // ---- FAST, NO-OVERWRITE INSERTION ----
-  const awbsRef = accountRef.collection("unused_awbs");
-  const writer = db.bulkWriter();  // no options supported for concurrency
+    // ---- FAST, NO-OVERWRITE INSERTION ----
+    const awbsRef = businessDoc?.ref?.collection("unused_awbs");
+    const writer = db.bulkWriter();  // no options supported for concurrency
 
-  let duplicates = 0;
+    let duplicates = 0;
 
-  writer.onWriteError((err) => {
-    // 'already-exists' (code 6) => skip, don't retry
-    if ((err as any).code === 6 || (err as any).code === "already-exists") {
-      duplicates++;
+    writer.onWriteError((err) => {
+      // 'already-exists' (code 6) => skip, don't retry
+      if ((err as any).code === 6 || (err as any).code === "already-exists") {
+        duplicates++;
+        return false;
+      }
+      // Retry other transient errors up to 3 times
+      if (err.failedAttempts < 3) return true;
       return false;
-    }
-    // Retry other transient errors up to 3 times
-    if (err.failedAttempts < 3) return true;
-    return false;
-  });
-
-  for (const awb of awbs) {
-    const docRef = awbsRef.doc(awb);
-    writer.create(docRef, {
-      status: "unused",
-      createdAt: FieldValue.serverTimestamp(),
     });
-  }
 
-  await writer.close();
+    for (const awb of awbs) {
+      const docRef = awbsRef?.doc(awb);
+      if(!docRef) continue;
+      writer.create(docRef, {
+        status: "unused",
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
 
-  const added = awbs.length - duplicates;
+    await writer.close();
 
-  return NextResponse.json({
-    awbs,
-    requested: count,
-    count: awbs.length,
-    added,
-    duplicates,
-  });
+    const added = awbs.length - duplicates;
+
+    return NextResponse.json({
+      awbs,
+      requested: count,
+      count: awbs.length,
+      added,
+      duplicates,
+    });
 
   } catch (error) {
     console.error("Error fetching AWBs:", error);

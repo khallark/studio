@@ -6,11 +6,24 @@ import { User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { CustomStatus } from './use-orders';
 
+/**
+ * Order mutations for business context
+ * 
+ * Changes from store-level version:
+ * - Takes businessId for cache invalidation (instead of storeId)
+ * - All API calls still work the same way
+ * - Cache invalidation now uses businessId to refresh all stores
+ */
+
 // ============================================================
 // MUTATION 1: UPDATE ORDER STATUS
 // ============================================================
 
-export function useUpdateOrderStatus(storeId: string | null, user: User | null | undefined) {
+export function useUpdateOrderStatus(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -25,7 +38,7 @@ export function useUpdateOrderStatus(storeId: string | null, user: User | null |
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderId, status }),
+        body: JSON.stringify({ businessId, shop: storeId, orderId, status }),
       });
 
       if (!response.ok) {
@@ -37,9 +50,9 @@ export function useUpdateOrderStatus(storeId: string | null, user: User | null |
     },
 
     onSuccess: () => {
-      // Invalidate all order-related queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      // ✅ Changed: Invalidate business-level queries instead of store-level
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Status Updated',
@@ -61,7 +74,11 @@ export function useUpdateOrderStatus(storeId: string | null, user: User | null |
 // MUTATION 2: REVERT ORDER STATUS
 // ============================================================
 
-export function useRevertOrderStatus(storeId: string | null, user: User | null | undefined) {
+export function useRevertOrderStatus(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -87,7 +104,7 @@ export function useRevertOrderStatus(storeId: string | null, user: User | null |
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderId }),
+        body: JSON.stringify({ businessId, shop: storeId, orderId }),
       });
 
       if (!response.ok) {
@@ -99,8 +116,8 @@ export function useRevertOrderStatus(storeId: string | null, user: User | null |
     },
 
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Status Reverted',
@@ -122,7 +139,11 @@ export function useRevertOrderStatus(storeId: string | null, user: User | null |
 // MUTATION 3: DISPATCH ORDERS
 // ============================================================
 
-export function useDispatchOrders(storeId: string | null, user: User | null | undefined) {
+export function useDispatchOrders(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -139,7 +160,7 @@ export function useDispatchOrders(storeId: string | null, user: User | null | un
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
       });
 
       if (!response.ok && response.status !== 207) {
@@ -151,8 +172,8 @@ export function useDispatchOrders(storeId: string | null, user: User | null | un
     },
 
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Dispatch Process Started',
@@ -183,7 +204,11 @@ export function useDispatchOrders(storeId: string | null, user: User | null | un
 // MUTATION 4: BULK UPDATE STATUS
 // ============================================================
 
-export function useBulkUpdateStatus(storeId: string | null, user: User | null | undefined) {
+export function useBulkUpdateStatus(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -206,7 +231,7 @@ export function useBulkUpdateStatus(storeId: string | null, user: User | null | 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds, status }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds, status }),
       });
 
       if (!response.ok) {
@@ -225,8 +250,8 @@ export function useBulkUpdateStatus(storeId: string | null, user: User | null | 
     },
 
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Bulk Update Successful',
@@ -248,7 +273,11 @@ export function useBulkUpdateStatus(storeId: string | null, user: User | null | 
 // MUTATION 5: ORDER SPLIT
 // ============================================================
 
-export function useOrderSplit(storeId: string | null, user: User | null | undefined) {
+export function useOrderSplit(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -263,20 +292,20 @@ export function useOrderSplit(storeId: string | null, user: User | null | undefi
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderId }),
+        body: JSON.stringify({ businessId, shop: storeId, orderId }),
       });
 
       if (!response.ok && response.status !== 207) {
         const result = await response.json();
-        throw new Error(result.details || 'Failed to split order');
+        throw new Error(result.error || 'Failed to split order');
       }
 
       return response.json();
     },
 
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Order Splitting Process Started',
@@ -307,7 +336,11 @@ export function useOrderSplit(storeId: string | null, user: User | null | undefi
 // MUTATION 6: RETURN BOOKING
 // ============================================================
 
-export function useReturnBooking(storeId: string | null, user: User | null | undefined) {
+export function useReturnBooking(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -330,6 +363,7 @@ export function useReturnBooking(storeId: string | null, user: User | null | und
           Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
+          businessId,
           shop: storeId,
           orderIds,
           pickupName: 'Majime Productions 2',
@@ -346,8 +380,8 @@ export function useReturnBooking(storeId: string | null, user: User | null | und
     },
 
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Return booking Process Started',
@@ -378,7 +412,7 @@ export function useReturnBooking(storeId: string | null, user: User | null | und
 // MUTATION 7: DELETE ORDER
 // ============================================================
 
-export function useDeleteOrder(storeId: string | null) {
+export function useDeleteOrder(businessId: string | null, storeId: string | null) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -389,7 +423,7 @@ export function useDeleteOrder(storeId: string | null) {
       const response = await fetch('/api/shopify/orders/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shop: storeId, orderId }),
+        body: JSON.stringify({ businessId, shop: storeId, orderId }),
       });
 
       if (!response.ok) {
@@ -401,8 +435,8 @@ export function useDeleteOrder(storeId: string | null) {
     },
 
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Order Deletion Initiated',
@@ -424,7 +458,11 @@ export function useDeleteOrder(storeId: string | null) {
 // MUTATION 8: DOWNLOAD SLIPS
 // ============================================================
 
-export function useDownloadSlips(storeId: string | null, user: User | null | undefined) {
+export function useDownloadSlips(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const { toast } = useToast();
 
   return useMutation({
@@ -445,7 +483,7 @@ export function useDownloadSlips(storeId: string | null, user: User | null | und
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
       });
 
       if (!response.ok) {
@@ -488,7 +526,11 @@ export function useDownloadSlips(storeId: string | null, user: User | null | und
 // MUTATION 9: DOWNLOAD EXCEL
 // ============================================================
 
-export function useDownloadExcel(storeId: string | null, user: User | null | undefined) {
+export function useDownloadExcel(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const { toast } = useToast();
 
   return useMutation({
@@ -509,7 +551,7 @@ export function useDownloadExcel(storeId: string | null, user: User | null | und
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
       });
 
       if (!response.ok) {
@@ -546,7 +588,11 @@ export function useDownloadExcel(storeId: string | null, user: User | null | und
 // MUTATION 10: DOWNLOAD PRODUCTS EXCEL
 // ============================================================
 
-export function useDownloadProductsExcel(storeId: string | null, user: User | null | undefined) {
+export function useDownloadProductsExcel(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const { toast } = useToast();
 
   return useMutation({
@@ -567,7 +613,7 @@ export function useDownloadProductsExcel(storeId: string | null, user: User | nu
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
       });
 
       if (!response.ok) {
@@ -604,7 +650,11 @@ export function useDownloadProductsExcel(storeId: string | null, user: User | nu
 // MUTATION 11: UPDATE SHIPPED STATUSES
 // ============================================================
 
-export function useUpdateShippedStatuses(storeId: string | null, user: User | null | undefined) {
+export function useUpdateShippedStatuses(
+  businessId: string | null,
+  storeId: string | null,
+  user: User | null | undefined
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -626,7 +676,7 @@ export function useUpdateShippedStatuses(storeId: string | null, user: User | nu
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ shop: storeId, orderIds }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
       });
 
       if (!response.ok) {
@@ -638,8 +688,8 @@ export function useUpdateShippedStatuses(storeId: string | null, user: User | nu
     },
 
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders', storeId] });
-      queryClient.invalidateQueries({ queryKey: ['orderCounts', storeId] });
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
 
       toast({
         title: 'Status Update Started',

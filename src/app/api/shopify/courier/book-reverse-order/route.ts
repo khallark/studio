@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendDTOBookedOrderWhatsAppMessage } from '../../../../../lib/communication/whatsappMessagesSendingFuncs';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -32,34 +33,34 @@ type LineItem = {
 
 /** Classify Delhivery create-shipment response */
 function evalDelhiveryResp(carrier: any): {
-    ok: boolean;
-    retryable: boolean;
-    code: string;
-    message: string;
-    carrierShipmentId?: string | null;
+  ok: boolean;
+  retryable: boolean;
+  code: string;
+  message: string;
+  carrierShipmentId?: string | null;
 } {
-    const remarksArr = carrier.packages[0].remarks;
-    let remarks = "";
-    if (Array.isArray(remarksArr)) remarks = remarksArr.join("\n ");
+  const remarksArr = carrier.packages[0].remarks;
+  let remarks = "";
+  if (Array.isArray(remarksArr)) remarks = remarksArr.join("\n ");
 
-    const okFlag = (carrier?.success === true);
+  const okFlag = (carrier?.success === true);
 
-    if (okFlag) {
+  if (okFlag) {
     return {
-        ok: true,
-        retryable: false,
-        code: "OK",
-        message: "created"
+      ok: true,
+      retryable: false,
+      code: "OK",
+      message: "created"
     };
-    }
+  }
 
-    // ----- Known permanent validation/business errors (non-retryable) -----
-    return {
+  // ----- Known permanent validation/business errors (non-retryable) -----
+  return {
     ok: false,
     retryable: false,
     code: "CARRIER_AMBIGUOUS",
     message: remarks,
-    };
+  };
 }
 
 const DLV_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json';
@@ -106,7 +107,7 @@ async function releaseAwb(shop: string, awb: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderId, variant_ids_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
+    const { businessId, shop, orderId, variant_ids_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
 
     // Validate inputs
     if (
@@ -122,42 +123,47 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Auth
-    const userId = await getUserIdFromToken(req);
-    if (!userId) {
-      return NextResponse.json({
-        ok: false,
-        reason: 'Unauthorized'
-    }, { status: 401 });
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    if (!result.authorised) {
+      const { error, status } = result;
+      return NextResponse.json({ error }, { status });
     }
 
     // Read account & API key
-    const accountRef = db.collection('accounts').doc(shop);
-    const accountSnap = await accountRef.get();
-    const accountData = accountSnap.data() as any;
-    if (!accountSnap.exists || !accountData) {
+    const { businessDoc } = result;
+    if (!businessDoc || !businessDoc.exists) {
       return NextResponse.json({
         ok: false,
         reason: 'Account Not found'
       }, { status: 404 });
     }
+
+    const businessData = businessDoc.data() as any;
+    if (!businessData) {
+      return NextResponse.json({
+        ok: false,
+        reason: 'Account Not found'
+      }, { status: 404 });
+    }
+
     const delhiveryApiKey =
-      accountData?.integrations?.couriers?.delhivery?.apiKey as string | undefined;
+      businessData?.integrations?.couriers?.delhivery?.apiKey as string | undefined;
     if (!delhiveryApiKey) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         ok: false,
         reason: 'Carrier Key missing'
-    }, { status: 400 });
+      }, { status: 400 });
     }
 
     // Read order
-    const orderRef = accountRef.collection('orders').doc(String(orderId));
+    const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
       return NextResponse.json({
         ok: false,
         reason: 'Order Not found'
-    }, { status: 404 });
+      }, { status: 404 });
     }
     const orderData = orderSnap.data() as any;
 
@@ -203,15 +209,15 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const products_desc = selected.length?
-    selected
-      .map(li => {
-        const name = li?.name || li?.title || "Item";
-        const qty = Number(li?.quantity ?? 1);
-        return `${name} x ${qty}`;
-      })
-      .join(', ').slice(0, 500)
-    : "";
+    const products_desc = selected.length ?
+      selected
+        .map(li => {
+          const name = li?.name || li?.title || "Item";
+          const qty = Number(li?.quantity ?? 1);
+          return `${name} x ${qty}`;
+        })
+        .join(', ').slice(0, 500)
+      : "";
 
     const totalQty = selected.reduce((sum, li) => sum + (li.quantity ?? 1), 0);
 
@@ -276,36 +282,38 @@ export async function POST(req: NextRequest) {
     const payload: any = {
       shipments: [shipment],
       pickup_location: { name: "Majime Productions 2" },
+      // pickup_location: { name: "Endora" },
+      // pickup_location: { name: "Sai arpan apartment" },
     };
 
     // Call Delhivery
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
     const respBody = await dlvResp.json();
-    if(!dlvResp.ok) {
-        await releaseAwb(shop, awb)
-        console.error(JSON.stringify(respBody))
-        return NextResponse.json(
+    if (!dlvResp.ok) {
+      await releaseAwb(shop, awb)
+      console.error(JSON.stringify(respBody))
+      return NextResponse.json(
         {
-            ok: false,
-            reason: JSON.stringify(respBody),
-            response: dlvResp
+          ok: false,
+          reason: JSON.stringify(respBody),
+          response: dlvResp
         },
         { status: 400 }
-        )
+      )
     }
-    
+
     const verdict = evalDelhiveryResp(respBody)
 
-    if(!verdict.ok) {
-        await releaseAwb(shop, awb)
-        return NextResponse.json(
+    if (!verdict.ok) {
+      await releaseAwb(shop, awb)
+      return NextResponse.json(
         {
-            ok: false,
-            reason: verdict.message,
-            response: dlvResp
+          ok: false,
+          reason: verdict.message,
+          response: dlvResp
         },
         { status: 400 }
-        )
+      )
     }
 
     const log = {
@@ -324,15 +332,15 @@ export async function POST(req: NextRequest) {
     }, { merge: true });
 
     console.log(payload)
-    
-    await sendDTOBookedOrderWhatsAppMessage(accountData, orderData);
+
+    await sendDTOBookedOrderWhatsAppMessage(businessData, orderData);
 
     return NextResponse.json(
-    {
+      {
         ok: true,
         response: respBody
-    },
-    { status: 200 }
+      },
+      { status: 200 }
     );
   } catch (error: any) {
     console.error('Reverse create failed:', error);

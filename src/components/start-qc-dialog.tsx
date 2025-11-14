@@ -19,6 +19,7 @@ import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
+import { getReturnImageUrl } from '@/lib/storage-helpers';
 
 type QcStatus = 'QC Pass' | 'QC Fail' | 'Not Received';
 
@@ -45,17 +46,19 @@ interface StartQcDialogProps {
   onClose: () => void;
   order: Order;
   shopId: string;
-  user: any;
+  businessId: any;
 }
 
-export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcDialogProps) {
+const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+
+export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: StartQcDialogProps) {
   const [qcStatuses, setQcStatuses] = useState<Record<string | number, QcStatus | null>>({});
   const [customerImageUrls, setCustomerImageUrls] = useState<string[]>([]);
   const [loadingImages, setLoadingImages] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const { toast } = useToast();
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -74,27 +77,41 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
     setRecordingTime(0);
 
     if (order.booked_return_images && order.booked_return_images.length > 0) {
-      setLoadingImages(true);
-      const fetchUrls = async () => {
-        const urls = await Promise.all(
-          order.booked_return_images!.map(async (imageName) => {
-            try {
-              const imageRef = ref(storage, `/return-images/${shopId}/${order.id}/${imageName}`);
-              return await getDownloadURL(imageRef);
-            } catch (error) {
-              console.error(`Failed to get download URL for ${imageName}`, error);
-              return null;
+    setLoadingImages(true);
+    const fetchUrls = async () => {
+      const urls = await Promise.all(
+        order.booked_return_images!.map(async (imageName) => {
+          try {
+            // ✅ Try appropriate path based on store
+            let imageRef;
+            if (shopId === SHARED_STORE_ID) {
+              imageRef = ref(storage, `return-images/shared/${shopId}/${order.id}/${imageName}`);
+            } else {
+              imageRef = ref(storage, `return-images/${businessId}/${shopId}/${order.id}/${imageName}`);
             }
-          })
-        );
-        setCustomerImageUrls(urls.filter((url): url is string => url !== null));
-        setLoadingImages(false);
-      };
-      fetchUrls();
-    } else {
+            
+            try {
+              return await getDownloadURL(imageRef);
+            } catch (err: any) {
+              // Fallback to legacy path
+              if (err.code === 'storage/object-not-found') {
+                const legacyRef = ref(storage, `return-images/${shopId}/${order.id}/${imageName}`);
+                return await getDownloadURL(legacyRef);
+              }
+              throw err;
+            }
+          } catch (error) {
+            console.error(`Failed to get download URL for ${imageName}`, error);
+            return null;
+          }
+        })
+      );
+      setCustomerImageUrls(urls.filter((url): url is string => url !== null));
       setLoadingImages(false);
-    }
-  }, [order, shopId]);
+    };
+    fetchUrls();
+  }
+}, [order, shopId, businessId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -107,13 +124,13 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       if (!isOpen) return;
       try {
         // OPTIMIZED: Lower resolution and frame rate for faster uploads
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 640 },      // Reduced from 1280
             height: { ideal: 480 },     // Reduced from 720
             frameRate: { ideal: 15 }    // Reduced from 24
           },
-          audio: true 
+          audio: true
         });
         setHasCameraPermission(true);
 
@@ -144,9 +161,9 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
           const newTime = prev + 1;
           if (newTime >= 180) {
             stopRecording();
-            toast({ 
-              title: 'Recording Complete', 
-              description: 'Maximum recording time reached (3 minutes).' 
+            toast({
+              title: 'Recording Complete',
+              description: 'Maximum recording time reached (3 minutes).'
             });
           }
           return newTime;
@@ -165,7 +182,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
   const startRecording = () => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      
+
       // OPTIMIZED: Much more aggressive compression for faster uploads
       const compressionOptions = [
         {
@@ -186,7 +203,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       ];
 
       let mediaRecorder: MediaRecorder | null = null;
-      
+
       for (const options of compressionOptions) {
         try {
           if (MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -219,14 +236,14 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       mediaRecorder.ondataavailable = (event) => {
         chunks.push(event.data);
       };
-      
+
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'video/webm' });
         const sizeMB = blob.size / (1024 * 1024);
         console.log(`Recorded video size: ${sizeMB.toFixed(2)} MB`);
         setRecordedVideo(blob);
       };
-      
+
       // OPTIMIZED: Request data in chunks for better memory management
       mediaRecorder.start(1000); // Get data every second
       setIsRecording(true);
@@ -258,14 +275,24 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       toast({ title: 'Uploading video...', description: 'This may take a moment.' });
 
       const fileName = `unboxing_video_${Date.now()}.webm`;
-      const filePath = `return-images/${shopId}/${order.id}/${fileName}`;
+
+      // ✅ Use appropriate path based on store
+      let filePath: string;
+      if (shopId === SHARED_STORE_ID) {
+        filePath = `return-images/shared/${shopId}/${order.id}/${fileName}`;
+      } else {
+        filePath = `return-images/${businessId}/${shopId}/${order.id}/${fileName}`;
+      }
+
+      console.log(`Uploading QC video to: ${filePath}`);
+
       const videoStorageRef = storageRef(storage, filePath);
-      
+
       const uploadTask = uploadBytesResumable(videoStorageRef, recordedVideo, {
         contentType: 'video/webm',
       });
 
-      uploadTask.on('state_changed', 
+      uploadTask.on('state_changed',
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
@@ -294,7 +321,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          shopId,
+          businessId,
+          shop: shopId,
           orderId: order.id,
           qcStatuses,
           videoPath: filePath,
@@ -318,17 +346,17 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
       onClose();
     } catch (error) {
       console.error('QC submission error:', error);
-      toast({ 
-        title: 'Submission Failed', 
-        description: error instanceof Error ? error.message : 'An unknown error occurred', 
-        variant: 'destructive' 
+      toast({
+        title: 'Submission Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);
     }
   };
-  
+
   const customerRequestedItems = order.returnItemsVariantIds
     ? order.raw.line_items.filter(li => order.returnItemsVariantIds!.includes(li.variant_id))
     : [];
@@ -383,19 +411,19 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
               <section>
                 <h3 className="font-semibold mb-3">2. Customer Images</h3>
                 {loadingImages ? (
-                    <Loader2 className="animate-spin" />
+                  <Loader2 className="animate-spin" />
                 ) : order.booked_return_images && order.booked_return_images.length > 0 ? (
-                    customerImageUrls.length > 0 ? (
+                  customerImageUrls.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {customerImageUrls.map((url, index) => (
+                      {customerImageUrls.map((url, index) => (
                         <div key={index} className="relative aspect-square">
-                            <Image src={url} alt={`Customer image ${index + 1}`} fill style={{ objectFit: 'cover' }} className="rounded-md" />
+                          <Image src={url} alt={`Customer image ${index + 1}`} fill style={{ objectFit: 'cover' }} className="rounded-md" />
                         </div>
-                        ))}
+                      ))}
                     </div>
-                    ) : <p className="text-sm text-muted-foreground">Could not load customer images.</p>
+                  ) : <p className="text-sm text-muted-foreground">Could not load customer images.</p>
                 ) : (
-                    <p className="text-sm text-muted-foreground">No customer images were provided for this return.</p>
+                  <p className="text-sm text-muted-foreground">No customer images were provided for this return.</p>
                 )}
               </section>
             </div>
@@ -404,78 +432,78 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
             <div className="space-y-6">
               {/* Reference Information */}
               <section className="space-y-4 text-sm text-muted-foreground">
-                  <h3 className="font-semibold text-foreground mb-2">2. Reference Information</h3>
-                  {customerRequestedItems.length > 0 ? (
-                    <div>
-                        <h4 className="font-medium">Customer Requested Items:</h4>
-                        <ul className="list-disc list-inside">
-                        {customerRequestedItems.map(item => <li key={item.id}>{item.title} (Qty: {item.quantity})</li>)}
-                        </ul>
-                    </div>
-                  ) : (
-                    <p>This order was manually booked for return, so no customer-requested items can be shown.</p>
-                  )}
-                  {order.booked_return_reason && (
-                     <div>
-                        <h4 className="font-medium">Reason for Return:</h4>
-                        <p>{order.booked_return_reason}</p>
-                     </div>
-                  )}
+                <h3 className="font-semibold text-foreground mb-2">2. Reference Information</h3>
+                {customerRequestedItems.length > 0 ? (
+                  <div>
+                    <h4 className="font-medium">Customer Requested Items:</h4>
+                    <ul className="list-disc list-inside">
+                      {customerRequestedItems.map(item => <li key={item.id}>{item.title} (Qty: {item.quantity})</li>)}
+                    </ul>
+                  </div>
+                ) : (
+                  <p>This order was manually booked for return, so no customer-requested items can be shown.</p>
+                )}
+                {order.booked_return_reason && (
+                  <div>
+                    <h4 className="font-medium">Reason for Return:</h4>
+                    <p>{order.booked_return_reason}</p>
+                  </div>
+                )}
               </section>
 
               {/* Video Recording */}
               <section>
                 <h3 className="font-semibold mb-3">3. Record Unboxing Video</h3>
-                 {hasCameraPermission === false ? (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Camera Access Denied</AlertTitle>
-                      <AlertDescription>
-                        Please enable camera permissions in your browser to record a video.
-                      </AlertDescription>
-                    </Alert>
+                {hasCameraPermission === false ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Camera Access Denied</AlertTitle>
+                    <AlertDescription>
+                      Please enable camera permissions in your browser to record a video.
+                    </AlertDescription>
+                  </Alert>
                 ) : (
-                <div className="space-y-2">
-                  <div className="bg-black rounded-md overflow-hidden aspect-video">
-                    <video ref={videoRef} className="w-full h-full" autoPlay muted playsInline />
-                  </div>
-                  
-                  {isRecording && (
-                    <div className="text-sm text-muted-foreground text-center">
-                      Recording: {formatTime(recordingTime)}
-                      {recordingTime > 150 && <span className="text-yellow-600 ml-2">(30 seconds remaining)</span>}
+                  <div className="space-y-2">
+                    <div className="bg-black rounded-md overflow-hidden aspect-video">
+                      <video ref={videoRef} className="w-full h-full" autoPlay muted playsInline />
                     </div>
-                  )}
 
-                  {recordedVideo ? (
-                    <div className="flex items-center gap-2">
-                      <Button onClick={() => setRecordedVideo(null)} variant="outline" className="w-full">
-                        Re-record Video
+                    {isRecording && (
+                      <div className="text-sm text-muted-foreground text-center">
+                        Recording: {formatTime(recordingTime)}
+                        {recordingTime > 150 && <span className="text-yellow-600 ml-2">(30 seconds remaining)</span>}
+                      </div>
+                    )}
+
+                    {recordedVideo ? (
+                      <div className="flex items-center gap-2">
+                        <Button onClick={() => setRecordedVideo(null)} variant="outline" className="w-full">
+                          Re-record Video
+                        </Button>
+                      </div>
+                    ) : isRecording ? (
+                      <Button onClick={stopRecording} className="w-full">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Stop Recording
                       </Button>
-                    </div>
-                  ) : isRecording ? (
-                    <Button onClick={stopRecording} className="w-full">
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Stop Recording
-                    </Button>
-                  ) : (
-                    <Button onClick={startRecording} className="w-full" disabled={!hasCameraPermission}>
-                      <Camera className="mr-2 h-4 w-4" />
-                      Start Recording
-                    </Button>
-                  )}
-                  {recordedVideo && (
-                     <div className="mt-4">
+                    ) : (
+                      <Button onClick={startRecording} className="w-full" disabled={!hasCameraPermission}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Start Recording
+                      </Button>
+                    )}
+                    {recordedVideo && (
+                      <div className="mt-4">
                         <h4 className="font-medium mb-2">Recorded Video Preview:</h4>
                         <video src={URL.createObjectURL(recordedVideo)} controls className="w-full rounded-md" />
                         <p className="text-sm text-muted-foreground mt-1">
                           Size: {(recordedVideo.size / (1024 * 1024)).toFixed(2)} MB
                           <span className="text-green-600 ml-2">✓ Optimized for fast upload</span>
                         </p>
-                    </div>
-                  )}
-                </div>
-                 )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
             </div>
           </div>
@@ -488,8 +516,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, user }: StartQcD
                 <span>{uploadProgress.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>

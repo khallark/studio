@@ -202,6 +202,10 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/courier/delete/route',
       },
       {
+        source: '/api/auth/set-business-claims',
+        destination: '/api/auth/set-business-claims/route',
+      },
+      {
         source: '/api/test',
         destination: '/api/test/route',
       }

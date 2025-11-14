@@ -5,7 +5,9 @@ import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage, db } from "@/lib/firebase-admin";
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from "firebase-admin/firestore";
+import { getBusinessIdForStore, getReturnImagesPath } from "@/lib/storage-helpers";
 
+const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = [
     'image/jpeg',
@@ -53,6 +55,17 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
+        // ✅ Lookup businessId (null for shared store)
+        const businessId = await getBusinessIdForStore(session.storeId);
+        
+        // For shared store, businessId will be null, which is fine
+        if (!businessId && session.storeId !== SHARED_STORE_ID) {
+            console.error(`Could not find business for store: ${session.storeId}`);
+            return NextResponse.json({ 
+                error: 'Store configuration error. Please contact support.' 
+            }, { status: 500 });
+        }
+        
         // Convert File to Buffer
         const arrayBuffer = await imageFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -60,8 +73,17 @@ export async function POST(req: NextRequest) {
         // Generate unique filename
         const fileExtension = imageFile.name.split('.').pop() || 'jpg';
         const uniqueFileName = `${session.storeId}_${orderId}_${uuidv4()}.${fileExtension}`;
-        const filePath = `return-images/${session.storeId}/${orderId}/${uniqueFileName}`;
 
+        // ✅ Get appropriate path (shared or business-specific)
+        const filePath = getReturnImagesPath(
+            businessId,
+            session.storeId,
+            orderId,
+            uniqueFileName
+        );
+
+        console.log(`Uploading to path: ${filePath}`);
+        
         // Upload to Firebase Storage
         const bucket = storage.bucket();
         const file = bucket.file(filePath);

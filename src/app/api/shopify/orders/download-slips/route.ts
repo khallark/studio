@@ -4,7 +4,7 @@ import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage } from 'pdf-lib';
 import bwip from 'bwip-js';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-import { authUserForStore } from '@/lib/authoriseUserForStore';
+import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
 
 
 // --- Typography scale ---
@@ -456,54 +456,43 @@ async function createSlipPage(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* -------------------- Handler -------------------- */
 export async function POST(req: NextRequest) {
   try {
-    const { shop, orderIds } = await req.json();
+    const { businessId, shop, orderIds } = await req.json();
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
 
     if (!shop || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json({ error: 'Shop and a non-empty array of orderIds are required' }, { status: 400 });
     }
 
     // ----- Auth -----
-    const result = await authUserForStore({ shop, req });
-        
-    if(!result.authorised) {
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+
+    const businessData = result.businessDoc?.data();
+
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
 
     const { shopDoc } = result;
-    const shopData = shopDoc?.data() || {};
     const sellerDetails = {
       name:
-        shopData?.companyName ||
-        shopData?.businessName ||
-        shopData?.primaryContact?.name ||
+        businessData?.companyName ||
+        businessData?.businessName ||
+        businessData?.primaryContact?.name ||
         'Majime Technologies', // sensible default
-      gst: shopData?.gstin || shopData?.gst || 'NOT_CONFIGURED',
+      gst: businessData?.gstin || businessData?.gst || 'NOT_CONFIGURED',
       returnAddress: [
-        shopData?.companyAddress?.address,
-        shopData?.companyAddress?.city,
-        shopData?.companyAddress?.state,
-        shopData?.companyAddress?.pincode,
-        shopData?.companyAddress?.country,
+        businessData?.companyAddress?.address,
+        businessData?.companyAddress?.city,
+        businessData?.companyAddress?.state,
+        businessData?.companyAddress?.pincode,
+        businessData?.companyAddress?.country,
       ]
         .filter(Boolean)
         .join(', '),
@@ -539,6 +528,14 @@ export async function POST(req: NextRequest) {
     const pages: PDFPage[] = [];
     for (const d of allDocs) {
       const order = d.data();
+      if (shop === SHARED_STORE_ID) {
+        const vendorName = businessData?.vendorName;
+        const vendors = order?.vendors;
+        const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+        if (!canProcess.authorised) {
+          continue;
+        }
+      }
       const page = await createSlipPage(pdfDoc, { regular: bold, bold }, order, sellerDetails);
       pages.push(page);
     }

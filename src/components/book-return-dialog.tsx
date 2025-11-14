@@ -38,9 +38,10 @@ interface BookReturnDialogProps {
   order: Order;
   shopId: string;
   user: any; // Firebase user object
+  businessId: string;
 }
 
-export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookReturnDialogProps) {
+export function BookReturnDialog({ isOpen, onClose, order, shopId, user, businessId }: BookReturnDialogProps) {
   const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -91,6 +92,15 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
       return;
     }
 
+    if(!businessId) {
+      toast({ 
+        title: "Auth Error", 
+        description: "Business not found.", 
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!user) {
       toast({ 
         title: "Auth Error", 
@@ -115,6 +125,7 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user }: BookR
           'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify({
+          businessId,
           shop: shopId,
           orderId: order.id,
           variant_ids_of_selected_line_items_to_be_returned: Array.from(selectedVariantIds),

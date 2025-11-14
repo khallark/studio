@@ -2,16 +2,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
 
 // ============================================================
-// HOOK WITH REAL-TIME UPDATES
+// HOOK WITH REAL-TIME UPDATES - Business-wide aggregation
 // ============================================================
 
-export function useOrderCounts(storeId: string | null) {
+export function useOrderCounts(businessId: string | null, stores: string[]) {
   const [counts, setCounts] = useState<StatusCounts>({
     'All Orders': 0,
     'New': 0,
@@ -38,60 +38,111 @@ export function useOrderCounts(storeId: string | null) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!storeId) {
+    if (!businessId || !stores || stores.length === 0) {
       setIsLoading(false);
       return;
     }
 
-    console.log('🔄 Setting up real-time listener for order counts');
-    const metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
+    console.log(`📊 Setting up real-time listeners for ${stores.length} stores`);
 
-    // ✅ Real-time listener
-    const unsubscribe = onSnapshot(
-      metadataRef,
-      
-      // Success callback
-      async (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          console.log('✅ Real-time counts update from metadata');
-          setCounts(data.counts as StatusCounts);
-          setError(null);
-        } else {
-          // ⚠️ Metadata doesn't exist yet - calculate on the fly
-          console.warn('⚠️ Metadata document missing, calculating counts...');
-          try {
-            const calculatedCounts = await calculateCounts(storeId);
-            setCounts(calculatedCounts);
-            setError(null);
-          } catch (err) {
-            console.error('❌ Failed to calculate counts:', err);
-            setError(err as Error);
-          }
-        }
-        setIsLoading(false);
-      },
-      
-      // Error callback
-      (err) => {
-        console.error('❌ Error listening to order counts:', err);
-        setError(err as Error);
-        setIsLoading(false);
-      }
-    );
+    // Create unsubscribe functions for each store
+    const unsubscribes: (() => void)[] = [];
+    
+    // Map to store each store's counts
+    const storeCounts = new Map<string, StatusCounts>();
 
-    // ✅ Cleanup listener on unmount
-    return () => {
-      console.log('🧹 Cleaning up order counts listener');
-      unsubscribe();
+    // Function to aggregate all store counts
+    const aggregateCounts = () => {
+      const aggregated: StatusCounts = {
+        'All Orders': 0,
+        'New': 0,
+        'Confirmed': 0,
+        'Ready To Dispatch': 0,
+        'Dispatched': 0,
+        'In Transit': 0,
+        'Out For Delivery': 0,
+        'Delivered': 0,
+        'RTO In Transit': 0,
+        'RTO Delivered': 0,
+        'DTO Requested': 0,
+        'DTO Booked': 0,
+        'DTO In Transit': 0,
+        'DTO Delivered': 0,
+        'Pending Refunds': 0,
+        'Lost': 0,
+        'Closed': 0,
+        'RTO Closed': 0,
+        'Cancellation Requested': 0,
+        'Cancelled': 0,
+      };
+
+      storeCounts.forEach((storeCounts) => {
+        (Object.keys(aggregated) as Array<keyof StatusCounts>).forEach((key) => {
+          aggregated[key] += storeCounts[key] || 0;
+        });
+      });
+
+      setCounts(aggregated);
+      setIsLoading(false);
     };
-  }, [storeId]);
+
+    // Set up listener for each store
+    stores.forEach((storeId) => {
+      const metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
+
+      const unsubscribe = onSnapshot(
+        metadataRef,
+        
+        async (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            storeCounts.set(storeId, data.counts as StatusCounts);
+            console.log(`✅ Counts update from store: ${storeId}`);
+          } else {
+            // Fallback: calculate counts for this store
+            console.warn(`⚠️ Metadata missing for store: ${storeId}, calculating...`);
+            try {
+              const calculatedCounts = await calculateCounts(storeId);
+              storeCounts.set(storeId, calculatedCounts);
+            } catch (err) {
+              console.error(`❌ Failed to calculate counts for ${storeId}:`, err);
+              // Set zeros for this store to avoid blocking other stores
+              storeCounts.set(storeId, {
+                'All Orders': 0, 'New': 0, 'Confirmed': 0, 'Ready To Dispatch': 0,
+                'Dispatched': 0, 'In Transit': 0, 'Out For Delivery': 0, 'Delivered': 0,
+                'RTO In Transit': 0, 'RTO Delivered': 0, 'DTO Requested': 0, 'DTO Booked': 0,
+                'DTO In Transit': 0, 'DTO Delivered': 0, 'Pending Refunds': 0, 'Lost': 0,
+                'Closed': 0, 'RTO Closed': 0, 'Cancellation Requested': 0, 'Cancelled': 0,
+              });
+            }
+          }
+          
+          // Aggregate after each store update
+          aggregateCounts();
+          setError(null);
+        },
+        
+        (err) => {
+          console.error(`❌ Error listening to counts for ${storeId}:`, err);
+          setError(err as Error);
+        }
+      );
+
+      unsubscribes.push(unsubscribe);
+    });
+
+    // Cleanup all listeners on unmount
+    return () => {
+      console.log('🧹 Cleaning up order counts listeners');
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [businessId, stores]);
 
   return { data: counts, isLoading, error };
 }
 
 // ============================================================
-// FALLBACK: CALCULATE COUNTS (ONLY IF METADATA MISSING)
+// FALLBACK: CALCULATE COUNTS FOR A SINGLE STORE
 // ============================================================
 
 async function calculateCounts(storeId: string): Promise<StatusCounts> {
@@ -141,9 +192,5 @@ async function calculateCounts(storeId: string): Promise<StatusCounts> {
   counts['All Orders'] = allOrdersCount;
   return counts;
 }
-
-// ============================================================
-// EXPORTS
-// ============================================================
 
 export type { StatusCounts, CustomStatus };

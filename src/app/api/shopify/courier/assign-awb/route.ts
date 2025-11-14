@@ -1,13 +1,14 @@
 // apps/web/src/app/api/shipments/bulk-create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { authUserForStore } from "@/lib/authoriseUserForStore";
+import { authUserForBusinessAndStore } from "@/lib/authoriseUser";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     // ----- Input -----
-    const { shop, orders, courier, pickupName, shippingMode } = (await req.json()) as {
+    const { businessId, shop, orders, courier, pickupName, shippingMode } = (await req.json()) as {
+      businessId: string;
       shop: string;
       orders: Array<{ orderId: string, name: string }>;
       courier?: string;
@@ -15,13 +16,17 @@ export async function POST(req: NextRequest) {
       shippingMode?: string
     };
 
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
+    }
+
     if (!shop || !courier || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
     }
 
-    const result = await authUserForStore({ shop, req });
+    const result = await authUserForBusinessAndStore({ businessId, shop, req });
 
-    if(!result.authorised) {
+    if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         "X-Api-Key": secret,
       },
-      body: JSON.stringify({shop, orders, courier, pickupName, shippingMode, requestedBy: result.userId}),
+      body: JSON.stringify({ businessId, shop, orders, courier, pickupName, shippingMode, requestedBy: result.userId }),
     });
 
     const json = await resp.json();

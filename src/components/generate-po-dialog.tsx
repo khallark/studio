@@ -29,10 +29,11 @@ interface GeneratePODialogProps {
   onClose: () => void;
   selectedOrders: Order[];
   shopId: string;
+  businessId: string
   user: any;
 }
 
-export function GeneratePODialog({ isOpen, onClose, selectedOrders, shopId, user }: GeneratePODialogProps) {
+export function GeneratePODialog({ isOpen, onClose, selectedOrders, shopId, user, businessId }: GeneratePODialogProps) {
   const [selectedVendor, setSelectedVendor] = useState<string>('');
   const [poNumber, setPoNumber] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -86,6 +87,7 @@ export function GeneratePODialog({ isOpen, onClose, selectedOrders, shopId, user
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
+          businessId,
           shop: shopId,
           vendor: selectedVendor,
           poNumber: poNumber.trim(),

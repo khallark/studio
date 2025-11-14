@@ -10,6 +10,7 @@ export async function GET(
     // Verify authentication
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
       return NextResponse.json(
         { error: 'Missing or invalid authorization header' },
         { status: 401 }
@@ -23,6 +24,7 @@ export async function GET(
     const { businessId } = params;
 
     if (!businessId || businessId === 'undefined') {
+      console.error('Invalid business ID');
       return NextResponse.json(
         { error: 'Invalid business ID' },
         { status: 400 }
@@ -34,6 +36,7 @@ export async function GET(
     const businessDoc = await businessRef.get();
 
     if (!businessDoc.exists) {
+      console.error('Business not found');
       return NextResponse.json(
         { error: 'Business not found' },
         { status: 404 }
@@ -43,8 +46,10 @@ export async function GET(
     // Check if current user is a member of this business
     const memberRef = businessRef.collection('members').doc(currentUserId);
     const memberDoc = await memberRef.get();
+    const isAuthorized = (currentUserId === businessId) || (memberDoc && memberDoc.exists && memberDoc.data()?.status === 'active');
 
-    if (!memberDoc.exists) {
+    if (!isAuthorized) {
+      console.error('User is not a member of this business');
       return NextResponse.json(
         { error: 'User is not a member of this business' },
         { status: 403 }

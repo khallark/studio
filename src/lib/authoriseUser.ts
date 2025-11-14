@@ -94,7 +94,7 @@ export async function authUserForBusiness({ businessId, req }: BusinessAuthParam
         const memberRef = businessRef.collection('members').doc(userId);
         const memberDoc = await memberRef.get();
 
-        const isAuthorized = (memberDoc && memberDoc.exists && memberDoc.data()?.status === 'active');
+        const isAuthorized = (userId === businessId) || (memberDoc && memberDoc.exists && memberDoc.data()?.status === 'active');
         if (!isAuthorized) {
             return {
                 authorised: false,

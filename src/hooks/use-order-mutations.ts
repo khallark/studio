@@ -21,14 +21,13 @@ import { CustomStatus } from './use-orders';
 
 export function useUpdateOrderStatus(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: CustomStatus }) => {
+    mutationFn: async ({ orderId, status, storeId }: { orderId: string; status: CustomStatus; storeId: string | null; }) => {
       if (!storeId || !user) throw new Error('Missing storeId or user');
 
       const idToken = await user.getIdToken();
@@ -76,7 +75,6 @@ export function useUpdateOrderStatus(
 
 export function useRevertOrderStatus(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
@@ -86,9 +84,11 @@ export function useRevertOrderStatus(
     mutationFn: async ({
       orderId,
       revertTo,
+      storeId
     }: {
       orderId: string;
       revertTo: 'Confirmed' | 'Delivered';
+      storeId: string | null;
     }) => {
       if (!storeId || !user) throw new Error('Missing storeId or user');
 
@@ -141,14 +141,16 @@ export function useRevertOrderStatus(
 
 export function useDispatchOrders(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId, }: {
+      orderIds: string[];
+      storeId: string | null;
+    }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -206,7 +208,6 @@ export function useDispatchOrders(
 
 export function useBulkUpdateStatus(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
@@ -216,9 +217,11 @@ export function useBulkUpdateStatus(
     mutationFn: async ({
       orderIds,
       status,
+      storeId,
     }: {
       orderIds: string[];
       status: CustomStatus;
+      storeId: string | null;
     }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
@@ -275,14 +278,13 @@ export function useBulkUpdateStatus(
 
 export function useOrderSplit(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderId: string) => {
+    mutationFn: async ({ orderId, storeId }: { orderId: string; storeId: string | null; }) => {
       if (!storeId || !user || !orderId) throw new Error('Invalid parameters');
 
       const idToken = await user.getIdToken();
@@ -338,14 +340,13 @@ export function useOrderSplit(
 
 export function useReturnBooking(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -460,13 +461,12 @@ export function useDeleteOrder(businessId: string | null, storeId: string | null
 
 export function useDownloadSlips(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -528,13 +528,12 @@ export function useDownloadSlips(
 
 export function useDownloadExcel(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -590,13 +589,12 @@ export function useDownloadExcel(
 
 export function useDownloadProductsExcel(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -652,14 +650,13 @@ export function useDownloadProductsExcel(
 
 export function useUpdateShippedStatuses(
   businessId: string | null,
-  storeId: string | null,
   user: User | null | undefined
 ) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (orderIds: string[]) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }

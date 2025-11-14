@@ -200,17 +200,17 @@ export default function BusinessOrdersPage() {
     // Create mutation hooks for each selected order's store
     // Note: This is a simplified approach. For bulk operations across stores,
     // you might need to group by storeId and call mutations per store.
-    const updateStatus = (storeId: string) => useUpdateOrderStatus(businessId, storeId, user);
-    const revertStatus = (storeId: string) => useRevertOrderStatus(businessId, storeId, user);
-    const dispatchOrders = (storeId: string) => useDispatchOrders(businessId, storeId, user);
-    const bulkUpdate = (storeId: string) => useBulkUpdateStatus(businessId, storeId, user);
-    const splitOrder = (storeId: string) => useOrderSplit(businessId, storeId, user);
-    const bookReturn = (storeId: string) => useReturnBooking(businessId, storeId, user);
-    const deleteOrder = (storeId: string) => useDeleteOrder(businessId, storeId);
-    const downloadSlips = (storeId: string) => useDownloadSlips(businessId, storeId, user);
-    const downloadExcel = (storeId: string) => useDownloadExcel(businessId, storeId, user);
-    const downloadProductsExcel = (storeId: string) => useDownloadProductsExcel(businessId, storeId, user);
-    const updateShippedStatuses = (storeId: string) => useUpdateShippedStatuses(businessId, storeId, user);
+    const updateStatus = useUpdateOrderStatus(businessId, user);
+    const revertStatus = useRevertOrderStatus(businessId, user);
+    const dispatchOrders = useDispatchOrders(businessId, user);
+    const bulkUpdate = useBulkUpdateStatus(businessId, user);
+    const splitOrder = useOrderSplit(businessId, user);
+    const bookReturn = useReturnBooking(businessId, user);
+    // const deleteOrder = useDeleteOrder(businessId, storeId);
+    const downloadSlips = useDownloadSlips(businessId, user);
+    const downloadExcel = useDownloadExcel(businessId, user);
+    const downloadProductsExcel = useDownloadProductsExcel(businessId, user);
+    const updateShippedStatuses = useUpdateShippedStatuses(businessId, user);
 
     // ============================================================
     // MUTATION HANDLERS
@@ -220,16 +220,16 @@ export default function BusinessOrdersPage() {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = updateStatus(storeId);
-        mutation.mutate({ orderId, status });
+        const mutation = updateStatus;
+        mutation.mutate({ orderId, status, storeId });
     };
 
     const handleRevertStatus = (orderId: string, revertTo: 'Confirmed' | 'Delivered') => {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = revertStatus(storeId);
-        mutation.mutate({ orderId, revertTo });
+        const mutation = revertStatus;
+        mutation.mutate({ orderId, revertTo, storeId });
     };
 
     const handleDispatch = (orderIds: string[]) => {
@@ -251,8 +251,8 @@ export default function BusinessOrdersPage() {
 
         // Dispatch for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = dispatchOrders(storeId);
-            mutation.mutate(storeOrderIds, {
+            const mutation = dispatchOrders;
+            mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -287,8 +287,8 @@ export default function BusinessOrdersPage() {
             const totalStores = ordersByStore.size;
 
             ordersByStore.forEach((storeOrderIds, storeId) => {
-                const mutation = bookReturn(storeId);
-                mutation.mutate(storeOrderIds, {
+                const mutation = bookReturn;
+                mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                     onSuccess: () => {
                         completedStores++;
                         if (completedStores === totalStores) {
@@ -317,8 +317,8 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = bulkUpdate(storeId);
-            mutation.mutate({ orderIds: storeOrderIds, status }, {
+            const mutation = bulkUpdate;
+            mutation.mutate({ orderIds: storeOrderIds, status, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -333,8 +333,8 @@ export default function BusinessOrdersPage() {
         const storeId = getOrderStoreId(orderId);
         if (!storeId) return;
 
-        const mutation = splitOrder(storeId);
-        mutation.mutate(orderId);
+        const mutation = splitOrder;
+        mutation.mutate({ orderId, storeId });
     };
 
     const handleDownloadSlips = () => {
@@ -359,8 +359,8 @@ export default function BusinessOrdersPage() {
 
         // Download for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadSlips(storeId);
-            mutation.mutate(storeOrderIds, {
+            const mutation = downloadSlips;
+            mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -392,8 +392,8 @@ export default function BusinessOrdersPage() {
 
         // Download for each store
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadExcel(storeId);
-            mutation.mutate(storeOrderIds, {
+            const mutation = downloadExcel;
+            mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -424,8 +424,8 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = downloadProductsExcel(storeId);
-            mutation.mutate(storeOrderIds, {
+            const mutation = downloadProductsExcel;
+            mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -456,8 +456,8 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            const mutation = updateShippedStatuses(storeId);
-            mutation.mutate(storeOrderIds, {
+            const mutation = updateShippedStatuses;
+            mutation.mutate({ orderIds: storeOrderIds, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {

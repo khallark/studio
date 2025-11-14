@@ -80,19 +80,19 @@ export default function BusinessLayout({
     shippingMode: string
   ) => {
     if (!user) {
-      toast({ 
-        title: "Authentication Error", 
-        description: "You must be logged in.", 
-        variant: "destructive" 
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in.",
+        variant: "destructive"
       });
       return;
     }
 
     if (!businessId) {
-      toast({ 
-        title: "Business Error", 
-        description: "Could not find business ID.", 
-        variant: "destructive" 
+      toast({
+        title: "Business Error",
+        description: "Could not find business ID.",
+        variant: "destructive"
       });
       return;
     }
@@ -112,7 +112,7 @@ export default function BusinessLayout({
     }, {} as Record<string, typeof ordersToProcess>);
 
     const storeIds = Object.keys(ordersByStore);
-    
+
     if (storeIds.length === 0) {
       toast({
         title: "No Valid Orders",
@@ -138,12 +138,12 @@ export default function BusinessLayout({
     // ✅ STEP 3: Make parallel API calls for each store
     try {
       const idToken = await user.getIdToken();
-      
+
       const apiCalls = storeIds.map(async (shopId) => {
         const storeOrders = ordersByStore[shopId];
-        
+
         console.log(`Calling API for ${shopId} with ${storeOrders.length} orders`);
-        
+
         const response = await fetch('/api/shopify/courier/assign-awb', {
           method: 'POST',
           headers: {
@@ -161,21 +161,21 @@ export default function BusinessLayout({
         });
 
         const result = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(`Store ${shopId}: ${result.details || result.error || 'Failed'}`);
         }
-        
-        return { 
-          shopId, 
-          count: storeOrders.length, 
-          success: true 
+
+        return {
+          shopId,
+          count: storeOrders.length,
+          success: true
         };
       });
 
       // ✅ STEP 4: Wait for all API calls (allow partial failures)
       const results = await Promise.allSettled(apiCalls);
-      
+
       // ✅ STEP 5: Analyze results
       const successful = results.filter(r => r.status === 'fulfilled');
       const failed = results.filter(r => r.status === 'rejected');
@@ -184,10 +184,10 @@ export default function BusinessLayout({
 
       // ✅ STEP 6: Show appropriate toasts
       if (successful.length > 0) {
-        const totalOrders = successful.reduce((sum, r) => 
+        const totalOrders = successful.reduce((sum, r) =>
           sum + (r.status === 'fulfilled' ? r.value.count : 0), 0
         );
-        
+
         toast({
           title: `AWB Assignment Started`,
           description: `Processing ${totalOrders} order(s) from ${successful.length} store(s) in the background.`,
@@ -206,12 +206,12 @@ export default function BusinessLayout({
         const errorMessages = failed
           .map(r => r.status === 'rejected' ? r.reason.message : '')
           .join('\n');
-        
+
         console.error('Failed stores:', errorMessages);
-        
+
         toast({
           title: `${failed.length} Store(s) Failed`,
-          description: successful.length > 0 
+          description: successful.length > 0
             ? 'Some stores processed successfully. Check console for failed stores.'
             : 'All stores failed to process. Please try again.',
           variant: 'destructive',
@@ -281,10 +281,7 @@ export default function BusinessLayout({
                 <SidebarMenuItem>
                   <Collapsible>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="w-full justify-between pr-2"
-                        isActive={pathname.startsWith(`/business/${businessId}/orders`)}
-                      >
+                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/orders`)}>
                         <div className="flex items-center gap-2">
                           <Package />
                           Orders
@@ -296,16 +293,22 @@ export default function BusinessLayout({
                       <SidebarMenuSub>
                         <SidebarMenuSubButton
                           asChild
-                          isActive={pathname === `/business/${businessId}/orders`}
+                          isActive={pathname === `/business/${businessId}/dashboard/orders`}
+                          className={cn(pathname === '/dashboard/orders/awb-processing' && 'text-muted-foreground')}
                         >
-                          <Link href={`/business/${businessId}/orders`}>All Orders</Link>
+                          <Link href={`/business/${businessId}/dashboard/orders`}>All Orders</Link>
+                        </SidebarMenuSubButton>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === `business/${businessId}/dashboard/orders/awb-processing`}>
+                          <Link href="/dashboard/orders/awb-processing">AWB Processing</Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </Collapsible>
                 </SidebarMenuItem>
 
-                <SidebarMenuItem>
+                {/* <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(`/business/${businessId}/members`)}
@@ -315,9 +318,9 @@ export default function BusinessLayout({
                       Members
                     </Link>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem> */}
 
-                <SidebarMenuItem>
+                {/* <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(`/business/${businessId}/logs`)}
@@ -327,12 +330,12 @@ export default function BusinessLayout({
                       Logs
                     </Link>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem> */}
               </SidebarMenu>
             </SidebarContent>
 
             <SidebarFooter>
-              <SidebarMenu>
+              {/* <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -344,7 +347,7 @@ export default function BusinessLayout({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </SidebarMenu>
+              </SidebarMenu> */}
 
               {user && (
                 <DropdownMenu>

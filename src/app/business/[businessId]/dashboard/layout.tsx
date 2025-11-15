@@ -301,7 +301,7 @@ export default function BusinessLayout({
                         <SidebarMenuSubButton
                           asChild
                           isActive={pathname === `/business/${businessId}/dashboard/orders/awb-processing`}>
-                          <Link href="/dashboard/orders/awb-processing">AWB Processing</Link>
+                          <Link href={`/business/${businessId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSub>
                     </CollapsibleContent>

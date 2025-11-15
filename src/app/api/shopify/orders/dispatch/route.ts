@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     const url = process.env.ENQUEUE_FUNCTION_URL_2!;
     const secret = process.env.ENQUEUE_FUNCTION_SECRET!;
     if (!url || !secret) {
+      console.error('Server not configured (FIREBASE_FUNCTIONS_BASE/TASKS_SECRET)');
       return NextResponse.json({ error: 'Server not configured (FIREBASE_FUNCTIONS_BASE/TASKS_SECRET)' }, { status: 500 });
     }
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
 
     const json = await resp.json();
     if (!resp.ok) {
+      console.error(JSON.stringify(json));
       return NextResponse.json({ ...json }, { status: 500 });
     }
 

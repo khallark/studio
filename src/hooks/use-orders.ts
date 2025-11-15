@@ -14,7 +14,6 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 
 
 export function useOrders(
-    user: string | undefined,
     businessId: string | null,
     stores: string[], // All stores in the business
     vendorName: string | null,
@@ -29,7 +28,6 @@ export function useOrders(
         
         // Query function - fetches and processes data from multiple stores
         queryFn: async () => {
-            if(!user) throw new Error('No user ID provided');
             if (!businessId) throw new Error('No business ID provided');
             if (!stores || stores.length === 0) {
                 console.warn('No stores available in business');
@@ -86,7 +84,7 @@ export function useOrders(
                 let q = query(ordersRef);
                 
                 // ✅ NEW: Filter by vendor for shared store
-                if (storeId === SHARED_STORE_ID && vendorName && user !== SUPER_ADMIN_ID) {
+                if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
                     q = query(q, where('vendors', 'array-contains', vendorName));
                 }
 

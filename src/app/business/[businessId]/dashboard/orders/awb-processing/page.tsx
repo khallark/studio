@@ -325,7 +325,7 @@ export default function BusinessAwbProcessingPage() {
             shippingMode
           );
         }}
-        shopId={selectedOrders[0]?.storeId || ''}
+        businessId={businessId}
       />
 
       <GenerateAwbDialog

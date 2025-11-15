@@ -44,7 +44,7 @@ interface StoreAuthOutput {
 }
 
 interface BusinessOrderInput {
-    userId: string;
+    businessId: string;
     vendorName: string;
     vendors: any;
 }
@@ -205,9 +205,9 @@ export async function authUserForBusinessAndStore({ businessId, shop, req }: Bus
     }
 }
 
-export function authBusinessForOrderOfTheExceptionStore({ userId, vendorName, vendors }: BusinessOrderInput): BusinessOrderOutput {
+export function authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors }: BusinessOrderInput): BusinessOrderOutput {
     try {
-        if(userId === SUPER_ADMIN_ID) {
+        if(businessId === SUPER_ADMIN_ID) {
             return {
                 authorised: true,
             }

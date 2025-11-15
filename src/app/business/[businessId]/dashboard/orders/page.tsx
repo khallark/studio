@@ -161,7 +161,6 @@ export default function BusinessOrdersPage() {
         isFetching,
         refetch: refetchOrders
     } = useOrders(
-        user?.uid,
         businessId,
         stores, // All stores in business
         vendorName,
@@ -1579,7 +1578,7 @@ export default function BusinessOrdersPage() {
                         );
                         setSelectedOrders([]);
                     }}
-                    shopId={ordersForAwb[0]?.storeId || ''}
+                    businessId={businessId}
                 />
             )}
 

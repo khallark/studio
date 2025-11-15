@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const json = await resp.json();
     if (!resp.ok) {
       console.error(JSON.stringify(json));
-      return NextResponse.json({ ...json }, { status: 500 });
+      return NextResponse.json({ ...json }, { status: resp.status });
     }
 
     return NextResponse.json({ ...json }, { status: 202 });

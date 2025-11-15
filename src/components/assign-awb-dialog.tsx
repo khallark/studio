@@ -28,7 +28,7 @@ interface AssignAwbDialogProps {
   onClose: () => void;
   orders: Order[];
   onConfirm: (courier: string, pickupName: string, shippingMode: string) => void;
-  shopId: string;
+  businessId: string;
 }
 
 const shippingModes = ['Surface', 'Express'];
@@ -41,7 +41,7 @@ interface CourierIntegrations {
     priorityList?: string[];
 }
 
-export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: AssignAwbDialogProps) {
+export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm }: AssignAwbDialogProps) {
   const [step, setStep] = useState(1);
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
@@ -52,9 +52,9 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
   const { toast } = useToast();
   
   useEffect(() => {
-    if (isOpen && shopId) {
+    if (isOpen && businessId) {
       setLoadingCouriers(true);
-      const accountRef = doc(db, 'accounts', shopId);
+      const accountRef = doc(db, 'users', businessId);
       getDoc(accountRef).then(docSnap => {
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -69,7 +69,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
             // Add integrated couriers
             if (integrations.delhivery) courierOptions.push('Delhivery');
             if (integrations.shiprocket) courierOptions.push('Shiprocket');
-            // if (integrations.xpressbees) courierOptions.push('Xpressbees');
+            if (integrations.xpressbees) courierOptions.push('Xpressbees');
           }
           
           setAvailableCouriers(courierOptions);
@@ -87,7 +87,7 @@ export function AssignAwbDialog({ isOpen, onClose, orders, onConfirm, shopId }: 
       setStep(1);
       setSelectedMode(null);
     }
-  }, [isOpen, shopId, toast]);
+  }, [isOpen, businessId, toast]);
 
   const handleNext = () => {
     if (step === 1 && !selectedCourier) {

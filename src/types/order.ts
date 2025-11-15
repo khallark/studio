@@ -64,6 +64,7 @@ export interface Order {
   booked_return_images?: string[];
   returnItemsVariantIds?: (string | number)[];
   vendorName?: string;
+  vendors: string[];
   raw: {
     cancelled_at: string | null;
     customer?: {

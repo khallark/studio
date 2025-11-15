@@ -1657,6 +1657,21 @@ export default function BusinessOrdersPage() {
                                                 {viewingOrder.storeId.split('.')[0]}
                                             </p>
                                         </div>
+                                        {viewingOrder.vendors && viewingOrder.vendors.length > 0 && (
+                                            <div>
+                                                <h4 className="font-semibold">Vendors</h4>
+                                                <div className="flex flex-wrap gap-2 mt-1">
+                                                    {viewingOrder.vendors.map((vendor: string, index: number) => (
+                                                        <span 
+                                                            key={index}
+                                                            className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                                                        >
+                                                            {vendor}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         {(viewingOrder.awb || viewingOrder.courier || viewingOrder.awb_reverse) && (
                                             <div>
                                                 <h4 className="font-semibold">Shipment Details</h4>

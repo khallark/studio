@@ -3,9 +3,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 // ============================================================
 // HOOK - Now business-wide, not store-specific
@@ -13,6 +14,7 @@ import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
 
 
 export function useOrders(
+    user: string | undefined,
     businessId: string | null,
     stores: string[], // All stores in the business
     vendorName: string | null,
@@ -27,6 +29,7 @@ export function useOrders(
         
         // Query function - fetches and processes data from multiple stores
         queryFn: async () => {
+            if(!user) throw new Error('No user ID provided');
             if (!businessId) throw new Error('No business ID provided');
             if (!stores || stores.length === 0) {
                 console.warn('No stores available in business');
@@ -74,6 +77,7 @@ export function useOrders(
             
             const allOrders: Order[] = [];
             const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+            const SUPER_ADMIN_ID =  'vD8UJMLtHNefUfkMgbcF605SNAm2';
             
             // Fetch orders from each store in parallel
             const storeQueries = storesToQuery.map(async (storeId) => {
@@ -82,7 +86,7 @@ export function useOrders(
                 let q = query(ordersRef);
                 
                 // ✅ NEW: Filter by vendor for shared store
-                if (storeId === SHARED_STORE_ID && vendorName) {
+                if (storeId === SHARED_STORE_ID && vendorName && user !== SUPER_ADMIN_ID) {
                     q = query(q, where('vendors', 'array-contains', vendorName));
                 }
 

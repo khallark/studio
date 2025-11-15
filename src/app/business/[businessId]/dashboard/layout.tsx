@@ -300,7 +300,7 @@ export default function BusinessLayout({
                         </SidebarMenuSubButton>
                         <SidebarMenuSubButton
                           asChild
-                          isActive={pathname === `business/${businessId}/dashboard/orders/awb-processing`}>
+                          isActive={pathname === `/business/${businessId}/dashboard/orders/awb-processing`}>
                           <Link href="/dashboard/orders/awb-processing">AWB Processing</Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSub>

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (shop === SHARED_STORE_ID) {
       const vendorName = businessData?.vendorName;
       const vendors = orderData?.vendors;
-      const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+      const canProcess = authBusinessForOrderOfTheExceptionStore({ userId: String(result.userId), vendorName, vendors });
       if (!canProcess.authorised) {
         const { error, status } = canProcess;
         return NextResponse.json({ error }, { status });

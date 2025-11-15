@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ...json }, { status: 202 });
   } catch (e: any) {
-    console.error('bulk-create error:', e);
+    // console.error('bulk-create error:', e);
     return NextResponse.json(
       { error: "start_batch_failed", details: String(e?.message ?? e) },
       { status: 500 });

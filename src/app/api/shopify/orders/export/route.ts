@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       if (shop === SHARED_STORE_ID) {
         const vendorName = businessData?.vendorName;
         const vendors = order?.vendors;
-        const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+        const canProcess = authBusinessForOrderOfTheExceptionStore({ userId: String(result.userId), vendorName, vendors });
         if (!canProcess.authorised) {
           return;
         }

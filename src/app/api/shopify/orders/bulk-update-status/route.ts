@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
                     
-                    const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+                    const canProcess = authBusinessForOrderOfTheExceptionStore({ userId: String(result.userId), vendorName, vendors });
                     if (!canProcess.authorised) {
                         console.error(`Order ${orderId} not authorized for this business, skipping split`);
                         continue;
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
                 if (shop === SHARED_STORE_ID) {
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
-                    const canProcess = authBusinessForOrderOfTheExceptionStore({ vendorName, vendors });
+                    const canProcess = authBusinessForOrderOfTheExceptionStore({ userId: String(result.userId), vendorName, vendors });
                     
                     if (!canProcess.authorised) {
                         console.log(`Order ${orderIds[i]} not authorized, skipping update`);

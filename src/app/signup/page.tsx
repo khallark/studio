@@ -38,9 +38,7 @@ export default function SignupPage() {
 
     if (!userDoc.exists()) {
         await setDoc(userRef, {
-        primaryAccountId: null,
-        activeAccountId: null,
-        accounts: [],
+        stores: [],
         profile: {
             displayName: displayName || email,
             email: email,

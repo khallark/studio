@@ -1614,6 +1614,7 @@ export default function BusinessOrdersPage() {
                 <AvailabilityDialog
                     isOpen={isAvailabilityDialogOpen}
                     onClose={() => setIsAvailabilityDialogOpen(false)}
+                    businessId={businessId}
                     user={user}
                     shopId={orders.filter(o => o.customStatus === 'Confirmed')[0]?.storeId || ''}
                     confirmedOrders={orders.filter(o => o.customStatus === 'Confirmed')}

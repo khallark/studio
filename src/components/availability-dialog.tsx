@@ -44,12 +44,14 @@ interface AvailabilityDialogProps {
   onClose: () => void;
   user: any;
   shopId: string;
+  businessId: string;
   confirmedOrders: Order[];
 }
 
 export function AvailabilityDialog({
   isOpen,
   onClose,
+  businessId,
   user,
   shopId,
   confirmedOrders,
@@ -94,6 +96,7 @@ export function AvailabilityDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
+          businessId,
           shop: shopId,
           orderId: order.id,
           tag: action,

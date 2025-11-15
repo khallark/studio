@@ -193,7 +193,7 @@ export default function BusinessLayout({
           description: `Processing ${totalOrders} order(s) from ${successful.length} store(s) in the background.`,
           action: (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/business/${businessId}/orders`}>
+              <Link href={`/business/${businessId}/dashboard/orders/awb-processing`}>
                 View Progress
                 <MoveRight className="ml-2 h-4 w-4" />
               </Link>

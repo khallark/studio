@@ -9,10 +9,12 @@ export async function POST(req: NextRequest) {
     const { businessId, shop, orderId, tag } = await req.json();
 
     if (!businessId) {
+      console.warn('No business id provided.');
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
     if (!shop || !orderId || !tag) {
+      console.warn('Shop, orderId, tag, and action are required');
       return NextResponse.json({ error: 'Shop, orderId, tag, and action are required' }, { status: 400 });
     }
 

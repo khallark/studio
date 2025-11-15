@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import * as xlsx from 'xlsx';
-import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { authUserForBusiness, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
-    const { businessId, shop, batchId, status, collectionName } = await req.json();
+    const { businessId, batchId, status, collectionName } = await req.json();
 
     if (!businessId) {
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
-    if (!shop || !batchId || !status || !collectionName) {
+    if (!businessId || !batchId || !status || !collectionName) {
       return NextResponse.json({ error: 'Missing params in payload' }, { status: 400 });
     }
 
-
     // ----- Auth -----
-    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+    const result = await authUserForBusiness({ businessId, req });
 
     if (!result.authorised) {
       const { error, status } = result;

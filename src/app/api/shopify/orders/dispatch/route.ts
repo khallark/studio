@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.authorised) {
       const { error, status } = result;
+      console.error(error);
       return NextResponse.json({ error }, { status });
     }
 

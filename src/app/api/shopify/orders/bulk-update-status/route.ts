@@ -72,8 +72,10 @@ export async function POST(req: NextRequest) {
                         continue;
                     }
 
+                    if(!vendors.includes('ENDORA') || vendors)
+
                     // Check if order needs splitting (multiple vendors)
-                    if (vendors && vendors.length > 1) {
+                    if (vendors && vendors.length > 1 && (vendors.includes('ENDORA') || vendors.includes('STYLE 05'))) {
                         console.log(`Enqueueing split for order ${orderId} (${vendors.length} vendors)`);
                         
                         const resp = await fetch(url, {

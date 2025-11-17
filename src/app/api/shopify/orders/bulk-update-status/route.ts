@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
         if (shop === SHARED_STORE_ID && url && secret) {
             console.log(`Processing ${orderIds.length} orders for splitting...`);
-            
+
             // Process splits sequentially to avoid overwhelming the system
             for (const orderId of orderIds) {
                 try {
@@ -59,47 +59,48 @@ export async function POST(req: NextRequest) {
                         continue;
                     }
 
-                    if(orderDoc.data()?.customStatus !== 'New') {
+                    if (orderDoc.data()?.customStatus !== 'New') {
                         console.warn(`Order ${orderId} is not New, only New orders cab be splitted`)
                     }
 
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
-                    
+
                     const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
                     if (!canProcess.authorised) {
                         console.error(`Order ${orderId} not authorized for this business, skipping split`);
                         continue;
                     }
 
-                    if(!vendors.includes('ENDORA') || vendors)
+                    if (!vendors.includes('ENDORA') || vendors)
 
-                    // Check if order needs splitting (multiple vendors)
-                    if (vendors && vendors.length > 1 && (vendors.includes('ENDORA') || vendors.includes('STYLE 05'))) {
-                        console.log(`Enqueueing split for order ${orderId} (${vendors.length} vendors)`);
-                        
-                        const resp = await fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Api-Key': secret,
-                            },
-                            body: JSON.stringify({
-                                shop, 
-                                orderId, 
-                                requestedBy: result.userId 
-                            }),
-                        });
+                        // Check if order needs splitting (multiple vendors)
+                        if (vendors && vendors.length > 1 && (vendors.includes('ENDORA') || vendors.includes('STYLE 05'))) {
+                            console.log(`Enqueueing split for order ${orderId} (${vendors.length} vendors)`);
 
-                        if (!resp.ok) {
-                            const json = await resp.json();
-                            console.warn(`Order ${orderId} split enqueue failed: ${json.error}`);
+                            const resp = await fetch(url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Api-Key': secret,
+                                },
+                                body: JSON.stringify({
+                                    shop,
+                                    orderId,
+                                    requestedBy: result.userId
+                                }),
+                            });
+
+                            if (!resp.ok) {
+                                const json = await resp.json();
+                                console.warn(`Order ${orderId} split enqueue failed: ${json.error}`);
+                            } else {
+                                console.log(`✓ Order ${orderId} split enqueued`);
+                            }
                         } else {
-                            console.log(`✓ Order ${orderId} split enqueued`);
+                            console.warn(`Order ${orderId} not eligible for splitting, skipping split`)
                         }
-                    }
 
-                    console.warn(`Order ${orderId} not eligible for splitting, skipping split`)
                 } catch (enqueueError) {
                     console.error(`Error enqueueing split for order ${orderId}:`, enqueueError);
                     // Continue with other orders - don't fail the whole batch
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
                     const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-                    
+
                     if (!canProcess.authorised) {
                         console.log(`Order ${orderIds[i]} not authorized, skipping update`);
                         continue;
@@ -164,16 +165,16 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        return NextResponse.json({ 
-            message: `${orderIds.length} order(s) successfully updated to ${status}` 
+        return NextResponse.json({
+            message: `${orderIds.length} order(s) successfully updated to ${status}`
         });
-        
+
     } catch (error) {
         console.error('Error during bulk order status update:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        return NextResponse.json({ 
-            error: 'Failed to bulk update order status', 
-            details: errorMessage 
+        return NextResponse.json({
+            error: 'Failed to bulk update order status',
+            details: errorMessage
         }, { status: 500 });
     }
 }

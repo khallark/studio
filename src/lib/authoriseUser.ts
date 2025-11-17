@@ -3,7 +3,7 @@ import { db, auth as adminAuth } from "./firebase-admin";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 
 export const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
-const SUPER_ADMIN_ID =  'vD8UJMLtHNefUfkMgbcF605SNAm2';
+const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
 
 export async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -207,7 +207,7 @@ export async function authUserForBusinessAndStore({ businessId, shop, req }: Bus
 
 export function authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors }: BusinessOrderInput): BusinessOrderOutput {
     try {
-        if(businessId === SUPER_ADMIN_ID) {
+        if (businessId === SUPER_ADMIN_ID) {
             return {
                 authorised: true,
             }
@@ -226,7 +226,9 @@ export function authBusinessForOrderOfTheExceptionStore({ businessId, vendorName
             }
         }
 
-        const isAuthorized = vendors.includes(vendorName);
+        const isAuthorized = vendorName !== 'OWR'
+            ? vendors.includes(vendorName)
+            : (vendors.includes(vendorName) || vendors.includes('Ghamand') || vendors.includes('BBB')) && !vendors.includes('ENDORA') && !vendors.includes('STYLE 05');
 
         if (!isAuthorized) {
             return {

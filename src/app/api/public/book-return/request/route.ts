@@ -9,7 +9,7 @@ import { sendDTORequestedOrderWhatsAppMessage } from "@/lib/communication/whatsa
 // Constants
 const DELIVERABLE_STATUSES = ["Delivered", "DTO Requested"];
 const IN_TRANSIT_STATUSES = ["In Transit", "RTO In Transit", "Out For Delivery"];
-const RETURN_BLOCKED_STATUSES = ["DTO In Transit", "DTO Delivered", "DTO Booked", "Pending Refunds"];
+const RETURN_BLOCKED_STATUSES = ["DTO In Transit", "DTO Delivered", "DTO Booked", "Pending Refunds", "DTO Refunded"];
 
 interface DeliveryStatus {
     Status: string;

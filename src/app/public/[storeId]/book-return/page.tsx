@@ -46,6 +46,7 @@ const STATUS_MAP: Record<string, string> = {
   'DTO In Transit': 'On way back',
   'DTO Delivered': 'Return Completed',
   'Pending Refunds': 'Refund Pending',
+  'DTO Refunded': 'Refunded',
   'Lost': 'Lost',
   'Closed': 'Delivered',
   'RTO Closed': 'Return Completed',
@@ -446,7 +447,7 @@ export default function BookReturnPage() {
   const alreadyRequested = ['DTO Requested'];
   const canTryRequesting = ['In Transit', 'Out For Delivery', 'RTO In Transit'];
   const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed', 'Cancellation Requested'];
-  const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'];
+  const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds', 'DTO Refunded'];
 
   if (loading) {
     return (
@@ -682,6 +683,15 @@ export default function BookReturnPage() {
                                     <span className="text-gray-600">Refund Pending</span>
                                     <br />
                                     Your return has been successfully verified and the corresponding amount will be refunded either in your store wallet or the bank account. If you have any questions, please DM us on Instagram @owr.life.
+                                  </>
+                                );
+                              }
+                              if (order.status === 'DTO Refunded') {
+                                return (
+                                  <>
+                                    <span className="text-gray-600">Refund Pending</span>
+                                    <br />
+                                    Your return has been successfully refunded either in your store wallet or the bank account. If you have any questions, please DM us on Instagram @owr.life.
                                   </>
                                 );
                               }

@@ -66,6 +66,7 @@ import { BookReturnDialog } from '@/components/book-return-dialog';
 import { StartQcDialog } from '@/components/start-qc-dialog';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { GeneratePODialog } from '@/components/generate-po-dialog';
+import { RefundDialog } from '@/components/refund-dialog';
 
 // ============================================================
 // HOOKS & TYPES (BUSINESS-LEVEL!)
@@ -145,6 +146,8 @@ export default function BusinessOrdersPage() {
     const [orderForQc, setOrderForQc] = useState<Order | null>(null);
     const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
+    const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+    const [orderForRefund, setOrderForRefund] = useState<Order | null>(null);
 
     // Item selection for availability
     const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
@@ -730,6 +733,7 @@ export default function BusinessOrdersPage() {
             case 'Delivered':
             case 'RTO Delivered':
             case 'DTO Delivered':
+            case 'DTO Refunded':
                 return 'success';
             case 'Lost':
             case 'Cancelled':
@@ -838,6 +842,15 @@ export default function BusinessOrdersPage() {
                         setIsQcDialogOpen(true);
                     }}>
                         Start QC
+                    </DropdownMenuItem>
+                );
+            case 'Pending Refunds':
+                return (
+                    <DropdownMenuItem onClick={() => {
+                        setOrderForRefund(order);
+                        setIsRefundDialogOpen(true);
+                    }}>
+                        Process Refund
                     </DropdownMenuItem>
                 );
             case 'RTO Delivered':
@@ -1003,6 +1016,13 @@ export default function BusinessOrdersPage() {
                         case 'DTO In Transit':
                         case 'DTO Delivered':
                         case 'Pending Refunds':
+                        case 'DTO Refunded':
+                            return (
+                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                </Button>
+                            );
                         case 'Lost':
                         case 'Closed':
                         case 'RTO Closed':
@@ -1316,6 +1336,9 @@ export default function BusinessOrdersPage() {
                                     <TabsTrigger value="Pending Refunds" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                                         Pending Refunds ({statusCounts?.['Pending Refunds'] || 0})
                                     </TabsTrigger>
+                                    <TabsTrigger value="DTO Refunded" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
+                                        DTO Refunded ({statusCounts?.['DTO Refunded'] || 0})
+                                    </TabsTrigger>
                                     <TabsTrigger value="Lost" className="outline-none flex-shrink-0 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-sm font-semibold text-gray-500 shadow-none transition-all duration-200 ease-in-out hover:text-gray-700 hover:bg-gray-50 data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:shadow-none">
                                         Lost ({statusCounts?.['Lost'] || 0})
                                     </TabsTrigger>
@@ -1568,13 +1591,13 @@ export default function BusinessOrdersPage() {
                     onConfirm={(courier, pickupName, shippingMode) => {
                         const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
                         processAwbAssignments(
-                            ordersToProcess.map(o => ({ 
-                                id: o.id, 
+                            ordersToProcess.map(o => ({
+                                id: o.id,
                                 name: o.name,
                                 storeId: o.storeId  // ✅ ADDED: Now includes storeId
-                            })), 
-                            courier, 
-                            pickupName, 
+                            })),
+                            courier,
+                            pickupName,
                             shippingMode
                         );
                         setSelectedOrders([]);
@@ -1638,6 +1661,25 @@ export default function BusinessOrdersPage() {
                 );
             })()}
 
+            {orderForRefund && (
+                <RefundDialog
+                    isOpen={isRefundDialogOpen}
+                    onClose={() => {
+                        setIsRefundDialogOpen(false);
+                        setOrderForRefund(null);
+                    }}
+                    order={orderForRefund}
+                    businessId={businessId}
+                    user={user}
+                    onRefundSuccess={() => {
+                        toast({
+                            title: 'Refund Processed',
+                            description: 'The refund has been processed successfully.',
+                        });
+                    }}
+                />
+            )}
+
             <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
                 <DialogContent className="max-w-4xl">
                     {viewingOrder && (
@@ -1664,7 +1706,7 @@ export default function BusinessOrdersPage() {
                                                 <h4 className="font-semibold">Vendors</h4>
                                                 <div className="flex flex-wrap gap-2 mt-1">
                                                     {viewingOrder.vendors.map((vendor: string, index: number) => (
-                                                        <span 
+                                                        <span
                                                             key={index}
                                                             className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
                                                         >

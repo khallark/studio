@@ -703,3 +703,90 @@ export function useUpdateShippedStatuses(
     },
   });
 }
+
+// ============================================================
+// MUTATION 12: PROCESS REFUND
+// ============================================================
+
+export function useProcessRefund(
+  businessId: string | null,
+  user: User | null | undefined
+) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      orderId,
+      storeId,
+      selectedItemIds,
+      refundAmount,
+      refundMethod,
+      currency,
+      customerId,
+    }: {
+      orderId: string;
+      storeId: string | null;
+      selectedItemIds: (string | number)[];
+      refundAmount: number;
+      refundMethod: 'store_credit' | 'manual';
+      currency: string;
+      customerId?: number;
+    }) => {
+      if (!storeId || !user) {
+        throw new Error('Invalid parameters');
+      }
+
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/refund', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          businessId,
+          shop: storeId,
+          orderId,
+          selectedItemIds,
+          refundAmount,
+          refundMethod,
+          currency,
+          customerId,
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || result.details || 'Failed to process refund');
+      }
+
+      return response.json();
+    },
+
+    onMutate: () => {
+      toast({
+        title: 'Processing Refund',
+        description: 'Please wait while we process the refund...',
+      });
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders', businessId] });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
+
+      toast({
+        title: 'Refund Processed',
+        description: data.message || 'The refund has been processed successfully.',
+      });
+    },
+
+    onError: (error: Error) => {
+      toast({
+        title: 'Refund Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}

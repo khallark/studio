@@ -1,7 +1,6 @@
 // types/order.ts
 
 import { Timestamp } from 'firebase/firestore';
-import { DateRange } from 'react-day-picker';
 
 // ============================================================
 // ORDER STATUSES
@@ -22,6 +21,7 @@ export type CustomStatus =
   | 'DTO In Transit'
   | 'DTO Delivered'
   | 'Pending Refunds'
+  | 'DTO Refunded'
   | 'Lost'
   | 'Closed'
   | 'RTO Closed'
@@ -68,6 +68,8 @@ export interface Order {
   raw: {
     cancelled_at: string | null;
     customer?: {
+      admin_graphql_api_id?: string;
+      id?: string;
       name?: string;
       first_name?: string;
       last_name?: string;

@@ -206,6 +206,10 @@ const nextConfig: NextConfig = {
         destination: '/api/auth/set-business-claims/route',
       },
       {
+        source: '/api/shopify/orders/refund',
+        destination: '/api/shopify/orders/refund/route',
+      },
+      {
         source: '/api/test',
         destination: '/api/test/route',
       }

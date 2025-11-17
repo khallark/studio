@@ -28,6 +28,7 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
     'DTO In Transit': 0,
     'DTO Delivered': 0,
     'Pending Refunds': 0,
+    'DTO Refunded': 0,
     'Lost': 0,
     'Closed': 0,
     'RTO Closed': 0,
@@ -47,7 +48,7 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
 
     // Create unsubscribe functions for each store
     const unsubscribes: (() => void)[] = [];
-    
+
     // Map to store each store's counts
     const storeCounts = new Map<string, StatusCounts>();
 
@@ -69,6 +70,7 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
         'DTO In Transit': 0,
         'DTO Delivered': 0,
         'Pending Refunds': 0,
+        'DTO Refunded': 0,
         'Lost': 0,
         'Closed': 0,
         'RTO Closed': 0,
@@ -92,7 +94,7 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
 
       const unsubscribe = onSnapshot(
         metadataRef,
-        
+
         async (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data();
@@ -111,17 +113,17 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
                 'All Orders': 0, 'New': 0, 'Confirmed': 0, 'Ready To Dispatch': 0,
                 'Dispatched': 0, 'In Transit': 0, 'Out For Delivery': 0, 'Delivered': 0,
                 'RTO In Transit': 0, 'RTO Delivered': 0, 'DTO Requested': 0, 'DTO Booked': 0,
-                'DTO In Transit': 0, 'DTO Delivered': 0, 'Pending Refunds': 0, 'Lost': 0,
+                'DTO In Transit': 0, 'DTO Delivered': 0, 'Pending Refunds': 0, 'DTO Refunded': 0, 'Lost': 0,
                 'Closed': 0, 'RTO Closed': 0, 'Cancellation Requested': 0, 'Cancelled': 0,
               });
             }
           }
-          
+
           // Aggregate after each store update
           aggregateCounts();
           setError(null);
         },
-        
+
         (err) => {
           console.error(`❌ Error listening to counts for ${storeId}:`, err);
           setError(err as Error);
@@ -165,6 +167,7 @@ async function calculateCounts(storeId: string): Promise<StatusCounts> {
     'DTO In Transit': 0,
     'DTO Delivered': 0,
     'Pending Refunds': 0,
+    'DTO Refunded': 0,
     'Lost': 0,
     'Closed': 0,
     'RTO Closed': 0,

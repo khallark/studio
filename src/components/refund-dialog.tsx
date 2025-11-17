@@ -129,7 +129,7 @@ export function RefundDialog({
         refundAmount,
         refundMethod,
         currency: order.currency,
-        customerId: order.raw.customer?.id,
+        customerId: Number(order.raw.customer?.id),
       },
       {
         onSuccess: () => {

@@ -2,7 +2,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, and } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
@@ -25,7 +25,7 @@ export function useOrders(
     return useQuery({
         // Query key - cache is based on these parameters
         queryKey: ['orders', businessId, stores, activeTab, currentPage, rowsPerPage, filters],
-        
+
         // Query function - fetches and processes data from multiple stores
         queryFn: async () => {
             if (!businessId) throw new Error('No business ID provided');
@@ -33,28 +33,28 @@ export function useOrders(
                 console.warn('No stores available in business');
                 return { orders: [], totalCount: 0, hasMore: false };
             }
-            
+
             // Determine which stores to query based on filter
             const storesToQuery = filters.storeFilter && filters.storeFilter.length > 0
-            ? stores.filter(s => filters.storeFilter!.includes(s))
-            : stores;
-            
+                ? stores.filter(s => filters.storeFilter!.includes(s))
+                : stores;
+
             if (storesToQuery.length === 0) {
                 return { orders: [], totalCount: 0, hasMore: false };
             }
-            
+
             console.log(`📦 Querying ${storesToQuery.length} stores:`, storesToQuery);
-            
+
             // ============================================================
             // DETERMINE SEARCH TYPE
             // ============================================================
-            
+
             let searchType: 'none' | 'name' | 'awb' | 'clientSide' = 'none';
             let searchValue = '';
-            
+
             if (filters.searchQuery) {
                 const query = filters.searchQuery.trim();
-                
+
                 if (/^#[\w-]+$/i.test(query)) {
                     searchType = 'name';
                     searchValue = query.toUpperCase();
@@ -68,29 +68,63 @@ export function useOrders(
                     searchValue = query.toLowerCase();
                 }
             }
-            
+
             // ============================================================
             // QUERY EACH STORE AND AGGREGATE RESULTS
             // ============================================================
-            
+
             const allOrders: Order[] = [];
             const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
-            const SUPER_ADMIN_ID =  'vD8UJMLtHNefUfkMgbcF605SNAm2';
-            
+            const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
+
             // Fetch orders from each store in parallel
             const storeQueries = storesToQuery.map(async (storeId) => {
                 const ordersRef = collection(db, 'accounts', storeId, 'orders');
-                
+
                 let q = query(ordersRef);
-                
+
                 // ✅ NEW: Filter by vendor for shared store
                 if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
-                    q = query(q, where('vendors', 'array-contains', vendorName));
+                    if (vendorName === 'OWR') {
+                        const allPermutations = [
+                            ["OWR"],
+                            ["Ghamand"],
+                            ["BBB"],
+                            ["OWR", "Ghamand"],
+                            ["Ghamand", "OWR"],
+                            ["OWR", "BBB"],
+                            ["BBB", "OWR"],
+                            ["Ghamand", "BBB"],
+                            ["BBB", "Ghamand"],
+                            ["OWR", "Ghamand", "BBB"],
+                            ["OWR", "BBB", "Ghamand"],
+                            ["Ghamand", "OWR", "BBB"],
+                            ["Ghamand", "BBB", "OWR"],
+                            ["BBB", "OWR", "Ghamand"],
+                            ["BBB", "Ghamand", "OWR"]
+                        ];
+                        q = query(q, where('vendors', 'in', allPermutations));
+                    }
+                    else {
+                        q = query(q, where('vendors', 'array-contains', vendorName));
+                    }
                 }
 
                 // Filter by status tab - use customStatus for all tabs including Cancelled
-                if (activeTab !== 'All Orders') {
-                    q = query(q, where('customStatus', '==', activeTab));
+                if (businessId === SUPER_ADMIN_ID) {
+                    if (activeTab !== 'All Orders') {
+                        q = query(q, where('customStatus', '==', activeTab));
+                    }
+                } else {
+                    if (activeTab !== 'All Orders') {
+                        if (activeTab === 'New') {
+                            q = query(q, where('customStatus', '==', 'ewiufeisf'));
+                        } else {
+                            q = query(q, where('customStatus', '==', activeTab));
+                        }
+                    } else {
+                        q = query(q, where('customStatus', '!=', 'New'));
+                    }
                 }
 
                 // Server-side search
@@ -158,23 +192,23 @@ export function useOrders(
                     })) as Order[];
                 } catch (error: any) {
                     console.error(`Error fetching orders from store ${storeId}:`, error);
-                    
+
                     if (error.message.includes("The query requires an index.")) {
                         try {
                             await fetch('/api/test', {
                                 method: "POST",
                                 body: JSON.stringify({ str: error.message })
                             });
-                        } catch {}
+                        } catch { }
                     }
-                    
+
                     return [];
                 }
             });
 
             // Wait for all store queries to complete
             const storeResults = await Promise.all(storeQueries);
-            
+
             // Flatten results from all stores
             storeResults.forEach(storeOrders => {
                 allOrders.push(...storeOrders);
@@ -183,7 +217,7 @@ export function useOrders(
             // ============================================================
             // SORT AGGREGATED RESULTS BY TIME
             // ============================================================
-            
+
             allOrders.sort((a, b) => {
                 const timeA = new Date(a.createdAt || 0).getTime();
                 const timeB = new Date(b.createdAt || 0).getTime();

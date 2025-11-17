@@ -64,10 +64,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // if (orderData?.financialStatus !== 'paid') {
-        //     return NextResponse.json({ error: 'Order is not paid' }, { status: 400 })
-        // }
-
         // Get access token
         const storeData = shopDoc?.data();
         const accessToken = storeData?.accessToken;
@@ -82,84 +78,9 @@ export async function POST(req: NextRequest) {
         // Process refund via Shopify if method is store_credit
         if (refundMethod === 'store_credit') {
             try {
-                // // Step 1: Add to customer's store credits FIRST (most important - customer gets their money)
-                // const storeCreditResponse = await fetch(
-                //     `https://${shop}/admin/api/2025-01/graphql.json`,
-                //     {
-                //         method: 'POST',
-                //         headers: {
-                //             'Content-Type': 'application/json',
-                //             'X-Shopify-Access-Token': accessToken,
-                //         },
-                //         body: JSON.stringify({
-                //             query: `
-                //                 mutation storeCreditAccountCredit($id: ID!, $creditInput: StoreCreditAccountCreditInput!) {
-                //                     storeCreditAccountCredit(id: $id, creditInput: $creditInput) {
-                //                         storeCreditAccountTransaction {
-                //                             amount {
-                //                                 amount
-                //                                 currencyCode
-                //                             }
-                //                             account {
-                //                                 id
-                //                                 balance {
-                //                                     amount
-                //                                     currencyCode
-                //                                 }
-                //                             }
-                //                         }
-                //                         userErrors {
-                //                             message
-                //                             field
-                //                         }
-                //                     }
-                //                 }
-                //             `,
-                //             variables: {
-                //                 id: `gid://shopify/Customer/${customerId}`,
-                //                 creditInput: {
-                //                     creditAmount: {
-                //                         amount: refundAmount.toFixed(2),
-                //                         currencyCode: currency,
-                //                     },
-                //                 },
-                //             },
-                //         }),
-                //     }
-                // );
-
-                // if (!storeCreditResponse.ok) {
-                //     const errorData = await storeCreditResponse.json();
-                //     console.log(JSON.stringify(errorData, null, 2));
-                //     console.error('Store credit error:', errorData);
-                //     throw new Error('Failed to add store credit');
-                // }
-
-                // storeCreditResult = await storeCreditResponse.json();
-                // console.log(JSON.stringify(storeCreditResult, null, 2));
-
-                // if (!storeCreditResult.data?.storeCreditAccountCredit?.storeCreditAccountTransaction) {
-                //     console.error('No transaction in response:', storeCreditResult);
-                //     throw new Error('Store credit transaction was not created');
-                // }
-
-                // console.log('✅ Store credit successfully added!');
-
-                // Step 2: Mark order as refunded in Shopify (bookkeeping)
-                // Build refund line items from selected items
-                const refundLineItems = orderData?.raw.line_items
-                    .filter((item: any) => selectedItemIds.includes(item.variant_id || item.id))
-                    .map((item: any) => ({
-                        line_item_id: item.id,
-                        quantity: item.quantity,
-                        restock_type: 'no_restock', // or 'cancel', 'return', 'legacy_restock'
-                    }));
-
-                console.log('Creating refund with line items:', refundLineItems);
-
-                const shopifyOrderId = orderData?.orderId;
-                const refundResponse = await fetch(
-                    `https://${shop}/admin/api/2025-01/orders/${shopifyOrderId}/refunds.json`,
+                // Step 1: Add to customer's store credits FIRST (most important - customer gets their money)
+                const storeCreditResponse = await fetch(
+                    `https://${shop}/admin/api/2025-01/graphql.json`,
                     {
                         method: 'POST',
                         headers: {
@@ -167,33 +88,58 @@ export async function POST(req: NextRequest) {
                             'X-Shopify-Access-Token': accessToken,
                         },
                         body: JSON.stringify({
-                            refund: {
-                                notify: false,
-                                note: `Refund processed for returned items - credited to store credit`,
-                                // transactions: [
-                                //     {
-                                //         kind: 'refund',
-                                //         gateway: 'store-credit',
-                                //         amount: refundAmount.toFixed(2),
-                                //     },
-                                // ],
-                                refund_line_items: refundLineItems,
+                            query: `
+                                mutation storeCreditAccountCredit($id: ID!, $creditInput: StoreCreditAccountCreditInput!) {
+                                    storeCreditAccountCredit(id: $id, creditInput: $creditInput) {
+                                        storeCreditAccountTransaction {
+                                            amount {
+                                                amount
+                                                currencyCode
+                                            }
+                                            account {
+                                                id
+                                                balance {
+                                                    amount
+                                                    currencyCode
+                                                }
+                                            }
+                                        }
+                                        userErrors {
+                                            message
+                                            field
+                                        }
+                                    }
+                                }
+                            `,
+                            variables: {
+                                id: `gid://shopify/Customer/${customerId}`,
+                                creditInput: {
+                                    creditAmount: {
+                                        amount: refundAmount.toFixed(2),
+                                        currencyCode: currency,
+                                    },
+                                },
                             },
                         }),
                     }
                 );
 
-                if (!refundResponse.ok) {
-                    const errorData = await refundResponse.json();
-                    console.log(JSON.stringify(refundResult, null, 2));
-                    console.error('Shopify refund marking error:', errorData);
-                    // Customer HAS their store credit, so we log but don't fail completely
-                    console.warn('Failed to mark order as refunded in Shopify, but customer has store credit');
-                    // Continue execution - customer has their money which is most important
-                } else {
-                    refundResult = await refundResponse.json();
-                    console.log(JSON.stringify(refundResult, null, 2));
+                if (!storeCreditResponse.ok) {
+                    const errorData = await storeCreditResponse.json();
+                    console.log(JSON.stringify(errorData, null, 2));
+                    console.error('Store credit error:', errorData);
+                    throw new Error('Failed to add store credit');
                 }
+
+                storeCreditResult = await storeCreditResponse.json();
+                console.log(JSON.stringify(storeCreditResult, null, 2));
+
+                if (!storeCreditResult.data?.storeCreditAccountCredit?.storeCreditAccountTransaction) {
+                    console.error('No transaction in response:', storeCreditResult);
+                    throw new Error('Store credit transaction was not created');
+                }
+
+                console.log('✅ Store credit successfully added!');
 
             } catch (error: any) {
                 console.error('Error processing store credit refund:', error);
@@ -221,7 +167,7 @@ export async function POST(req: NextRequest) {
             }),
         };
 
-        // await orderRef?.update(updateData);
+        await orderRef?.update(updateData);
 
         return NextResponse.json({
             success: true,

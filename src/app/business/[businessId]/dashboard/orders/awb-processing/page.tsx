@@ -532,7 +532,6 @@ function BatchRow({
 
           <div>
             <div className="flex items-center gap-2">
-              <div className="font-semibold hover:underline">Batch {batch.id}</div>
               <div className="font-semibold hover:underline">
                 Batch {batch.id}
               </div>

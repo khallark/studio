@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import { Order } from '@/types/order';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -42,6 +43,7 @@ export function RefundDialog({
 }: RefundDialogProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string | number>>(new Set());
   const [refundMethod, setRefundMethod] = useState<RefundMethod>('store_credit');
+  const [manualRefundAmount, setManualRefundAmount] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   // Use the mutation hook
@@ -51,14 +53,29 @@ export function RefundDialog({
   const lineItems = order.raw.line_items || [];
   const returnItemIds = new Set(order.returnItemsVariantIds || []);
 
-  // Calculate refund amount based on selected items
-  const refundAmount = useMemo(() => {
+  // Calculate suggested refund amount based on selected items
+  const calculatedAmount = useMemo(() => {
     return lineItems
       .filter((item: any) => selectedItems.has(item.variant_id || item.id))
       .reduce((sum: number, item: any) => {
         return sum + (parseFloat(item.price) * item.quantity);
       }, 0);
   }, [selectedItems, lineItems]);
+
+  // Update manual amount when calculated amount changes
+  React.useEffect(() => {
+    if (calculatedAmount > 0) {
+      setManualRefundAmount(calculatedAmount.toFixed(2));
+    } else {
+      setManualRefundAmount('');
+    }
+  }, [calculatedAmount]);
+
+  // Parse manual refund amount
+  const refundAmount = parseFloat(manualRefundAmount) || 0;
+
+  // Validate refund amount
+  const isValidAmount = refundAmount > 0 && refundAmount <= order.totalPrice;
 
   // Handle item selection toggle
   const handleItemToggle = (itemId: string | number) => {
@@ -89,6 +106,19 @@ export function RefundDialog({
       return;
     }
 
+    if (!isValidAmount) {
+      setError('Please enter a valid refund amount');
+      return;
+    }
+
+    if (refundAmount > order.totalPrice) {
+      setError(`Refund amount cannot exceed order total (${new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: order.currency,
+      }).format(order.totalPrice)})`);
+      return;
+    }
+
     setError(null);
 
     processRefund.mutate(
@@ -99,7 +129,7 @@ export function RefundDialog({
         refundAmount,
         refundMethod,
         currency: order.currency,
-        customerId: Number(order.raw.customer?.id),
+        customerId: order.raw.customer?.id,
       },
       {
         onSuccess: () => {
@@ -108,6 +138,7 @@ export function RefundDialog({
           // Reset state
           setSelectedItems(new Set());
           setRefundMethod('store_credit');
+          setManualRefundAmount('');
         },
         onError: (err: any) => {
           setError(err.message || 'An unexpected error occurred');
@@ -121,6 +152,7 @@ export function RefundDialog({
     if (!processRefund.isPending) {
       setSelectedItems(new Set());
       setRefundMethod('store_credit');
+      setManualRefundAmount('');
       setError(null);
       onClose();
     }
@@ -132,7 +164,7 @@ export function RefundDialog({
         <DialogHeader>
           <DialogTitle>Process Refund - {order.name}</DialogTitle>
           <DialogDescription>
-            Select items to refund and choose a refund method. Items marked with a badge are return items.
+            Select items to refund and enter the refund amount. Items marked with a badge are return items.
           </DialogDescription>
         </DialogHeader>
 
@@ -151,7 +183,7 @@ export function RefundDialog({
               </Button>
             </div>
 
-            <div className="border rounded-lg divide-y">
+            <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
               {lineItems.map((item: any, index: number) => {
                 const itemId = item.variant_id || item.id;
                 const isReturnItem = returnItemIds.has(itemId);
@@ -213,6 +245,58 @@ export function RefundDialog({
 
           <Separator />
 
+          {/* Refund Amount */}
+          <div className="space-y-4">
+            <h4 className="font-semibold">Refund Amount</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Order Total:</span>
+                <span className="font-mono">
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: order.currency,
+                  }).format(order.totalPrice)}
+                </span>
+              </div>
+              {calculatedAmount > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Suggested Amount (based on selection):</span>
+                  <span className="font-mono font-semibold">
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: order.currency,
+                    }).format(calculatedAmount)}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="refund-amount">Enter Refund Amount *</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{order.currency}</span>
+                  <Input
+                    id="refund-amount"
+                    type="number"
+                    min="0"
+                    max={order.totalPrice}
+                    step="0.01"
+                    placeholder="0.00"
+                    value={manualRefundAmount}
+                    onChange={(e) => setManualRefundAmount(e.target.value)}
+                    className="flex-1 text-lg font-mono"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  You can adjust the amount as needed (max: {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: order.currency,
+                  }).format(order.totalPrice)})
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Refund Method Selection */}
           <div className="space-y-4">
             <h4 className="font-semibold">Refund Method</h4>
@@ -246,25 +330,6 @@ export function RefundDialog({
             </RadioGroup>
           </div>
 
-          <Separator />
-
-          {/* Refund Summary */}
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Selected Items:</span>
-              <span className="font-semibold">{selectedItems.size}</span>
-            </div>
-            <div className="flex justify-between items-center text-lg">
-              <span className="font-semibold">Refund Amount:</span>
-              <span className="font-bold font-mono">
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: order.currency,
-                }).format(refundAmount)}
-              </span>
-            </div>
-          </div>
-
           {/* Error Alert */}
           {error && (
             <Alert variant="destructive">
@@ -280,7 +345,7 @@ export function RefundDialog({
           </Button>
           <Button
             onClick={handleRefund}
-            disabled={processRefund.isPending || selectedItems.size === 0}
+            disabled={processRefund.isPending || selectedItems.size === 0 || !isValidAmount}
           >
             {processRefund.isPending ? (
               <>
@@ -288,10 +353,10 @@ export function RefundDialog({
                 Processing...
               </>
             ) : (
-              `Process Refund (${new Intl.NumberFormat('en-US', {
+              `Process Refund${refundAmount > 0 ? ` (${new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: order.currency,
-              }).format(refundAmount)})`
+              }).format(refundAmount)})` : ''}`
             )}
           </Button>
         </DialogFooter>

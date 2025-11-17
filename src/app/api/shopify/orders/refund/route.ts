@@ -127,11 +127,13 @@ export async function POST(req: NextRequest) {
 
                 if (!storeCreditResponse.ok) {
                     const errorData = await storeCreditResponse.json();
+                    console.log(JSON.stringify(errorData, null, 2));
                     console.error('Store credit error:', errorData);
                     throw new Error('Failed to add store credit');
                 }
 
                 storeCreditResult = await storeCreditResponse.json();
+                console.log(JSON.stringify(storeCreditResult, null, 2));
 
                 if (storeCreditResult.data?.storeCreditAccountCredit?.userErrors?.length > 0) {
                     const errors = storeCreditResult.data.storeCreditAccountCredit.userErrors;
@@ -173,6 +175,7 @@ export async function POST(req: NextRequest) {
                     // Continue execution - customer has their money which is most important
                 } else {
                     refundResult = await refundResponse.json();
+                    console.log(JSON.stringify(refundResult, null, 2));
                 }
 
             } catch (error: any) {

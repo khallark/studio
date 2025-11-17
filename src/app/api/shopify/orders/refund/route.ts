@@ -159,13 +159,13 @@ export async function POST(req: NextRequest) {
                             refund: {
                                 notify: false,
                                 note: `Refund processed for returned items - credited to store credit`,
-                                transactions: [
-                                    {
-                                        kind: 'refund',
-                                        gateway: 'store-credit',
-                                        amount: refundAmount.toFixed(2),
-                                    },
-                                ],
+                                // transactions: [
+                                //     {
+                                //         kind: 'refund',
+                                //         gateway: 'store-credit',
+                                //         amount: refundAmount.toFixed(2),
+                                //     },
+                                // ],
                             },
                         }),
                     }
@@ -196,18 +196,18 @@ export async function POST(req: NextRequest) {
         }
 
         // Update Firestore order document
-        // const updateData: any = {
-        //     refundedAmount: refundAmount,
-        //     customStatus: 'DTO Refunded',
-        //     lastStatusUpdate: FieldValue.serverTimestamp(),
-        //     customStatusesLogs: FieldValue.arrayUnion({
-        //         status: 'DTO Refunded',
-        //         createdAt: Timestamp.now(),
-        //         remarks: refundMethod === 'store_credit'
-        //             ? `Refunded ${currency} ${refundAmount.toFixed(2)} to customer's store credits`
-        //             : `Manually refunded ${currency} ${refundAmount.toFixed(2)}`,
-        //     }),
-        // };
+        const updateData: any = {
+            refundedAmount: refundAmount,
+            customStatus: 'DTO Refunded',
+            lastStatusUpdate: FieldValue.serverTimestamp(),
+            customStatusesLogs: FieldValue.arrayUnion({
+                status: 'DTO Refunded',
+                createdAt: Timestamp.now(),
+                remarks: refundMethod === 'store_credit'
+                    ? `Refunded ${currency} ${refundAmount.toFixed(2)} to customer's store credits`
+                    : `Manually refunded ${currency} ${refundAmount.toFixed(2)}`,
+            }),
+        };
 
         // await orderRef?.update(updateData);
 

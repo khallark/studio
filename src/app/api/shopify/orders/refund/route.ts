@@ -146,6 +146,17 @@ export async function POST(req: NextRequest) {
                 // console.log('✅ Store credit successfully added!');
 
                 // Step 2: Mark order as refunded in Shopify (bookkeeping)
+                // Build refund line items from selected items
+                const refundLineItems = orderData?.raw.line_items
+                    .filter((item: any) => selectedItemIds.includes(item.variant_id || item.id))
+                    .map((item: any) => ({
+                        line_item_id: item.id,
+                        quantity: item.quantity,
+                        restock_type: 'no_restock', // or 'cancel', 'return', 'legacy_restock'
+                    }));
+
+                console.log('Creating refund with line items:', refundLineItems);
+
                 const shopifyOrderId = orderData?.orderId;
                 const refundResponse = await fetch(
                     `https://${shop}/admin/api/2025-01/orders/${shopifyOrderId}/refunds.json`,
@@ -166,6 +177,7 @@ export async function POST(req: NextRequest) {
                                 //         amount: refundAmount.toFixed(2),
                                 //     },
                                 // ],
+                                refund_line_items: refundLineItems,
                             },
                         }),
                     }

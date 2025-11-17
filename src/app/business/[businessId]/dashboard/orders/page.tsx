@@ -1459,7 +1459,7 @@ export default function BusinessOrdersPage() {
                                                     {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
                                                         <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
                                                     )}
-                                                    {activeTab.includes('DTO') && activeTab !== 'DTO Requested' && (
+                                                    {(activeTab.includes('DTO') || activeTab === 'Pending Refunds') && activeTab !== 'DTO Requested' && (
                                                         <TableCell className="text-xs md:text-sm py-2">{order.awb_reverse || 'N/A'}</TableCell>
                                                     )}
                                                     <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>

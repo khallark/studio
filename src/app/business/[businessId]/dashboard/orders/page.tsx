@@ -1557,6 +1557,7 @@ export default function BusinessOrdersPage() {
                 }}
                 onConfirm={handleBulkSelectByAwb}
                 customStatus={awbBulkSelectStatus}
+                orders={orders}
             />
 
             {ordersForAwb.length > 0 && (

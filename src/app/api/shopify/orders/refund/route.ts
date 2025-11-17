@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        if (orderData?.financialStatus !== 'paid') {
-            return NextResponse.json({ error: 'Order is not paid' }, { status: 400 })
-        }
+        // if (orderData?.financialStatus !== 'paid') {
+        //     return NextResponse.json({ error: 'Order is not paid' }, { status: 400 })
+        // }
 
         // Get access token
         const storeData = shopDoc?.data();

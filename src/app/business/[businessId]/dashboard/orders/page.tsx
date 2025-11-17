@@ -1378,7 +1378,7 @@ export default function BusinessOrdersPage() {
                                         {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
                                             <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                         )}
-                                        {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab) && (
+                                        {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds', 'DTO Refunded'].includes(activeTab) && (
                                             <TableHead className="font-medium text-muted-foreground">Return AWB</TableHead>
                                         )}
                                         <TableHead className="font-medium text-muted-foreground">Customer</TableHead>
@@ -1404,7 +1404,7 @@ export default function BusinessOrdersPage() {
                                                 {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
                                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                                 )}
-                                                {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds'].includes(activeTab) && (
+                                                {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds', 'DTO Refunded'].includes(activeTab) && (
                                                     <TableCell className="py-2"><Skeleton className="h-5 w-24" /></TableCell>
                                                 )}
                                                 <TableCell className="py-2"><Skeleton className="h-5 w-32" /></TableCell>

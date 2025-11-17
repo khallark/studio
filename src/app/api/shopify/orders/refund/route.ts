@@ -118,7 +118,6 @@ export async function POST(req: NextRequest) {
                                         amount: refundAmount.toFixed(2),
                                         currencyCode: currency,
                                     },
-                                    note: `Refund for order ${orderData?.name || orderId}`,
                                 },
                             },
                         }),

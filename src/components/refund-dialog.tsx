@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Order } from '@/types/order';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useProcessRefund } from '@/hooks/use-order-mutations';
 import { User } from 'firebase/auth';
 
 interface RefundDialogProps {
@@ -41,8 +42,10 @@ export function RefundDialog({
 }: RefundDialogProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string | number>>(new Set());
   const [refundMethod, setRefundMethod] = useState<RefundMethod>('store_credit');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Use the mutation hook
+  const processRefund = useProcessRefund(businessId, user);
 
   // Get line items from order
   const lineItems = order.raw.line_items || [];
@@ -80,58 +83,42 @@ export function RefundDialog({
   };
 
   // Handle refund submission
-  const handleRefund = async () => {
+  const handleRefund = () => {
     if (selectedItems.size === 0) {
       setError('Please select at least one item to refund');
       return;
     }
 
-    setIsProcessing(true);
     setError(null);
 
-    try {
-      const response = await fetch('/api/shopify/orders/refund', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    processRefund.mutate(
+      {
+        orderId: order.id,
+        storeId: order.storeId,
+        selectedItemIds: Array.from(selectedItems),
+        refundAmount,
+        refundMethod,
+        currency: order.currency,
+        customerId: Number(order.raw.customer?.id),
+      },
+      {
+        onSuccess: () => {
+          onRefundSuccess();
+          onClose();
+          // Reset state
+          setSelectedItems(new Set());
+          setRefundMethod('store_credit');
         },
-        body: JSON.stringify({
-          businessId,
-          shop: order.storeId,
-          orderId: order.id,
-          selectedItemIds: Array.from(selectedItems),
-          refundAmount,
-          refundMethod,
-          currency: order.currency,
-          customerId: order.raw.customer?.id,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.details || 'Failed to process refund');
+        onError: (err: any) => {
+          setError(err.message || 'An unexpected error occurred');
+        },
       }
-
-      // Success!
-      onRefundSuccess();
-      onClose();
-      
-      // Reset state
-      setSelectedItems(new Set());
-      setRefundMethod('store_credit');
-      
-    } catch (err: any) {
-      console.error('Refund error:', err);
-      setError(err.message || 'An unexpected error occurred');
-    } finally {
-      setIsProcessing(false);
-    }
+    );
   };
 
   // Reset state when dialog closes
   const handleClose = () => {
-    if (!isProcessing) {
+    if (!processRefund.isPending) {
       setSelectedItems(new Set());
       setRefundMethod('store_credit');
       setError(null);
@@ -288,14 +275,14 @@ export function RefundDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
+          <Button variant="outline" onClick={handleClose} disabled={processRefund.isPending}>
             Cancel
           </Button>
           <Button
             onClick={handleRefund}
-            disabled={isProcessing || selectedItems.size === 0}
+            disabled={processRefund.isPending || selectedItems.size === 0}
           >
-            {isProcessing ? (
+            {processRefund.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...

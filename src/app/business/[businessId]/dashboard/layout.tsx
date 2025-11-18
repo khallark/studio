@@ -325,7 +325,7 @@ export default function BusinessLayout({
             </SidebarContent>
 
             <SidebarFooter>
-              {/* <SidebarMenu>
+              <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -337,8 +337,7 @@ export default function BusinessLayout({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </SidebarMenu> */}
-
+              </SidebarMenu>
               {user && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

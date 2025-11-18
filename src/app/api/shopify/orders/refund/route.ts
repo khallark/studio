@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
         // Update Firestore order document
         const updateData: any = {
             refundedAmount: refundAmount,
+            refundMethod: refundMethod,
             customStatus: 'DTO Refunded',
             lastStatusUpdate: FieldValue.serverTimestamp(),
             customStatusesLogs: FieldValue.arrayUnion({

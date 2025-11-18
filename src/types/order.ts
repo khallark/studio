@@ -65,6 +65,7 @@ export interface Order {
   returnItemsVariantIds?: (string | number)[];
   vendorName?: string;
   vendors: string[];
+  unboxing_video_path?: string;
   raw: {
     cancelled_at: string | null;
     customer?: {

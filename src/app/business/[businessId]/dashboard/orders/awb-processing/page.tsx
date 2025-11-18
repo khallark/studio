@@ -1,4 +1,4 @@
-// app/business/[businessId]/orders/awb-processing/page.tsx
+// app/business/[businessId]/dashboard/orders/awb-processing/page.tsx
 
 'use client';
 
@@ -41,6 +41,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useAwbCount } from '@/hooks/use-awb-count';
+import { useBusinessContext } from '../../../layout';
 
 type ShipmentBatch = {
   id: string;
@@ -67,14 +68,14 @@ type BatchType = 'forward' | 'return';
 
 export default function BusinessAwbProcessingPage() {
   const params = useParams();
-  const businessId = params?.businessId as string;
 
   const {
     isAuthorized,
     stores,
     loading: authLoading,
     user,
-  } = useBusinessAuthorization(businessId);
+    businessId,
+  } = useBusinessContext();
 
   const [isFetchAwbDialogOpen, setIsFetchAwbDialogOpen] = useState(false);
   const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);

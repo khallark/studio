@@ -44,7 +44,6 @@ export function useBusinessAuthorization(businessId: string) {
           description: 'Business ID is missing or invalid.',
           variant: 'destructive',
         });
-        router.push('/');
         return;
       }
 
@@ -64,7 +63,6 @@ export function useBusinessAuthorization(businessId: string) {
             description: 'You do not have access to this business.',
             variant: 'destructive',
           });
-          router.push('/');
           return;
         }
 
@@ -110,7 +108,6 @@ export function useBusinessAuthorization(businessId: string) {
           description: 'An error occurred while checking your permissions.',
           variant: 'destructive',
         });
-        router.push('/');
       }
     }
 

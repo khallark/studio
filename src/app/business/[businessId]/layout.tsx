@@ -24,8 +24,12 @@ export default function BusinessLayout({
   const businessId = params?.businessId as string;
   
   const businessAuth = useBusinessAuthorization(businessId);
-
   const { isAuthorized, loading } = businessAuth;
+
+  useEffect(() => {
+    if(loading) return;
+    if(isAuthorized) router.push(`/business/${businessId}/dashboard/orders`);
+  }, [isAuthorized, loading, businessId, router])
 
   // Loading state
   if (loading) {
@@ -35,11 +39,6 @@ export default function BusinessLayout({
       </div>
     );
   }
-
-  useEffect(() => {
-    if(loading) return;
-    if(isAuthorized) router.push(`/business/${businessId}/dashboard/orders`);
-  }, [isAuthorized, loading, businessId, router])
 
   // Not authorized - show 404
   if (!isAuthorized) {

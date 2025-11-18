@@ -379,7 +379,7 @@ export function RefundDialog({
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           {item.sku && <span>SKU: {item.sku}</span>}
                           <span>Qty: {item.quantity}</span>
-                          <span>
+                          <span className='font-mono'>
                             Price: {new Intl.NumberFormat('en-US', {
                               style: 'currency',
                               currency: order.currency,
@@ -497,6 +497,7 @@ export function RefundDialog({
           <Button
             onClick={handleRefund}
             disabled={processRefund.isPending || selectedItems.size === 0 || !isValidAmount}
+            className='font-mono'
           >
             {processRefund.isPending ? (
               <>

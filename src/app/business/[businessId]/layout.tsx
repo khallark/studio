@@ -5,15 +5,6 @@ import { useParams } from 'next/navigation';
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { createContext, useContext } from 'react';
 
-// Create context to share with child pages
-export const BusinessContext = createContext<ReturnType<typeof useBusinessAuthorization> | null>(null);
-
-export function useBusiness() {
-  const context = useContext(BusinessContext);
-  if (!context) throw new Error('useBusiness must be used within BusinessLayout');
-  return context;
-}
-
 export default function BusinessLayout({ 
   children 
 }: { 
@@ -48,8 +39,8 @@ export default function BusinessLayout({
 
   // Provide business context to all children
   return (
-    <BusinessContext.Provider value={businessAuth}>
+    <>
       {children}
-    </BusinessContext.Provider>
+    </>
   );
 }

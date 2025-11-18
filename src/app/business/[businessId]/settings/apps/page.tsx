@@ -1,4 +1,4 @@
-// /store/[storeId]/settings/apps/page.tsx
+// /business/[businessId]/settings/apps/page.tsx
 
 'use client';
 
@@ -12,8 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -41,8 +40,6 @@ import {
 import { Reorder } from "framer-motion"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
-import { useParams } from 'next/navigation';
 import { useBusinessContext } from '../../layout';
 
 interface CourierSetting {

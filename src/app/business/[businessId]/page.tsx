@@ -2,16 +2,12 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useBusinessContext } from './layout';
 
 export default function BusinessPage() {
   const router = useRouter();
-  // const businessId = params?.businessId as string;
-
-  // const { isAuthorized, loading } = useBusinessAuthorization(businessId);
   const { isAuthorized, loading, businessId } = useBusinessContext();
 
   useEffect(() => {

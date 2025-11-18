@@ -1,9 +1,9 @@
 
-// store/[storeId]/settings/pickup-locations
+// business/[businessId]/settings/pickup-locations
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -34,13 +34,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, MapPin, Edit, Trash2 } from 'lucide-react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, onSnapshot, DocumentReference } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, DocumentReference } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useParams } from 'next/navigation';
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 import { useBusinessContext } from '../../layout';
 
 interface Location {
@@ -52,16 +49,8 @@ interface Location {
     country: string;
 }
 
-interface UserData {
-    activeAccountId: string | null;
-}
-
-type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
-
 
 export default function PickupLocationsPage() {
-    const params = useParams();
-    const nonPrefixedStoreId = params?.storeId as string;
     const { isAuthorized, loading: authLoading, user, businessId } = useBusinessContext();
 
     const { toast } = useToast();

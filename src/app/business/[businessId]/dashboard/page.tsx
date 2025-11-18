@@ -1,4 +1,4 @@
-// app/business/[businessId]/dashboard/page.tsx
+// /business/[businessId]/dashboard/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -10,11 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Zap } from 'lucide-react';
 import React, { useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 import { useBusinessContext } from '../layout';
 
 export default function Dashboard() {
@@ -23,7 +19,6 @@ export default function Dashboard() {
   // ============================================================
   
   // Business level authorization
-  // const businessAuth = useBusinessAuthorization(businessId);
   const businessAuth = useBusinessContext();
 
   useEffect(() => {

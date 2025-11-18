@@ -1,9 +1,8 @@
-// app/business/[businessId]/dashboard/orders/awb-processing/page.tsx
+// /business/[businessId]/dashboard/orders/awb-processing/page.tsx
 
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import {
   collection,
@@ -39,7 +38,6 @@ import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
 import { AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog';
-import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { useAwbCount } from '@/hooks/use-awb-count';
 import { useBusinessContext } from '../../../layout';
 
@@ -67,8 +65,6 @@ interface Order {
 type BatchType = 'forward' | 'return';
 
 export default function BusinessAwbProcessingPage() {
-  const params = useParams();
-
   const {
     isAuthorized,
     stores,

@@ -7,22 +7,11 @@ import { Home, User, Smartphone, MapPin, FileText } from 'lucide-react';
 import {
   SidebarProvider,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter, useParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 import { useBusinessContext } from '../layout';
 
 export default function SettingsLayout({
@@ -71,7 +60,6 @@ export default function SettingsLayout({
     { href: `/business/${businessId}/settings`, label: 'Store Details', icon: User },
     { href: `/business/${businessId}/settings/apps`, label: 'Apps & Integrations', icon: Smartphone },
     { href: `/business/${businessId}/settings/pickup-locations`, label: 'Pickup Locations', icon: MapPin },
-    { href: `/business/${businessId}/settings/slip-designer`, label: 'Slip Designer', icon: FileText },
   ];
 
   return (

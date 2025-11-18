@@ -1,4 +1,4 @@
-// /store/[storeId]/settings/page.tsx
+// /business/[businessId]/settings/page.tsx
 
 'use client';
 
@@ -13,16 +13,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useParams } from 'next/navigation';
-import { useStoreAuthorization } from '@/hooks/use-store-authorization';
 import { useBusinessContext } from '../layout';
 
 interface CompanyAddress {
@@ -50,8 +46,6 @@ interface SettingsData {
     primaryContact?: PrimaryContact;
     customerServices?: CustomerServices;
 }
-
-type MemberRole = 'SuperAdmin' | 'Admin' | 'Staff' | 'Vendor';
 
 export default function SettingsPage() {
     const { isAuthorized, loading: authLoading, user, businessId } = useBusinessContext();

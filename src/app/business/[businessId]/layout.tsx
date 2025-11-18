@@ -1,7 +1,7 @@
 // app/business/[businessId]/layout.tsx
 'use client';
 
-import { useParams, useRouter } from 'next/navigation'; // ✅ Both from next/navigation
+import { useParams, usePathname, useRouter } from 'next/navigation'; // ✅ Both from next/navigation
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { createContext, useContext, useEffect } from 'react';
 
@@ -21,6 +21,7 @@ export default function BusinessLayout({
 }) {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const businessId = params?.businessId as string;
   
   const businessAuth = useBusinessAuthorization(businessId);
@@ -28,7 +29,9 @@ export default function BusinessLayout({
 
   useEffect(() => {
     if(loading) return;
-    if(isAuthorized) router.push(`/business/${businessId}/dashboard/orders`);
+    if (isAuthorized && pathname === `/business/${businessId}`) {
+      router.push(`/business/${businessId}/dashboard/orders`);
+    }
   }, [isAuthorized, loading, businessId, router])
 
   // Loading state

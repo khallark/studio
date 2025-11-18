@@ -1,4 +1,4 @@
-// app/business/[businessId]/layout.tsx
+// /business/[businessId]/dashboard/layout.tsx
 'use client';
 
 import Link from 'next/link';
@@ -28,9 +28,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { usePathname, useRouter, useParams } from 'next/navigation';
-import React, { createContext, useCallback, useContext } from 'react';
-import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
+import { usePathname, useRouter } from 'next/navigation';
+import React, { useCallback } from 'react';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';

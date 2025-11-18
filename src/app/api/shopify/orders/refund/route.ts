@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { sendDTORefundedWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 
 export async function POST(req: NextRequest) {
     try {
@@ -169,6 +170,14 @@ export async function POST(req: NextRequest) {
         };
 
         await orderRef?.update(updateData);
+
+
+        try {
+            const shopData = (await db.collection('accounts').doc('nfkjgp-sv.myshopify.com').get()).data() as any;
+            sendDTORefundedWhatsAppMessage(shopData, orderData as any);
+        } catch (error: any) {
+            console.error(`Whatsapp sending error: ${error?.message}`);
+        }
 
         return NextResponse.json({
             success: true,

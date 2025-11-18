@@ -314,7 +314,7 @@ export function RefundDialog({
                 <Separator />
               </>
             )}
-            
+
             {/* Line Items Selection */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -361,6 +361,11 @@ export function RefundDialog({
                                 Return Item
                               </Badge>
                             )}
+                            {item.qc_status ??
+                              <Badge variant="secondary" className="ml-2">
+                                {item.qc_status}
+                              </Badge>
+                            }
                           </div>
                           <div className="text-right">
                             <p className="font-mono text-sm">

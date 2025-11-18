@@ -349,7 +349,7 @@ export function RefundDialog({
                       />
                       <div className="flex-1 space-y-1">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
+                          <div className="flex-1 gap-2">
                             <Label
                               htmlFor={`item-${itemId}`}
                               className="font-medium cursor-pointer"
@@ -361,11 +361,11 @@ export function RefundDialog({
                                 Return Item
                               </Badge>
                             )}
-                            {item.qc_status ??
+                            {item.qc_status && (
                               <Badge variant='success' className="ml-2">
                                 {item.qc_status}
                               </Badge>
-                            }
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="font-mono text-sm">

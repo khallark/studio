@@ -362,7 +362,7 @@ export function RefundDialog({
                               </Badge>
                             )}
                             {item.qc_status ??
-                              <Badge variant="secondary" className="ml-2">
+                              <Badge variant='success' className="ml-2">
                                 {item.qc_status}
                               </Badge>
                             }

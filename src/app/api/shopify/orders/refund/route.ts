@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
 
         try {
             const shopData = (await db.collection('accounts').doc('nfkjgp-sv.myshopify.com').get()).data() as any;
-            sendDTORefundedWhatsAppMessage(shopData, orderData as any);
+            await sendDTORefundedWhatsAppMessage(shopData, orderData as any);
         } catch (error: any) {
             console.error(`Whatsapp sending error: ${error?.message}`);
         }

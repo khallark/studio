@@ -380,7 +380,7 @@ export async function POST(req: NextRequest) {
       if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
         const shopDoc = (await accountRef.get()).data() as any;
         console.log('Trying to send message');
-        sendNewOrderWhatsAppMessage(shopDoc, {
+        await sendNewOrderWhatsAppMessage(shopDoc, {
           orderId: dataToSave.orderId,
           createdAt: dataToSave.createdAt,
           name: dataToSave.name,

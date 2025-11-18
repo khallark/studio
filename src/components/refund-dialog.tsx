@@ -241,7 +241,7 @@ export function RefundDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Process Refund - {order.name}</DialogTitle>
           <DialogDescription>
@@ -249,8 +249,8 @@ export function RefundDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6">
+        <ScrollArea className="flex-1 overflow-y-auto pr-4 -mr-4">
+          <div className="space-y-6 py-4">
             {/* Customer Images and QC Video Section */}
             {hasMedia && (
               <>
@@ -314,7 +314,7 @@ export function RefundDialog({
                 <Separator />
               </>
             )}
-
+            
             {/* Line Items Selection */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -485,7 +485,7 @@ export function RefundDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 pt-4 border-t">
           <Button variant="outline" onClick={handleClose} disabled={processRefund.isPending}>
             Cancel
           </Button>

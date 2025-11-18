@@ -1,10 +1,9 @@
 // app/business/[businessId]/layout.tsx
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // ✅ Both from next/navigation
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { createContext, useContext, useEffect } from 'react';
-import { useRouter } from 'next/router';
 
 // Create context to share with child pages
 export const BusinessContext = createContext<ReturnType<typeof useBusinessAuthorization> | null>(null);
@@ -39,8 +38,8 @@ export default function BusinessLayout({
 
   useEffect(() => {
     if(loading) return;
-    if(isAuthorized) router.push(`/business/${businessId}/dasboard/orders`);
-  }, [isAuthorized, loading])
+    if(isAuthorized) router.push(`/business/${businessId}/dashboard/orders`);
+  }, [isAuthorized, loading, businessId, router])
 
   // Not authorized - show 404
   if (!isAuthorized) {

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { authUserForBusiness, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 async function getShiprocketToken(email: string, password: string): Promise<string> {
   const response = await fetch('https://apiv2.shiprocket.in/v1/external/auth/login', {
@@ -23,18 +23,14 @@ async function getShiprocketToken(email: string, password: string): Promise<stri
 
 export async function POST(req: NextRequest) {
   try {
-    const { businessId, shop, email, password } = await req.json();
+    const { businessId, email, password } = await req.json();
 
     if (!businessId) {
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
-    if (!shop) {
-      return NextResponse.json({ error: 'No active shop selected.' }, { status: 400 });
-    }
-
     // ----- Auth -----
-    const result = await authUserForBusinessAndStore({ businessId, shop, req });
+    const result = await authUserForBusiness({ businessId, req });
 
     if (!result.authorised) {
       const { error, status } = result;
@@ -48,20 +44,20 @@ export async function POST(req: NextRequest) {
     // Get Shiprocket token to validate credentials
     const token = await getShiprocketToken(email, password);
 
-    const { memberDoc } = result;
-    const memberRole = memberDoc?.data()?.role;
-    if (!memberRole) {
-      return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
-    }
+    const { businessDoc } = result;
+    // const memberRole = memberDoc?.data()?.role;
+    // if (!memberRole) {
+    //   return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
+    // }
 
-    let targetRef;
-    if (memberRole === 'Vendor') {
-      targetRef = memberDoc?.ref;
-    } else {
-      targetRef = db.collection('accounts').doc(shop);
-    }
+    // let targetRef;
+    // if (memberRole === 'Vendor') {
+    //   targetRef = memberDoc?.ref;
+    // } else {
+    //   targetRef = db.collection('accounts').doc(shop);
+    // }
 
-    await targetRef.set({
+    await businessDoc?.ref.set({
       integrations: {
         couriers: {
           shiprocket: {

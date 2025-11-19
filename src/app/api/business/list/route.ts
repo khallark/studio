@@ -1,7 +1,8 @@
-// /api/businesses/list/route.ts
+// app/api/businesses/list/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { getUserIdFromToken } from '@/lib/authoriseUser';
+import { useId } from 'react';
 
 export async function GET(request: NextRequest) {
     try {
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
                 { status: 401 }
             );
         }
+
         const userId = await getUserIdFromToken(request);
 
         if (!userId) {
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get user's business document
-        const userBusinessRef = adminDb.collection('users').doc(userId);
+        const userBusinessRef = adminDb.collection('businesses').doc(userId);
         const userBusinessSnap = await userBusinessRef.get();
 
         if (!userBusinessSnap.exists) {
@@ -36,6 +38,11 @@ export async function GET(request: NextRequest) {
         const userData = userBusinessSnap.data();
         const businessIds: string[] = userData?.businesses || [];
 
+        // Always include user's own business (if not already in the array)
+        if (!businessIds.includes(userId)) {
+            businessIds.unshift(userId); // Add at the beginning
+        }
+
         if (businessIds.length === 0) {
             return NextResponse.json({ businesses: [] });
         }
@@ -44,7 +51,7 @@ export async function GET(request: NextRequest) {
         const businessPromises = businessIds.map(async (businessId) => {
             try {
                 // Get business document
-                const businessDocRef = adminDb.collection('users').doc(businessId);
+                const businessDocRef = adminDb.collection('businesses').doc(businessId);
                 const businessDocSnap = await businessDocRef.get();
 
                 if (!businessDocSnap.exists) {

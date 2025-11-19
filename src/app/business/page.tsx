@@ -101,10 +101,6 @@ export default function BusinessListPage() {
               <div className="h-8 w-px bg-border" />
               <h1 className="text-xl font-semibold text-foreground">Businesses</h1>
             </div>
-            <Button variant="outline" size="sm" disabled>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Business
-            </Button>
           </div>
         </div>
       </header>

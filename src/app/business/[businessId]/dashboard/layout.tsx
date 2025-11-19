@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check, Menu, X } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -14,6 +14,8 @@ import {
   SidebarFooter,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -123,6 +125,21 @@ function BusinessSwitcher({
         </div>
       )}
     </div>
+  );
+}
+
+function SidebarCloseButton() {
+  const { toggleSidebar } = useSidebar();
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="md:hidden absolute top-4 right-4"
+      onClick={toggleSidebar}
+    >
+      <X className="h-5 w-5" />
+    </Button>
   );
 }
 
@@ -334,7 +351,10 @@ export default function BusinessLayout({
       >
         <SidebarProvider>
           <Sidebar>
-            <SidebarContent>
+            <SidebarContent className="relative">
+              {/* Close button for mobile */}
+              <SidebarCloseButton />
+
               <SidebarHeader>
                 <Logo />
               </SidebarHeader>
@@ -453,6 +473,16 @@ export default function BusinessLayout({
           </Sidebar>
 
           <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
+            {/* Mobile header with hamburger menu */}
+            <header className="md:hidden sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-3">
+              <SidebarTrigger>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SidebarTrigger>
+              <Logo />
+            </header>
+
             <main className="flex-1 overflow-y-auto">
               {children}
             </main>

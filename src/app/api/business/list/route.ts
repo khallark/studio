@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Get user's business document
-        const userBusinessRef = adminDb.collection('businesses').doc(userId);
+        const userBusinessRef = adminDb.collection('users').doc(userId);
         const userBusinessSnap = await userBusinessRef.get();
 
         if (!userBusinessSnap.exists) {
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         const businessPromises = businessIds.map(async (businessId) => {
             try {
                 // Get business document
-                const businessDocRef = adminDb.collection('businesses').doc(businessId);
+                const businessDocRef = adminDb.collection('users').doc(businessId);
                 const businessDocSnap = await businessDocRef.get();
 
                 if (!businessDocSnap.exists) {

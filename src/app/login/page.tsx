@@ -35,7 +35,7 @@ function LoginComponent() {
   })
 
   const handleSuccessfulLogin = () => {
-      router.push(redirectUrl || '/dashboard');
+      router.push(redirectUrl || '/business');
   };
 
   const handleGoogleLogin = async () => {

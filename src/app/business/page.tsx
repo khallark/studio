@@ -133,10 +133,6 @@ export default function BusinessListPage() {
                 <p className="text-sm text-muted-foreground text-center max-w-sm mb-4">
                   You don't have access to any businesses yet. Contact your administrator or create a new business.
                 </p>
-                <Button variant="outline" disabled>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Business
-                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -193,7 +189,7 @@ export default function BusinessListPage() {
           {businesses.length > 0 && (
             <div className="mt-8 p-4 rounded-lg border bg-muted/50">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Tip:</strong> Your personal business (where your user ID matches the business ID) is always displayed first and highlighted.
+                <strong className="text-foreground">Tip:</strong> You, as a business always display first and highlighted.
               </p>
             </div>
           )}

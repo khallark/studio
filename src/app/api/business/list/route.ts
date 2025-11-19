@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { getUserIdFromToken } from '@/lib/authoriseUser';
-import { useId } from 'react';
 
 export async function GET(request: NextRequest) {
     try {

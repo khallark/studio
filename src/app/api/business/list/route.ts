@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
                 return {
                     businessId,
-                    businessName: businessData?.primaryContact?.name || 'Unnamed Business',
+                    businessName: businessData?.primaryContact?.name || businessData?.profile?.displayName || 'Unnamed Business',
                     memberCount: membersSnap.size,
                     isOwnBusiness: businessId === userId,
                 };

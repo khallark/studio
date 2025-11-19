@@ -71,7 +71,7 @@ function BusinessSwitcher({
   if (!currentBusiness) return null;
 
   return (
-    <div className="relative px-2 py-2" ref={dropdownRef}>
+    <div className="relative px-2 pb-2" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-sidebar-accent/50 hover:bg-sidebar-accent rounded-md transition-colors w-full group"
@@ -89,7 +89,7 @@ function BusinessSwitcher({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 left-2 right-2 bg-popover border border-border rounded-md shadow-lg max-h-[280px] overflow-y-auto">
+        <div className="absolute z-50 bottom-full mb-1 left-2 right-2 bg-popover border border-border rounded-md shadow-lg max-h-[280px] overflow-y-auto">
           <div className="py-1">
             {businesses.map((business) => (
               <button
@@ -99,7 +99,7 @@ function BusinessSwitcher({
                 className={cn(
                   "w-full px-3 py-2 flex items-center gap-2 transition-colors text-left text-sm",
                   business.currentlySelected
-                    ? "bg-accent/50 cursor-default text-muted-foreground"
+                    ? "bg-accent/20 cursor-default text-muted-foreground"
                     : "hover:bg-accent cursor-pointer text-foreground"
                 )}
               >
@@ -110,10 +110,7 @@ function BusinessSwitcher({
                   )}
                 />
                 <span
-                  className={cn(
-                    "flex-1 truncate",
-                    business.currentlySelected && "font-semibold"
-                  )}
+                  className="flex-1 truncate"
                 >
                   {business.name}
                 </span>
@@ -342,14 +339,6 @@ export default function BusinessLayout({
                 <Logo />
               </SidebarHeader>
 
-              {/* Business Switcher */}
-              {joinedBusinesses && joinedBusinesses.length > 0 && (
-                <BusinessSwitcher
-                  businesses={joinedBusinesses}
-                  currentBusinessId={businessId}
-                />
-              )}
-
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -396,6 +385,14 @@ export default function BusinessLayout({
             </SidebarContent>
 
             <SidebarFooter>
+              {/* Business Switcher - Above Settings */}
+              {joinedBusinesses && joinedBusinesses.length > 0 && (
+                <BusinessSwitcher
+                  businesses={joinedBusinesses}
+                  currentBusinessId={businessId}
+                />
+              )}
+
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -409,6 +406,7 @@ export default function BusinessLayout({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
+
               {user && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -4,8 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, ChevronRight, Loader2, Plus, Users, Crown } from 'lucide-react';
@@ -24,6 +23,7 @@ export default function BusinessListPage() {
   const router = useRouter();
   const [businesses, setBusinesses] = useState<BusinessMembership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = 'My Businesses';
@@ -35,65 +35,27 @@ export default function BusinessListPage() {
     const fetchBusinesses = async () => {
       try {
         setLoading(true);
-        const businessList: BusinessMembership[] = [];
+        setError(null);
 
-        // Get user's business document to access the businesses array
-        const userBusinessRef = doc(db, 'businesses', user.uid);
-        const userBusinessSnap = await getDoc(userBusinessRef);
+        const idToken = await user.getIdToken();
 
-        if (!userBusinessSnap.exists()) {
-          console.warn('User business document not found');
-          setLoading(false);
-          return;
+        const response = await fetch('/api/business/list', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch businesses');
         }
 
-        const userData = userBusinessSnap.data();
-        const businessIds: string[] = userData.businesses || [];
-
-        // Fetch details for each business
-        const businessDetails = await Promise.all(
-          businessIds.map(async (businessId) => {
-            try {
-              // Get business document
-              const businessDocRef = doc(db, 'businesses', businessId);
-              const businessDocSnap = await getDoc(businessDocRef);
-
-              if (!businessDocSnap.exists()) {
-                console.warn(`Business ${businessId} not found`);
-                return null;
-              }
-
-              const businessData = businessDocSnap.data();
-
-              // Count members
-              const membersRef = collection(db, `businesses/${businessId}/members`);
-              const membersSnap = await getDocs(membersRef);
-
-              return {
-                businessId,
-                businessName: businessData.primaryContact?.name || 'Unnamed Business',
-                memberCount: membersSnap.size,
-                isOwnBusiness: businessId === user.uid,
-              };
-            } catch (error) {
-              console.error(`Error fetching business ${businessId}:`, error);
-              return null;
-            }
-          })
-        );
-
-        // Filter out nulls and sort: own business first, then by name
-        const validBusinesses = businessDetails
-          .filter((b): b is BusinessMembership => b !== null)
-          .sort((a, b) => {
-            if (a.isOwnBusiness) return -1;
-            if (b.isOwnBusiness) return 1;
-            return a.businessName.localeCompare(b.businessName);
-          });
-
-        setBusinesses(validBusinesses);
+        const data = await response.json();
+        setBusinesses(data.businesses || []);
       } catch (error) {
         console.error('Error fetching businesses:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load businesses');
       } finally {
         setLoading(false);
       }
@@ -107,6 +69,23 @@ export default function BusinessListPage() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading your businesses...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="rounded-full bg-destructive/10 p-4 w-16 h-16 mx-auto flex items-center justify-center">
+            <Building2 className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="text-2xl font-semibold">Failed to Load Businesses</h2>
+          <p className="text-muted-foreground">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

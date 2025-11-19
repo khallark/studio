@@ -210,6 +210,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/refund/route',
       },
       {
+        source: '/api/business/list',
+        destination: '/api/business/list/route',
+      },
+      {
         source: '/api/test',
         destination: '/api/test/route',
       }

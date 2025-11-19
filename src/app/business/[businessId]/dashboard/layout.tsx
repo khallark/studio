@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, History, MoveRight } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -29,12 +29,105 @@ import { Logo } from '@/components/logo';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
+
+function BusinessSwitcher({
+  businesses,
+  currentBusinessId
+}: {
+  businesses: Array<{ id: string; name: string; currentlySelected: boolean }>;
+  currentBusinessId: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  const currentBusiness = businesses.find(b => b.currentlySelected);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const handleBusinessSwitch = (businessId: string) => {
+    setIsOpen(false);
+    router.push(`/business/${businessId}/dashboard/orders`);
+  };
+
+  if (!currentBusiness || businesses.length <= 1) return null;
+
+  return (
+    <div className="relative px-2 py-2" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-2 bg-sidebar-accent/50 hover:bg-sidebar-accent rounded-md transition-colors w-full group"
+      >
+        <Building2 className="w-4 h-4 text-sidebar-foreground/70 flex-shrink-0" />
+        <span className="font-medium text-sm text-sidebar-foreground truncate flex-1 text-left">
+          {currentBusiness.name}
+        </span>
+        <ChevronDown
+          className={cn(
+            "w-4 h-4 text-sidebar-foreground/70 flex-shrink-0 transition-transform",
+            isOpen && "rotate-180"
+          )}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 left-2 right-2 bg-popover border border-border rounded-md shadow-lg max-h-[280px] overflow-y-auto">
+          <div className="py-1">
+            {businesses.map((business) => (
+              <button
+                key={business.id}
+                onClick={() => handleBusinessSwitch(business.id)}
+                disabled={business.currentlySelected}
+                className={cn(
+                  "w-full px-3 py-2 flex items-center gap-2 transition-colors text-left text-sm",
+                  business.currentlySelected
+                    ? "bg-accent/50 cursor-default text-muted-foreground"
+                    : "hover:bg-accent cursor-pointer text-foreground"
+                )}
+              >
+                <Building2
+                  className={cn(
+                    "w-4 h-4 flex-shrink-0",
+                    business.currentlySelected ? "text-muted-foreground" : "text-foreground/70"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "flex-1 truncate",
+                    business.currentlySelected && "font-semibold"
+                  )}
+                >
+                  {business.name}
+                </span>
+                {business.currentlySelected && (
+                  <Check className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BusinessLayout({
   children,
@@ -45,7 +138,7 @@ export default function BusinessLayout({
   const router = useRouter();
 
   const businessAuth = useBusinessContext();
-  const { isAuthorized, loading, user, stores, businessId } = businessAuth;
+  const { isAuthorized, loading, user, stores, businessId, joinedBusinesses } = businessAuth;
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -63,7 +156,7 @@ export default function BusinessLayout({
   };
 
   const processAwbAssignments = useCallback(async (
-    ordersToProcess: { id: string, name: string, storeId: string }[], // ✅ storeId is required
+    ordersToProcess: { id: string, name: string, storeId: string }[],
     courier: string,
     pickupName: string,
     shippingMode: string
@@ -86,7 +179,6 @@ export default function BusinessLayout({
       return;
     }
 
-    // ✅ STEP 1: Group orders by store
     const ordersByStore = ordersToProcess.reduce((acc, order) => {
       const storeId = order.storeId;
       if (!storeId) {
@@ -111,7 +203,6 @@ export default function BusinessLayout({
       return;
     }
 
-    // ✅ STEP 2: Validate all stores belong to this business
     const invalidStores = storeIds.filter(storeId => !stores.includes(storeId));
     if (invalidStores.length > 0) {
       toast({
@@ -124,7 +215,6 @@ export default function BusinessLayout({
 
     console.log(`Processing ${ordersToProcess.length} orders across ${storeIds.length} store(s)`);
 
-    // ✅ STEP 3: Make parallel API calls for each store
     try {
       const idToken = await user.getIdToken();
 
@@ -162,16 +252,13 @@ export default function BusinessLayout({
         };
       });
 
-      // ✅ STEP 4: Wait for all API calls (allow partial failures)
       const results = await Promise.allSettled(apiCalls);
 
-      // ✅ STEP 5: Analyze results
       const successful = results.filter(r => r.status === 'fulfilled');
       const failed = results.filter(r => r.status === 'rejected');
 
       console.log(`Results: ${successful.length} successful, ${failed.length} failed`);
 
-      // ✅ STEP 6: Show appropriate toasts
       if (successful.length > 0) {
         const totalOrders = successful.reduce((sum, r) =>
           sum + (r.status === 'fulfilled' ? r.value.count : 0), 0
@@ -217,7 +304,7 @@ export default function BusinessLayout({
       });
     }
 
-  }, [user, businessId, stores, toast]);
+  }, [user, businessId, stores]);
 
   // Loading state
   if (loading) {
@@ -254,6 +341,15 @@ export default function BusinessLayout({
               <SidebarHeader>
                 <Logo />
               </SidebarHeader>
+
+              {/* Business Switcher */}
+              {joinedBusinesses && joinedBusinesses.length > 1 && (
+                <BusinessSwitcher
+                  businesses={joinedBusinesses}
+                  currentBusinessId={businessId}
+                />
+              )}
+
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -296,30 +392,6 @@ export default function BusinessLayout({
                     </CollapsibleContent>
                   </Collapsible>
                 </SidebarMenuItem>
-
-                {/* <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(`/business/${businessId}/members`)}
-                  >
-                    <Link href={`/business/${businessId}/members`}>
-                      <Users />
-                      Members
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem> */}
-
-                {/* <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(`/business/${businessId}/logs`)}
-                  >
-                    <Link href={`/business/${businessId}/logs`}>
-                      <History />
-                      Logs
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem> */}
               </SidebarMenu>
             </SidebarContent>
 

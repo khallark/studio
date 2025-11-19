@@ -18,11 +18,19 @@ export interface BusinessContextType {
   vendorName: string | null;
 }
 
+interface JoinedBusiness {
+  id: string;
+  name: string;
+  currentlySelected: boolean;
+}
+
 export function useBusinessAuthorization(businessId: string) {
   const [user, userLoading] = useAuthState(auth);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [member, setMember] = useState<any | null>(null);
+  const [userIsBusiness, setUserIsBusiness] = useState<boolean | null>(null);
   const [stores, setStores] = useState<string[]>([]);
+  const [joinedBusinesses, setJoinedBusinesses] = useState<JoinedBusiness[] | null>(null);
   const [vendorName, setVendorName] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -68,8 +76,10 @@ export function useBusinessAuthorization(businessId: string) {
 
         const data = await response.json();
         setIsAuthorized(true);
+        setUserIsBusiness(data.userIsBusiness);
         setMember(data.member);
         setStores(data.stores || []); // All stores in the business
+        setJoinedBusinesses(data.joinedBusinesses || []);
         setVendorName(data.vendorName || null);
         
         // ✅ ADD: Set custom claims for Firebase Storage access
@@ -116,9 +126,11 @@ export function useBusinessAuthorization(businessId: string) {
 
   return {
     isAuthorized,
+    userIsBusiness,
     member,
     memberRole: member?.role || null,
     stores, // Array of ALL store IDs in this business
+    joinedBusinesses,
     vendorName,
     loading: userLoading || isAuthorized === null,
     user,

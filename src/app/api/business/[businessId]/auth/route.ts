@@ -55,10 +55,31 @@ export async function GET(
         { status: 403 }
       );
     }
-
     // Get the business data
     const businessData = businessDoc.data();
-    const memberData = memberDoc.data();
+    const arr: string[] = businessData?.businesses || []; // Default to empty array
+
+    // Include current business and all joined businesses (removing duplicates)
+    const businessIds = Array.from(new Set([currentUserId, ...arr]));
+
+    let joinedBusinesses = await Promise.all(
+      businessIds.map(async (id: string) => {
+        const businessDoc = await db.collection('users').doc(id).get();
+        if (businessDoc.exists) {
+          const data = businessDoc.data();
+          return {
+            id,
+            name: data?.primaryContact?.name || data?.profile?.displayName || 'Unnamed Business',
+            currentlySelected: id === businessId, // Mark current as selected
+          };
+        }
+        return null;
+      })
+    );
+
+    // Filter out null values only
+    joinedBusinesses = joinedBusinesses.filter((item): item is NonNullable<typeof item> => item !== null);
+    const memberData = memberDoc.exists ? memberDoc.data() : null;
 
     // Get the list of stores (accounts) in this business
     const stores = businessData?.stores || [];
@@ -66,17 +87,19 @@ export async function GET(
     return NextResponse.json({
       authorized: true,
       businessId,
-      member: {
+      userIsBusiness: businessId === currentUserId,
+      member: memberData ? {
         id: memberDoc.id,
         permissions: memberData?.permissions || {},
-      },
+      } : null,
       stores, // Array of store IDs
+      joinedBusinesses,
       vendorName: businessData?.vendorName || null,
       currentUserId,
     });
   } catch (error) {
     console.error('Business authorization error:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('auth/id-token-expired')) {
         return NextResponse.json(
@@ -93,7 +116,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { error: 'Business authorization check failed' },
+      { error: `Business authorization check failed: ${error}` },
       { status: 500 }
     );
   }

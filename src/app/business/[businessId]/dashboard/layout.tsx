@@ -68,7 +68,7 @@ function BusinessSwitcher({
     router.push(`/business/${businessId}/dashboard/orders`);
   };
 
-  if (!currentBusiness || businesses.length <= 1) return null;
+  if (!currentBusiness) return null;
 
   return (
     <div className="relative px-2 py-2" ref={dropdownRef}>
@@ -343,7 +343,7 @@ export default function BusinessLayout({
               </SidebarHeader>
 
               {/* Business Switcher */}
-              {joinedBusinesses && joinedBusinesses.length > 1 && (
+              {joinedBusinesses && joinedBusinesses.length > 0 && (
                 <BusinessSwitcher
                   businesses={joinedBusinesses}
                   currentBusinessId={businessId}

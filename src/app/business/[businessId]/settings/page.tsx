@@ -71,8 +71,8 @@ export default function SettingsPage() {
 
     // 3. Get Settings Data based on Role
     useEffect(() => {
-        if (!businessId) {
-            if (!authLoading) setLoading(false);
+        if (authLoading || !isAuthorized || !businessId) {
+            if (!authLoading && !isAuthorized) setLoading(false);
             return;
         }
 
@@ -102,7 +102,7 @@ export default function SettingsPage() {
 
         return () => unsub();
 
-    }, [businessId, user, toast, authLoading]);
+    }, [businessId, isAuthorized, user, toast, authLoading]);
 
 
     const hasAddress = !!displayedData?.companyAddress?.address;

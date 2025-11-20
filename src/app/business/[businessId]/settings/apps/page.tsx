@@ -114,8 +114,8 @@ export default function AppsSettingsPage() {
 
     // 3. Get Settings Data based on Role
     useEffect(() => {
-        if (!businessId) {
-            if (!authLoading) setDataLoading(false);
+        if (authLoading || !isAuthorized || !businessId) {
+            if (!authLoading && !isAuthorized) setDataLoading(false);
             return;
         }
 
@@ -149,7 +149,7 @@ export default function AppsSettingsPage() {
         });
 
         return () => unsub();
-    }, [businessId, user, toast, authLoading]);
+    }, [businessId, user, toast, authLoading, isAuthorized]);
 
 
 

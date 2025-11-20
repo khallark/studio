@@ -73,7 +73,7 @@ export default function PickupLocationsPage() {
     }, [])
 
     useEffect(() => {
-        if (businessId && user) {
+        if (authLoading && isAuthorized && businessId && user) {
             setLoading(true);
 
             const locationsRef = collection(db, 'users', businessId, 'pickupLocations');
@@ -96,7 +96,7 @@ export default function PickupLocationsPage() {
         } else if (!authLoading && (!businessId)) {
             setLoading(false);
         }
-    }, [businessId, user, toast, authLoading]);
+    }, [businessId, isAuthorized, user, toast, authLoading]);
 
     useEffect(() => {
         if (editingLocation) {

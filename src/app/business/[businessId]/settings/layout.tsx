@@ -25,6 +25,7 @@ function BusinessSwitcher({
   currentBusinessId: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -45,7 +46,9 @@ function BusinessSwitcher({
 
   const handleBusinessSwitch = (businessId: string) => {
     setIsOpen(false);
-    router.push(`/business/${businessId}/dashboard/orders`);
+    // Replace the current businessId with the new one, keeping the rest of the path
+    const newPath = pathname.replace(/\/business\/[^\/]+/, `/business/${businessId}`);
+    router.push(newPath);
   };
 
   if (!currentBusiness) return null;

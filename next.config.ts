@@ -186,12 +186,16 @@ const nextConfig: NextConfig = {
         destination: '/proxy/api/checkout/verify-otp/route',
       },
       {
-        source: '/api/shops/members/create-invite',
-        destination: '/api/shops/members/create-invite/route',
+        source: '/api/business/members/create-invite',
+        destination: '/api/business/members/create-invite/route',
       },
       {
-        source: '/api/shops/members/join',
-        destination: '/api/shops/members/join/route',
+        source: '/api/business/members/join',
+        destination: '/api/business/members/join/route',
+      },
+      {
+        source: '/api/public/join-business/[sessionId]',
+        destination: '/api/public/join-business/[sessionId]/route',
       },
       {
         source: '/api/settings/get-details',
@@ -212,6 +216,10 @@ const nextConfig: NextConfig = {
       {
         source: '/api/business/list',
         destination: '/api/business/list/route',
+      },
+      {
+        source: '/api/business/[businessId]/auth',
+        destination: '/api/business/[businessId]/auth/route',
       },
       {
         source: '/api/test',

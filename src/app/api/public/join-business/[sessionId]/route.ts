@@ -1,4 +1,4 @@
-// src/app/api/public/join-shop/[sessionId]/route.ts
+// /api/public/join-business/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    const sessionRef = db.collection('join-a-shop').doc(sessionId);
+    const sessionRef = db.collection('join-a-business').doc(sessionId);
     const sessionDoc = await sessionRef.get();
 
     if (!sessionDoc.exists) {
@@ -29,13 +29,13 @@ export async function GET(
     if (sessionData.expiresAt.toDate() < new Date()) {
       return NextResponse.json({ error: 'Invitation link has expired' }, { status: 410 });
     }
-    
+
     // Return only the data needed by the client
     const clientSafeData = {
-        shopId: sessionData.shopId,
-        shopName: sessionData.shopName,
-        role: sessionData.role,
-        permissions: sessionData.permissions,
+      businessId: sessionData.businessId,
+      businessName: sessionData.businessName,
+      role: sessionData.role,
+      permissions: sessionData.permissions,
     };
 
     return NextResponse.json(clientSafeData);

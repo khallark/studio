@@ -20,26 +20,62 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Get stores for this business
-        const businessDoc = await db.collection('users').doc(businessId).get();
-        const stores = businessDoc.data()?.stores || [];
+        const userId = result.userId!;
 
-        // Set custom claims
-        await auth.setCustomUserClaims(result.userId!, {
-            businessId: businessId,
-            authorizedStores: stores,
+        // ✅ Get user's own document
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+
+        // ✅ Get user's direct stores
+        const directStores: string[] = userData?.stores || [];
+
+        // ✅ Get stores from businesses user is a member of
+        const userBusinesses: string[] = userData?.businesses || [];
+        const memberStores: string[] = [];
+
+        for (const businessId of userBusinesses) {
+            // Check if user is an active member
+            const memberDoc = await db.collection('users').doc(businessId)
+                .collection('members').doc(userId).get();
+
+            if (memberDoc.exists && memberDoc.data()?.status === 'active') {
+                // Get business's stores
+                const businessDoc = await db.collection('users').doc(businessId).get();
+                const businessStores = businessDoc.data()?.stores || [];
+                memberStores.push(...businessStores);
+            }
+        }
+
+        // ✅ Combine and deduplicate all accessible stores
+        const accessibleStores = [...new Set([...directStores, ...memberStores])];
+
+        // ✅ Get current business info for additional claims
+        const businessDoc = await db.collection('users').doc(businessId).get();
+
+        // Set custom claims with ALL accessible stores
+        await auth.setCustomUserClaims(userId, {
+            businessId: businessId, // Current active business
+            accessibleStores, // All stores user can access
             vendorName: businessDoc.data()?.vendorName,
         });
 
-        return Response.json({
+        console.log(`✅ Set custom claims for user ${userId}:`);
+        console.log(`   - Current business: ${businessId}`);
+        console.log(`   - Accessible stores: ${accessibleStores.length}`);
+        console.log(`   - Direct stores: ${directStores.length}`);
+        console.log(`   - Member stores: ${memberStores.length}`);
+
+        return NextResponse.json({
             success: true,
             businessId,
-            storeCount: stores.length
+            accessibleStoresCount: accessibleStores.length,
+            directStoresCount: directStores.length,
+            memberStoresCount: memberStores.length
         });
 
     } catch (error) {
         console.error('Set claims error:', error);
-        return Response.json({
+        return NextResponse.json({
             error: 'Failed to set claims'
         }, { status: 500 });
     }

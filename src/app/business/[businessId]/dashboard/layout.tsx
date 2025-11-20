@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check, Menu, X } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check, Menu, X, UserPlus } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -391,7 +391,6 @@ export default function BusinessLayout({
                         <SidebarMenuSubButton
                           asChild
                           isActive={pathname === `/business/${businessId}/dashboard/orders`}
-                          className={cn(pathname === '/dashboard/orders/awb-processing' && 'text-muted-foreground')}
                         >
                           <Link href={`/business/${businessId}/dashboard/orders`}>All Orders</Link>
                         </SidebarMenuSubButton>
@@ -399,6 +398,33 @@ export default function BusinessLayout({
                           asChild
                           isActive={pathname === `/business/${businessId}/dashboard/orders/awb-processing`}>
                           <Link href={`/business/${businessId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </SidebarMenuItem>
+
+                {/* Members Section */}
+                <SidebarMenuItem>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}>
+                        <div className="flex items-center gap-2">
+                          <Users />
+                          Members
+                        </div>
+                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === `/business/${businessId}/dashboard/members/invite`}>
+                          <Link href={`/business/${businessId}/dashboard/members/invite`}>
+                            <UserPlus className="h-4 w-4" />
+                            Invite
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSub>
                     </CollapsibleContent>

@@ -75,7 +75,6 @@ export function useBusinessAuthorization(businessId: string) {
         }
 
         const data = await response.json();
-        setIsAuthorized(true);
         setUserIsBusiness(data.userIsBusiness);
         setMember(data.member);
         setStores(data.stores || []); // All stores in the business
@@ -108,6 +107,8 @@ export function useBusinessAuthorization(businessId: string) {
           // Storage operations will just fail if needed
           console.error('Failed to refresh claims (non-critical):', claimsError);
         }
+
+        setIsAuthorized(true);
         
         console.log(`✅ Authorized for business: ${businessId}`);
         console.log(`📦 Stores: ${data.stores?.length || 0}`);

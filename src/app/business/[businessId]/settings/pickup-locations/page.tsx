@@ -73,7 +73,7 @@ export default function PickupLocationsPage() {
     }, [])
 
     useEffect(() => {
-        if (authLoading && isAuthorized && businessId && user) {
+        if (!authLoading && isAuthorized && businessId && user) {
             setLoading(true);
 
             const locationsRef = collection(db, 'users', businessId, 'pickupLocations');

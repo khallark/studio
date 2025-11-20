@@ -56,12 +56,12 @@ export async function GET(
       );
     }
     // Get the business data
-    const businessData = businessDoc.data();
-    const arr: string[] = businessData?.businesses || []; // Default to empty array
-
+    const userData = (await db.collection('users').doc(currentUserId).get()).data();
+    const arr: string[] = userData?.businesses || []; // Default to empty array
+    
     // Include current business and all joined businesses (removing duplicates)
     const businessIds = Array.from(new Set([currentUserId, ...arr]));
-
+    
     let joinedBusinesses = await Promise.all(
       businessIds.map(async (id: string) => {
         const businessDoc = await db.collection('users').doc(id).get();
@@ -76,12 +76,13 @@ export async function GET(
         return null;
       })
     );
-
+    
     // Filter out null values only
     joinedBusinesses = joinedBusinesses.filter((item): item is NonNullable<typeof item> => item !== null);
     const memberData = memberDoc.exists ? memberDoc.data() : null;
-
+    
     // Get the list of stores (accounts) in this business
+    const businessData = businessDoc.data();
     const stores = businessData?.stores || [];
 
     return NextResponse.json({

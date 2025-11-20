@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         console.log(`✅ Set custom claims for user ${userId}:`);
         console.log(`   - Current business: ${businessId}`);
         console.log(`   - Accessible stores: ${accessibleStores.length}`);
+        console.log(JSON.stringify(accessibleStores, null, 2));
         console.log(`   - Direct stores: ${directStores.length}`);
         console.log(`   - Member stores: ${memberStores.length}`);
 

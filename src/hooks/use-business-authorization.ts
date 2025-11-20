@@ -80,6 +80,7 @@ export function useBusinessAuthorization(businessId: string) {
         setMember(data.member);
         setStores(data.stores || []); // All stores in the business
         setJoinedBusinesses(data.joinedBusinesses || []);
+        console.log(JSON.stringify(data.joinedBusinesses, null, 2));
         setVendorName(data.vendorName || null);
         
         // ✅ ADD: Set custom claims for Firebase Storage access

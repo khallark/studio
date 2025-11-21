@@ -441,7 +441,7 @@ async function createSlipPage(
 
   y = drawWrappedText(
     page,
-    `Return Address: ${sellerDetails.returnAddress || 'Majime Productions, Udhyog Vihar Bhattian, Bahadarke Road, Ludhiana, Punjab, 141008'}`,
+    `Return Address: ${sellerDetails.returnAddress}`,
     // `Return Address: ${'Endora, 11/403-A, Laxmi Nagar, Delhi - 110092'}`,
     // `Return Address: ${'Sai arpan apartment, Greater Thane, Maharashtra, IN, 42100'}`,
     xText,
@@ -479,14 +479,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error }, { status });
     }
 
-    const { shopDoc } = result;
     const sellerDetails = {
       name:
         businessData?.companyName ||
         businessData?.businessName ||
         businessData?.primaryContact?.name ||
-        'Majime Technologies', // sensible default
-      gst: businessData?.gstin || businessData?.gst || 'NOT_CONFIGURED',
+        '-', // sensible default
+      gst: businessData?.gstin || businessData?.gst || '-',
       returnAddress: [
         businessData?.companyAddress?.address,
         businessData?.companyAddress?.city,
@@ -498,6 +497,7 @@ export async function POST(req: NextRequest) {
         .join(', '),
     };
 
+    const { shopDoc } = result;
     const ordersColRef = shopDoc?.ref.collection('orders');
     // The request sends Firestore document IDs, which are strings.
     const stringIds = orderIds.map(String);

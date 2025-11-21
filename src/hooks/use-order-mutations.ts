@@ -27,17 +27,27 @@ export function useUpdateOrderStatus(
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ orderId, status, storeId }: { orderId: string; status: CustomStatus; storeId: string | null; }) => {
-      if (!storeId || !user) throw new Error('Missing storeId or user');
+    mutationFn: async ({
+      orderId,
+      status,
+      storeId
+    }: {
+      orderId: string;
+      status: CustomStatus;
+      storeId: string | null;
+    }) => {
+      if (!storeId || !user || !orderId) {
+        throw new Error('Missing storeId or user or orderId');
+      }
 
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/shopify/orders/update-status', {
+      const response = await fetch('/api/shopify/orders/bulk-update-status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ businessId, shop: storeId, orderId, status }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds: [orderId], status }),
       });
 
       if (!response.ok) {
@@ -46,6 +56,13 @@ export function useUpdateOrderStatus(
       }
 
       return response.json();
+    },
+
+    onMutate: (variables) => {
+      toast({
+        title: 'Update in Progress',
+        description: `Updating order to "${variables.status}". Please wait.`,
+      });
     },
 
     onSuccess: () => {

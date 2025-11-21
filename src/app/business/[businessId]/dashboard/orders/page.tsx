@@ -235,6 +235,7 @@ export default function BusinessOrdersPage() {
 
     const handleDispatch = (orderIds: string[]) => {
         // Group orders by store
+
         const ordersByStore = new Map<string, string[]>();
         orderIds.forEach(orderId => {
             const order = orders.find(o => o.id === orderId);
@@ -892,6 +893,25 @@ export default function BusinessOrdersPage() {
         const isDisabled = !isAnyOrderSelected;
         const showUpdateShippedButton = shippedStatuses.includes(activeTab);
 
+        // ✅ Track loading states from mutations
+        const isUpdatingShipped = updateShippedStatuses.isPending;
+        const isDispatching = dispatchOrders.isPending;
+        const isBulkUpdating = bulkUpdate.isPending;
+        const isBookingReturn = bookReturn.isPending;
+        const isDownloadingSlips = downloadSlips.isPending;
+        const isDownloadingExcel = downloadExcel.isPending;
+        const isDownloadingProducts = downloadProductsExcel.isPending;
+
+        // ✅ Any operation in progress should disable all buttons
+        const isAnyOperationInProgress =
+            isUpdatingShipped ||
+            isDispatching ||
+            isBulkUpdating ||
+            isBookingReturn ||
+            isDownloadingSlips ||
+            isDownloadingExcel ||
+            isDownloadingProducts;
+
         return (
             <div className="flex items-center gap-2 flex-wrap justify-end">
                 {showUpdateShippedButton && (
@@ -899,8 +919,9 @@ export default function BusinessOrdersPage() {
                         variant="outline"
                         size="sm"
                         onClick={handleUpdateShippedStatuses}
-                        disabled={isDisabled}
+                        disabled={isDisabled || isUpdatingShipped || isAnyOperationInProgress}
                     >
+                        {isUpdatingShipped && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Update {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Shipped Statuses
                     </Button>
                 )}
@@ -909,41 +930,124 @@ export default function BusinessOrdersPage() {
                     switch (activeTab) {
                         case 'All Orders':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                    onClick={handleDownloadExcel}
+                                >
+                                    {isDownloadingExcel ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                        </>
+                                    )}
                                 </Button>
                             );
                         case 'New':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                                        Confirm
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        onClick={() => handleBulkUpdateStatus('Confirmed')}
+                                    >
+                                        {isBulkUpdating ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Confirming...
+                                            </>
+                                        ) : (
+                                            'Confirm'
+                                        )}
                                     </Button>
                                 </>
                             );
                         case 'Confirmed':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" onClick={() => setIsAvailabilityDialogOpen(true)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsAvailabilityDialogOpen(true)}
+                                        disabled={isAnyOperationInProgress}
+                                    >
                                         Perform Items availability
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleGeneratePOClick}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isAnyOperationInProgress}
+                                        onClick={handleGeneratePOClick}
+                                    >
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadProductsExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Products Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingProducts || isAnyOperationInProgress}
+                                        onClick={handleDownloadProductsExcel}
+                                    >
+                                        {isDownloadingProducts ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Products Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleAssignAwbClick}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isAnyOperationInProgress}
+                                        onClick={handleAssignAwbClick}
+                                    >
                                         Assign AWBs
                                     </Button>
                                 </>
@@ -951,63 +1055,188 @@ export default function BusinessOrdersPage() {
                         case 'Ready To Dispatch':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" onClick={() => {
-                                        setIsAwbBulkSelectOpen(true);
-                                        setAwbBulkSelectStatus("Ready To Dispatch");
-                                    }}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsAwbBulkSelectOpen(true);
+                                            setAwbBulkSelectStatus("Ready To Dispatch");
+                                        }}
+                                        disabled={isAnyOperationInProgress}
+                                    >
                                         <ScanBarcode className="mr-2 h-4 w-4" />
                                         AWB Bulk Selection
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => setIsGeneratePODialogOpen(true)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isAnyOperationInProgress}
+                                        onClick={() => setIsGeneratePODialogOpen(true)}
+                                    >
                                         Generate Purchase Order
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadSlips}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Slips {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingSlips || isAnyOperationInProgress}
+                                        onClick={handleDownloadSlips}
+                                    >
+                                        {isDownloadingSlips ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Slips {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                                        Dispatch {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDispatching || isAnyOperationInProgress}
+                                        onClick={() => handleBulkUpdateStatus('Dispatched')}
+                                    >
+                                        {isDispatching ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Dispatching...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Dispatch {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
                                 </>
                             );
                         case 'Delivered':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('Closed')}>
-                                    Close Orders {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                    onClick={() => handleBulkUpdateStatus('Closed')}
+                                >
+                                    {isBulkUpdating ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Closing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Close Orders {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                        </>
+                                    )}
                                 </Button>
                             );
                         case 'RTO Delivered':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" onClick={() => {
-                                        setIsAwbBulkSelectOpen(true);
-                                        setAwbBulkSelectStatus("RTO Delivered");
-                                    }}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsAwbBulkSelectOpen(true);
+                                            setAwbBulkSelectStatus("RTO Delivered");
+                                        }}
+                                        disabled={isAnyOperationInProgress}
+                                    >
                                         <ScanBarcode className="mr-2 h-4 w-4" />
                                         AWB Bulk Selection
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('RTO Closed')}>
-                                        RTO Close
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        onClick={() => handleBulkUpdateStatus('RTO Closed')}
+                                    >
+                                        {isBulkUpdating ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Closing...
+                                            </>
+                                        ) : (
+                                            'RTO Close'
+                                        )}
                                     </Button>
                                 </>
                             );
                         case 'DTO Requested':
                             return (
                                 <>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={() => handleBulkUpdateStatus('DTO Requested')}>
-                                        Book {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
+                                        onClick={() => handleBulkUpdateStatus('DTO Requested')}
+                                    >
+                                        {isBookingReturn ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Booking...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Book {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Returns
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
                                     </Button>
                                 </>
                             );
@@ -1023,9 +1252,23 @@ export default function BusinessOrdersPage() {
                         case 'Pending Refunds':
                         case 'DTO Refunded':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                    onClick={handleDownloadExcel}
+                                >
+                                    {isDownloadingExcel ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                        </>
+                                    )}
                                 </Button>
                             );
                         case 'Lost':
@@ -1033,9 +1276,23 @@ export default function BusinessOrdersPage() {
                         case 'RTO Closed':
                         case 'Cancellation Requested':
                             return (
-                                <Button variant="outline" size="sm" disabled={isDisabled} onClick={handleDownloadExcel}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                    onClick={handleDownloadExcel}
+                                >
+                                    {isDownloadingExcel ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                        </>
+                                    )}
                                 </Button>
                             );
                         default:

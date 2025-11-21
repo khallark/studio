@@ -54,6 +54,8 @@ type ShipmentBatch = {
   courier?: string;
   pickupName?: string;
   shippingMode?: string;
+  shop?: string; // Store ID that the batch was created for
+  storeId?: string; // Alternative field name
 };
 
 interface Order {
@@ -101,7 +103,7 @@ export default function BusinessAwbProcessingPage() {
     setLoading(true);
 
     // ✅ Batches are stored at: users/{businessId}/shipment_batches (or book_return_batches)
-    const collectionName = batchType === 'forward' 
+    const collectionName = batchType === 'forward'
       ? 'shipment_batches' // For forward shipments
       : 'book_return_batches'; // For return shipments
 
@@ -368,9 +370,23 @@ function BatchRow({
       setIsRetrying(true);
 
       try {
-        // ✅ Batches are at: users/{businessId}/shipment_batches/{batchId}/jobs
-        const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
+        // ✅ Get storeId from batch document (one batch = one store)
+        const batchStoreId = batch.shop || batch.storeId;
 
+        if (!batchStoreId) {
+          console.error('Batch missing store information. Batch data:', batch);
+          toast({
+            title: 'Cannot Retry',
+            description: 'This batch is missing store information. Please contact support.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        console.log(`Retrying failed jobs from batch ${batchId} for store ${batchStoreId}`);
+
+        // ✅ Fetch failed jobs
+        const collectionName = batchType === 'forward' ? 'shipment_batches' : 'book_return_batches';
         const jobsRef = collection(db, 'users', businessId, collectionName, batchId, 'jobs');
         const failedJobsQuery = query(jobsRef, where('status', '==', 'failed'));
         const failedJobsSnapshot = await getDocs(failedJobsQuery);
@@ -383,15 +399,22 @@ function BatchRow({
           return;
         }
 
-        // Extract order details from failed jobs
+        console.log(`Found ${failedJobsSnapshot.docs.length} failed jobs to retry`);
+
+        // ✅ Use batch-level storeId for ALL orders
         const ordersToProcess = failedJobsSnapshot.docs.map((jobDoc) => {
           const jobData = jobDoc.data();
+          const orderId = jobData.orderId || jobDoc.id;
+          const orderName = jobData.orderName || `#${orderId}`;
+
           return {
-            id: jobData.orderId || jobDoc.id, // jobDoc.id is the orderId
-            name: jobData.orderName || `#${jobDoc.id}`,
-            storeId: jobData.shop || jobData.storeId, // ✅ Get storeId from job data
+            id: orderId,
+            name: orderName,
+            storeId: batchStoreId, // ✅ Use batch-level storeId
           };
         });
+
+        console.log(`Prepared ${ordersToProcess.length} orders for retry with storeId: ${batchStoreId}`);
 
         handleAssignAwbClick(ordersToProcess);
       } catch (error) {
@@ -406,7 +429,7 @@ function BatchRow({
         setIsRetrying(false);
       }
     },
-    [user, toast, handleAssignAwbClick, batchType, businessId]
+    [user, toast, handleAssignAwbClick, batchType, businessId, batch]
   );
 
   const handleRetryFailed = async () => {

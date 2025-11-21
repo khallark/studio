@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL;
         const secret = process.env.ENQUEUE_FUNCTION_SECRET;
+        const orderIdsBeingSplit = new Set<string | number>(); // Track orders being split
 
         if (shop === SHARED_STORE_ID && url && secret) {
             console.log(`Processing ${orderIds.length} orders for splitting...`);
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest) {
                     }
 
                     if (orderDoc.data()?.customStatus !== 'New') {
-                        console.warn(`Order ${orderId} is not New, only New orders cab be splitted`)
+                        console.warn(`Order ${orderId} is not New, only New orders can be split`);
+                        continue;
                     }
 
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
@@ -72,34 +74,33 @@ export async function POST(req: NextRequest) {
                         continue;
                     }
 
-                    if (!vendors.includes('ENDORA') || vendors)
+                    // Check if order needs splitting (multiple vendors)
+                    if (vendors && vendors.length > 1 && (vendors.includes('ENDORA') || vendors.includes('STYLE 05'))) {
+                        console.log(`Enqueueing split for order ${orderId} (${vendors.length} vendors)`);
 
-                        // Check if order needs splitting (multiple vendors)
-                        if (vendors && vendors.length > 1 && (vendors.includes('ENDORA') || vendors.includes('STYLE 05'))) {
-                            console.log(`Enqueueing split for order ${orderId} (${vendors.length} vendors)`);
+                        const resp = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Api-Key': secret,
+                            },
+                            body: JSON.stringify({
+                                shop,
+                                orderId,
+                                requestedBy: result.userId
+                            }),
+                        });
 
-                            const resp = await fetch(url, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-Api-Key': secret,
-                                },
-                                body: JSON.stringify({
-                                    shop,
-                                    orderId,
-                                    requestedBy: result.userId
-                                }),
-                            });
-
-                            if (!resp.ok) {
-                                const json = await resp.json();
-                                console.warn(`Order ${orderId} split enqueue failed: ${json.error}`);
-                            } else {
-                                console.log(`✓ Order ${orderId} split enqueued`);
-                            }
+                        if (!resp.ok) {
+                            const json = await resp.json();
+                            console.warn(`Order ${orderId} split enqueue failed: ${json.error}`);
                         } else {
-                            console.warn(`Order ${orderId} not eligible for splitting, skipping split`)
+                            console.log(`✓ Order ${orderId} split enqueued`);
+                            orderIdsBeingSplit.add(orderId); // Mark as being split
                         }
+                    } else {
+                        console.warn(`Order ${orderId} not eligible for splitting, skipping split`);
+                    }
 
                 } catch (enqueueError) {
                     console.error(`Error enqueueing split for order ${orderId}:`, enqueueError);
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         // STEP 2: Update order statuses in transaction
         // ============================================
+        let updatedCount = 0;
         await db.runTransaction(async (transaction) => {
             // Fetch all orders first (transaction requirement)
             const orderRefs = orderIds.map(id => ordersColRef.doc(String(id)));
@@ -120,9 +122,16 @@ export async function POST(req: NextRequest) {
             for (let i = 0; i < orderRefs.length; i++) {
                 const orderRef = orderRefs[i];
                 const orderDoc = orderDocs[i];
+                const orderId = orderIds[i];
 
                 if (!orderDoc.exists) {
-                    console.warn(`Order ${orderIds[i]} not found in transaction, skipping`);
+                    console.warn(`Order ${orderId} not found in transaction, skipping`);
+                    continue;
+                }
+
+                // Skip orders that are being split
+                if (orderIdsBeingSplit.has(orderId)) {
+                    console.log(`Order ${orderId} is being split, skipping ${status} update`);
                     continue;
                 }
 
@@ -133,7 +142,7 @@ export async function POST(req: NextRequest) {
                     const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
 
                     if (!canProcess.authorised) {
-                        console.log(`Order ${orderIds[i]} not authorized, skipping update`);
+                        console.log(`Order ${orderId} not authorized, skipping update`);
                         continue;
                     }
                 }
@@ -162,12 +171,17 @@ export async function POST(req: NextRequest) {
                     lastUpdatedBy: userRefData,
                     customStatusesLogs: FieldValue.arrayUnion(log),
                 });
+
+                updatedCount++;
             }
         });
 
-        return NextResponse.json({
-            message: `${orderIds.length} order(s) successfully updated to ${status}`
-        });
+        const splitCount = orderIdsBeingSplit.size;
+        const message = splitCount > 0
+            ? `${updatedCount} order(s) successfully updated to ${status}. ${splitCount} order(s) queued for splitting (not ${status === 'Confirmed' ? 'confirmed' : 'updated'}).`
+            : `${updatedCount} order(s) successfully updated to ${status}`;
+
+        return NextResponse.json({ message });
 
     } catch (error) {
         console.error('Error during bulk order status update:', error);

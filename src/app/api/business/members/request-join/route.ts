@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getUserIdFromToken, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { getUserIdFromToken, SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 interface JoinRequest {
     userId: string;
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Check if user is already a member
-        const memberRef = db.collection('users').doc(SUPER_ADMIN_ID).collection('members').doc(userId);
+        const memberRef = db.collection('users').doc(SHARED_STORE_ID).collection('members').doc(userId);
         const memberDoc = await memberRef.get();
 
         if (memberDoc.exists) {

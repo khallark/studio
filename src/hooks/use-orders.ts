@@ -108,16 +108,21 @@ export function useOrders(
                     }
                 }
 
-                // Filter the 'New' and 'DTO Requested' order for vendors, if the store is MAJIME. Vendors are not allowed to see them.
-                if (storeId === SHARED_STORE_ID) {
-                    if (businessId !== SUPER_ADMIN_ID) {
-                        q = query(q, where('customStatus', 'not-in', ['New', 'DTO Requested']));
-                    }
-                }
-
                 // Filter by status tab - use customStatus for all tabs
                 if (activeTab !== 'All Orders') {
+                    // For non-admin on shared store, block access to 'New' and 'DTO Requested'
+                    if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID) {
+                        if (activeTab === 'New' || activeTab === 'DTO Requested') {
+                            // Don't query at all - return empty for these tabs
+                            return [];
+                        }
+                    }
                     q = query(q, where('customStatus', '==', activeTab));
+                } else {
+                    // Only for "All Orders" tab on shared store
+                    if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID) {
+                        q = query(q, where('customStatus', 'not-in', ['New', 'DTO Requested']));
+                    }
                 }
 
                 // Server-side search

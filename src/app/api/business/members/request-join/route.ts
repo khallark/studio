@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Check if user is already a member
-        const memberRef = db.collection('users').doc(SHARED_STORE_ID).collection('members').doc(userId);
+        const memberRef = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(userId);
         const memberDoc = await memberRef.get();
 
         if (memberDoc.exists) {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Check if vendorName already exists (case-insensitive)
-        const existingVendorQuery = await db.collection('users')
+        const existingVendorQuery = await db.collection('accounts')
             .doc(SHARED_STORE_ID)
             .collection('members')
             .get();
@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
         });
 
         if (vendorNameExists) {
-            return NextResponse.json({
-                error: 'This vendor name is already taken. Please choose a different name.'
+            return NextResponse.json({ 
+                error: 'This vendor name is already taken. Please choose a different name.' 
             }, { status: 400 });
         }
 
@@ -69,19 +69,19 @@ export async function POST(req: NextRequest) {
         });
 
         if (vendorNameInPendingRequests) {
-            return NextResponse.json({
-                error: 'A request with this vendor name is already pending. Please choose a different name or wait for that request to be processed.'
+            return NextResponse.json({ 
+                error: 'A request with this vendor name is already pending. Please choose a different name or wait for that request to be processed.' 
             }, { status: 400 });
         }
 
         // 5. Check if there's already a pending request from this user
-        const userPendingRequest = existingPendingRequests.docs.find(doc =>
+        const userPendingRequest = existingPendingRequests.docs.find(doc => 
             doc.data().userId === userId
         );
 
         if (userPendingRequest) {
-            return NextResponse.json({
-                error: 'You already have a pending request to become a vendor at MAJIME.'
+            return NextResponse.json({ 
+                error: 'You already have a pending request to become a vendor at MAJIME.' 
             }, { status: 400 });
         }
 

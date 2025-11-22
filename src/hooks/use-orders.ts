@@ -3,15 +3,13 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, orderBy, limit, getDocs, and } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
-import { useAuthState } from 'react-firebase-hooks/auth';
 
 // ============================================================
 // HOOK - Now business-wide, not store-specific
 // ============================================================
-
 
 export function useOrders(
     businessId: string | null,
@@ -110,21 +108,16 @@ export function useOrders(
                     }
                 }
 
-                // Filter by status tab - use customStatus for all tabs including Cancelled
-                if (businessId === SUPER_ADMIN_ID) {
-                    if (activeTab !== 'All Orders') {
-                        q = query(q, where('customStatus', '==', activeTab));
+                // Filter the 'New' and 'DTO Requested' order for vendors, if the store is MAJIME. Vendors are not allowed to see them.
+                if (storeId === SHARED_STORE_ID) {
+                    if (businessId !== SUPER_ADMIN_ID) {
+                        q = query(q, where('customStatus', 'not-in', ['New', 'DTO Requested']));
                     }
-                } else {
-                    if (activeTab !== 'All Orders') {
-                        if (activeTab === 'New') {
-                            q = query(q, where('customStatus', '==', 'ewiufeisf'));
-                        } else {
-                            q = query(q, where('customStatus', '==', activeTab));
-                        }
-                    } else {
-                        q = query(q, where('customStatus', '!=', 'New'));
-                    }
+                }
+
+                // Filter by status tab - use customStatus for all tabs
+                if (activeTab !== 'All Orders') {
+                    q = query(q, where('customStatus', '==', activeTab));
                 }
 
                 // Server-side search

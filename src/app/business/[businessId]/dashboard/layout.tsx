@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, History, MoveRight, Building2, Check, Menu, X, UserPlus } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -418,6 +418,14 @@ export default function BusinessLayout({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === `/business/${businessId}/dashboard/members/requests`}>
+                          <Link href={`/business/${businessId}/dashboard/members/requests`}>
+                            <Inbox className="h-4 w-4" />
+                            Requests
+                          </Link>
+                        </SidebarMenuSubButton>
                         <SidebarMenuSubButton
                           asChild
                           isActive={pathname === `/business/${businessId}/dashboard/members/invite`}>

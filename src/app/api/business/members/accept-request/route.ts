@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
             const memberDoc = await transaction.get(memberRef);
 
             if (memberDoc.exists) {
-                throw new Error('User is already a member of MAJIME');
+                throw new Error('User is already a vendor of MAJIME');
             }
 
             // Get requested business doc

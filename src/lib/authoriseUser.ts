@@ -3,7 +3,7 @@ import { db, auth as adminAuth } from "./firebase-admin";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 
 export const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
-const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
+export const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
 
 export async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');

@@ -194,6 +194,14 @@ const nextConfig: NextConfig = {
         destination: '/api/business/members/join/route',
       },
       {
+        source: '/api/business/members/request-join',
+        destination: '/api/business/members/request-join/route',
+      },
+      {
+        source: '/api/business/members/accept-request',
+        destination: '/api/business/members/accept-request/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

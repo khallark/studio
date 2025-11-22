@@ -109,19 +109,19 @@ export function useOrders(
                 }
 
                 // Filter by status tab - use customStatus for all tabs
-                if (activeTab !== 'All Orders') {
-                    // For non-admin on shared store, block access to 'New' and 'DTO Requested'
-                    if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID) {
-                        if (activeTab === 'New' || activeTab === 'DTO Requested') {
-                            // Don't query at all - return empty for these tabs
-                            return [];
-                        }
-                    }
-                    q = query(q, where('customStatus', '==', activeTab));
-                } else {
-                    // Only for "All Orders" tab on shared store
-                    if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID) {
+                const isSharedStoreNonSuperAdmin = storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID;
+
+                if (activeTab === 'All Orders') {
+                    if (isSharedStoreNonSuperAdmin) {
                         q = query(q, where('customStatus', 'not-in', ['New', 'DTO Requested']));
+                    }
+                } else {
+                    // For specific status tabs
+                    if (isSharedStoreNonSuperAdmin && (activeTab === 'New' || activeTab === 'DTO Requested')) {
+                        // Hide these tabs for non-super-admin users on shared store
+                        q = query(q, where('customStatus', '==', 'some-random-shit'));
+                    } else {
+                        q = query(q, where('customStatus', '==', activeTab));
                     }
                 }
 

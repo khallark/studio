@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
             // Update user's businesses array
             transaction.update(requestedBusinessRef, {
                 stores: FieldValue.arrayUnion(SHARED_STORE_ID),
+                vendorName: requestData.requestedVendorName,
             })
 
             // Add user as a member with "Vendor" member role

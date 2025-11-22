@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Check if user is already a member
-            const memberRef = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(businessId);
+            const memberRef = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(requestUserId);
             const memberDoc = await transaction.get(memberRef);
 
             if (memberDoc.exists) {
@@ -54,13 +54,13 @@ export async function POST(req: NextRequest) {
             }
 
             // Get requested business doc
-            const requestedBusinessRef = db.collection('users').doc(businessId);
+            const requestedBusinessRef = db.collection('users').doc(requestUserId);
             const requestedBusinessDoc = await transaction.get(requestedBusinessRef);
             const requestedBusinessData = requestedBusinessDoc.data();
             const userProfile = await adminAuth.getUser(requestUserId);
 
             // Update user's businesses array
-            transaction.set(requestedBusinessRef, {
+            transaction.update(requestedBusinessRef, {
                 stores: FieldValue.arrayUnion(SHARED_STORE_ID),
             })
 

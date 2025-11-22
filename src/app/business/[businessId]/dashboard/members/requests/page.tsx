@@ -16,6 +16,7 @@ interface JoinRequest {
     id: string;
     userId: string;
     email: string;
+    requestedVendorName: string | null;
     displayName: string;
     photoURL: string | null;
     requestedAt: any;
@@ -248,6 +249,9 @@ export default function JoinRequestsPage() {
                                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                                                         <Calendar className="h-4 w-4" />
                                                         <span>Requested {formatDate(request.requestedAt)}</span>
+                                                    </div>
+                                                    <div className='className="flex items-center gap-2 text-sm text-muted-foreground mt-1'>
+                                                        <span>Requested VendorName {request.requestedVendorName}</span>
                                                     </div>
                                                 </div>
 

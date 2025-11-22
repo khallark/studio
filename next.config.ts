@@ -202,6 +202,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/members/accept-request/route',
       },
       {
+        source: '/api/business/members/decline-request',
+        destination: '/api/business/members/decline-request/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

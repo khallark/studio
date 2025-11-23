@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { db, auth as adminAuth } from "./firebase-admin";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 
-export const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
-export const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
+export const SHARED_STORE_ID = process.env.SHARER_STORE_ID!;
+export const SUPER_ADMIN_ID = process.env.SUPER_ADMIN_ID!;
 
 export async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');

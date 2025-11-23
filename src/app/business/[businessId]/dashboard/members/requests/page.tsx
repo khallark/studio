@@ -7,10 +7,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Check, X, Mail, User, Calendar } from 'lucide-react';
+import { Check, X, Mail, User, Calendar, ShieldAlert } from 'lucide-react';
 import { useBusinessContext } from '../../../layout';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
+
+// Import SUPER_ADMIN_ID
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID || 'YOUR_SUPER_ADMIN_ID';
 
 interface JoinRequest {
     id: string;
@@ -27,6 +31,7 @@ interface JoinRequest {
 export default function JoinRequestsPage() {
     const { user, businessId, isAuthorized, loading: authLoading } = useBusinessContext();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [requests, setRequests] = useState<JoinRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,6 +43,12 @@ export default function JoinRequestsPage() {
 
     useEffect(() => {
         if (!authLoading && isAuthorized && businessId) {
+            // Check if user is super admin
+            if (businessId !== SUPER_ADMIN_ID) {
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
 
             const requestsRef = collection(db, 'users', businessId, 'join-requests');
@@ -188,6 +199,24 @@ export default function JoinRequestsPage() {
         return null;
     }
 
+    // Check if user is super admin
+    if (businessId !== SUPER_ADMIN_ID) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+                <div className="text-center space-y-4">
+                    <ShieldAlert className="mx-auto h-16 w-16 text-destructive" />
+                    <h1 className="text-4xl font-bold text-gray-700">Access Denied</h1>
+                    <p className="text-muted-foreground max-w-md">
+                        You don't have permission to view join requests. This page is only accessible to super administrators.
+                    </p>
+                    <Button onClick={() => router.push(`/business/${businessId}/dashboard/orders`)}>
+                        Go to Dashboard
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="flex flex-col p-4 md:p-6 gap-4 max-w-4xl mx-auto">
@@ -250,9 +279,13 @@ export default function JoinRequestsPage() {
                                                         <Calendar className="h-4 w-4" />
                                                         <span>Requested {formatDate(request.requestedAt)}</span>
                                                     </div>
-                                                    <div className='className="flex items-center gap-2 text-sm text-muted-foreground mt-1'>
-                                                        <span>Requested VendorName {request.requestedVendorName}</span>
-                                                    </div>
+                                                    {request.requestedVendorName && (
+                                                        <div className="mt-2">
+                                                            <Badge variant="secondary">
+                                                                Vendor: {request.requestedVendorName}
+                                                            </Badge>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {request.message && (

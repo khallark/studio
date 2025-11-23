@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForBusiness, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { authUserForBusiness, SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 interface JoinRequest {
     id: string;
@@ -21,6 +21,13 @@ export async function POST(req: NextRequest) {
 
         if (!businessId || !requestId || !requestUserId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // Check if this is the super admin business
+        if (businessId !== SUPER_ADMIN_ID) {
+            return NextResponse.json({
+                error: 'Only super administrators can accept join requests'
+            }, { status: 403 });
         }
 
         // Authorize the current user
@@ -59,13 +66,13 @@ export async function POST(req: NextRequest) {
             const requestedBusinessData = requestedBusinessDoc.data();
             const userProfile = await adminAuth.getUser(requestUserId);
 
-            // Update user's businesses array
+            // Update user's stores array and vendorName
             transaction.update(requestedBusinessRef, {
                 stores: FieldValue.arrayUnion(SHARED_STORE_ID),
                 vendorName: requestData.requestedVendorName,
-            })
+            });
 
-            // Add user as a member with "Vendor" member role
+            // Add user as a member with "Vendor" role
             const memberData = {
                 role: 'Vendor',
                 vendorName: requestData?.requestedVendorName,
@@ -73,7 +80,7 @@ export async function POST(req: NextRequest) {
                     canViewOrders: true,
                     canManageOrders: false
                 },
-                displayName: requestedBusinessData?.primaryContact?.name || requestedBusinessData?.profile.name || requestedBusinessDoc.id,
+                displayName: requestedBusinessData?.primaryContact?.name || requestedBusinessData?.profile?.name || requestedBusinessDoc.id,
                 photoURL: userProfile.photoURL || null,
                 joinedAt: FieldValue.serverTimestamp(),
                 status: 'active',

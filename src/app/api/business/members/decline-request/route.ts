@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForBusiness } from '@/lib/authoriseUser';
+import { authUserForBusiness, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
     try {
@@ -9,6 +9,13 @@ export async function POST(req: NextRequest) {
 
         if (!businessId || !requestId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // Check if this is the super admin business
+        if (businessId !== SUPER_ADMIN_ID) {
+            return NextResponse.json({
+                error: 'Only super administrators can decline join requests'
+            }, { status: 403 });
         }
 
         // Authorize the current user

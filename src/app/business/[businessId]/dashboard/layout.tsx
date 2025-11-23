@@ -38,6 +38,9 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
 
+// Define SUPER_ADMIN_ID
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID || 'YOUR_SUPER_ADMIN_ID';
+
 function BusinessSwitcher({
   businesses,
   currentBusinessId
@@ -346,6 +349,9 @@ export default function BusinessLayout({
     );
   }
 
+  // Check if this is the super admin business
+  const isSuperAdmin = businessId === SUPER_ADMIN_ID;
+
   return (
     <>
       <ProcessingQueueProvider
@@ -418,14 +424,17 @@ export default function BusinessLayout({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/dashboard/members/requests`}>
-                          <Link href={`/business/${businessId}/dashboard/members/requests`}>
-                            <Inbox className="h-4 w-4" />
-                            Requests
-                          </Link>
-                        </SidebarMenuSubButton>
+                        {/* Only show Requests for super admin */}
+                        {isSuperAdmin && (
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === `/business/${businessId}/dashboard/members/requests`}>
+                            <Link href={`/business/${businessId}/dashboard/members/requests`}>
+                              <Inbox className="h-4 w-4" />
+                              Requests
+                            </Link>
+                          </SidebarMenuSubButton>
+                        )}
                         <SidebarMenuSubButton
                           asChild
                           isActive={pathname === `/business/${businessId}/dashboard/members/invite`}>

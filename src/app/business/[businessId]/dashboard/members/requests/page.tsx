@@ -13,7 +13,7 @@ import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestor
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
-const SUPER_ADMIN_ID = process.env.SUPER_ADMIN_ID!;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
 
 interface JoinRequest {
     id: string;

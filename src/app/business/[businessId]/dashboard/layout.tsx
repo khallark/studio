@@ -38,7 +38,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
 
-const SUPER_ADMIN_ID = process.env.SUPER_ADMIN_ID!;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
 
 function BusinessSwitcher({
   businesses,

@@ -37,9 +37,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
-
-// Define SUPER_ADMIN_ID
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID || 'YOUR_SUPER_ADMIN_ID';
+import { SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 function BusinessSwitcher({
   businesses,

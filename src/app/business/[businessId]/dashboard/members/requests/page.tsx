@@ -12,9 +12,7 @@ import { useBusinessContext } from '../../../layout';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-
-// Import SUPER_ADMIN_ID
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID || 'YOUR_SUPER_ADMIN_ID';
+import { SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 interface JoinRequest {
     id: string;

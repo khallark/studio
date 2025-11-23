@@ -62,13 +62,13 @@ export async function GET(request: NextRequest) {
 
                 // Count members
                 const membersSnap = await adminDb
-                    .collection(`businesses/${businessId}/members`)
+                    .collection(`users/${businessId}/members`)
                     .get();
 
                 return {
                     businessId,
                     businessName: businessData?.primaryContact?.name || businessData?.profile?.displayName || 'Unnamed Business',
-                    memberCount: membersSnap.size,
+                    memberCount: 1 + membersSnap.size,
                     isOwnBusiness: businessId === userId,
                 };
             } catch (error) {

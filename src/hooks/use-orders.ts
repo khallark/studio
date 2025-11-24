@@ -117,7 +117,7 @@ export function useOrders(
                     }
                 } else {
                     // For specific status tabs
-                    if (isSharedStoreNonSuperAdmin && (activeTab === 'New' || activeTab === 'DTO Requested')) {
+                    if (isSharedStoreNonSuperAdmin && ['New', 'DTO Requested', 'Pending Refunds'].includes(activeTab)) {
                         // Hide these tabs for non-super-admin users on shared store
                         q = query(q, where('customStatus', '==', 'some-random-shit'));
                     } else {

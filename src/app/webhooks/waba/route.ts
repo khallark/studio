@@ -270,11 +270,10 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
         // ✅ SPLIT ORDER LOGIC (ONLY for SHARED_STORE_ID)
         // ============================================
 
-        // Extract shop from document path: accounts/{shop}/orders/{orderId}
-        const pathParts = orderDoc.ref.path.split('/');
-        const shop = pathParts[1]; // "accounts" is at index 0, shop at index 1
+        // Extract store ID from document
+        const shop = orderData?.storeId;
 
-        if (shop === SHARED_STORE_ID) {
+        if (shop && shop === SHARED_STORE_ID) {
             const vendors = orderData?.vendors || [];
             const orderId = orderData?.orderId || orderDoc.id;
 

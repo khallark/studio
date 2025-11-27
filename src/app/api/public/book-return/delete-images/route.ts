@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage } from "@/lib/firebase-admin";
 import { getBusinessIdForStore } from "@/lib/storage-helpers";
-
-const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+import { SHARED_STORE_ID } from "@/lib/authoriseUser";
 
 export async function POST(req: NextRequest) {
     try {

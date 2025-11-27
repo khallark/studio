@@ -37,7 +37,7 @@ interface RefundDialogProps {
 
 type RefundMethod = 'store_credit' | 'manual';
 
-const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 
 export function RefundDialog({
   isOpen,

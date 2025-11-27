@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db, auth as adminAuth } from "./firebase-admin";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 
-export const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARER_STORE_ID!;
+export const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 export const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
 
 export async function getUserIdFromToken(req: NextRequest): Promise<string | null> {

@@ -49,7 +49,7 @@ interface StartQcDialogProps {
   businessId: any;
 }
 
-const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 
 export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: StartQcDialogProps) {
   const [qcStatuses, setQcStatuses] = useState<Record<string | number, QcStatus | null>>({});

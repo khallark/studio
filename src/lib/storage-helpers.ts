@@ -4,7 +4,7 @@ import { ref, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { db } from './firebase-admin';
 
-const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 
 /**
  * Get businessId for a store, or null if it's a shared store

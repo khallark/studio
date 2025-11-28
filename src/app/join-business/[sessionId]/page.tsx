@@ -63,6 +63,13 @@ export default function JoinBusinessPage() {
     fetchSession();
   }, [sessionId]);
 
+  // Redirect to login if user is not logged in and session is valid
+  useEffect(() => {
+    if (!loadingAuth && !user && status === 'valid') {
+      router.push(`/login?redirect=/join-business/${sessionId}`);
+    }
+  }, [loadingAuth, user, status, sessionId, router]);
+
   const handleJoin = async () => {
     if (!user) {
       toast({
@@ -189,7 +196,6 @@ export default function JoinBusinessPage() {
                 {loadingAuth ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2 h-4 w-4" />}
                 Accept Invitation & Join Business
               </Button>
-              {!user && <p className="text-center text-sm text-muted-foreground">Please <a href={`/login?redirect=/join-business/${sessionId}`} className="underline">log in</a> or <a href="/signup" className="underline">sign up</a> to accept.</p>}
             </CardContent>
           </>
         );

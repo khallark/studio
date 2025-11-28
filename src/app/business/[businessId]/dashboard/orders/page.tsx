@@ -94,6 +94,8 @@ import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
 
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
+
 export default function BusinessOrdersPage() {
     // ============================================================
     // AUTHORIZATION (Business-level only!)
@@ -769,13 +771,14 @@ export default function BusinessOrdersPage() {
             case 'Confirmed':
                 return (
                     <>
-                        <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrders([order.id]);
-                            handleAssignAwbClick();
-                        }}>
-                            Assign AWB
-                        </DropdownMenuItem>
+                        {order.storeId !== SHARED_STORE_ID &&
+                            <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrders([order.id]);
+                                handleAssignAwbClick();
+                            }}>
+                                Assign AWB
+                            </DropdownMenuItem>}
                         <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
                             Split this order
                         </DropdownMenuItem>
@@ -892,6 +895,12 @@ export default function BusinessOrdersPage() {
         const isAnyOrderSelected = selectedOrders.length > 0;
         const isDisabled = !isAnyOrderSelected;
         const showUpdateShippedButton = shippedStatuses.includes(activeTab);
+
+        // ✅ Check if any selected order is from SHARED_STORE_ID
+        const hasSharedStoreOrder = selectedOrders.some(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            return order?.storeId === SHARED_STORE_ID;
+        });
 
         // ✅ Track loading states from mutations
         const isUpdatingShipped = updateShippedStatuses.isPending;
@@ -1045,7 +1054,7 @@ export default function BusinessOrdersPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        disabled={isDisabled || isAnyOperationInProgress}
+                                        disabled={isDisabled || hasSharedStoreOrder || isAnyOperationInProgress}
                                         onClick={handleAssignAwbClick}
                                     >
                                         Assign AWBs

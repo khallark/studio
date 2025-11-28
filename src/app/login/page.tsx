@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -10,20 +9,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import { auth, db } from '@/lib/firebase';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
   signInWithEmailAndPassword,
   AuthError
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 function LoginComponent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const [user, loadingAuth] = useAuthState(auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +33,19 @@ function LoginComponent() {
 
   useEffect(() => {
     document.title = "Majime - Login";
-  })
+  }, []);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loadingAuth && user) {
+      const destination = redirectUrl || '/business';
+      router.push(destination);
+    }
+  }, [loadingAuth, user, redirectUrl, router]);
 
   const handleSuccessfulLogin = () => {
-      router.push(redirectUrl || '/business');
+    const destination = redirectUrl || '/business';
+    router.push(destination);
   };
 
   const handleGoogleLogin = async () => {
@@ -45,7 +55,7 @@ function LoginComponent() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      
+
       const userRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userRef);
 
@@ -72,12 +82,19 @@ function LoginComponent() {
       handleSuccessfulLogin();
     } catch (error) {
       console.error('Error during Google login:', error);
-       toast({
+      const authError = error as AuthError;
+
+      // Don't show error if user closed the popup
+      if (authError.code === 'auth/popup-closed-by-user' || authError.code === 'auth/cancelled-popup-request') {
+        setLoading(false);
+        return;
+      }
+
+      toast({
         title: 'Error',
-        description: (error as AuthError).message,
+        description: authError.message,
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -90,14 +107,17 @@ function LoginComponent() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userRef = doc(db, 'users', userCredential.user.uid);
+
+      // Update last login time
       await updateDoc(userRef, {
         lastLoginAt: serverTimestamp(),
       });
+
       handleSuccessfulLogin();
     } catch (err) {
       const authError = err as AuthError;
       console.error('Error signing in:', authError.code, authError.message);
-      
+
       let errorMessage = 'An unexpected error occurred. Please try again.';
       switch (authError.code) {
         case 'auth/user-not-found':
@@ -115,7 +135,7 @@ function LoginComponent() {
           errorMessage = 'An unexpected error occurred. Please try again.';
           break;
       }
-      
+
       setError(errorMessage);
       toast({
         title: 'Login Failed',
@@ -126,6 +146,26 @@ function LoginComponent() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (loadingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-secondary/50">
+        <Card className="mx-auto max-w-sm w-full">
+          <div className="p-8 flex flex-col items-center text-center">
+            <Logo className="mb-8" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Don't show login form if already logged in (will redirect)
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-secondary/50 p-4">
@@ -164,10 +204,10 @@ function LoginComponent() {
                     Forgot your password?
                   </Link>
                 </div>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  required 
+                <Input
+                  id="password"
+                  type="password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
@@ -175,26 +215,43 @@ function LoginComponent() {
               </div>
               {error && <p className="text-destructive text-sm text-center">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
               </Button>
-               <div className="relative">
+              <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+                  <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Or continue with
-                    </span>
+                  </span>
                 </div>
               </div>
               <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={loading}>
-                {loading ? 'Processing...' : 'Login with Google'}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Login with Google'
+                )}
               </Button>
             </div>
           </form>
           <div className="mt-4 text-center text-sm">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="underline">
+            <Link
+              href={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : '/signup'}
+              className="underline"
+            >
               Sign up
             </Link>
           </div>
@@ -207,8 +264,13 @@ function LoginComponent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen bg-secondary/50">
+        <Card className="mx-auto max-w-sm w-full">
+          <div className="p-8 flex flex-col items-center text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
+          </div>
+        </Card>
       </div>
     }>
       <LoginComponent />

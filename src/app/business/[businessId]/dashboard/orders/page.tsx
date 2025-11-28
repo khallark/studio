@@ -763,7 +763,7 @@ export default function BusinessOrdersPage() {
                         <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
                             Confirm
                         </DropdownMenuItem>
-                        {order.storeId !== SHARED_STORE_ID &&
+                        {(businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) &&
                             <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
                                 Split this order
                             </DropdownMenuItem>
@@ -773,7 +773,7 @@ export default function BusinessOrdersPage() {
             case 'Confirmed':
                 return (
                     <>
-                        {order.storeId !== SHARED_STORE_ID &&
+                        {(businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) &&
                             <>
                                 <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation();

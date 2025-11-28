@@ -278,7 +278,7 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
             const orderId = orderData?.orderId || orderDoc.id;
 
             // Check if order needs splitting (multiple vendors)
-            if (vendors && vendors.length > 1) {
+            if (orderId && vendors && vendors.length > 1) {
                 console.log(`🔀 Order ${orderData?.name} has ${vendors.length} vendors - triggering split`);
 
                 // Call enqueue function

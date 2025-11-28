@@ -95,7 +95,7 @@ import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
 
 const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
-
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
 export default function BusinessOrdersPage() {
     // ============================================================
     // AUTHORIZATION (Business-level only!)
@@ -895,6 +895,7 @@ export default function BusinessOrdersPage() {
         const isAnyOrderSelected = selectedOrders.length > 0;
         const isDisabled = !isAnyOrderSelected;
         const showUpdateShippedButton = shippedStatuses.includes(activeTab);
+        const isSharedStoreAdmin = businessId === SUPER_ADMIN_ID;
 
         // ✅ Check if any selected order is from SHARED_STORE_ID
         const hasSharedStoreOrder = selectedOrders.some(orderId => {
@@ -1054,7 +1055,7 @@ export default function BusinessOrdersPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        disabled={isDisabled || hasSharedStoreOrder || isAnyOperationInProgress}
+                                        disabled={isDisabled || (!isSharedStoreAdmin && hasSharedStoreOrder) || isAnyOperationInProgress}
                                         onClick={handleAssignAwbClick}
                                     >
                                         Assign AWBs

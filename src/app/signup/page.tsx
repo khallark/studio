@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -16,7 +16,6 @@ import {
   updateProfile,
   AuthError
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Loader2 } from 'lucide-react';
@@ -45,25 +44,33 @@ function SignupComponent() {
     }
   }, [loadingAuth, user, redirectUrl, router]);
 
-  const createUserDocument = async (uid: string, email: string, displayName: string, phone: string | null) => {
-    const userRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userRef);
+  const createUserDocumentViaAPI = async (user: any, displayName: string, phone: string | null) => {
+    try {
+      const idToken = await user.getIdToken();
 
-    if (!userDoc.exists()) {
-      await setDoc(userRef, {
-        stores: [],
-        profile: {
-          displayName: displayName || email,
-          email: email,
-          phone: phone,
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        lastLoginAt: serverTimestamp(),
+        body: JSON.stringify({
+          idToken,
+          displayName: displayName || user.displayName,
+          email: user.email,
+          phone: phone,
+        }),
       });
-    } else {
-      await updateDoc(userRef, {
-        lastLoginAt: serverTimestamp(),
-        'profile.phone': phone,
-      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user document');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error creating user document:', error);
+      throw error;
     }
   };
 
@@ -79,7 +86,9 @@ function SignupComponent() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      await createUserDocument(user.uid, user.email!, user.displayName || '', user.phoneNumber);
+
+      // Create user document via API
+      await createUserDocumentViaAPI(user, user.displayName || '', user.phoneNumber);
 
       toast({
         title: 'Welcome!',
@@ -99,7 +108,7 @@ function SignupComponent() {
 
       toast({
         title: 'Error',
-        description: authError.message,
+        description: authError.message || 'Failed to create account',
         variant: 'destructive',
       });
       setLoading(false);
@@ -112,10 +121,15 @@ function SignupComponent() {
     setLoading(true);
 
     try {
+      // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
+      // Update display name in Firebase Auth
       await updateProfile(user, { displayName });
-      await createUserDocument(user.uid, user.email!, displayName, null);
+
+      // Create user document via API
+      await createUserDocumentViaAPI(user, displayName, null);
 
       toast({
         title: 'Account Created',

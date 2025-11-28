@@ -234,6 +234,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/[businessId]/auth/route',
       },
       {
+        source: '/api/signup',
+        destination: '/api/signup/route',
+      },
+      {
         source: '/api/test',
         destination: '/api/test/route',
       }

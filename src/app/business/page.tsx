@@ -19,7 +19,7 @@ interface BusinessMembership {
 }
 
 export default function BusinessListPage() {
-  const [user] = useAuthState(auth);
+  const [user, loadingAuth] = useAuthState(auth);
   const router = useRouter();
   const [businesses, setBusinesses] = useState<BusinessMembership[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +28,13 @@ export default function BusinessListPage() {
   useEffect(() => {
     document.title = 'My Businesses';
   }, []);
+
+  // Redirect to login if user is not logged in
+  useEffect(() => {
+    if (!loadingAuth && !user) {
+      router.push('/login?redirect=/business');
+    }
+  }, [loadingAuth, user, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -136,9 +143,8 @@ export default function BusinessListPage() {
               {businesses.map((business) => (
                 <Card
                   key={business.businessId}
-                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer group ${
-                    business.isOwnBusiness ? 'border-primary/50 bg-primary/5' : ''
-                  }`}
+                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer group ${business.isOwnBusiness ? 'border-primary/50 bg-primary/5' : ''
+                    }`}
                   onClick={() => router.push(`/business/${business.businessId}/dashboard`)}
                 >
                   <CardHeader className="pb-3">

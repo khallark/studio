@@ -5,26 +5,41 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useBusinessContext } from './layout';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebase';
 
 export default function BusinessPage() {
   const router = useRouter();
   const { isAuthorized, loading, businessId } = useBusinessContext();
+  const [user, loadingAuth] = useAuthState(auth);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loadingAuth && !user) {
+      router.push(`/login?redirect=/business/${businessId}`);
+    }
+  }, [loadingAuth, user, businessId, router]);
 
   useEffect(() => {
-    if (!loading && isAuthorized) {
+    if (!loading && !loadingAuth && isAuthorized && user) {
       // Redirect to dashboard if authorized
       router.replace(`/business/${businessId}/dashboard`);
     }
-  }, [loading, isAuthorized, businessId, router]);
+  }, [loading, loadingAuth, isAuthorized, businessId, user, router]);
 
-  // Loading state
-  if (loading) {
+  // Loading state (checking both auth and authorization)
+  if (loading || loadingAuth) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Verifying access...</p>
       </div>
     );
+  }
+
+  // Not authenticated - will redirect to login
+  if (!user) {
+    return null;
   }
 
   // Not authorized - show 404

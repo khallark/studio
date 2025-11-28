@@ -25,7 +25,7 @@ export default function RequestJoinPage() {
     // Redirect to login if user is not logged in
     useEffect(() => {
         if (!loadingAuth && !user) {
-            router.push('/login?redirect=/request-join');
+            router.push('/login?redirect=/join-majime');
         }
     }, [loadingAuth, user, router]);
 

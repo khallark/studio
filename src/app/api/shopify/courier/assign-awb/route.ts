@@ -1,6 +1,6 @@
 // apps/web/src/app/api/shipments/bulk-create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { authUserForBusinessAndStore } from "@/lib/authoriseUser";
+import { authUserForBusinessAndStore, SHARED_STORE_ID, SUPER_ADMIN_ID } from "@/lib/authoriseUser";
 
 export const runtime = "nodejs";
 
@@ -20,16 +20,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
+    if(shop === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID) {
+      return NextResponse.json({ error: 'This business cannot perform this task.' }, { status: 400 });
+    }
+    
     if (!shop || !courier || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json({ error: "missing params in the request body" }, { status: 400 });
     }
-
+    
     const result = await authUserForBusinessAndStore({ businessId, shop, req });
-
+    
     if (!result.authorised) {
       const { error, status } = result;
       return NextResponse.json({ error }, { status });
     }
+    
 
     // Ask Firebase Function to enqueue Cloud Tasks (one per job)
     const url = process.env.ENQUEUE_FUNCTION_URL!;

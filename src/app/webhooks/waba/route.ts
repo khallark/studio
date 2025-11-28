@@ -5,6 +5,7 @@ import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestor
 import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
 import { SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { boolean } from 'zod';
 
 // Fire-and-forget pattern: Webhook responds immediately and processes async
 // This prevents timeout issues on starter plans with 45-50 second limits
@@ -252,28 +253,17 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
             return false;
         }
 
-        const log = {
-            status: 'Confirmed',
-            createdAt: Timestamp.now(),
-            remarks: 'This order was confirmed by the customer via Whatsapp',
-        };
-
-        await orderDoc.ref.update({
-            customStatus: 'Confirmed',
-            confirmedAt: FieldValue.serverTimestamp(),
-            customStatusesLogs: FieldValue.arrayUnion(log),
-        });
-
-        console.log(`✅ Order ${orderData?.name ?? '{Unknown}'} confirmed`);
-
         // ============================================
         // ✅ SPLIT ORDER LOGIC (ONLY for SHARED_STORE_ID)
         // ============================================
+
+        let isSplitEligible = false;
 
         // Extract store ID from document
         const shop = orderData?.storeId;
 
         if (shop && shop === SHARED_STORE_ID) {
+            isSplitEligible = true;
             const vendors = orderData?.vendors || [];
             const orderId = orderData?.orderId || orderDoc.id;
 
@@ -324,6 +314,22 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
         } else {
             console.log(`✓ Shop ${shop} is not shared store, skipping split logic`);
         }
+
+        if (!isSplitEligible) {
+            const log = {
+                status: 'Confirmed',
+                createdAt: Timestamp.now(),
+                remarks: 'This order was confirmed by the customer via Whatsapp',
+            };
+
+            await orderDoc.ref.update({
+                customStatus: 'Confirmed',
+                confirmedAt: FieldValue.serverTimestamp(),
+                customStatusesLogs: FieldValue.arrayUnion(log),
+            });
+        }
+
+        console.log(`✅ Order ${orderData?.name ?? '{Unknown}'} confirmed`);
 
         return true;
     } catch (error) {

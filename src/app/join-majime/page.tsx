@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,13 @@ export default function RequestJoinPage() {
     const [vendorName, setVendorName] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Redirect to login if user is not logged in
+    useEffect(() => {
+        if (!loadingAuth && !user) {
+            router.push('/login?redirect=/request-join');
+        }
+    }, [loadingAuth, user, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,6 +95,27 @@ export default function RequestJoinPage() {
         }
     };
 
+    // Show loading state while checking auth
+    if (loadingAuth) {
+        return (
+            <main className="flex flex-1 flex-col items-center justify-center min-h-screen bg-muted/40 p-4">
+                <Card className="w-full max-w-lg">
+                    <div className="p-8 flex flex-col items-center text-center">
+                        <Logo className="mb-8" />
+                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                        <CardTitle className="mt-6 text-2xl">Loading...</CardTitle>
+                        <CardDescription>Please wait a moment.</CardDescription>
+                    </div>
+                </Card>
+            </main>
+        );
+    }
+
+    // Don't render form if user is not logged in (will redirect)
+    if (!user) {
+        return null;
+    }
+
     return (
         <main className="flex flex-1 flex-col items-center justify-center min-h-screen bg-muted/40 p-4">
             <Card className="w-full max-w-lg">
@@ -141,7 +169,7 @@ export default function RequestJoinPage() {
                         <Button
                             type="submit"
                             className="w-full"
-                            disabled={isSubmitting || loadingAuth || !vendorName.trim()}
+                            disabled={isSubmitting || !vendorName.trim()}
                         >
                             {isSubmitting ? (
                                 <>
@@ -152,19 +180,6 @@ export default function RequestJoinPage() {
                                 'Request to Join MAJIME'
                             )}
                         </Button>
-
-                        {!user && (
-                            <p className="text-center text-sm text-muted-foreground">
-                                Don't have an account?{' '}
-                                <a href="/signup" className="underline font-medium">
-                                    Sign up
-                                </a>{' '}
-                                or{' '}
-                                <a href={`/login?redirect=/request-join`} className="underline font-medium">
-                                    log in
-                                </a>
-                            </p>
-                        )}
                     </form>
                 </CardContent>
             </Card>

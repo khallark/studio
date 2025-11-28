@@ -16,11 +16,11 @@ export default function BusinessRootLayout({
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login if not authenticated
+    // Redirect to login if user is not logged in
     if (!loading && !user) {
-      router.push('/login');
+      router.push('/login?redirect=/business');
     }
-  }, [user, loading, router]);
+  }, [loading, user, router]);
 
   // Loading state
   if (loading) {

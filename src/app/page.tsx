@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, LogOut, Users } from 'lucide-react';
+import { ArrowRight, LogOut, Users, BriefcaseBusiness } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import {
@@ -18,11 +18,64 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
 
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID;
 
 export default function Home() {
   const [user, loading, error] = useAuthState(auth);
   const router = useRouter();
+  const [showJoinMajime, setShowJoinMajime] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    const checkUserAccess = async () => {
+      if (!user) {
+        // If not logged in, show Join Majime
+        setShowJoinMajime(true);
+        setCheckingAccess(false);
+        return;
+      }
+
+      try {
+        // Check if user is super admin
+        if (user.uid === SUPER_ADMIN_ID) {
+          setShowJoinMajime(false);
+          setCheckingAccess(false);
+          return;
+        }
+
+        // Get user document to check stores
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const userStores = userData.stores || [];
+
+          // Check if user has the shared store
+          if (userStores.includes(SHARED_STORE_ID)) {
+            setShowJoinMajime(false);
+          } else {
+            setShowJoinMajime(true);
+          }
+        } else {
+          // User doc doesn't exist, show Join Majime
+          setShowJoinMajime(true);
+        }
+      } catch (error) {
+        console.error('Error checking user access:', error);
+        // On error, default to showing Join Majime
+        setShowJoinMajime(true);
+      } finally {
+        setCheckingAccess(false);
+      }
+    };
+
+    checkUserAccess();
+  }, [user]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -61,14 +114,19 @@ export default function Home() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/business">Your Businesses</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/join-majime" className="flex items-center">
-                    <Users className="mr-2 h-4 w-4" />
-                    <span>Join Majime</span>
+                  <Link href="/business">
+                    <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                    <span>Your Businesses</span>
                   </Link>
                 </DropdownMenuItem>
+                {showJoinMajime && !checkingAccess && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/join-majime" className="flex items-center">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Join Majime</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -106,10 +164,12 @@ export default function Home() {
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    <span>Want to collaborate? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join an existing business</Link></span>
-                  </div>
+                  {showJoinMajime && !checkingAccess && (
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>Want to collaborate? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join an existing business</Link></span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -119,9 +179,11 @@ export default function Home() {
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>
-                  <p className="text-sm text-muted-foreground">
-                    Already part of a team? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join your business on Majime</Link>
-                  </p>
+                  {showJoinMajime && (
+                    <p className="text-sm text-muted-foreground">
+                      Already part of a team? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join your business on Majime</Link>
+                    </p>
+                  )}
                 </div>
               )}
             </div>

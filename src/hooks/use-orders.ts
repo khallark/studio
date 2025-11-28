@@ -81,6 +81,10 @@ export function useOrders(
 
                 let q = query(ordersRef);
 
+                // Track if we need client-side status filtering
+                let needsClientSideStatusFilter = false;
+                const excludedStatuses = ['New', 'DTO Requested', 'Pending Refunds'];
+
                 // ✅ NEW: Filter by vendor for shared store
                 if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
@@ -111,13 +115,23 @@ export function useOrders(
                 // Filter by status tab - use customStatus for all tabs
                 const isSharedStoreNonSuperAdmin = storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID;
 
+                // Server-side search
+                const hasSearch = searchType === 'name' || searchType === 'awb';
+
                 if (activeTab === 'All Orders') {
                     if (isSharedStoreNonSuperAdmin) {
-                        q = query(q, where('customStatus', 'not-in', ['New', 'DTO Requested']));
+                        // ✅ Only use not-in if there's no search query
+                        // Firestore doesn't allow not-in with other where clauses on different fields
+                        if (!hasSearch) {
+                            q = query(q, where('customStatus', 'not-in', excludedStatuses));
+                        } else {
+                            // Will filter on client-side after fetching
+                            needsClientSideStatusFilter = true;
+                        }
                     }
                 } else {
                     // For specific status tabs
-                    if (isSharedStoreNonSuperAdmin && ['New', 'DTO Requested', 'Pending Refunds'].includes(activeTab)) {
+                    if (isSharedStoreNonSuperAdmin && excludedStatuses.includes(activeTab)) {
                         // Hide these tabs for non-super-admin users on shared store
                         q = query(q, where('customStatus', '==', 'some-random-shit'));
                     } else {
@@ -125,7 +139,6 @@ export function useOrders(
                     }
                 }
 
-                // Server-side search
                 if (searchType === 'name') {
                     q = query(q, where('name', '==', searchValue));
                 } else if (searchType === 'awb') {
@@ -183,11 +196,18 @@ export function useOrders(
 
                 try {
                     const snapshot = await getDocs(q);
-                    return snapshot.docs.map((doc) => ({
+                    let orders = snapshot.docs.map((doc) => ({
                         id: doc.id,
                         storeId, // Add store ID to each order
                         ...doc.data(),
                     })) as Order[];
+
+                    // ✅ Apply client-side status filter if needed
+                    if (needsClientSideStatusFilter) {
+                        orders = orders.filter(order => !excludedStatuses.includes(order.customStatus));
+                    }
+
+                    return orders;
                 } catch (error: any) {
                     console.error(`Error fetching orders from store ${storeId}:`, error);
 

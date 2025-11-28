@@ -88,16 +88,7 @@ function SignupComponent() {
       const user = result.user;
 
       // Create user document via API
-      const response = await createUserDocumentViaAPI(user, user.displayName || '', user.phoneNumber);
-      
-      if (!response.ok) {
-        const { error } = await response.json();
-        toast({
-          title: 'Error',
-          description: error,
-        });
-        return;
-      }
+      await createUserDocumentViaAPI(user, user.displayName || '', user.phoneNumber);
 
       toast({
         title: 'Welcome!',

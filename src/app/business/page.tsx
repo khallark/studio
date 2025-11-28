@@ -200,7 +200,7 @@ export default function BusinessListPage() {
                       </Badge>
                     </div>
                     <CardDescription className="text-base">
-                      Don't have experience to sell on own? Sell your products at majime!
+                      Don't have experience to sell on own? Sell your products at <b>MAJIME</b>!
                     </CardDescription>
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export default function BusinessListPage() {
                     </div>
                     <div>
                       <h4 className="font-semibold text-sm mb-1">Let us sell your products</h4>
-                      <p className="text-xs text-muted-foreground">Once you feel like yourself, sell it yourself, by creating a store</p>
+                      <p className="text-xs text-muted-foreground">Once you feel like yourself, sell it yourself, by creating a store.</p>
                     </div>
                   </div>
 
@@ -225,7 +225,7 @@ export default function BusinessListPage() {
                     </div>
                     <div>
                       <h4 className="font-semibold text-sm mb-1">All orders on a single Dashboard</h4>
-                      <p className="text-xs text-muted-foreground">Manage all your orders from one powerful dashboard (MAJIME's too!)</p>
+                      <p className="text-xs text-muted-foreground">Manage all your orders from one powerful dashboard ( MAJIME's too! )</p>
                     </div>
                   </div>
 
@@ -244,7 +244,7 @@ export default function BusinessListPage() {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-xl bg-background/60 backdrop-blur-sm border border-primary/20">
                   <div>
                     <h4 className="font-semibold text-lg mb-1">Ready to get started?</h4>
-                    <p className="text-sm text-muted-foreground">Join MAJIME today and transform your business operations</p>
+                    <p className="text-sm text-muted-foreground">Join <b>MAJIME</b> today and transform your business operations</p>
                   </div>
                   <Button
                     size="lg"

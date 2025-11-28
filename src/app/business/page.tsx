@@ -7,7 +7,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2, ChevronRight, Loader2, Users, Crown, Sparkles, ArrowRight, Package, TrendingUp, Zap } from 'lucide-react';
+import { Building2, ChevronRight, Loader2, Users, Crown, Sparkles, ArrowRight, Package, TrendingUp, Zap, Contact } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/logo';
 import { doc, getDoc } from 'firebase/firestore';
@@ -194,13 +194,13 @@ export default function BusinessListPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-2xl font-bold">Join MAJIME Business Network</CardTitle>
+                      <CardTitle className="text-2xl font-bold">Join MAJIME's own business</CardTitle>
                       <Badge className="bg-primary/20 text-primary border-primary/30 font-semibold">
                         Exclusive Access
                       </Badge>
                     </div>
                     <CardDescription className="text-base">
-                      Get access to premium features and join our growing community of businesses
+                      Don't have experience to sell on own? Sell your products at majime!
                     </CardDescription>
                   </div>
                 </div>
@@ -214,18 +214,8 @@ export default function BusinessListPage() {
                       <Package className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-sm mb-1">Unified Order Management</h4>
-                      <p className="text-xs text-muted-foreground">Manage all your orders from one powerful dashboard</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-background/60 backdrop-blur-sm border border-primary/20">
-                    <div className="rounded-lg bg-primary/10 p-2 mt-1">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">Real-time Analytics</h4>
-                      <p className="text-xs text-muted-foreground">Get insights into your business performance</p>
+                      <h4 className="font-semibold text-sm mb-1">Let us sell your products</h4>
+                      <p className="text-xs text-muted-foreground">Once you feel like yourself, sell it yourself, by creating a store</p>
                     </div>
                   </div>
 
@@ -234,8 +224,18 @@ export default function BusinessListPage() {
                       <Zap className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-sm mb-1">Automated Workflows</h4>
-                      <p className="text-xs text-muted-foreground">Save time with smart automation features</p>
+                      <h4 className="font-semibold text-sm mb-1">All orders on a single Dashboard</h4>
+                      <p className="text-xs text-muted-foreground">Manage all your orders from one powerful dashboard (MAJIME's too!)</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-background/60 backdrop-blur-sm border border-primary/20">
+                    <div className="rounded-lg bg-primary/10 p-2 mt-1">
+                      <Contact className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm mb-1">Contact us</h4>
+                      <p className="text-xs text-muted-foreground">If there are any queries regarding the joining process, contact us!</p>
                     </div>
                   </div>
                 </div>

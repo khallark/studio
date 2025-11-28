@@ -763,25 +763,30 @@ export default function BusinessOrdersPage() {
                         <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>
                             Confirm
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
-                            Split this order
-                        </DropdownMenuItem>
+                        {order.storeId !== SHARED_STORE_ID &&
+                            <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
+                                Split this order
+                            </DropdownMenuItem>
+                        }
                     </>
                 );
             case 'Confirmed':
                 return (
                     <>
                         {order.storeId !== SHARED_STORE_ID &&
-                            <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedOrders([order.id]);
-                                handleAssignAwbClick();
-                            }}>
-                                Assign AWB
-                            </DropdownMenuItem>}
-                        <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
-                            Split this order
-                        </DropdownMenuItem>
+                            <>
+                                <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrders([order.id]);
+                                    handleAssignAwbClick();
+                                }}>
+                                    Assign AWB
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOrderSplit(order.id)}>
+                                    Split this order
+                                </DropdownMenuItem>
+                            </>
+                        }
                     </>
                 );
             case 'Ready To Dispatch':

@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, LogOut } from 'lucide-react';
-import { Logo } from '@/components/logo';
+import { ArrowRight, LogOut, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -29,21 +28,24 @@ export default function Home() {
     await signOut(auth);
     router.push('/');
   };
-  
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Logo />
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/favicon.ico" alt="Majime" width={32} height={32} />
+          <span className="text-xl font-bold">Majime</span>
+        </Link>
         <nav className="flex items-center gap-2 sm:gap-4">
           {loading ? (
-             <div className="h-10 w-24 bg-muted rounded-md animate-pulse" />
+            <div className="h-10 w-24 bg-muted rounded-md animate-pulse" />
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">
-                   <Avatar className="h-8 w-8">
-                     <AvatarImage src={user.photoURL || "https://picsum.photos/32/32"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
-                     <AvatarFallback>{user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}</AvatarFallback>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.photoURL || "https://picsum.photos/32/32"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
+                    <AvatarFallback>{user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                   <span>{user.displayName || user.email}</span>
                 </Button>
@@ -58,9 +60,16 @@ export default function Home() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Dashboard</Link>
+                <DropdownMenuItem asChild>
+                  <Link href="/business">Your Businesses</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/join-majime" className="flex items-center">
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>Join Majime</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
@@ -89,12 +98,32 @@ export default function Home() {
               <p className="text-lg text-muted-foreground">
                 Majime brings all your Shopify data into a single, powerful dashboard. Stop switching tabs and start making smarter decisions.
               </p>
-              <Button size="lg" asChild>
-                <Link href="/signup">
-                  Get Started for Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
+              {user ? (
+                <div className="space-y-4">
+                  <Button size="lg" asChild>
+                    <Link href="/business">
+                      Go to Your Businesses
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
+                  </Button>
+                  <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>Want to collaborate? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join an existing business</Link></span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Button size="lg" asChild>
+                    <Link href="/signup">
+                      Get Started for Free
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Already part of a team? <Link href="/join-majime" className="text-primary hover:underline font-medium">Join your business on Majime</Link>
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex justify-center">
               <Image

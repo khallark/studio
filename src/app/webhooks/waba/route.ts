@@ -464,7 +464,6 @@ async function handleTextMessages(messages: any[]) {
             const textBody = message.text.body.toLowerCase().trim();
             const from = message.from; // Phone number
 
-
             // Check if message is "send pdf again"
             if (textBody === 'send pdf again') {
                 console.log(`💬 Text from ${from}: "${textBody}"`);
@@ -486,6 +485,36 @@ async function handleTextMessages(messages: any[]) {
                 }
 
                 console.log('✅ Confirmed Delayed orders PDF resend logic executed');
+            }
+
+            // ✅ NEW: Check if message is "send excel" or "send excel again"
+            if (textBody === 'send excel' || textBody === 'send excel again') {
+                console.log(`💬 Text from ${from}: "${textBody}"`);
+                console.log('📊 User requested Excel download');
+
+                // Trigger Excel generation function
+                try {
+                    const response = await fetch('https://asia-south1-orderflow-jnig7.cloudfunctions.net/generateSharedStoreOrdersExcel', {
+                        method: 'POST',
+                        headers: {
+                            'X-Api-Key': process.env.ENQUEUE_FUNCTION_SECRET || '',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ phoneNumbers: [from] })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        console.error('❌ Excel generation failed:', errorData);
+                    } else {
+                        const data = await response.json();
+                        console.log('✅ Excel generation triggered successfully:', data);
+                    }
+                } catch (error) {
+                    console.error('❌ Error triggering Excel generation:', error);
+                }
+
+                console.log('✅ Shared store orders Excel download logic executed');
             }
 
         } catch (error) {

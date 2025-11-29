@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All location fields are required' }, { status: 400 });
     }
 
-    const { memberDoc } = result
-    const locationRef = memberDoc?.ref.collection('pickupLocations').doc(locationId);
+    const { businessDoc } = result
+    const locationRef = businessDoc?.ref.collection('pickupLocations').doc(locationId);
     // const memberData = memberDoc?.data();
     // const memberRole = memberData?.role;
     // if (!memberRole) {

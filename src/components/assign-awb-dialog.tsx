@@ -43,11 +43,11 @@ interface AssignAwbDialogProps {
 const shippingModes = ['Surface', 'Express'];
 
 interface CourierIntegrations {
-    delhivery?: { apiKey: string; };
-    shiprocket?: { email: string; apiKey: string; };
-    xpressbees?: { email: string; apiKey: string; };
-    priorityEnabled?: boolean;
-    priorityList?: string[];
+  delhivery?: { apiKey: string; };
+  shiprocket?: { email: string; apiKey: string; };
+  xpressbees?: { email: string; apiKey: string; };
+  priorityEnabled?: boolean;
+  priorityList?: string[];
 }
 
 export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm }: AssignAwbDialogProps) {
@@ -55,14 +55,14 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
-  
+
   const [availableCouriers, setAvailableCouriers] = useState<string[]>([]);
   const [availableWarehouses, setAvailableWarehouses] = useState<Location[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
   const [loadingWarehouses, setLoadingWarehouses] = useState(true);
 
   const { toast } = useToast();
-  
+
   useEffect(() => {
     if (isOpen && businessId) {
       // Fetch courier integrations
@@ -84,14 +84,14 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
             if (integrations.shiprocket) courierOptions.push('Shiprocket');
             if (integrations.xpressbees) courierOptions.push('Xpressbees');
           }
-          
+
           setAvailableCouriers(courierOptions);
           setSelectedCourier(courierOptions[0] || null);
         }
         setLoadingCouriers(false);
       }).catch(err => {
         console.error("Failed to fetch courier integrations", err);
-        toast({ title: "Error", description: "Could not load courier options.", variant: "destructive"});
+        toast({ title: "Error", description: "Could not load courier options.", variant: "destructive" });
         setLoadingCouriers(false);
       });
 
@@ -108,7 +108,7 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
         setLoadingWarehouses(false);
       }).catch(err => {
         console.error("Failed to fetch pickup locations", err);
-        toast({ title: "Error", description: "Could not load warehouse options.", variant: "destructive"});
+        toast({ title: "Error", description: "Could not load warehouse options.", variant: "destructive" });
         setLoadingWarehouses(false);
       });
     }
@@ -124,7 +124,7 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
       toast({ title: "Selection Required", description: "Please select a courier service.", variant: "destructive" });
       return;
     }
-    
+
     if (step === 2 && !selectedWarehouse) {
       toast({ title: "Selection Required", description: "Please select a warehouse.", variant: "destructive" });
       return;
@@ -138,7 +138,16 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
   };
 
   const handleConfirm = () => {
-    if(!selectedCourier) {
+    if (availableWarehouses.length === 0) {
+      toast({
+        title: "No Pickup Locations",
+        description: "Please add at least one pickup location in Settings before assigning AWBs.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedCourier) {
       toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
       return;
     }
@@ -147,13 +156,13 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
       return;
     }
     if ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && !selectedMode) {
-        toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
-        return;
+      toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
+      return;
     }
 
     const selectedLocation = availableWarehouses.find(w => w.id === selectedWarehouse);
     const pickupName = selectedLocation?.name || "";
-    
+
     onConfirm(selectedCourier, pickupName, selectedMode || 'Surface');
     onClose();
   };
@@ -166,20 +175,20 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
             <h3 className="font-semibold">Step 1: Choose Courier Service</h3>
             {loadingCouriers ? (
               <div className="space-y-2">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
               </div>
             ) : availableCouriers.length > 0 ? (
-                <RadioGroup value={selectedCourier || ""} onValueChange={setSelectedCourier}>
-                  {availableCouriers.map(service => (
-                    <div key={service} className="flex items-center space-x-2">
-                      <RadioGroupItem value={service} id={service} />
-                      <Label htmlFor={service} className="capitalize">{service}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+              <RadioGroup value={selectedCourier || ""} onValueChange={setSelectedCourier}>
+                {availableCouriers.map(service => (
+                  <div key={service} className="flex items-center space-x-2">
+                    <RadioGroupItem value={service} id={service} />
+                    <Label htmlFor={service} className="capitalize">{service}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
             ) : (
-                 <p className="text-sm text-muted-foreground text-center py-4">No courier services integrated. Please connect a courier in Settings.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No courier services integrated. Please connect a courier in Settings.</p>
             )}
           </div>
         );
@@ -189,20 +198,20 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
             <h3 className="font-semibold">Step 2: Choose Warehouse</h3>
             {loadingWarehouses ? (
               <div className="space-y-2">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
               </div>
             ) : availableWarehouses.length > 0 ? (
-                <RadioGroup value={selectedWarehouse || ""} onValueChange={setSelectedWarehouse}>
-                  {availableWarehouses.map(warehouse => (
-                    <div key={warehouse.id} className="flex items-center space-x-2">
-                      <RadioGroupItem value={warehouse.id} id={warehouse.id} />
-                      <Label htmlFor={warehouse.id}>{warehouse.name}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+              <RadioGroup value={selectedWarehouse || ""} onValueChange={setSelectedWarehouse}>
+                {availableWarehouses.map(warehouse => (
+                  <div key={warehouse.id} className="flex items-center space-x-2">
+                    <RadioGroupItem value={warehouse.id} id={warehouse.id} />
+                    <Label htmlFor={warehouse.id}>{warehouse.name}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
             ) : (
-                 <p className="text-sm text-muted-foreground text-center py-4">No warehouses found. Please add a pickup location in Settings.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No warehouses found. Please add a pickup location in Settings.</p>
             )}
           </div>
         );
@@ -225,7 +234,7 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
         return null;
     }
   };
-  
+
   const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && step === 3) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 2);
   const canProceed = availableCouriers.length > 0 && availableWarehouses.length > 0;
 
@@ -240,28 +249,28 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
           </DialogDescription>
         </DialogHeader>
         <div className="py-6 min-h-[200px]">
-            {renderStepContent()}
+          {renderStepContent()}
         </div>
         <DialogFooter className="flex justify-between w-full">
-            <div>
-              {step > 1 && (
-                <Button variant="ghost" onClick={handleBack}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Back
-                </Button>
-              )}
-            </div>
-            <div>
-              <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              {!isFinalStep && (
-                <Button onClick={handleNext} className="ml-2" disabled={!canProceed}>Next</Button>
-              )}
-              {isFinalStep && (
-                  <Button onClick={handleConfirm} className="ml-2" disabled={!canProceed}>
-                      Assign AWBs & Create Shipments
-                  </Button>
-              )}
-            </div>
+          <div>
+            {step > 1 && (
+              <Button variant="ghost" onClick={handleBack}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            )}
+          </div>
+          <div>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            {!isFinalStep && (
+              <Button onClick={handleNext} className="ml-2" disabled={!canProceed}>Next</Button>
+            )}
+            {isFinalStep && (
+              <Button onClick={handleConfirm} className="ml-2" disabled={!canProceed}>
+                Assign AWBs & Create Shipments
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

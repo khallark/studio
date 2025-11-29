@@ -32,30 +32,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All location fields are required' }, { status: 400 });
     }
 
-    const { businessDoc } = result
-    const locationRef = businessDoc?.ref.collection('pickupLocations').doc(locationId);
-    // const memberData = memberDoc?.data();
-    // const memberRole = memberData?.role;
-    // if (!memberRole) {
-    //   return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
-    // }
+    const { businessDoc } = result;
 
-    // let locationRef;
-    // if (memberRole === 'Vendor') {
-    //   locationRef = memberDoc?.ref.collection('pickupLocations').doc(locationId);
-    // } else if (memberRole === 'SuperAdmin' || memberRole === 'Admin') {
-    //   const accountRef = db.collection('accounts').doc(shop);
-    //   locationRef = accountRef.collection('pickupLocations').doc(locationId);
-    // } else {
-    //   return NextResponse.json({ error: 'Forbidden: You do not have permission to delete locations.' }, { status: 403 });
-    // }
+    // Get the document reference
+    const locationDocRef = businessDoc?.ref.collection('pickupLocations').doc(locationId);
 
-    const docSnap = await locationRef?.get();
-    if (!docSnap?.exists) {
+    if (!locationDocRef) {
+      return NextResponse.json({ error: 'Invalid business reference' }, { status: 500 });
+    }
+
+    // Get the document snapshot
+    const docSnap = await locationDocRef.get();
+
+    if (!docSnap.exists) {
       return NextResponse.json({ error: 'Location not found' }, { status: 404 });
     }
 
-    await locationRef?.update({
+    // Update the document
+    await locationDocRef.update({
       ...location,
       updatedAt: FieldValue.serverTimestamp(),
     });

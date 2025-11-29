@@ -393,7 +393,7 @@ export async function POST(req: NextRequest) {
       // Shopify Credit capture: Only for non-split orders
       if (
         Array.isArray(orderData.payment_gateway_names) &&
-        orderData.payment_gateway_names.includes('shopify_credit')
+        (orderData.payment_gateway_names.includes('shopify_credit') || orderData.payment_gateway_names.includes('shopify_store_credit')) 
       ) {
         console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
         await captureShopifyCreditPayment(shopDomain, orderId);

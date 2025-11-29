@@ -14,13 +14,22 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from './ui/skeleton';
 
 interface Order {
   id: string;
   name: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  postcode: string;
+  country: string;
 }
 
 interface AssignAwbDialogProps {
@@ -44,15 +53,19 @@ interface CourierIntegrations {
 export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm }: AssignAwbDialogProps) {
   const [step, setStep] = useState(1);
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   
   const [availableCouriers, setAvailableCouriers] = useState<string[]>([]);
+  const [availableWarehouses, setAvailableWarehouses] = useState<Location[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
+  const [loadingWarehouses, setLoadingWarehouses] = useState(true);
 
   const { toast } = useToast();
   
   useEffect(() => {
     if (isOpen && businessId) {
+      // Fetch courier integrations
       setLoadingCouriers(true);
       const accountRef = doc(db, 'users', businessId);
       getDoc(accountRef).then(docSnap => {
@@ -81,6 +94,23 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
         toast({ title: "Error", description: "Could not load courier options.", variant: "destructive"});
         setLoadingCouriers(false);
       });
+
+      // Fetch pickup locations
+      setLoadingWarehouses(true);
+      const pickupLocationsRef = collection(db, 'users', businessId, 'pickupLocations');
+      getDocs(pickupLocationsRef).then(snapshot => {
+        const locations: Location[] = [];
+        snapshot.forEach(doc => {
+          locations.push({ id: doc.id, ...doc.data() } as Location);
+        });
+        setAvailableWarehouses(locations);
+        setSelectedWarehouse(locations[0]?.id || null);
+        setLoadingWarehouses(false);
+      }).catch(err => {
+        console.error("Failed to fetch pickup locations", err);
+        toast({ title: "Error", description: "Could not load warehouse options.", variant: "destructive"});
+        setLoadingWarehouses(false);
+      });
     }
 
     if (isOpen) {
@@ -95,9 +125,8 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
       return;
     }
     
-    // If Shiprocket or Priority is chosen, go directly to confirm
-    if (step === 1 && (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority')) {
-      handleConfirm();
+    if (step === 2 && !selectedWarehouse) {
+      toast({ title: "Selection Required", description: "Please select a warehouse.", variant: "destructive" });
       return;
     }
 
@@ -113,12 +142,17 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
       toast({ title: "Selection Required", description: "Please select a courier.", variant: "destructive" });
       return;
     }
+    if (!selectedWarehouse) {
+      toast({ title: "Selection Required", description: "Please select a warehouse.", variant: "destructive" });
+      return;
+    }
     if ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && !selectedMode) {
         toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
         return;
     }
 
-    const pickupName = "Majime Productions 2"; // Hardcoded pickup name
+    const selectedLocation = availableWarehouses.find(w => w.id === selectedWarehouse);
+    const pickupName = selectedLocation?.name || "";
     
     onConfirm(selectedCourier, pickupName, selectedMode || 'Surface');
     onClose();
@@ -150,10 +184,33 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
           </div>
         );
       case 2:
+        return (
+          <div className="space-y-4">
+            <h3 className="font-semibold">Step 2: Choose Warehouse</h3>
+            {loadingWarehouses ? (
+              <div className="space-y-2">
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+              </div>
+            ) : availableWarehouses.length > 0 ? (
+                <RadioGroup value={selectedWarehouse || ""} onValueChange={setSelectedWarehouse}>
+                  {availableWarehouses.map(warehouse => (
+                    <div key={warehouse.id} className="flex items-center space-x-2">
+                      <RadioGroupItem value={warehouse.id} id={warehouse.id} />
+                      <Label htmlFor={warehouse.id}>{warehouse.name}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+            ) : (
+                 <p className="text-sm text-muted-foreground text-center py-4">No warehouses found. Please add a pickup location in Settings.</p>
+            )}
+          </div>
+        );
+      case 3:
         if (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') return null;
         return (
           <div className="space-y-4">
-            <h3 className="font-semibold">Step 2: Choose Shipping Mode</h3>
+            <h3 className="font-semibold">Step 3: Choose Shipping Mode</h3>
             <RadioGroup value={selectedMode || ""} onValueChange={setSelectedMode}>
               {shippingModes.map(mode => (
                 <div key={mode} className="flex items-center space-x-2">
@@ -169,8 +226,8 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
     }
   };
   
-  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && step === 2) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 1);
-  const canProceed = availableCouriers.length > 0;
+  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && step === 3) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 2);
+  const canProceed = availableCouriers.length > 0 && availableWarehouses.length > 0;
 
 
   return (

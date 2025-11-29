@@ -9,10 +9,12 @@ export async function POST(req: NextRequest) {
     const { businessId, shop, locationId, location } = await req.json();
 
     if (!businessId) {
+      console.error('Not business id provided');
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
     if (!shop || !locationId || !location) {
+      console.error('Shop, locationId, and location data are required', shop, locationId, location);
       return NextResponse.json({ error: 'Shop, locationId, and location data are required' }, { status: 400 });
     }
 
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
 
     const { name, address, city, postcode, country } = location;
     if (!name || !address || !city || !postcode || !country) {
+      console.error('All location fields are required', name, address, city, postcode, country);
       return NextResponse.json({ error: 'All location fields are required' }, { status: 400 });
     }
 

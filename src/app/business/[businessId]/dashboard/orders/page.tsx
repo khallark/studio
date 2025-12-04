@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Table,
     TableBody,
@@ -97,7 +97,14 @@ import { BulkReturnDialog } from '@/components/bulk-return-dialog';
 
 const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
+
 export default function BusinessOrdersPage() {
+    // ============================================================
+    // ROUTER & URL PARAMS
+    // ============================================================
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
     // ============================================================
     // AUTHORIZATION (Business-level only!)
     // ============================================================
@@ -114,9 +121,21 @@ export default function BusinessOrdersPage() {
     const { processAwbAssignments } = useProcessingQueue();
 
     // ============================================================
-    // UI STATE
+    // UI STATE - Initialize activeTab from URL parameter
     // ============================================================
-    const [activeTab, setActiveTab] = useState<CustomStatus | 'All Orders'>('All Orders');
+    const [activeTab, setActiveTab] = useState<CustomStatus | 'All Orders'>(() => {
+        const tabParam = searchParams.get('activeTab');
+        // Validate that the tab parameter is a valid tab
+        const validTabs: (CustomStatus | 'All Orders')[] = [
+            'All Orders', 'New', 'Confirmed', 'Ready To Dispatch', 'Dispatched',
+            'In Transit', 'Out For Delivery', 'Delivered', 'RTO In Transit',
+            'RTO Delivered', 'DTO Requested', 'DTO Booked', 'DTO In Transit',
+            'DTO Delivered', 'Pending Refunds', 'DTO Refunded', 'Lost',
+            'Closed', 'RTO Closed', 'Cancellation Requested', 'Cancelled'
+        ];
+        return validTabs.includes(tabParam as any) ? (tabParam as CustomStatus | 'All Orders') : 'All Orders';
+    });
+
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -155,6 +174,32 @@ export default function BusinessOrdersPage() {
     // Item selection for availability
     const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
     const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<string | null>(null);
+
+    // ============================================================
+    // UPDATE URL WHEN TAB CHANGES
+    // ============================================================
+    const handleTabChange = (value: string) => {
+        // Validate that the value is a valid tab
+        const validTabs: (CustomStatus | 'All Orders')[] = [
+            'All Orders', 'New', 'Confirmed', 'Ready To Dispatch', 'Dispatched',
+            'In Transit', 'Out For Delivery', 'Delivered', 'RTO In Transit',
+            'RTO Delivered', 'DTO Requested', 'DTO Booked', 'DTO In Transit',
+            'DTO Delivered', 'Pending Refunds', 'DTO Refunded', 'Lost',
+            'Closed', 'RTO Closed', 'Cancellation Requested', 'Cancelled'
+        ];
+
+        if (!validTabs.includes(value as any)) return;
+
+        const typedValue = value as CustomStatus | 'All Orders';
+        setActiveTab(typedValue);
+
+        // Update URL parameter
+        const current = new URLSearchParams(Array.from(searchParams.entries()));
+        current.set('activeTab', value);
+        const search = current.toString();
+        const query = search ? `?${search}` : '';
+        router.push(`/business/${businessId}/dashboard/orders${query}`, { scroll: false });
+    };
 
     // ============================================================
     // DATA FETCHING (Business-wide!)
@@ -1544,7 +1589,7 @@ export default function BusinessOrdersPage() {
                         </div>
                     </CardHeader>
 
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CustomStatus | 'All Orders')} className="flex flex-col flex-1 min-h-0">
+                    <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
                         <div className="border-b border-gray-200 shrink-0 bg-white shadow-sm">
                             <div className="overflow-x-auto px-2 sm:px-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                                 <TabsList className="inline-flex h-auto rounded-none bg-transparent p-0 gap-0 min-w-max">

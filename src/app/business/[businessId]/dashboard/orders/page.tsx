@@ -189,7 +189,7 @@ export default function BusinessOrdersPage() {
         ];
 
         if (!validTabs.includes(value as any)) return;
-
+        
         const typedValue = value as CustomStatus | 'All Orders';
         setActiveTab(typedValue);
 
@@ -646,7 +646,7 @@ export default function BusinessOrdersPage() {
 
     useEffect(() => {
         document.title = "Business Orders Dashboard";
-    }, []);
+    }, [activeTab]);
 
     useEffect(() => {
         const savedRowsPerPage = localStorage.getItem('rowsPerPage');

@@ -6,6 +6,8 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
+    return NextResponse.json({ error: 'API shut down for the moment.' }, { status: 500 });
+    
     const { businessId, shop, orderIds } = await req.json();
 
     if (!businessId) {

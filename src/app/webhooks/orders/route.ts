@@ -162,7 +162,7 @@ function extractSplitMetadata(orderData: any): {
   }
 
   const metadata: any = {};
-  
+
   for (const attr of orderData.note_attributes) {
     switch (attr.name) {
       case "_original_order_id":
@@ -249,6 +249,8 @@ export async function POST(req: NextRequest) {
       email: orderData.customer?.email ?? 'N/A',
       createdAt: orderData.created_at,
       updatedAt: orderData.updated_at,
+      // createdAt: Timestamp.fromDate(new Date(orderData.created_at)),
+      // updatedAt: Timestamp.fromDate(new Date(orderData.updated_at)),
       financialStatus: orderData.financial_status,
       fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
       totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
@@ -294,7 +296,7 @@ export async function POST(req: NextRequest) {
       // 3) Create → only here do we create the doc
       if (topic === 'orders/create') {
         created = true;
-        
+
         // ✅ Different handling for split orders
         let log;
         let customStatus;
@@ -326,7 +328,7 @@ export async function POST(req: NextRequest) {
           createdByTopic: topic,
           customStatusesLogs: log, // Initialize logs array
         });
-        
+
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
         return;
       }
@@ -337,16 +339,16 @@ export async function POST(req: NextRequest) {
           console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
           return;
         }
-        
+
         // Check if the order was cancelled
         const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
-        
+
         let log;
         let updateData: { [key: string]: any } = {
           ...dataToSave,
           updatedByTopic: topic,
         };
-        
+
         if (isCancelled) {
           log = {
             status: "Cancelled",
@@ -363,9 +365,9 @@ export async function POST(req: NextRequest) {
           };
           console.log(`Updated order ${orderId} for ${shopDomain}`);
         }
-        
+
         updateData.customStatusesLogs = FieldValue.arrayUnion(log);
-        
+
         tx.update(orderRef, updateData);
         await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
       }
@@ -376,7 +378,7 @@ export async function POST(req: NextRequest) {
       // WhatsApp message: Only for non-split orders
       const customerPhone = orderData?.shipping_address?.phone || orderData?.billing_address?.phone || orderData?.customer?.phone;
       const cleanPhone = normalizePhoneNumber(customerPhone);
-      
+
       if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
         const shopDoc = (await accountRef.get()).data() as any;
         console.log('Trying to send message');
@@ -393,7 +395,7 @@ export async function POST(req: NextRequest) {
       // Shopify Credit capture: Only for non-split orders
       if (
         Array.isArray(orderData.payment_gateway_names) &&
-        (orderData.payment_gateway_names.includes('shopify_credit') || orderData.payment_gateway_names.includes('shopify_store_credit')) 
+        (orderData.payment_gateway_names.includes('shopify_credit') || orderData.payment_gateway_names.includes('shopify_store_credit'))
       ) {
         console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
         await captureShopifyCreditPayment(shopDomain, orderId);

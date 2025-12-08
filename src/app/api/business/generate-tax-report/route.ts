@@ -1,13 +1,11 @@
 // app/api/business/generate-tax-report/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/firebase-admin';
-import { authUserForBusiness, getUserIdFromToken } from '@/lib/authoriseUser';
+import { authUserForBusiness,  } from '@/lib/authoriseUser';
 
 const CLOUD_FUNCTION_URL = process.env.GENERATE_CUSTOM_TAX_REPORT_URL!;
 const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
 export async function POST(req: NextRequest) {
     try {
-
         const { businessId, storeId, startDate, endDate } = await req.json();
 
         if (!businessId || typeof businessId !== 'string') {
@@ -91,6 +89,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        console.log(CLOUD_FUNCTION_URL, ENQUEUE_FUNCTION_SECRET, businessId, storeId, startDate, endDate, start, end);
+
         // ✅ FIRE-AND-FORGET: Trigger Cloud Function without awaiting
         fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
         }).catch((error) => {
             // Log error but don't block the response
             console.error('Cloud Function trigger error:', error);
+        }).finally(() => {
+            console.log('Request sent');
         });
 
         // ✅ Return immediately - don't wait for Cloud Function

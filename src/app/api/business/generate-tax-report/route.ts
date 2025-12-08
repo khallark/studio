@@ -1,6 +1,10 @@
 // app/api/business/generate-tax-report/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authUserForBusiness,  } from '@/lib/authoriseUser';
+import { authUserForBusiness, } from '@/lib/authoriseUser';
+
+export function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const CLOUD_FUNCTION_URL = process.env.GENERATE_CUSTOM_TAX_REPORT_URL!;
 const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
@@ -109,6 +113,8 @@ export async function POST(req: NextRequest) {
         }).finally(() => {
             console.log('Request sent');
         });
+
+        await sleep(200);
 
         // ✅ Return immediately - don't wait for Cloud Function
         return NextResponse.json({

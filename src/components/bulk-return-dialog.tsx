@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from './ui/skeleton';
+import { Loader2 } from 'lucide-react';
 
 interface Order {
     id: string;
@@ -50,12 +51,19 @@ export function BulkReturnDialog({
     const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
     const [availableWarehouses, setAvailableWarehouses] = useState<Location[]>([]);
     const [loadingWarehouses, setLoadingWarehouses] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const { toast } = useToast();
 
+    // Reset submitting state when dialog opens/closes
+    useEffect(() => {
+        if (!isOpen) {
+            setIsSubmitting(false);
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         if (isOpen && businessId) {
-            // Fetch pickup locations
             setLoadingWarehouses(true);
             const pickupLocationsRef = collection(db, 'users', businessId, 'pickupLocations');
             getDocs(pickupLocationsRef).then(snapshot => {
@@ -78,7 +86,7 @@ export function BulkReturnDialog({
         }
     }, [isOpen, businessId, toast]);
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (availableWarehouses.length === 0) {
             toast({
                 title: "No Pickup Locations",
@@ -100,13 +108,19 @@ export function BulkReturnDialog({
         const selectedLocation = availableWarehouses.find(w => w.id === selectedWarehouse);
         const pickupName = selectedLocation?.name || "";
 
-        onConfirm(pickupName);
+        setIsSubmitting(true);
+        try {
+            await onConfirm(pickupName);
+        } catch (error) {
+            console.error("Failed to book returns:", error);
+            setIsSubmitting(false);
+        }
     };
 
-    const canProceed = availableWarehouses.length > 0;
+    const canProceed = availableWarehouses.length > 0 && !isSubmitting;
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Book Return for {orders.length} Order(s)</DialogTitle>
@@ -123,7 +137,11 @@ export function BulkReturnDialog({
                                 <Skeleton className="h-6 w-full" />
                             </div>
                         ) : availableWarehouses.length > 0 ? (
-                            <RadioGroup value={selectedWarehouse || ""} onValueChange={setSelectedWarehouse}>
+                            <RadioGroup 
+                                value={selectedWarehouse || ""} 
+                                onValueChange={setSelectedWarehouse}
+                                disabled={isSubmitting}
+                            >
                                 {availableWarehouses.map(warehouse => (
                                     <div key={warehouse.id} className="flex items-center space-x-2">
                                         <RadioGroupItem value={warehouse.id} id={warehouse.id} />
@@ -140,9 +158,18 @@ export function BulkReturnDialog({
                 </div>
                 <DialogFooter className="flex justify-between w-full">
                     <div>
-                        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                        <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
                         <Button onClick={handleConfirm} className="ml-2" disabled={!canProceed}>
-                            Book Returns
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Booking...
+                                </>
+                            ) : (
+                                'Book Returns'
+                            )}
                         </Button>
                     </div>
                 </DialogFooter>

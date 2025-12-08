@@ -1,6 +1,6 @@
 // app/api/business/generate-tax-report/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authUserForBusiness, } from '@/lib/authoriseUser';
+import { authUserForBusiness } from '@/lib/authoriseUser';
 
 export function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -8,6 +8,7 @@ export function sleep(ms: number): Promise<void> {
 
 const CLOUD_FUNCTION_URL = process.env.GENERATE_CUSTOM_TAX_REPORT_URL!;
 const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
+
 export async function POST(req: NextRequest) {
     try {
         const { businessId, storeId, startDate, endDate } = await req.json();
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest) {
         const stores = businessDoc?.data()?.stores;
         if (stores && Array.isArray(stores) && !stores.includes(storeId)) {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'the business is not auth to access this store' },
-                { status: 400 }
+                { error: 'Validation Error', message: 'the business is not authorized to access this store' },
+                { status: 403 }
             );
         }
 
@@ -93,37 +94,127 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        console.log(CLOUD_FUNCTION_URL, ENQUEUE_FUNCTION_SECRET, businessId, storeId, startDate, endDate, start, end);
-
-        // ✅ FIRE-AND-FORGET: Trigger Cloud Function without awaiting
-        fetch(CLOUD_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "X-Api-Key": ENQUEUE_FUNCTION_SECRET,
-            },
-            body: JSON.stringify({
-                startDate,
-                endDate,
-                storeId,
-            })
-        }).catch((error) => {
-            // Log error but don't block the response
-            console.error('Cloud Function trigger error:', error);
-        }).finally(() => {
-            console.log('Request sent');
+        console.log('🚀 Calling Cloud Function:', {
+            url: CLOUD_FUNCTION_URL,
+            storeId,
+            startDate,
+            endDate
         });
 
-        await sleep(200);
+        // ✅ Call Cloud Function with timeout
+        let response: Response;
+        try {
+            response = await Promise.race([
+                fetch(CLOUD_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Key': ENQUEUE_FUNCTION_SECRET,
+                    },
+                    body: JSON.stringify({
+                        startDate,
+                        endDate,
+                        storeId,
+                    }),
+                }),
+                new Promise<Response>((_, reject) =>
+                    setTimeout(() => reject(new Error('Cloud Function request timeout')), 10000)
+                )
+            ]);
+        } catch (error: any) {
+            console.error('❌ Cloud Function request failed:', error);
+            return NextResponse.json(
+                {
+                    error: 'Cloud Function Error',
+                    message: error.message === 'Cloud Function request timeout'
+                        ? 'The request to generate the report timed out. Please try again.'
+                        : 'Failed to initiate report generation. Please try again.'
+                },
+                { status: 503 }
+            );
+        }
 
-        // ✅ Return immediately - don't wait for Cloud Function
+        // ✅ Validate response status
+        if (!response.ok) {
+            console.error('❌ Cloud Function returned error status:', response.status);
+
+            let errorMessage = 'Failed to initiate report generation';
+            let errorDetails = null;
+
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+                errorDetails = errorData;
+            } catch (parseError) {
+                // If response is not JSON, try to get text
+                try {
+                    const errorText = await response.text();
+                    if (errorText) {
+                        errorMessage = errorText;
+                    }
+                } catch {
+                    // Ignore parsing errors
+                }
+            }
+
+            console.error('Cloud Function error details:', errorDetails);
+
+            return NextResponse.json(
+                {
+                    error: 'Cloud Function Error',
+                    message: errorMessage,
+                    status: response.status,
+                    ...(errorDetails && { details: errorDetails })
+                },
+                { status: response.status >= 500 ? 503 : 400 }
+            );
+        }
+
+        // ✅ Parse and validate response body
+        let responseData: any;
+        try {
+            responseData = await response.json();
+        } catch (parseError) {
+            console.error('❌ Failed to parse Cloud Function response:', parseError);
+            return NextResponse.json(
+                {
+                    error: 'Invalid Response',
+                    message: 'Received invalid response from report generation service'
+                },
+                { status: 500 }
+            );
+        }
+
+        // ✅ Validate response contains expected fields
+        if (!responseData.success) {
+            console.error('❌ Cloud Function returned unsuccessful response:', responseData);
+            return NextResponse.json(
+                {
+                    error: 'Report Generation Failed',
+                    message: responseData.message || 'Failed to queue report generation',
+                    details: responseData
+                },
+                { status: 400 }
+            );
+        }
+
+        console.log('✅ Cloud Function call successful:', {
+            taskName: responseData.taskName,
+            status: responseData.status,
+            dateRange: responseData.dateRange
+        });
+
+        // ✅ Return success - report is queued
         return NextResponse.json({
             success: true,
             message: 'Tax report generation has been initiated. You will receive the report on WhatsApp shortly.',
+            taskName: responseData.taskName,
+            dateRange: responseData.dateRange,
+            status: responseData.status || 'queued'
         }, { status: 202 }); // 202 Accepted - request accepted for processing
 
     } catch (error: any) {
-        console.error('Tax report API error:', error);
+        console.error('❌ Tax report API error:', error);
         return NextResponse.json(
             {
                 error: 'Internal Server Error',

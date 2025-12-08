@@ -94,6 +94,8 @@ import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
 import { BulkReturnDialog } from '@/components/bulk-return-dialog';
+import { TaxReportDialog } from '@/components/tax-report-dialog';
+import { FileSpreadsheet } from 'lucide-react';
 
 const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
@@ -163,6 +165,7 @@ export default function BusinessOrdersPage() {
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
     const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
     const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
+    const [isTaxReportDialogOpen, setIsTaxReportDialogOpen] = useState(false);
     const [orderForQc, setOrderForQc] = useState<Order | null>(null);
     const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
@@ -189,7 +192,7 @@ export default function BusinessOrdersPage() {
         ];
 
         if (!validTabs.includes(value as any)) return;
-        
+
         const typedValue = value as CustomStatus | 'All Orders';
         setActiveTab(typedValue);
 
@@ -1412,6 +1415,14 @@ export default function BusinessOrdersPage() {
                                 <Button
                                     variant="outline"
                                     size="sm"
+                                    onClick={() => setIsTaxReportDialogOpen(true)}
+                                >
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                    Tax Report
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => refetchOrders()}
                                     disabled={isFetching}
                                 >
@@ -2024,6 +2035,14 @@ export default function BusinessOrdersPage() {
                     businessId={businessId}
                 />
             )}
+
+            <TaxReportDialog
+                isOpen={isTaxReportDialogOpen}
+                onClose={() => setIsTaxReportDialogOpen(false)}
+                stores={stores}
+                user={user}
+                businessId={businessId}
+            />
 
             <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
                 <DialogContent className="max-w-4xl">

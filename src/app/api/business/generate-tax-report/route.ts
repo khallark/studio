@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
                         'X-Api-Key': ENQUEUE_FUNCTION_SECRET,
                     },
                     body: JSON.stringify({
+                        businessId,
                         startDate,
                         endDate,
                         storeId,

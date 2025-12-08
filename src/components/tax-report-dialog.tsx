@@ -91,7 +91,7 @@ export function TaxReportDialog({ isOpen, onClose, stores, user, businessId }: T
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || result.message || 'Failed to generate report');
+                throw new Error(result.message || result.error || 'Failed to generate report');
             }
 
             // Success toast

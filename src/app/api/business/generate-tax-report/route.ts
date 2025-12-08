@@ -8,7 +8,7 @@ const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
 export async function POST(req: NextRequest) {
     try {
 
-        const { businessId } = await req.json();
+        const { businessId, storeId, startDate, endDate } = await req.json();
 
         if (!businessId || typeof businessId !== 'string') {
             return NextResponse.json(
@@ -33,9 +33,6 @@ export async function POST(req: NextRequest) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
         }
-
-        // Parse request body
-        const { storeId, startDate, endDate } = await req.json();
 
         // Validate inputs
         if (!storeId || typeof storeId !== 'string') {

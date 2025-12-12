@@ -1305,7 +1305,7 @@ export default function BusinessOrdersPage() {
                                         </>
                                     )}
                                 </Button>
-                                <Button
+                                {/* <Button
                                     variant="outline"
                                     size="sm"
                                     disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
@@ -1322,7 +1322,7 @@ export default function BusinessOrdersPage() {
                                             Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                         </>
                                     )}
-                                </Button>
+                                </Button> */}
                             </>
                         case 'In Transit':
                         case 'Out For Delivery':

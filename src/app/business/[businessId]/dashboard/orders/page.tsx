@@ -957,18 +957,6 @@ export default function BusinessOrdersPage() {
 
         return (
             <div className="flex items-center gap-2 flex-wrap justify-end">
-                {showUpdateShippedButton && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUpdateShippedStatuses}
-                        disabled={isDisabled || isUpdatingShipped || isAnyOperationInProgress}
-                    >
-                        {isUpdatingShipped && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Update {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''} Shipped Statuses
-                    </Button>
-                )}
-
                 {(() => {
                     switch (activeTab) {
                         case 'All Orders':

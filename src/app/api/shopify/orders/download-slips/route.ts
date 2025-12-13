@@ -383,7 +383,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
       <!-- JsBarcode library for barcode generation -->
       <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     </head>
-    <body style="height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center;">
+    <body style="height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; flex-direction: column;">
       ${slips}
       
       <script>

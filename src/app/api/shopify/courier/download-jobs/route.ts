@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { authUserForBusiness, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
@@ -48,38 +48,63 @@ export async function POST(req: NextRequest) {
     // Check if any successful job has an errorMessage (for Remarks column)
     const hasRemarks = status === 'success' && jobsSnapshot.docs.some(doc => doc.data().errorMessage);
 
+    // Build column definitions dynamically
+    const columns: { header: string; key: string; width: number }[] = [
+      { header: 'Order Id', key: 'orderId', width: 15 },
+    ];
+
+    if (isPriority) {
+      columns.push({ header: 'Courier', key: 'courier', width: 15 });
+    }
+
+    if (status === 'failed') {
+      columns.push({ header: 'Error Reason', key: 'errorReason', width: 40 });
+    }
+
+    if (hasRemarks) {
+      columns.push({ header: 'Remarks', key: 'remarks', width: 30 });
+    }
+
+    // Build report data
     const reportData = jobsSnapshot.docs.map(doc => {
       const data = doc.data();
       const row: Record<string, string> = {
-        'Order Id': data.orderName || doc.id,
+        orderId: data.orderName || doc.id,
       };
 
-      // Add Courier column if batch is Priority
       if (isPriority) {
-        row['Courier'] = data.courier || 'N/A';
+        row.courier = data.courier || 'N/A';
       }
 
-      // Add Error Reason for failed jobs
       if (status === 'failed') {
-        row['Error Reason'] = data.errorMessage || 'No error message provided';
+        row.errorReason = data.errorMessage || 'No error message provided';
       }
 
-      // Add Remarks for successful jobs if any job has an errorMessage
       if (hasRemarks) {
-        row['Remarks'] = data.errorMessage || '';
+        row.remarks = data.errorMessage || '';
       }
 
       return row;
     });
 
-    const worksheet = xlsx.utils.json_to_sheet(reportData);
-    const workbook = xlsx.utils.book_new();
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
     const sheetName = status === 'success' ? 'Successful Jobs' : 'Failed Jobs';
-    xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+    const worksheet = workbook.addWorksheet(sheetName);
 
-    const buf = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Set columns
+    worksheet.columns = columns;
 
-    return new NextResponse(buf, {
+    // Add rows
+    worksheet.addRows(reportData);
+
+    // Make header row bold
+    worksheet.getRow(1).font = { bold: true };
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

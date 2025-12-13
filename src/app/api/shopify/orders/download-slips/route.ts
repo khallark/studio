@@ -206,7 +206,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         
         .slip {
           width: 750px;
-          height: 1070px;
+          min-height: 1070px;
           padding: 20px;
           page-break-after: always;
           position: relative;

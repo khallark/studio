@@ -195,7 +195,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         body {
           font-family: 'Noto Sans', 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', sans-serif;
           font-size: 14px;
-          line-height: 1;
+          line-height: 1.2;
           color: #000;
         }
         
@@ -206,7 +206,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         
         .slip {
           width: 750px;
-          height: 1200px;
+          height: 1050px;
           padding: 20px;
           page-break-after: always;
           position: relative;
@@ -272,7 +272,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           font-size: 18px;
           font-weight: 700;
           margin-bottom: 6px;
-          line-height: 1;
+          line-height: 1.2;
         }
         
         .address-line.pin {
@@ -376,7 +376,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           right: 20px;
           font-size: 12px;
           font-weight: 700;
-          line-height: 1.1;
+          line-height: 1.2;
         }
       </style>
       

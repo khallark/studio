@@ -193,8 +193,6 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         body {
-          height: 100vh;
-          width: 100wv;
           font-family: 'Noto Sans', 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', sans-serif;
           font-size: 14px;
           line-height: 1.4;
@@ -218,6 +216,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           position: relative;
           border: 2px solid #000;
           margin: 0 auto;
+          margin-top: 25px;
         }
         
         .slip:last-child {

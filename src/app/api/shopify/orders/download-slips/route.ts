@@ -190,10 +190,6 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           margin: 0;
           padding: 0;
           box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
         }
         
         body {
@@ -201,6 +197,10 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           font-size: 14px;
           line-height: 1.4;
           color: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
         }
         
         @page {

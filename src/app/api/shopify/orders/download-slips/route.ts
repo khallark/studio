@@ -351,7 +351,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           width: 100%;
           border-collapse: collapse;
           margin: 18px 0;
-          font-size: 15px;
+          font-size: 16px;
         }
         
         .product-table th {
@@ -359,14 +359,14 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           font-weight: 700;
           padding: 10px 6px;
           border-bottom: 1.5px solid #000;
-          font-size: 14px;
+          font-size: 16px;
         }
         
         .product-table td {
           padding: 10px 6px;
-          font-weight: 700;
+          font-weight: 900;
           vertical-align: top;
-          font-size: 15px;
+          font-size: 16.5px;
         }
         
         .product-table .product-name,

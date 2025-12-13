@@ -174,7 +174,7 @@ function generateSlipHTML(
 
 function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: string; returnAddress: string }): string {
   const slips = orders.map(order => generateSlipHTML(order, sellerDetails)).join('');
-
+  
   // Collect all AWB numbers for barcode generation
   const awbNumbers = orders.map(order => order.awb || `276468${Date.now().toString().slice(-10)}`);
 
@@ -383,7 +383,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
       <!-- JsBarcode library for barcode generation -->
       <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     </head>
-    <body>
+    <body style="height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center;">
       ${slips}
       
       <script>

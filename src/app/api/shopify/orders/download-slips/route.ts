@@ -174,7 +174,7 @@ function generateSlipHTML(
 
 function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: string; returnAddress: string }): string {
   const slips = orders.map(order => generateSlipHTML(order, sellerDetails)).join('');
-  
+
   // Collect all AWB numbers for barcode generation
   const awbNumbers = orders.map(order => order.awb || `276468${Date.now().toString().slice(-10)}`);
 
@@ -194,7 +194,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         
         body {
           font-family: 'Noto Sans', 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', sans-serif;
-          font-size: 12px;
+          font-size: 14px;
           line-height: 1.4;
           color: #000;
         }
@@ -207,7 +207,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         .slip {
           width: 595px;
           height: 842px;
-          padding: 30px;
+          padding: 20px;
           page-break-after: always;
           position: relative;
           border: 2px solid #000;
@@ -219,99 +219,99 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         .header {
-          margin-bottom: 10px;
+          margin-bottom: 12px;
         }
         
         .courier-name {
-          font-size: 22px;
+          font-size: 28px;
           font-weight: 700;
         }
         
         .divider {
-          border-top: 1px solid #000;
-          margin: 10px 0;
+          border-top: 1.5px solid #000;
+          margin: 12px 0;
         }
         
         .awb-section {
-          margin: 15px 0 10px 0;
+          margin: 18px 0 12px 0;
         }
         
         .awb-label {
-          font-size: 15px;
+          font-size: 20px;
           font-weight: 700;
         }
         
         .barcode-container {
           text-align: center;
-          margin: 15px 0 20px 0;
+          margin: 20px 0 25px 0;
         }
         
         .barcode {
-          max-width: 280px;
-          height: 80px;
+          max-width: 380px;
+          height: 100px;
         }
         
         .ship-payment-row {
           display: flex;
           justify-content: space-between;
-          margin: 15px 0;
+          margin: 20px 0;
         }
         
         .ship-to {
           flex: 1;
-          max-width: 60%;
+          max-width: 62%;
         }
         
         .ship-to-header {
-          font-size: 16px;
+          font-size: 22px;
           font-weight: 700;
-          margin-bottom: 8px;
+          margin-bottom: 12px;
         }
         
         .address-line {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 700;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
           line-height: 1.5;
         }
         
         .address-line.pin {
-          margin-top: 5px;
+          margin-top: 8px;
         }
         
         .address-line.phone {
-          margin-top: 3px;
-          font-size: 13px;
+          margin-top: 6px;
+          font-size: 17px;
         }
         
         .payment-info {
           text-align: right;
-          min-width: 150px;
+          min-width: 180px;
         }
         
         .payment-type {
-          font-size: 15px;
+          font-size: 20px;
           font-weight: 700;
-          margin-bottom: 5px;
+          margin-bottom: 8px;
         }
         
         .payment-amount {
-          font-size: 16px;
+          font-size: 22px;
           font-weight: 700;
-          margin-bottom: 15px;
+          margin-bottom: 20px;
         }
         
         .date-section {
-          margin-top: 10px;
+          margin-top: 15px;
         }
         
         .date-label {
-          font-size: 13px;
+          font-size: 17px;
           font-weight: 700;
         }
         
         .date-value {
-          font-size: 13px;
+          font-size: 17px;
           font-weight: 700;
         }
         
@@ -319,7 +319,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin: 10px 0;
+          margin: 12px 0;
         }
         
         .seller-info {
@@ -327,53 +327,54 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         .seller-name {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 700;
-          margin-bottom: 5px;
+          margin-bottom: 6px;
         }
         
         .seller-gst {
-          font-size: 13px;
+          font-size: 16px;
           font-weight: 700;
         }
         
         .order-number {
-          font-size: 15px;
+          font-size: 20px;
           font-weight: 700;
         }
         
         .product-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 15px 0;
-          font-size: 12px;
+          margin: 18px 0;
+          font-size: 15px;
         }
         
         .product-table th {
           text-align: left;
           font-weight: 700;
-          padding: 8px 5px;
-          border-bottom: 1px solid #000;
-          font-size: 11px;
+          padding: 10px 6px;
+          border-bottom: 1.5px solid #000;
+          font-size: 14px;
         }
         
         .product-table td {
-          padding: 8px 5px;
+          padding: 10px 6px;
           font-weight: 700;
           vertical-align: top;
+          font-size: 15px;
         }
         
         .product-table .product-name,
         .product-table .product-name-header {
-          width: 40%;
+          width: 38%;
         }
         
         .return-address {
           position: absolute;
-          bottom: 30px;
-          left: 30px;
-          right: 30px;
-          font-size: 13px;
+          bottom: 20px;
+          left: 20px;
+          right: 20px;
+          font-size: 16px;
           font-weight: 700;
           line-height: 1.5;
         }
@@ -393,12 +394,12 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
             try {
               JsBarcode(svg, awb, {
                 format: "CODE128",
-                width: 2,
-                height: 60,
+                width: 2.5,
+                height: 80,
                 displayValue: true,
-                fontSize: 14,
+                fontSize: 18,
                 margin: 10,
-                textMargin: 5
+                textMargin: 8
               });
             } catch (e) {
               console.error('Barcode error:', e);

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
@@ -65,44 +65,55 @@ export async function POST(req: NextRequest) {
       if (order.raw.line_items && order.raw.line_items.length > 0) {
         order.raw.line_items.forEach((item: any) => {
           flattenedData.push({
-            "Sr. No.": serialNumber++,
-            "Item SKU": item.sku || 'N/A',
-            "Item Qty": item.quantity,
-            "Vendor": item.vendor || 'N/A',
-            "Order Name": order.name,
-            "Availabity": "", // Blank as requested
+            srNo: serialNumber++,
+            itemSku: item.sku || 'N/A',
+            itemQty: item.quantity,
+            vendor: item.vendor || 'N/A',
+            orderName: order.name,
+            availability: '', // Blank as requested
           });
         });
       }
     });
 
-    const worksheet = xlsx.utils.json_to_sheet(flattenedData);
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Products');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Sr. No.', key: 'srNo', width: 10 },
+      { header: 'Item SKU', key: 'itemSku', width: 20 },
+      { header: 'Item Qty', key: 'itemQty', width: 10 },
+      { header: 'Vendor', key: 'vendor', width: 15 },
+      { header: 'Order Name', key: 'orderName', width: 15 },
+      { header: 'Availabity', key: 'availability', width: 12 },
+    ];
+
+    // Add rows
+    worksheet.addRows(flattenedData);
 
     // Apply black borders to all cells
-    const range = xlsx.utils.decode_range(worksheet['!ref']!);
-    const border = {
-      top: { style: 'thin', color: { rgb: '000000' } },
-      bottom: { style: 'thin', color: { rgb: '000000' } },
-      left: { style: 'thin', color: { rgb: '000000' } },
-      right: { style: 'thin', color: { rgb: '000000' } },
+    const borderStyle: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: '000000' } },
+      bottom: { style: 'thin', color: { argb: '000000' } },
+      left: { style: 'thin', color: { argb: '000000' } },
+      right: { style: 'thin', color: { argb: '000000' } },
     };
 
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cell_address = { c: C, r: R };
-        const cell_ref = xlsx.utils.encode_cell(cell_address);
-        if (!worksheet[cell_ref]) continue;
-        if (!worksheet[cell_ref].s) worksheet[cell_ref].s = {};
-        worksheet[cell_ref].s.border = border;
-      }
-    }
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = borderStyle;
+      });
+    });
 
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Products');
+    // Make header row bold
+    worksheet.getRow(1).font = { bold: true };
 
-    const buf = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    return new NextResponse(buf, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

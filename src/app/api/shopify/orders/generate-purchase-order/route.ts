@@ -1,7 +1,208 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+
+// Type assertion for chromium properties that exist at runtime but not in types
+const chromiumConfig = chromium as typeof chromium & {
+  defaultViewport: { width: number; height: number } | null;
+  headless: boolean | 'shell';
+};
+
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function generatePurchaseOrderHTML(
+  vendor: string,
+  poNumber: string,
+  items: { name: string; quantity: number }[],
+  totalPcs: number
+): string {
+  const dateStr = new Date().toLocaleDateString('en-GB');
+
+  const itemRows = items
+    .map(
+      (item, index) => `
+      <tr>
+        <td class="center">${index + 1}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td class="center">${item.quantity}</td>
+      </tr>
+    `
+    )
+    .join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap');
+        
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Noto Sans', sans-serif;
+          font-size: 12px;
+          color: #000;
+          padding: 50px;
+        }
+        
+        @page {
+          size: A4;
+          margin: 0;
+        }
+        
+        .container {
+          width: 100%;
+          max-width: 495px;
+          margin: 0 auto;
+        }
+        
+        .header {
+          background-color: #4472C4;
+          color: white;
+          text-align: center;
+          padding: 10px;
+          font-size: 20px;
+          font-weight: bold;
+          border: 1px solid #000;
+        }
+        
+        .info-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        
+        .info-table td {
+          border: 1px solid #000;
+          padding: 6px 8px;
+          font-size: 12px;
+        }
+        
+        .info-table .label {
+          font-weight: bold;
+          width: 50%;
+        }
+        
+        .sign-row {
+          border: 1px solid #000;
+          padding: 6px 8px;
+          text-align: right;
+          font-weight: bold;
+          font-size: 12px;
+        }
+        
+        .items-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+        
+        .items-table th,
+        .items-table td {
+          border: 1px solid #000;
+          padding: 6px 8px;
+          font-size: 11px;
+        }
+        
+        .items-table th {
+          font-weight: bold;
+          text-align: left;
+        }
+        
+        .items-table .center {
+          text-align: center;
+        }
+        
+        .items-table th:first-child {
+          width: 60px;
+        }
+        
+        .items-table th:last-child {
+          width: 80px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">Purchase Order</div>
+        
+        <table class="info-table">
+          <tr>
+            <td class="label">Po. No.</td>
+            <td>${escapeHtml(vendor)}-${escapeHtml(poNumber)}</td>
+          </tr>
+          <tr>
+            <td class="label">Date</td>
+            <td>${escapeHtml(dateStr)}</td>
+          </tr>
+          <tr>
+            <td class="label">Total Pcs</td>
+            <td>${totalPcs}</td>
+          </tr>
+        </table>
+        
+        <div class="sign-row">Sign.</div>
+        
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="center">Sr. No.</th>
+              <th>Item SKU</th>
+              <th class="center">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function generatePDFWithPuppeteer(htmlContent: string): Promise<Buffer> {
+  const browser = await puppeteer.launch({
+    args: chromiumConfig.args,
+    defaultViewport: chromiumConfig.defaultViewport,
+    executablePath: await chromiumConfig.executablePath(),
+    headless: chromiumConfig.headless,
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    await page.setContent(htmlContent, {
+      waitUntil: ['networkidle0', 'domcontentloaded'],
+      timeout: 30000,
+    });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,118 +280,11 @@ export async function POST(req: NextRequest) {
 
     const totalPcs = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Create PDF with pdf-lib
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Generate HTML and PDF
+    const htmlContent = generatePurchaseOrderHTML(vendor, poNumber, items, totalPcs);
+    const pdfBuffer = await generatePDFWithPuppeteer(htmlContent);
 
-    let page = pdfDoc.addPage([595.28, 841.89]); // A4 size
-    const { width, height } = page.getSize();
-
-    const margin = 50;
-    const tableWidth = width - (margin * 2);
-
-    // Blue header
-    page.drawRectangle({
-      x: margin,
-      y: height - 90,
-      width: tableWidth,
-      height: 40,
-      color: rgb(0.267, 0.447, 0.769), // #4472C4
-      borderColor: rgb(0, 0, 0),
-      borderWidth: 1,
-    });
-
-    page.drawText('Purchase Order', {
-      x: margin + tableWidth / 2 - boldFont.widthOfTextAtSize('Purchase Order', 20) / 2,
-      y: height - 77,
-      size: 20,
-      font: boldFont,
-      color: rgb(1, 1, 1),
-    });
-
-    // Info table
-    const tableTop = height - 110;
-    const rowHeight = 25;
-    const col1Width = 250;
-    const col2Width = tableWidth - col1Width;
-
-    // Po. No. row
-    page.drawRectangle({ x: margin, y: tableTop - rowHeight, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawText('Po. No.', { x: margin + 5, y: tableTop - rowHeight + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText(`${vendor}-${poNumber}`, { x: margin + col1Width + 5, y: tableTop - rowHeight + 7, size: 12, font: font, color: rgb(0, 0, 0) });
-
-    // Date row
-    page.drawRectangle({ x: margin, y: tableTop - rowHeight * 2, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight * 2, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawText('Date', { x: margin + 5, y: tableTop - rowHeight * 2 + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText(new Date().toLocaleDateString('en-GB'), { x: margin + col1Width + 5, y: tableTop - rowHeight * 2 + 7, size: 12, font: font, color: rgb(0, 0, 0) });
-
-    // Total Pcs row
-    page.drawRectangle({ x: margin, y: tableTop - rowHeight * 3, width: col1Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawRectangle({ x: margin + col1Width, y: tableTop - rowHeight * 3, width: col2Width, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawText('Total Pcs', { x: margin + 5, y: tableTop - rowHeight * 3 + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText(totalPcs.toString(), { x: margin + col1Width + 5, y: tableTop - rowHeight * 3 + 7, size: 12, font: font, color: rgb(0, 0, 0) });
-
-    // Sign row
-    const signRowY = tableTop - rowHeight * 4;
-    page.drawRectangle({ x: margin, y: signRowY, width: tableWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    const signText = 'Sign.';
-    const signTextWidth = boldFont.widthOfTextAtSize(signText, 12);
-    page.drawText(signText, { x: width - margin - signTextWidth - 5, y: signRowY + 7, size: 12, font: boldFont, color: rgb(0, 0, 0) });
-
-    // Items table header
-    const itemsTableTop = signRowY - 10;
-    const srNoWidth = 60;
-    const qtyWidth = 80;
-    const itemNameWidth = tableWidth - srNoWidth - qtyWidth;
-
-    page.drawRectangle({ x: margin, y: itemsTableTop - rowHeight, width: srNoWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawRectangle({ x: margin + srNoWidth, y: itemsTableTop - rowHeight, width: itemNameWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-    page.drawRectangle({ x: margin + srNoWidth + itemNameWidth, y: itemsTableTop - rowHeight, width: qtyWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-
-    page.drawText('Sr. No.', { x: margin + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText('Item SKU', { x: margin + srNoWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText('Qty', { x: margin + srNoWidth + itemNameWidth + 5, y: itemsTableTop - rowHeight + 7, size: 11, font: boldFont, color: rgb(0, 0, 0) });
-
-    // Items rows
-    let currentY = itemsTableTop - rowHeight;
-
-    items.forEach((item, index) => {
-      if (currentY - rowHeight < margin) {
-        page = pdfDoc.addPage([595.28, 841.89]);
-        currentY = height - margin;
-      }
-
-      currentY -= rowHeight;
-
-      page.drawRectangle({ x: margin, y: currentY, width: srNoWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-      page.drawRectangle({ x: margin + srNoWidth, y: currentY, width: itemNameWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-      page.drawRectangle({ x: margin + srNoWidth + itemNameWidth, y: currentY, width: qtyWidth, height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 1 });
-
-      page.drawText((index + 1).toString(), { x: margin + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
-
-      // Truncate long item names
-      let itemName = item.name;
-      const maxWidth = itemNameWidth - 10;
-      let textWidth = font.widthOfTextAtSize(itemName, 10);
-      if (textWidth > maxWidth) {
-        while (textWidth > maxWidth && itemName.length > 0) {
-          itemName = itemName.slice(0, -1);
-          textWidth = font.widthOfTextAtSize(itemName + '...', 10);
-        }
-        itemName = itemName + '...';
-      }
-
-      page.drawText(itemName, { x: margin + srNoWidth + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
-      page.drawText(item.quantity.toString(), { x: margin + srNoWidth + itemNameWidth + 5, y: currentY + 7, size: 10, font: font, color: rgb(0, 0, 0) });
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const buffer = Buffer.from(pdfBytes);
-
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

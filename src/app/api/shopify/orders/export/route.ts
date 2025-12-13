@@ -1,6 +1,5 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
@@ -93,89 +92,118 @@ export async function POST(req: NextRequest) {
         order.raw.line_items.forEach((item: any) => {
           const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
           flattenedData.push({
-            'Order name': order.name,
-            'AWB': order.awb ?? 'N/A',
-            'Return AWB': order.awb_reverse ?? 'N/A',
-            'Courier': order.courier ?? 'N/A',
-            'Order date': formatDate(order.createdAt),
-            'Customer': customerName,
-            'Email': order.raw.customer?.email ||
-              order.raw?.contact_email ||
-              'N/A',
-            'Phone': order.raw.customer?.phone ||
-              order.raw.billing_address?.phone ||
-              order.raw.shipping_address?.phone ||
-              'N/A',
-            'Item title': item.title,
-            'Item SKU': item.sku || 'N/A',
-            'Item Quantity': item.quantity,
-            'Item Price': item.price,
-            'Total Order Price': order.totalPrice,
-            'Discount': order.raw.total_discounts || 0,
-            'Vendor': item.vendor || 'N/A',
-            'Currency': order.currency,
-            'Payment Status': paymentStatus,
-            'Status': order.customStatus,
-            'Billing Address': formatAddress(order.raw.billing_address),
-            'Billing City': order.raw.billing_address?.city || 'N/A',
-            'Billing State': order.raw.billing_address?.province || 'N/A',
-            'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
-            'Billing Country': order.raw.billing_address?.country || 'N/A',
-            'Shipping Adress': formatAddress(order.raw.shipping_address),
-            'Shipping City': order.raw.shipping_address?.city || 'N/A',
-            'Shipping State': order.raw.shipping_address?.province || 'N/A',
-            'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
-            'Shipping Country': order.raw.shipping_address?.country || 'N/A',
+            orderName: order.name,
+            awb: order.awb ?? 'N/A',
+            returnAwb: order.awb_reverse ?? 'N/A',
+            courier: order.courier ?? 'N/A',
+            orderDate: formatDate(order.createdAt),
+            customer: customerName,
+            email: order.raw.customer?.email || order.raw?.contact_email || 'N/A',
+            phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',
+            itemTitle: item.title,
+            itemSku: item.sku || 'N/A',
+            itemQuantity: item.quantity,
+            itemPrice: item.price,
+            totalOrderPrice: order.totalPrice,
+            discount: order.raw.total_discounts || 0,
+            vendor: item.vendor || 'N/A',
+            currency: order.currency,
+            paymentStatus: paymentStatus,
+            status: order.customStatus,
+            billingAddress: formatAddress(order.raw.billing_address),
+            billingCity: order.raw.billing_address?.city || 'N/A',
+            billingState: order.raw.billing_address?.province || 'N/A',
+            billingPincode: order.raw.billing_address?.zip || 'N/A',
+            billingCountry: order.raw.billing_address?.country || 'N/A',
+            shippingAddress: formatAddress(order.raw.shipping_address),
+            shippingCity: order.raw.shipping_address?.city || 'N/A',
+            shippingState: order.raw.shipping_address?.province || 'N/A',
+            shippingPincode: order.raw.shipping_address?.zip || 'N/A',
+            shippingCountry: order.raw.shipping_address?.country || 'N/A',
           });
         });
       } else {
         // Handle orders with no line items
         const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
         flattenedData.push({
-          'Order name': order.name,
-          'AWB': order.awb ?? 'N/A',
-          'Return AWB': order.awb_reverse ?? 'N/A',
-          'Courier': order.courier ?? 'N/A',
-          'Order date': formatDate(order.createdAt),
-          'Customer': customerName,
-          'Email': order.raw.customer?.email ||
-            order.raw?.contact_email ||
-            'N/A',
-          'Phone': order.raw.customer?.phone ||
-            order.raw.billing_address?.phone ||
-            order.raw.shipping_address?.phone ||
-            'N/A',
-          'Item title': 'N/A',
-          'Item SKU': 'N/A',
-          'Item Quantity': 0,
-          'Item Price': 0,
-          'Total Order Price': order.totalPrice,
-          'Discount': order.raw.total_discounts || 0,
-          'Vendor': 'N/A',
-          'Currency': order.currency,
-          'Payment Status': paymentStatus,
-          'Status': order.customStatus,
-          'Billing Address': formatAddress(order.raw.billing_address),
-          'Billing City': order.raw.billing_address?.city || 'N/A',
-          'Billing State': order.raw.billing_address?.province || 'N/A',
-          'Billing Pincode': order.raw.billing_address?.zip || 'N/A',
-          'Billing Country': order.raw.billing_address?.country || 'N/A',
-          'Shipping Adress': formatAddress(order.raw.shipping_address),
-          'Shipping City': order.raw.shipping_address?.city || 'N/A',
-          'Shipping State': order.raw.shipping_address?.province || 'N/A',
-          'Shipping Pincode': order.raw.shipping_address?.zip || 'N/A',
-          'Shipping Country': order.raw.shipping_address?.country || 'N/A',
+          orderName: order.name,
+          awb: order.awb ?? 'N/A',
+          returnAwb: order.awb_reverse ?? 'N/A',
+          courier: order.courier ?? 'N/A',
+          orderDate: formatDate(order.createdAt),
+          customer: customerName,
+          email: order.raw.customer?.email || order.raw?.contact_email || 'N/A',
+          phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',
+          itemTitle: 'N/A',
+          itemSku: 'N/A',
+          itemQuantity: 0,
+          itemPrice: 0,
+          totalOrderPrice: order.totalPrice,
+          discount: order.raw.total_discounts || 0,
+          vendor: 'N/A',
+          currency: order.currency,
+          paymentStatus: paymentStatus,
+          status: order.customStatus,
+          billingAddress: formatAddress(order.raw.billing_address),
+          billingCity: order.raw.billing_address?.city || 'N/A',
+          billingState: order.raw.billing_address?.province || 'N/A',
+          billingPincode: order.raw.billing_address?.zip || 'N/A',
+          billingCountry: order.raw.billing_address?.country || 'N/A',
+          shippingAddress: formatAddress(order.raw.shipping_address),
+          shippingCity: order.raw.shipping_address?.city || 'N/A',
+          shippingState: order.raw.shipping_address?.province || 'N/A',
+          shippingPincode: order.raw.shipping_address?.zip || 'N/A',
+          shippingCountry: order.raw.shipping_address?.country || 'N/A',
         });
       }
     });
 
-    const worksheet = xlsx.utils.json_to_sheet(flattenedData);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Orders');
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Orders');
 
-    const buf = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Define columns
+    worksheet.columns = [
+      { header: 'Order name', key: 'orderName', width: 15 },
+      { header: 'AWB', key: 'awb', width: 18 },
+      { header: 'Return AWB', key: 'returnAwb', width: 18 },
+      { header: 'Courier', key: 'courier', width: 15 },
+      { header: 'Order date', key: 'orderDate', width: 12 },
+      { header: 'Customer', key: 'customer', width: 20 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'Item title', key: 'itemTitle', width: 30 },
+      { header: 'Item SKU', key: 'itemSku', width: 15 },
+      { header: 'Item Quantity', key: 'itemQuantity', width: 12 },
+      { header: 'Item Price', key: 'itemPrice', width: 12 },
+      { header: 'Total Order Price', key: 'totalOrderPrice', width: 15 },
+      { header: 'Discount', key: 'discount', width: 10 },
+      { header: 'Vendor', key: 'vendor', width: 15 },
+      { header: 'Currency', key: 'currency', width: 10 },
+      { header: 'Payment Status', key: 'paymentStatus', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Billing Address', key: 'billingAddress', width: 30 },
+      { header: 'Billing City', key: 'billingCity', width: 15 },
+      { header: 'Billing State', key: 'billingState', width: 15 },
+      { header: 'Billing Pincode', key: 'billingPincode', width: 12 },
+      { header: 'Billing Country', key: 'billingCountry', width: 15 },
+      { header: 'Shipping Adress', key: 'shippingAddress', width: 30 }, // Kept typo to match original
+      { header: 'Shipping City', key: 'shippingCity', width: 15 },
+      { header: 'Shipping State', key: 'shippingState', width: 15 },
+      { header: 'Shipping Pincode', key: 'shippingPincode', width: 12 },
+      { header: 'Shipping Country', key: 'shippingCountry', width: 15 },
+    ];
 
-    return new NextResponse(buf, {
+    // Add rows
+    worksheet.addRows(flattenedData);
+
+    // Make header row bold
+    worksheet.getRow(1).font = { bold: true };
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

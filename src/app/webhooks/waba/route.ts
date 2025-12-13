@@ -263,12 +263,12 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
         const shop = orderData?.storeId;
 
         if (shop && shop === SHARED_STORE_ID) {
-            isSplitEligible = true;
             const vendors = orderData?.vendors || [];
             const orderId = orderData?.orderId || orderDoc.id;
 
             // Check if order needs splitting (multiple vendors)
             if (orderId && vendors && vendors.length > 1) {
+                isSplitEligible = true;
                 console.log(`🔀 Order ${orderData?.name} has ${vendors.length} vendors - triggering split`);
 
                 // Call enqueue function

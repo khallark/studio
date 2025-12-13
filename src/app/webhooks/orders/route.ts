@@ -72,42 +72,91 @@ function normalizePhoneNumber(phoneNumber: string): string {
   }
 }
 
-async function captureShopifyCreditPayment(shopDomain: string, orderId: string) {
+async function captureShopifyCreditPayment(
+  shopDomain: string,
+  orderId: string,
+  accessToken: string,
+  financialStatus: string
+): Promise<{ success: boolean; error?: string }> {
+  // Skip if already captured/paid
+  if (financialStatus === 'paid') {
+    console.log(`Order ${orderId} already paid, skipping capture.`);
+    return { success: true };
+  }
+
+  if (financialStatus !== 'authorized') {
+    console.log(`Order ${orderId} has status '${financialStatus}', not 'authorized'. Skipping capture.`);
+    return { success: false, error: `Unexpected financial status: ${financialStatus}` };
+  }
+
   try {
-    const accountRef = db.collection('accounts').doc(shopDomain);
-    const accountDoc = await accountRef.get();
+    // First, fetch existing transactions to find the authorization
+    const txnListUrl = `https://${shopDomain}/admin/api/2025-01/orders/${orderId}/transactions.json`;
+    const listResponse = await fetch(txnListUrl, {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (!accountDoc.exists) {
-      console.error(`Account document not found for shop: ${shopDomain}`);
-      return;
+    if (!listResponse.ok) {
+      const errorBody = await listResponse.text();
+      console.error(`Failed to fetch transactions for order ${orderId}. Status: ${listResponse.status}. Body: ${errorBody}`);
+      return { success: false, error: `Failed to fetch transactions: ${listResponse.status}` };
     }
 
-    const accessToken = accountDoc.data()?.accessToken;
-    if (!accessToken) {
-      console.error(`Access token not found for shop: ${shopDomain}`);
-      return;
+    const { transactions } = await listResponse.json();
+
+    // Find the authorization transaction for store credit
+    const authTxn = transactions?.find(
+      (t: any) => t.kind === 'authorization' && t.status === 'success'
+    );
+
+    if (!authTxn) {
+      console.log(`No authorization transaction found for order ${orderId}. May already be captured.`);
+      return { success: true }; // Not an error - might be auto-captured
     }
 
+    // Check if already captured
+    const existingCapture = transactions?.find(
+      (t: any) => t.kind === 'capture' && t.status === 'success' && t.parent_id === authTxn.id
+    );
+
+    if (existingCapture) {
+      console.log(`Order ${orderId} already has a successful capture. Skipping.`);
+      return { success: true };
+    }
+
+    // Now capture with the parent_id
     const captureUrl = `https://${shopDomain}/admin/api/2025-01/orders/${orderId}/transactions.json`;
-    const response = await fetch(captureUrl, {
+    const captureResponse = await fetch(captureUrl, {
       method: 'POST',
       headers: {
         'X-Shopify-Access-Token': accessToken,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ transaction: { kind: 'capture' } }),
+      body: JSON.stringify({
+        transaction: {
+          kind: 'capture',
+          parent_id: authTxn.id,
+          amount: authTxn.amount, // Capture full authorized amount
+        },
+      }),
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(
-        `Failed to capture Shopify Credit for order ${orderId}. Status: ${response.status}. Body: ${errorBody}`
-      );
-    } else {
-      console.log(`Successfully captured Shopify Credit payment for order ${orderId}.`);
+    if (!captureResponse.ok) {
+      const errorBody = await captureResponse.text();
+      console.error(`Failed to capture for order ${orderId}. Status: ${captureResponse.status}. Body: ${errorBody}`);
+      return { success: false, error: errorBody };
     }
+
+    console.log(`Successfully captured Shopify Credit payment for order ${orderId}.`);
+    return { success: true };
+
   } catch (error) {
     console.error(`Error during Shopify Credit capture for order ${orderId}:`, error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -392,13 +441,30 @@ export async function POST(req: NextRequest) {
         console.log('No valid phone number found for order, skipping WhatsApp message sending. Phone:', customerPhone, 'Normalized:', cleanPhone);
       }
 
-      // Shopify Credit capture: Only for non-split orders
+      // Shopify Credit capture
       if (
         Array.isArray(orderData.payment_gateway_names) &&
-        (orderData.payment_gateway_names.includes('shopify_credit') || orderData.payment_gateway_names.includes('shopify_store_credit'))
+        (orderData.payment_gateway_names.includes('shopify_credit') ||
+          orderData.payment_gateway_names.includes('shopify_store_credit'))
       ) {
         console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
-        await captureShopifyCreditPayment(shopDomain, orderId);
+
+        const accountDoc = await accountRef.get();
+        const accessToken = accountDoc.data()?.accessToken;
+
+        if (accessToken) {
+          const result = await captureShopifyCreditPayment(
+            shopDomain,
+            orderId,
+            accessToken,
+            orderData.financial_status
+          );
+
+          if (!result.success) {
+            // Optionally: Queue for retry or log to a failures collection
+            console.error(`Capture failed for ${orderId}:`, result.error);
+          }
+        }
       }
     } else if (created && isSplit) {
       console.log(`Split order ${orderId}: Skipping WhatsApp message and Shopify Credit capture`);

@@ -667,6 +667,24 @@ export default function BusinessOrdersPage() {
         setCurrentPage(1);
     }, [rowsPerPage]);
 
+    useEffect(() => {
+        const tabParam = searchParams.get('activeTab');
+        const validTabs: (CustomStatus | 'All Orders')[] = [
+            'All Orders', 'New', 'Confirmed', 'Ready To Dispatch', 'Dispatched',
+            'In Transit', 'Out For Delivery', 'Delivered', 'RTO In Transit',
+            'RTO Delivered', 'DTO Requested', 'DTO Booked', 'DTO In Transit',
+            'DTO Delivered', 'Pending Refunds', 'DTO Refunded', 'Lost',
+            'Closed', 'RTO Closed', 'Cancellation Requested', 'Cancelled'
+        ];
+        const newTab = validTabs.includes(tabParam as any)
+            ? (tabParam as CustomStatus | 'All Orders')
+            : 'All Orders';
+
+        if (newTab !== activeTab) {
+            setActiveTab(newTab);
+        }
+    }, [searchParams]); // Re-run when searchParams changes
+
     // ============================================================
     // PAGINATION
     // ============================================================

@@ -174,7 +174,7 @@ function generateSlipHTML(
 
 function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: string; returnAddress: string }): string {
   const slips = orders.map(order => generateSlipHTML(order, sellerDetails)).join('');
-  
+
   // Collect all AWB numbers for barcode generation
   const awbNumbers = orders.map(order => order.awb || `276468${Date.now().toString().slice(-10)}`);
 
@@ -248,6 +248,8 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         .barcode-container {
+          scale: 1.1;
+          transform: scaleY(1.1);
           text-align: center;
           margin: 20px 0 25px 0;
         }

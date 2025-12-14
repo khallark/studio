@@ -196,8 +196,8 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           font-family: 'Noto Sans', 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', sans-serif;
           font-size: 14px;
           line-height: 1.4;
-          color: #fff;
-          background-color: #000;
+          color: #000;
+          background-color: #fff;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -215,7 +215,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           padding: 20px;
           page-break-after: always;
           position: relative;
-          border: 2px solid #fff;
+          border: 2px solid #000;
           margin: 0 auto;
           margin-top: 25px;
         }
@@ -234,7 +234,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         .divider {
-          border-top: 1.5px solid #fff;
+          border-top: 1.5px solid #000;
           margin: 12px 0;
         }
         
@@ -361,7 +361,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
           text-align: left;
           font-weight: 700;
           padding: 10px 6px;
-          border-bottom: 1.5px solid #fff;
+          border-bottom: 1.5px solid #000;
           font-size: 16px;
         }
         

@@ -1341,24 +1341,44 @@ export default function BusinessOrdersPage() {
                         case 'Pending Refunds':
                         case 'DTO Refunded':
                             return (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
-                                    onClick={handleDownloadExcel}
-                                >
-                                    {isDownloadingExcel ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Downloading...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
-                                        </>
-                                    )}
-                                </Button>
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingSlips || isAnyOperationInProgress}
+                                        onClick={handleDownloadSlips}
+                                    >
+                                        {isDownloadingSlips ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Slips {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                        onClick={handleDownloadExcel}
+                                    >
+                                        {isDownloadingExcel ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Downloading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download Excel {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
+                                            </>
+                                        )}
+                                    </Button>
+                                </>
                             );
                         case 'Lost':
                         case 'Closed':

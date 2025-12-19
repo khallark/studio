@@ -1,7 +1,7 @@
 // /business/[businessId]/dashboard/page.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useBusinessContext } from '../layout';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -25,7 +25,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, RefreshCw, AlertCircle } from 'lucide-react';
+import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
@@ -49,13 +49,21 @@ interface TableRowData {
     netSaleValue: number;
 }
 
+interface StatusBreakdown {
+    [status: string]: TableRowData;
+}
+
+interface CategoryData extends TableRowData {
+    breakdown: StatusBreakdown;
+}
+
 interface TableData {
     grossSales: TableRowData;
-    cancellations: TableRowData;
-    pendingDispatch: TableRowData;
-    returns: TableRowData;
-    inTransit: TableRowData;
-    delivered: TableRowData;
+    cancellations: CategoryData;
+    pendingDispatch: CategoryData;
+    returns: CategoryData;
+    inTransit: CategoryData;
+    delivered: CategoryData;
 }
 
 interface FirestoreTableData {
@@ -74,14 +82,45 @@ type DateRangePreset = 'today' | 'last7days' | 'last30days' | 'custom';
 // CONSTANTS
 // ============================================================
 
-const PARTICULARS_CONFIG = [
-    { key: 'grossSales', label: 'Gross Sales' },
-    { key: 'cancellations', label: 'Cancellations' },
-    { key: 'pendingDispatch', label: 'Pending Dispatch' },
-    { key: 'returns', label: 'Returns' },
-    { key: 'inTransit', label: 'In-Transit' },
-    { key: 'delivered', label: 'Delivered' },
-] as const;
+const QUERY_COOLDOWN_MS = 3000; // 3 seconds cooldown between queries
+
+// Status labels for display
+const STATUS_LABELS: Record<string, string> = {
+    // Pending Dispatch
+    "New": "New",
+    "Confirmed": "Confirmed",
+    "Ready To Dispatch": "Ready To Dispatch",
+    // In Transit
+    "Dispatched": "Dispatched",
+    "In Transit": "In Transit",
+    "Out For Delivery": "Out For Delivery",
+    "DTO Requested": "DTO Requested",
+    "DTO Booked": "DTO Booked",
+    "DTO In Transit": "DTO In Transit",
+    // Delivered
+    "Closed": "Closed",
+    "Delivered": "Delivered",
+    // Cancellations
+    "Cancellation Requested": "Cancellation Requested",
+    "Cancelled": "Cancelled",
+    // Returns
+    "RTO Delivered": "RTO Delivered",
+    "RTO Closed": "RTO Closed",
+    "RTO In Transit": "RTO In Transit",
+    "DTO Delivered": "DTO Delivered",
+    "Pending Refund": "Pending Refund",
+    "DTO Refunded": "DTO Refunded",
+    "Lost": "Lost",
+};
+
+// Order of statuses within each category for display
+const STATUS_ORDER: Record<string, string[]> = {
+    pendingDispatch: ["New", "Confirmed", "Ready To Dispatch"],
+    inTransit: ["Dispatched", "In Transit", "Out For Delivery", "DTO Requested", "DTO Booked", "DTO In Transit"],
+    delivered: ["Closed", "Delivered"],
+    cancellations: ["Cancellation Requested", "Cancelled"],
+    returns: ["RTO Delivered", "RTO Closed", "RTO In Transit", "DTO Delivered", "Pending Refund", "DTO Refunded", "Lost"],
+};
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -89,25 +128,19 @@ const PARTICULARS_CONFIG = [
 
 // Convert to IST ISO string
 function toISTISOString(date: Date): string {
-    // Create a new date adjusted for IST (UTC+5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const utcTime = date.getTime();
-    const istTime = new Date(utcTime);
-    
-    // Format as ISO string with IST offset
-    const year = istTime.getFullYear();
-    const month = String(istTime.getMonth() + 1).padStart(2, '0');
-    const day = String(istTime.getDate()).padStart(2, '0');
-    const hours = String(istTime.getHours()).padStart(2, '0');
-    const minutes = String(istTime.getMinutes()).padStart(2, '0');
-    const seconds = String(istTime.getSeconds()).padStart(2, '0');
-    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+05:30`;
 }
 
 function getDateRangeFromPreset(preset: DateRangePreset): { start: Date; end: Date } {
     const now = new Date();
-    
+
     switch (preset) {
         case 'today':
             return {
@@ -146,6 +179,15 @@ function formatNumber(value: number): string {
     return new Intl.NumberFormat('en-IN').format(value);
 }
 
+// Calculate Net Sales from data
+function calculateNetSales(data: TableData): TableRowData {
+    return {
+        orderCount: data.grossSales.orderCount - data.cancellations.orderCount - data.returns.orderCount,
+        itemCount: data.grossSales.itemCount - data.cancellations.itemCount - data.returns.itemCount,
+        netSaleValue: Math.round((data.grossSales.netSaleValue - data.cancellations.netSaleValue - data.returns.netSaleValue) * 100) / 100,
+    };
+}
+
 // ============================================================
 // COMPONENTS
 // ============================================================
@@ -154,17 +196,17 @@ const TableSkeleton = () => (
     <Table>
         <TableHeader>
             <TableRow>
-                <TableHead className="w-[200px]">Particulars</TableHead>
+                <TableHead className="w-[280px]">Particulars</TableHead>
                 <TableHead className="text-right">Order Count</TableHead>
                 <TableHead className="text-right">Item Count</TableHead>
                 <TableHead className="text-right">Net Sale Value</TableHead>
             </TableRow>
         </TableHeader>
         <TableBody>
-            {[...Array(6)].map((_, i) => (
+            {[...Array(7)].map((_, i) => (
                 <TableRow key={i}>
                     <TableCell>
-                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-5 w-40" />
                     </TableCell>
                     <TableCell className="text-right">
                         <Skeleton className="h-5 w-16 ml-auto" />
@@ -181,34 +223,229 @@ const TableSkeleton = () => (
     </Table>
 );
 
-const DataTable = ({ data }: { data: TableData }) => (
-    <Table>
-        <TableHeader>
-            <TableRow>
-                <TableHead className="w-[200px]">Particulars</TableHead>
-                <TableHead className="text-right">Order Count</TableHead>
-                <TableHead className="text-right">Item Count</TableHead>
-                <TableHead className="text-right">Net Sale Value</TableHead>
-            </TableRow>
-        </TableHeader>
-        <TableBody>
-            {PARTICULARS_CONFIG.map(({ key, label }) => (
-                <TableRow key={key} className={key === 'grossSales' ? 'font-semibold bg-muted/50' : ''}>
-                    <TableCell className="font-medium">{label}</TableCell>
-                    <TableCell className="text-right font-mono">
-                        {formatNumber(data[key].orderCount)}
+// Expandable Row Component
+interface ExpandableRowProps {
+    label: string;
+    data: TableRowData;
+    icon?: React.ReactNode;
+    indent?: number;
+    isExpandable?: boolean;
+    isExpanded?: boolean;
+    onToggle?: () => void;
+    className?: string;
+}
+
+const ExpandableRow = ({
+    label,
+    data,
+    icon,
+    indent = 0,
+    isExpandable = false,
+    isExpanded = false,
+    onToggle,
+    className = '',
+}: ExpandableRowProps) => (
+    <TableRow className={cn('transition-colors', className)}>
+        <TableCell
+            className={cn(
+                'font-medium cursor-default',
+                isExpandable && 'cursor-pointer hover:text-primary'
+            )}
+            onClick={isExpandable ? onToggle : undefined}
+            style={{ paddingLeft: `${16 + indent * 24}px` }}
+        >
+            <div className="flex items-center gap-2">
+                {icon && <span className="text-muted-foreground w-4 flex-shrink-0">{icon}</span>}
+                {isExpandable && (
+                    <span className="text-muted-foreground w-4 flex-shrink-0">
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </span>
+                )}
+                <span>{label}</span>
+            </div>
+        </TableCell>
+        <TableCell className="text-right font-mono">
+            {formatNumber(data.orderCount)}
+        </TableCell>
+        <TableCell className="text-right font-mono">
+            {formatNumber(data.itemCount)}
+        </TableCell>
+        <TableCell className="text-right font-mono">
+            {formatCurrency(data.netSaleValue)}
+        </TableCell>
+    </TableRow>
+);
+
+// Status Breakdown Rows
+interface StatusBreakdownRowsProps {
+    breakdown: StatusBreakdown;
+    statusOrder: string[];
+    indent: number;
+}
+
+const StatusBreakdownRows = ({ breakdown, statusOrder, indent }: StatusBreakdownRowsProps) => (
+    <>
+        {statusOrder.map((status) => {
+            const data = breakdown[status];
+            // Only show status if it has any data
+            if (!data || (data.orderCount === 0 && data.itemCount === 0 && data.netSaleValue === 0)) {
+                return null;
+            }
+            return (
+                <TableRow key={status} className="text-muted-foreground text-sm bg-muted/30">
+                    <TableCell
+                        className="font-normal"
+                        style={{ paddingLeft: `${16 + indent * 24}px` }}
+                    >
+                        <div className="flex items-center gap-2">
+                            <span className="w-4" /> {/* Spacer for alignment */}
+                            <span className="w-4" /> {/* Spacer for alignment */}
+                            <span>{STATUS_LABELS[status] || status}</span>
+                        </div>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                        {formatNumber(data[key].itemCount)}
+                        {formatNumber(data.orderCount)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                        {formatCurrency(data[key].netSaleValue)}
+                        {formatNumber(data.itemCount)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                        {formatCurrency(data.netSaleValue)}
                     </TableCell>
                 </TableRow>
-            ))}
-        </TableBody>
-    </Table>
+            );
+        })}
+    </>
 );
+
+// Main Data Table Component
+const DataTable = ({ data }: { data: TableData }) => {
+    // Expansion state
+    const [isNetSalesExpanded, setIsNetSalesExpanded] = useState(false);
+    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+        pendingDispatch: false,
+        inTransit: false,
+        delivered: false,
+    });
+
+    // Calculate Net Sales
+    const netSales = calculateNetSales(data);
+
+    const toggleCategory = (category: string) => {
+        setExpandedCategories(prev => ({
+            ...prev,
+            [category]: !prev[category],
+        }));
+    };
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="w-[280px]">Particulars</TableHead>
+                    <TableHead className="text-right">Order Count</TableHead>
+                    <TableHead className="text-right">Item Count</TableHead>
+                    <TableHead className="text-right">Net Sale Value</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {/* Gross Sales Row */}
+                <ExpandableRow
+                    label="Gross Sales"
+                    data={data.grossSales}
+                    icon={<Plus className="h-3 w-3 text-green-600" />}
+                    className="font-semibold bg-green-50/50 dark:bg-green-950/20"
+                />
+
+                {/* Cancellations Row (subtracted) */}
+                <ExpandableRow
+                    label="Cancellations"
+                    data={data.cancellations}
+                    icon={<Minus className="h-3 w-3 text-red-600" />}
+                    className="text-red-600 dark:text-red-400"
+                />
+
+                {/* Returns Row (subtracted) */}
+                <ExpandableRow
+                    label="Returns"
+                    data={data.returns}
+                    icon={<Minus className="h-3 w-3 text-red-600" />}
+                    className="text-red-600 dark:text-red-400"
+                />
+
+                {/* Net Sales Row (calculated, expandable) */}
+                <ExpandableRow
+                    label="Net Sales"
+                    data={netSales}
+                    icon={<Equal className="h-3 w-3 text-blue-600" />}
+                    isExpandable={true}
+                    isExpanded={isNetSalesExpanded}
+                    onToggle={() => setIsNetSalesExpanded(!isNetSalesExpanded)}
+                    className="font-semibold bg-blue-50/50 dark:bg-blue-950/20 border-t-2 border-blue-200 dark:border-blue-800"
+                />
+
+                {/* Net Sales Breakdown (when expanded) */}
+                {isNetSalesExpanded && (
+                    <>
+                        {/* Pending Dispatch */}
+                        <ExpandableRow
+                            label="Pending Dispatch"
+                            data={data.pendingDispatch}
+                            indent={1}
+                            isExpandable={true}
+                            isExpanded={expandedCategories.pendingDispatch}
+                            onToggle={() => toggleCategory('pendingDispatch')}
+                            className="bg-muted/20"
+                        />
+                        {expandedCategories.pendingDispatch && (
+                            <StatusBreakdownRows
+                                breakdown={data.pendingDispatch.breakdown}
+                                statusOrder={STATUS_ORDER.pendingDispatch}
+                                indent={2}
+                            />
+                        )}
+
+                        {/* In-Transit */}
+                        <ExpandableRow
+                            label="In-Transit"
+                            data={data.inTransit}
+                            indent={1}
+                            isExpandable={true}
+                            isExpanded={expandedCategories.inTransit}
+                            onToggle={() => toggleCategory('inTransit')}
+                            className="bg-muted/20"
+                        />
+                        {expandedCategories.inTransit && (
+                            <StatusBreakdownRows
+                                breakdown={data.inTransit.breakdown}
+                                statusOrder={STATUS_ORDER.inTransit}
+                                indent={2}
+                            />
+                        )}
+
+                        {/* Delivered */}
+                        <ExpandableRow
+                            label="Delivered"
+                            data={data.delivered}
+                            indent={1}
+                            isExpandable={true}
+                            isExpanded={expandedCategories.delivered}
+                            onToggle={() => toggleCategory('delivered')}
+                            className="bg-muted/20"
+                        />
+                        {expandedCategories.delivered && (
+                            <StatusBreakdownRows
+                                breakdown={data.delivered.breakdown}
+                                statusOrder={STATUS_ORDER.delivered}
+                                indent={2}
+                            />
+                        )}
+                    </>
+                )}
+            </TableBody>
+        </Table>
+    );
+};
 
 // ============================================================
 // MAIN COMPONENT
@@ -231,6 +468,11 @@ export default function Dashboard() {
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Rate limiting state
+    const [cooldownRemaining, setCooldownRemaining] = useState(0);
+    const lastQueryTimeRef = useRef<number>(0);
+    const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
     // ============================================================
     // COMPUTED VALUES
     // ============================================================
@@ -247,19 +489,71 @@ export default function Dashboard() {
         : [selectedStores];
 
     // ============================================================
+    // RATE LIMITING
+    // ============================================================
+
+    const startCooldown = useCallback(() => {
+        const remaining = Math.ceil(QUERY_COOLDOWN_MS / 1000);
+        setCooldownRemaining(remaining);
+
+        // Clear any existing interval
+        if (cooldownIntervalRef.current) {
+            clearInterval(cooldownIntervalRef.current);
+        }
+
+        // Start countdown
+        cooldownIntervalRef.current = setInterval(() => {
+            setCooldownRemaining(prev => {
+                if (prev <= 1) {
+                    if (cooldownIntervalRef.current) {
+                        clearInterval(cooldownIntervalRef.current);
+                        cooldownIntervalRef.current = null;
+                    }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    }, []);
+
+    const canQuery = useCallback(() => {
+        const now = Date.now();
+        const timeSinceLastQuery = now - lastQueryTimeRef.current;
+        return timeSinceLastQuery >= QUERY_COOLDOWN_MS;
+    }, []);
+
+    // Cleanup interval on unmount
+    useEffect(() => {
+        return () => {
+            if (cooldownIntervalRef.current) {
+                clearInterval(cooldownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // ============================================================
     // API CALL
     // ============================================================
 
-    const fetchTableData = useCallback(async () => {
+    const fetchTableData = useCallback(async (force = false) => {
         if (!businessAuth.businessId || storesToFetch.length === 0 || !user) {
             return;
         }
 
+        // Check rate limiting (skip for initial load)
+        if (!force && !canQuery()) {
+            console.log('Query blocked by rate limiting');
+            return;
+        }
+
+        // Update last query time and start cooldown
+        lastQueryTimeRef.current = Date.now();
+        startCooldown();
         setIsRefreshing(true);
 
         try {
             const token = await user.getIdToken();
-            
+
             const response = await fetch('/api/business/table-data', {
                 method: 'POST',
                 headers: {
@@ -283,7 +577,7 @@ export default function Dashboard() {
         } finally {
             setIsRefreshing(false);
         }
-    }, [businessAuth.businessId, storesToFetch, currentDateRange, user]);
+    }, [businessAuth.businessId, storesToFetch, currentDateRange, user, canQuery, startCooldown]);
 
     // ============================================================
     // FIRESTORE LISTENER
@@ -302,7 +596,7 @@ export default function Dashboard() {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     const tableData = data?.tableData as FirestoreTableData | undefined;
-                    
+
                     if (tableData) {
                         setTableDataState(tableData);
                     } else {
@@ -328,8 +622,10 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (businessAuth.isAuthorized && !businessAuth.loading && storesToFetch.length > 0) {
-            fetchTableData();
+            // For initial load, force the query (bypass rate limiting)
+            fetchTableData(true);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
 
     // ============================================================
@@ -395,7 +691,9 @@ export default function Dashboard() {
     };
 
     const handleRefresh = () => {
-        fetchTableData();
+        if (canQuery()) {
+            fetchTableData();
+        }
     };
 
     // ============================================================
@@ -424,6 +722,7 @@ export default function Dashboard() {
     };
 
     const isLoading = tableDataState?.loading || isInitialLoad || isRefreshing;
+    const isRefreshDisabled = isLoading || cooldownRemaining > 0;
 
     // ============================================================
     // RENDER
@@ -509,14 +808,21 @@ export default function Dashboard() {
                         </Popover>
                     )}
 
-                    {/* Refresh Button */}
+                    {/* Refresh Button with Cooldown */}
                     <Button
                         variant="outline"
                         size="icon"
                         onClick={handleRefresh}
-                        disabled={isLoading}
+                        disabled={isRefreshDisabled}
+                        className="relative"
+                        title={cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Refresh'}
                     >
                         <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                        {cooldownRemaining > 0 && !isLoading && (
+                            <span className="absolute -top-2 -right-2 bg-muted text-muted-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center border">
+                                {cooldownRemaining}
+                            </span>
+                        )}
                     </Button>
                 </div>
             </div>
@@ -554,8 +860,9 @@ export default function Dashboard() {
                                 size="sm"
                                 className="ml-auto"
                                 onClick={handleRefresh}
+                                disabled={isRefreshDisabled}
                             >
-                                Retry
+                                {cooldownRemaining > 0 ? `Retry (${cooldownRemaining}s)` : 'Retry'}
                             </Button>
                         </div>
                     )}
@@ -574,10 +881,20 @@ export default function Dashboard() {
                             <p className="text-muted-foreground mb-4">
                                 No data available. Click refresh to load data.
                             </p>
-                            <Button onClick={handleRefresh}>
+                            <Button onClick={handleRefresh} disabled={isRefreshDisabled}>
                                 <RefreshCw className="mr-2 h-4 w-4" />
-                                Load Data
+                                {cooldownRemaining > 0 ? `Load Data (${cooldownRemaining}s)` : 'Load Data'}
                             </Button>
+                        </div>
+                    )}
+
+                    {/* Legend */}
+                    {!isLoading && tableDataState?.data && (
+                        <div className="mt-6 pt-4 border-t">
+                            <p className="text-xs text-muted-foreground">
+                                Click on <span className="font-medium">Net Sales</span> to expand and view breakdown by status.
+                                Each category can be further expanded to see individual order statuses.
+                            </p>
                         </div>
                     )}
                 </CardContent>

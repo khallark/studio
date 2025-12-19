@@ -210,6 +210,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/generate-tax-report/route',
       },
       {
+        source: '/api/business/table-data',
+        destination: '/api/business/table-data/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

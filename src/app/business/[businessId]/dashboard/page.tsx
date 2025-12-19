@@ -286,11 +286,7 @@ interface StatusBreakdownRowsProps {
 const StatusBreakdownRows = ({ breakdown, statusOrder, indent }: StatusBreakdownRowsProps) => (
     <>
         {statusOrder.map((status) => {
-            const data = breakdown[status];
-            // Only show status if it has any data
-            if (!data || (data.orderCount === 0 && data.itemCount === 0 && data.netSaleValue === 0)) {
-                return null;
-            }
+            const data = breakdown[status] || { orderCount: 0, itemCount: 0, netSaleValue: 0 };
             return (
                 <TableRow key={status} className="text-muted-foreground text-sm bg-muted/30">
                     <TableCell

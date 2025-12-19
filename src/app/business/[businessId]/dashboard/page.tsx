@@ -195,13 +195,13 @@ const DataTable = ({ data }: { data: TableData }) => (
             {PARTICULARS_CONFIG.map(({ key, label }) => (
                 <TableRow key={key} className={key === 'grossSales' ? 'font-semibold bg-muted/50' : ''}>
                     <TableCell className="font-medium">{label}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-mono">
                         {formatNumber(data[key].orderCount)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-mono">
                         {formatNumber(data[key].itemCount)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-mono">
                         {formatCurrency(data[key].netSaleValue)}
                     </TableCell>
                 </TableRow>

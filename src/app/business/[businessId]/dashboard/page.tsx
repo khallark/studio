@@ -579,6 +579,45 @@ export default function Dashboard() {
     // FIRESTORE LISTENER
     // ============================================================
 
+    // Track the expected filter params to validate incoming data
+    const expectedParamsRef = useRef<{
+        startTime: string;
+        endTime: string;
+        stores: string[];
+    } | null>(null);
+
+    // Update expected params whenever filters change
+    useEffect(() => {
+        expectedParamsRef.current = {
+            startTime: toISTISOString(currentDateRange.start),
+            endTime: toISTISOString(currentDateRange.end),
+            stores: storesToFetch,
+        };
+    }, [currentDateRange.start, currentDateRange.end, storesToFetch]);
+
+    // Helper to check if data matches current filters
+    const dataMatchesCurrentFilters = useCallback((tableData: FirestoreTableData): boolean => {
+        if (!expectedParamsRef.current) return false;
+
+        const { startTime, endTime, stores } = expectedParamsRef.current;
+
+        // Check if times match
+        if (tableData.startTime !== startTime || tableData.endTime !== endTime) {
+            return false;
+        }
+
+        // Check if stores match (order-independent comparison)
+        const dataStores = tableData.stores || [];
+        if (dataStores.length !== stores.length) {
+            return false;
+        }
+
+        const sortedDataStores = [...dataStores].sort();
+        const sortedExpectedStores = [...stores].sort();
+
+        return sortedDataStores.every((store, index) => store === sortedExpectedStores[index]);
+    }, []);
+
     useEffect(() => {
         if (!businessAuth.businessId || !businessAuth.isAuthorized) {
             return;
@@ -594,7 +633,24 @@ export default function Dashboard() {
                     const tableData = data?.tableData as FirestoreTableData | undefined;
 
                     if (tableData) {
-                        setTableDataState(tableData);
+                        // Always update if loading (to show loading state)
+                        if (tableData.loading) {
+                            setTableDataState(tableData);
+                        }
+                        // Only update with actual data if it matches current filters
+                        else if (dataMatchesCurrentFilters(tableData)) {
+                            setTableDataState(tableData);
+                        }
+                        // Data doesn't match current filters - keep showing loading or stale indicator
+                        else {
+                            console.log('Received stale data, ignoring. Expected:', expectedParamsRef.current, 'Got:', {
+                                startTime: tableData.startTime,
+                                endTime: tableData.endTime,
+                                stores: tableData.stores,
+                            });
+                            // Set loading state to indicate we're waiting for correct data
+                            setTableDataState(prev => prev ? { ...prev, loading: true } : { loading: true });
+                        }
                     } else {
                         setTableDataState(null);
                     }
@@ -610,17 +666,34 @@ export default function Dashboard() {
         );
 
         return () => unsubscribe();
-    }, [businessAuth.businessId, businessAuth.isAuthorized]);
+    }, [businessAuth.businessId, businessAuth.isAuthorized, dataMatchesCurrentFilters]);
 
     // ============================================================
-    // INITIAL DATA FETCH & DATE RANGE CHANGE
+    // INITIAL DATA FETCH & DATE RANGE CHANGE (with debounce)
     // ============================================================
+
+    // Debounce timer ref
+    const filterDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (businessAuth.isAuthorized && !businessAuth.loading && storesToFetch.length > 0) {
-            // For initial load, force the query (bypass rate limiting)
-            fetchTableData(true);
+            // Clear any pending debounced fetch
+            if (filterDebounceRef.current) {
+                clearTimeout(filterDebounceRef.current);
+            }
+
+            // Debounce filter changes to prevent rapid successive calls
+            // Use shorter debounce (300ms) to feel responsive while preventing spam
+            filterDebounceRef.current = setTimeout(() => {
+                fetchTableData(true); // Force fetch, bypassing rate limit for filter changes
+            }, 300);
         }
+
+        return () => {
+            if (filterDebounceRef.current) {
+                clearTimeout(filterDebounceRef.current);
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
 
@@ -688,7 +761,7 @@ export default function Dashboard() {
 
     const handleRefresh = () => {
         if (canQuery()) {
-            fetchTableData();
+            fetchTableData(false); // Don't force - respect rate limiting for manual refresh
         }
     };
 

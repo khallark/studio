@@ -620,8 +620,12 @@ export default function Dashboard() {
     // ============================================================
 
     useEffect(() => {
+        // Skip if custom is selected but no date range chosen yet
+        if (datePreset === 'custom' && (!customDateRange?.from || !customDateRange?.to)) {
+            return;
+        }
+
         if (businessAuth.isAuthorized && !businessAuth.loading && storesToFetch.length > 0) {
-            // For initial load, force the query (bypass rate limiting)
             fetchTableData(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

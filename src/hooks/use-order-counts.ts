@@ -2,16 +2,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs, where, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
+import { SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 // ============================================================
 // HOOK WITH REAL-TIME UPDATES - Business-wide aggregation
 // ============================================================
 
-export function useOrderCounts(businessId: string | null, stores: string[]) {
+export function useOrderCounts(businessId: string | null, vendorName: string | null, stores: string[]) {
   const [counts, setCounts] = useState<StatusCounts>({
     'All Orders': 0,
     'New': 0,
@@ -90,7 +91,16 @@ export function useOrderCounts(businessId: string | null, stores: string[]) {
 
     // Set up listener for each store
     stores.forEach((storeId) => {
-      const metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
+      let metadataRef = null;
+      if(storeId === SHARED_STORE_ID) {
+        if(businessId === SUPER_ADMIN_ID) {
+          metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');  
+        } else {
+          metadataRef = doc(db, 'accounts', storeId, 'members', businessId);
+        }
+      } else {
+        metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
+      }
 
       const unsubscribe = onSnapshot(
         metadataRef,

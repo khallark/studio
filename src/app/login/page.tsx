@@ -15,7 +15,7 @@ import {
   signInWithEmailAndPassword,
   AuthError
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -48,6 +48,36 @@ function LoginComponent() {
     router.push(destination);
   };
 
+  const createUserDocumentViaAPI = async (user: any, displayName: string, phone: string | null) => {
+    try {
+      const idToken = await user.getIdToken();
+
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          idToken,
+          displayName: displayName || user.displayName,
+          email: user.email,
+          phone: phone,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user document');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error creating user document:', error);
+      throw error;
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
@@ -60,18 +90,8 @@ function LoginComponent() {
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        // Create user document for new user
-        await setDoc(userRef, {
-          primaryAccountId: null,
-          activeAccountId: null,
-          accounts: [],
-          profile: {
-            displayName: user.displayName || user.email,
-            email: user.email,
-            phone: null,
-          },
-          lastLoginAt: serverTimestamp(),
-        });
+        // Create user document via API for new user
+        await createUserDocumentViaAPI(user, user.displayName || '', user.phoneNumber);
       } else {
         // Update last login for existing user
         await updateDoc(userRef, {

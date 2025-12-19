@@ -484,6 +484,9 @@ export default function Dashboard() {
         ? businessAuth.stores || []
         : [selectedStores];
 
+    // Combined loading state
+    const isLoading = tableDataState?.loading || isInitialLoad || isRefreshing;
+
     // ============================================================
     // RATE LIMITING
     // ============================================================
@@ -579,45 +582,6 @@ export default function Dashboard() {
     // FIRESTORE LISTENER
     // ============================================================
 
-    // Track the expected filter params to validate incoming data
-    const expectedParamsRef = useRef<{
-        startTime: string;
-        endTime: string;
-        stores: string[];
-    } | null>(null);
-
-    // Update expected params whenever filters change
-    useEffect(() => {
-        expectedParamsRef.current = {
-            startTime: toISTISOString(currentDateRange.start),
-            endTime: toISTISOString(currentDateRange.end),
-            stores: storesToFetch,
-        };
-    }, [currentDateRange.start, currentDateRange.end, storesToFetch]);
-
-    // Helper to check if data matches current filters
-    const dataMatchesCurrentFilters = useCallback((tableData: FirestoreTableData): boolean => {
-        if (!expectedParamsRef.current) return false;
-
-        const { startTime, endTime, stores } = expectedParamsRef.current;
-
-        // Check if times match
-        if (tableData.startTime !== startTime || tableData.endTime !== endTime) {
-            return false;
-        }
-
-        // Check if stores match (order-independent comparison)
-        const dataStores = tableData.stores || [];
-        if (dataStores.length !== stores.length) {
-            return false;
-        }
-
-        const sortedDataStores = [...dataStores].sort();
-        const sortedExpectedStores = [...stores].sort();
-
-        return sortedDataStores.every((store, index) => store === sortedExpectedStores[index]);
-    }, []);
-
     useEffect(() => {
         if (!businessAuth.businessId || !businessAuth.isAuthorized) {
             return;
@@ -633,24 +597,7 @@ export default function Dashboard() {
                     const tableData = data?.tableData as FirestoreTableData | undefined;
 
                     if (tableData) {
-                        // Always update if loading (to show loading state)
-                        if (tableData.loading) {
-                            setTableDataState(tableData);
-                        }
-                        // Only update with actual data if it matches current filters
-                        else if (dataMatchesCurrentFilters(tableData)) {
-                            setTableDataState(tableData);
-                        }
-                        // Data doesn't match current filters - keep showing loading or stale indicator
-                        else {
-                            console.log('Received stale data, ignoring. Expected:', expectedParamsRef.current, 'Got:', {
-                                startTime: tableData.startTime,
-                                endTime: tableData.endTime,
-                                stores: tableData.stores,
-                            });
-                            // Set loading state to indicate we're waiting for correct data
-                            setTableDataState(prev => prev ? { ...prev, loading: true } : { loading: true });
-                        }
+                        setTableDataState(tableData);
                     } else {
                         setTableDataState(null);
                     }
@@ -666,34 +613,17 @@ export default function Dashboard() {
         );
 
         return () => unsubscribe();
-    }, [businessAuth.businessId, businessAuth.isAuthorized, dataMatchesCurrentFilters]);
+    }, [businessAuth.businessId, businessAuth.isAuthorized]);
 
     // ============================================================
-    // INITIAL DATA FETCH & DATE RANGE CHANGE (with debounce)
+    // INITIAL DATA FETCH & DATE RANGE CHANGE
     // ============================================================
-
-    // Debounce timer ref
-    const filterDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (businessAuth.isAuthorized && !businessAuth.loading && storesToFetch.length > 0) {
-            // Clear any pending debounced fetch
-            if (filterDebounceRef.current) {
-                clearTimeout(filterDebounceRef.current);
-            }
-
-            // Debounce filter changes to prevent rapid successive calls
-            // Use shorter debounce (300ms) to feel responsive while preventing spam
-            filterDebounceRef.current = setTimeout(() => {
-                fetchTableData(true); // Force fetch, bypassing rate limit for filter changes
-            }, 300);
+            // For initial load, force the query (bypass rate limiting)
+            fetchTableData(true);
         }
-
-        return () => {
-            if (filterDebounceRef.current) {
-                clearTimeout(filterDebounceRef.current);
-            }
-        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
 
@@ -761,7 +691,7 @@ export default function Dashboard() {
 
     const handleRefresh = () => {
         if (canQuery()) {
-            fetchTableData(false); // Don't force - respect rate limiting for manual refresh
+            fetchTableData();
         }
     };
 
@@ -790,7 +720,6 @@ export default function Dashboard() {
         }
     };
 
-    const isLoading = tableDataState?.loading || isInitialLoad || isRefreshing;
     const isRefreshDisabled = isLoading || cooldownRemaining > 0;
 
     // ============================================================
@@ -810,8 +739,12 @@ export default function Dashboard() {
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Store Selector */}
-                    <Select value={selectedStores} onValueChange={handleStoreChange}>
+                    {/* Store Selector - Disabled while loading */}
+                    <Select
+                        value={selectedStores}
+                        onValueChange={handleStoreChange}
+                        disabled={isLoading}
+                    >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Select store" />
                         </SelectTrigger>
@@ -825,8 +758,12 @@ export default function Dashboard() {
                         </SelectContent>
                     </Select>
 
-                    {/* Date Range Selector */}
-                    <Select value={datePreset} onValueChange={handleDatePresetChange}>
+                    {/* Date Range Selector - Disabled while loading */}
+                    <Select
+                        value={datePreset}
+                        onValueChange={handleDatePresetChange}
+                        disabled={isLoading}
+                    >
                         <SelectTrigger className="w-[140px]">
                             <SelectValue placeholder="Date range" />
                         </SelectTrigger>
@@ -838,12 +775,13 @@ export default function Dashboard() {
                         </SelectContent>
                     </Select>
 
-                    {/* Custom Date Picker */}
+                    {/* Custom Date Picker - Disabled while loading */}
                     {datePreset === 'custom' && (
                         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
+                                    disabled={isLoading}
                                     className={cn(
                                         'w-[240px] justify-start text-left font-normal',
                                         !customDateRange && 'text-muted-foreground'

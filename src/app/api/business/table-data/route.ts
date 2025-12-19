@@ -69,13 +69,13 @@ export async function POST(req: NextRequest) {
 
         // Validate that requested stores belong to the business
         const actualBusinessStores: string[] = businessDoc?.data()?.stores || [];
-        
+
         const invalidStores = stores.filter((store: string) => !actualBusinessStores.includes(store));
         if (invalidStores.length > 0) {
             return NextResponse.json(
-                { 
-                    error: 'Validation Error', 
-                    message: `The following stores do not belong to this business: ${invalidStores.join(', ')}` 
+                {
+                    error: 'Validation Error',
+                    message: `The following stores do not belong to this business: ${invalidStores.join(', ')}`
                 },
                 { status: 403 }
             );
@@ -113,44 +113,56 @@ export async function POST(req: NextRequest) {
         // FIRE-AND-FORGET CLOUD FUNCTION CALL
         // ============================================================
 
-        // We don't await this - fire and forget
-        fetch(CLOUD_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': ENQUEUE_FUNCTION_SECRET,
-            },
-            body: JSON.stringify({
-                businessId,
-                stores,
-                startTime,
-                endTime,
-            }),
-        })
-            .then(async (response) => {
-                if (!response.ok) {
-                    console.error('❌ Cloud Function returned error:', response.status);
-                    const errorText = await response.text().catch(() => 'Unknown error');
-                    console.error('Error details:', errorText);
-                    
-                    // Update document with error state
-                    await businessDocRef.update({
-                        'tableData.loading': false,
-                        'tableData.error': `Cloud function failed: ${response.status}`,
-                    });
-                } else {
-                    console.log('✅ Cloud Function call initiated successfully');
-                }
-            })
-            .catch(async (error) => {
-                console.error('❌ Cloud Function request failed:', error);
-                
+        try {
+            // We await the fetch to ensure the request is sent,
+            // but we don't wait for the cloud function to finish processing
+            const response = await fetch(CLOUD_FUNCTION_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': ENQUEUE_FUNCTION_SECRET,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    stores,
+                    startTime,
+                    endTime,
+                }),
+            });
+
+            if (!response.ok) {
+                console.error('❌ Cloud Function returned error:', response.status);
+                const errorText = await response.text().catch(() => 'Unknown error');
+                console.error('Error details:', errorText);
+
                 // Update document with error state
                 await businessDocRef.update({
                     'tableData.loading': false,
-                    'tableData.error': error.message || 'Failed to call cloud function',
+                    'tableData.error': `Cloud function failed: ${response.status}`,
                 });
+
+                return NextResponse.json(
+                    { error: 'Cloud function failed', message: errorText },
+                    { status: 500 }
+                );
+            }
+
+            console.log('✅ Cloud Function call successful');
+
+        } catch (error: any) {
+            console.error('❌ Cloud Function request failed:', error);
+
+            // Update document with error state
+            await businessDocRef.update({
+                'tableData.loading': false,
+                'tableData.error': error.message || 'Failed to call cloud function',
             });
+
+            return NextResponse.json(
+                { error: 'Failed to trigger cloud function', message: error.message },
+                { status: 500 }
+            );
+        }
 
         // ============================================================
         // RETURN ACCEPTED RESPONSE

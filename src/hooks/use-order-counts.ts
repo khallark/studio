@@ -2,11 +2,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, getDocs, where, query } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
-import { SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
 
 // ============================================================
 // HOOK WITH REAL-TIME UPDATES - Business-wide aggregation

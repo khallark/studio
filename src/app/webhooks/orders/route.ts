@@ -354,7 +354,7 @@ export async function POST(req: NextRequest) {
           // Split order: Mark as Confirmed
           customStatus = 'Confirmed';
           log = [{
-            status: "Confirmed and Splitted",
+            status: "Confirmed",
             createdAt: Timestamp.now(),
             remarks: `This order was confirmed and splitted successfully`
           }];

@@ -5,10 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export function useRtoInTransitCounts(businessId: string | null, stores: string[]) {
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+
+export function useRtoInTransitCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({
     queryKey: ['rtoInTransitCounts', businessId, stores],
-    
+
     queryFn: async () => {
       if (!businessId) throw new Error('No business ID provided');
       if (!stores || stores.length === 0) {
@@ -22,12 +25,16 @@ export function useRtoInTransitCounts(businessId: string | null, stores: string[
       // Query each store in parallel
       const storeQueries = stores.map(async (storeId) => {
         const ordersRef = collection(db, 'accounts', storeId, 'orders');
-        
-        const q = query(
+
+        let q = query(
           ordersRef,
           where('customStatus', '==', 'RTO In Transit')
         );
-        
+
+        if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
+          q = query(q, where("vendors", "array-contains", vendorName));
+        }
+
         const snapshot = await getDocs(q);
 
         let reAttempt = 0;
@@ -36,7 +43,7 @@ export function useRtoInTransitCounts(businessId: string | null, stores: string[
 
         snapshot.docs.forEach((doc) => {
           const order = doc.data();
-          
+
           // Skip Shopify-cancelled orders
           if (order.raw?.cancelled_at) return;
 
@@ -60,7 +67,7 @@ export function useRtoInTransitCounts(businessId: string | null, stores: string[
 
       // Wait for all stores
       const results = await Promise.all(storeQueries);
-      
+
       // Aggregate results
       results.forEach(({ reAttempt, refused, noReply }) => {
         totalReAttempt += reAttempt;

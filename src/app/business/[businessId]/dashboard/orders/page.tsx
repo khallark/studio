@@ -238,7 +238,7 @@ export default function BusinessOrdersPage() {
     // ✅ Fetch aggregated counts
     const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
     const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores, vendorName);
-    const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores);
+    const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores, vendorName);
     const { data: unusedAwbsCount = 0 } = useAwbCount(businessId);
 
     // ============================================================

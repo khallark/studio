@@ -292,6 +292,7 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
                         body: JSON.stringify({
                             shop,
                             orderId,
+                            requestedBy: "customer_via_whatsapp"
                         }),
                     });
 

@@ -98,7 +98,7 @@ import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { FileSpreadsheet } from 'lucide-react';
 
 const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
 
 export default function BusinessOrdersPage() {
     // ============================================================
@@ -237,7 +237,7 @@ export default function BusinessOrdersPage() {
 
     // ✅ Fetch aggregated counts
     const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
-    const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores);
+    const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores, vendorName);
     const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores);
     const { data: unusedAwbsCount = 0 } = useAwbCount(businessId);
 

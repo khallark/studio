@@ -5,7 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export function useAvailabilityCounts(businessId: string | null, stores: string[]) {
+const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
+const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+
+export function useAvailabilityCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({
     queryKey: ['availabilityCounts', businessId, stores],
     
@@ -23,10 +26,14 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
       const storeQueries = stores.map(async (storeId) => {
         const ordersRef = collection(db, 'accounts', storeId, 'orders');
         
-        const q = query(
+        let q = query(
           ordersRef,
           where('customStatus', '==', 'Confirmed')
         );
+
+        if(storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
+          q = query(q, where("vendors", "array-contains", vendorName));
+        }
         
         const snapshot = await getDocs(q);
 

@@ -1518,6 +1518,7 @@ export default function BusinessOrdersPage() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap justify-end">
+                                {businessId === SUPER_ADMIN_ID &&
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -1525,7 +1526,7 @@ export default function BusinessOrdersPage() {
                                 >
                                     <FileSpreadsheet className="mr-2 h-4 w-4" />
                                     Tax Report
-                                </Button>
+                                </Button>}
                                 <Button
                                     variant="outline"
                                     size="sm"

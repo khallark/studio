@@ -1876,7 +1876,7 @@ export default function BusinessOrdersPage() {
                                                             </Badge>
                                                         </TableCell>
                                                     )}
-                                                    {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
+                                                    {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) && (
                                                         <TableCell className="text-xs md:text-sm py-2">{order.awb || 'N/A'}</TableCell>
                                                     )}
                                                     {(activeTab.includes('DTO') || activeTab === 'Pending Refunds') && activeTab !== 'DTO Requested' && (

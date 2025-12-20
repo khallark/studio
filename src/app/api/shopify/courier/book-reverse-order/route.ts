@@ -157,7 +157,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Read order
-    const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
+    const shopRef = db.collection('accounts').doc(shop);
+    const orderRef = shopRef.collection('orders').doc(String(orderId));
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
       return NextResponse.json({
@@ -333,7 +334,9 @@ export async function POST(req: NextRequest) {
 
     console.log(payload)
 
-    await sendDTOBookedOrderWhatsAppMessage(businessData, orderData);
+    const shopData = (await shopRef.get()).data() as any;
+
+    await sendDTOBookedOrderWhatsAppMessage(shopData, orderData);
 
     return NextResponse.json(
       {

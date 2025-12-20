@@ -1795,7 +1795,7 @@ export default function BusinessOrdersPage() {
                                         {activeTab === 'All Orders' && (
                                             <TableHead className="font-medium text-muted-foreground">Current Status</TableHead>
                                         )}
-                                        {!['All Orders', 'New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
+                                        {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) && (
                                             <TableHead className="font-medium text-muted-foreground">AWB</TableHead>
                                         )}
                                         {['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds', 'DTO Refunded'].includes(activeTab) && (

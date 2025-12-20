@@ -94,6 +94,7 @@ const STATUS_LABELS: Record<string, string> = {
     "Dispatched": "Dispatched",
     "In Transit": "In Transit",
     "Out For Delivery": "Out For Delivery",
+    "RTO In Transit": "RTO In Transit",
     "DTO Requested": "DTO Requested",
     "DTO Booked": "DTO Booked",
     "DTO In Transit": "DTO In Transit",
@@ -106,7 +107,6 @@ const STATUS_LABELS: Record<string, string> = {
     // Returns
     "RTO Delivered": "RTO Delivered",
     "RTO Closed": "RTO Closed",
-    "RTO In Transit": "RTO In Transit",
     "DTO Delivered": "DTO Delivered",
     "Pending Refund": "Pending Refund",
     "DTO Refunded": "DTO Refunded",

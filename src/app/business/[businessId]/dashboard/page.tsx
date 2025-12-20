@@ -116,10 +116,10 @@ const STATUS_LABELS: Record<string, string> = {
 // Order of statuses within each category for display
 const STATUS_ORDER: Record<string, string[]> = {
     pendingDispatch: ["New", "Confirmed", "Ready To Dispatch"],
-    inTransit: ["Dispatched", "In Transit", "Out For Delivery", "DTO Requested", "DTO Booked", "DTO In Transit"],
+    inTransit: ["Dispatched", "In Transit", "Out For Delivery", "RTO In Transit", "DTO Requested", "DTO Booked", "DTO In Transit"],
     delivered: ["Closed", "Delivered"],
     cancellations: ["Cancellation Requested", "Cancelled"],
-    returns: ["RTO Delivered", "RTO Closed", "RTO In Transit", "DTO Delivered", "Pending Refund", "DTO Refunded", "Lost"],
+    returns: ["RTO Delivered", "RTO Closed", "DTO Delivered", "Pending Refund", "DTO Refunded", "Lost"],
 };
 
 // ============================================================

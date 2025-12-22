@@ -15,11 +15,13 @@ export async function POST(req: NextRequest) {
     };
 
     if (!businessId) {
+      console.log(businessId);
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
     }
 
     // Note: No courier param - it's read from order.courier in the function
     if (!shop || !shippingMode || !Array.isArray(orderIds) || orderIds.length === 0) {
+      console.log(shop, shippingMode, orderIds)
       return NextResponse.json(
         { error: "missing params in the request body" },
         { status: 400 }

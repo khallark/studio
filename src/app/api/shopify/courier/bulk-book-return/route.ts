@@ -7,11 +7,10 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     // ----- Input -----
-    const { businessId, shop, orderIds, pickupName, shippingMode } = (await req.json()) as {
+    const { businessId, shop, orderIds, shippingMode } = (await req.json()) as {
       businessId: string;
       shop: string;
       orderIds: string[];
-      pickupName?: string;
       shippingMode?: string;
     };
 
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Note: No courier param - it's read from order.courier in the function
-    if (!shop || !pickupName || !shippingMode || !Array.isArray(orderIds) || orderIds.length === 0) {
+    if (!shop || !shippingMode || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(
         { error: "missing params in the request body" },
         { status: 400 }
@@ -55,7 +54,6 @@ export async function POST(req: NextRequest) {
         businessId,
         shop,
         orderIds,
-        pickupName,
         shippingMode,
         requestedBy: result.userId,
       }),

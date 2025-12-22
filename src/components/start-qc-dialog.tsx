@@ -19,7 +19,6 @@ import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
-import { getReturnImageUrl } from '@/lib/storage-helpers';
 
 type QcStatus = 'QC Pass' | 'QC Fail' | 'Not Received';
 

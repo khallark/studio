@@ -137,7 +137,7 @@ export function RefundDialog({
     return lineItems
       .filter((item: any) => selectedItems.has(item.variant_id || item.id))
       .reduce((sum: number, item: any) => {
-        return sum + (parseFloat(item.price) * item.quantity);
+        return sum + (parseFloat(item.price) * item.quantity - item.discount_allocations.reduce((a: any, i: any) => a + Number(i.amount), 0));
       }, 0);
   }, [selectedItems, lineItems]);
 
@@ -154,7 +154,7 @@ export function RefundDialog({
   const refundAmount = parseFloat(manualRefundAmount) || 0;
 
   // Validate refund amount
-  const isValidAmount = refundAmount > 0 && refundAmount <= order.totalPrice;
+  const isValidAmount = refundAmount >= 0 && refundAmount <= order.totalPrice;
 
   // Handle item selection toggle
   const handleItemToggle = (itemId: string | number) => {
@@ -334,7 +334,7 @@ export function RefundDialog({
                   const itemId = item.variant_id || item.id;
                   const isReturnItem = returnItemIds.has(itemId);
                   const isSelected = selectedItems.has(itemId);
-                  const itemTotal = parseFloat(item.price) * item.quantity;
+                  const itemTotal = parseFloat(item.price) * item.quantity - item.discount_allocations.reduce((a: any, i: any) => a + Number(i.amount), 0);
 
                   return (
                     <div

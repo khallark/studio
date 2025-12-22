@@ -67,6 +67,7 @@ export interface Order {
   vendors: string[];
   unboxing_video_path?: string;
   raw: {
+    total_price: string;
     cancelled_at: string | null;
     customer?: {
       admin_graphql_api_id?: string;

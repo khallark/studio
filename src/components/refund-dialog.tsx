@@ -154,7 +154,7 @@ export function RefundDialog({
   const refundAmount = parseFloat(manualRefundAmount) || 0;
 
   // Validate refund amount
-  const isValidAmount = refundAmount >= 0 && refundAmount <= order.totalPrice;
+  const isValidAmount = refundAmount >= 0 && refundAmount <= Number(order.raw.total_price);
 
   // Handle item selection toggle
   const handleItemToggle = (itemId: string | number) => {
@@ -190,11 +190,11 @@ export function RefundDialog({
       return;
     }
 
-    if (refundAmount > order.totalPrice) {
+    if (refundAmount > Number(order.raw.total_price)) {
       setError(`Refund amount cannot exceed order total (${new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: order.currency,
-      }).format(order.totalPrice)})`);
+      }).format(Number(order.raw.total_price))})`);
       return;
     }
 
@@ -405,7 +405,7 @@ export function RefundDialog({
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: order.currency,
-                    }).format(order.totalPrice)}
+                    }).format(Number(order.raw?.total_price))}
                   </span>
                 </div>
                 {calculatedAmount > 0 && (
@@ -427,7 +427,7 @@ export function RefundDialog({
                       id="refund-amount"
                       type="number"
                       min="0"
-                      max={order.totalPrice}
+                      max={order.raw.total_price}
                       step="0.01"
                       placeholder="0.00"
                       value={manualRefundAmount}
@@ -439,7 +439,7 @@ export function RefundDialog({
                     You can adjust the amount as needed (max: {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: order.currency,
-                    }).format(order.totalPrice)})
+                    }).format(Number(order.raw.total_price))})
                   </p>
                 </div>
               </div>

@@ -129,7 +129,6 @@ export function BookReturnDialog({ isOpen, onClose, order, shopId, user, busines
           shop: shopId,
           orderId: order.id,
           variant_ids_of_selected_line_items_to_be_returned: Array.from(selectedVariantIds),
-          pickupName: "Majime Production 2",
           shipping_mode: "Surface",
         })
       });

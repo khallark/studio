@@ -363,7 +363,7 @@ export function useReturnBooking(
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ orderIds, storeId, pickupName }: { orderIds: string[]; storeId: string | null; pickupName: string; }) => {
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
       }
@@ -384,7 +384,6 @@ export function useReturnBooking(
           businessId,
           shop: storeId,
           orderIds,
-          pickupName: pickupName,
           shippingMode: 'Surface',
         }),
       });

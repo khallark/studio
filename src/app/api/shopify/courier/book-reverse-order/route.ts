@@ -4,21 +4,6 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendDTOBookedOrderWhatsAppMessage } from '../../../../../lib/communication/whatsappMessagesSendingFuncs';
 import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
-async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const idToken = authHeader.split('Bearer ')[1];
-    try {
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-      return decodedToken.uid;
-    } catch (error) {
-      console.error('Error verifying auth token:', error);
-      return null;
-    }
-  }
-  return null;
-}
-
 type LineItem = {
   id: string | number;
   title?: string;
@@ -30,6 +15,45 @@ type LineItem = {
   sku?: string | null;
   variant_id?: string | number;
 };
+
+/** Fetch pickup location from Delhivery tracking API */
+async function fetchPickupLocation(
+  forwardAwb: string,
+  apiKey: string,
+): Promise<{ ok: boolean; pickupName?: string; error?: string }> {
+  try {
+    const trackingUrl = `https://track.delhivery.com/api/v1/packages/json/?waybill=${forwardAwb}`;
+    const resp = await fetch(trackingUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!resp.ok) {
+      return { ok: false, error: `Tracking API returned HTTP ${resp.status}` };
+    }
+
+    const data = await resp.json();
+    const shipment = data?.ShipmentData?.[0]?.Shipment;
+
+    if (!shipment) {
+      return { ok: false, error: "No shipment data found in tracking response" };
+    }
+
+    const pickupLocation = shipment.PickupLocation;
+
+    if (!pickupLocation) {
+      return { ok: false, error: "PickupLocation not found in shipment data" };
+    }
+
+    return { ok: true, pickupName: String(pickupLocation) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: `Failed to fetch tracking data: ${message}` };
+  }
+}
 
 /** Classify Delhivery create-shipment response */
 function evalDelhiveryResp(carrier: any): {
@@ -107,13 +131,12 @@ async function releaseAwb(shop: string, awb: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { businessId, shop, orderId, variant_ids_of_selected_line_items_to_be_returned, pickupName, shipping_mode } = await req.json();
+    const { businessId, shop, orderId, variant_ids_of_selected_line_items_to_be_returned, shipping_mode } = await req.json();
 
-    // Validate inputs
+    // Validate inputs (pickupName no longer required)
     if (
       !shop ||
       !orderId ||
-      !pickupName ||
       !Array.isArray(variant_ids_of_selected_line_items_to_be_returned) ||
       variant_ids_of_selected_line_items_to_be_returned.length === 0
     ) {
@@ -167,6 +190,26 @@ export async function POST(req: NextRequest) {
       }, { status: 404 });
     }
     const orderData = orderSnap.data() as any;
+
+    // Check if order has forward AWB
+    const forwardAwb = orderData?.awb;
+    if (!forwardAwb) {
+      return NextResponse.json({
+        ok: false,
+        reason: 'Order does not have a forward AWB. Cannot fetch pickup location.'
+      }, { status: 400 });
+    }
+
+    // Fetch pickup location from tracking API
+    const pickupResult = await fetchPickupLocation(forwardAwb, delhiveryApiKey);
+    if (!pickupResult.ok || !pickupResult.pickupName) {
+      return NextResponse.json({
+        ok: false,
+        reason: pickupResult.error || 'Failed to fetch pickup location from tracking API'
+      }, { status: 400 });
+    }
+
+    const pickupName = pickupResult.pickupName;
 
     const awb = await allocateAwb(shop);
 
@@ -282,9 +325,7 @@ export async function POST(req: NextRequest) {
 
     const payload: any = {
       shipments: [shipment],
-      pickup_location: { name: "Majime Productions 2" },
-      // pickup_location: { name: "Endora" },
-      // pickup_location: { name: "Sai arpan apartment" },
+      pickup_location: { name: pickupName },
     };
 
     // Call Delhivery

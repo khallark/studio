@@ -93,7 +93,6 @@ import { Order, CustomStatus } from '@/types/order';
 import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
-import { BulkReturnDialog } from '@/components/bulk-return-dialog';
 import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { FileSpreadsheet } from 'lucide-react';
 
@@ -171,8 +170,6 @@ export default function BusinessOrdersPage() {
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
     const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
     const [orderForRefund, setOrderForRefund] = useState<Order | null>(null);
-    const [isBulkReturnDialogOpen, setIsBulkReturnDialogOpen] = useState(false);
-    const [ordersForBulkReturn, setOrdersForBulkReturn] = useState<Order[]>([]);
 
     // Item selection for availability
     const [itemSelection, setItemSelection] = useState<Record<string, Set<string | number>>>({});
@@ -325,10 +322,34 @@ export default function BusinessOrdersPage() {
         }
 
         if (status === 'DTO Requested') {
-            // ✅ CHANGED: Open dialog instead of booking directly
+            // Directly book returns without dialog - pickup location is fetched by cloud function
             const ordersToReturn = orders.filter(o => selectedOrders.includes(o.id));
-            setOrdersForBulkReturn(ordersToReturn);
-            setIsBulkReturnDialogOpen(true);
+
+            // Group by store
+            const ordersByStore = new Map<string, string[]>();
+            ordersToReturn.forEach(order => {
+                if (!ordersByStore.has(order.storeId)) {
+                    ordersByStore.set(order.storeId, []);
+                }
+                ordersByStore.get(order.storeId)!.push(order.id);
+            });
+
+            let completedStores = 0;
+            const totalStores = ordersByStore.size;
+
+            ordersByStore.forEach((storeOrderIds, storeId) => {
+                bookReturn.mutate({
+                    orderIds: storeOrderIds,
+                    storeId,
+                }, {
+                    onSuccess: () => {
+                        completedStores++;
+                        if (completedStores === totalStores) {
+                            setSelectedOrders([]);
+                        }
+                    }
+                });
+            });
             return;
         }
 
@@ -2104,49 +2125,6 @@ export default function BusinessOrdersPage() {
                             description: 'The refund has been processed successfully.',
                         });
                     }}
-                />
-            )}
-
-            {ordersForBulkReturn.length > 0 && user && (
-                <BulkReturnDialog
-                    isOpen={isBulkReturnDialogOpen}
-                    onClose={() => {
-                        setIsBulkReturnDialogOpen(false);
-                        setOrdersForBulkReturn([]);
-                    }}
-                    orders={ordersForBulkReturn}
-                    onConfirm={(pickupName) => {  // ✅ Receives pickup name
-                        // Group by store
-                        const ordersByStore = new Map<string, string[]>();
-                        ordersForBulkReturn.forEach(order => {
-                            if (!ordersByStore.has(order.storeId)) {
-                                ordersByStore.set(order.storeId, []);
-                            }
-                            ordersByStore.get(order.storeId)!.push(order.id);
-                        });
-
-                        let completedStores = 0;
-                        const totalStores = ordersByStore.size;
-
-                        ordersByStore.forEach((storeOrderIds, storeId) => {
-                            const mutation = bookReturn;
-                            mutation.mutate({
-                                orderIds: storeOrderIds,
-                                storeId,
-                                pickupName  // ✅ Pass pickup name
-                            }, {
-                                onSuccess: () => {
-                                    completedStores++;
-                                    if (completedStores === totalStores) {
-                                        setSelectedOrders([]);
-                                        setIsBulkReturnDialogOpen(false);
-                                        setOrdersForBulkReturn([]);
-                                    }
-                                }
-                            });
-                        });
-                    }}
-                    businessId={businessId}
                 />
             )}
 

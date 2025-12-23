@@ -737,6 +737,7 @@ export function useProcessRefund(
       storeId,
       selectedItemIds,
       refundAmount,
+      itemRefundAmounts,
       refundMethod,
       currency,
       customerId,
@@ -745,6 +746,7 @@ export function useProcessRefund(
       storeId: string | null;
       selectedItemIds: (string | number)[];
       refundAmount: number;
+      itemRefundAmounts: Record<string | number, number>;
       refundMethod: 'store_credit' | 'manual';
       currency: string;
       customerId?: number;
@@ -766,6 +768,7 @@ export function useProcessRefund(
           orderId,
           selectedItemIds,
           refundAmount,
+          itemRefundAmounts,
           refundMethod,
           currency,
           customerId,

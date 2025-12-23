@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
             orderId,
             selectedItemIds,
             refundAmount,
+            itemRefundAmounts, // New: { [variantId/itemId]: refundAmount }
             refundMethod,
             currency,
             customerId,
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
         if (!shop || !orderId || !selectedItemIds || !refundAmount || !refundMethod || !currency) {
             console.warn('Missing required parameters');
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+        }
+
+        if (!itemRefundAmounts || typeof itemRefundAmounts !== 'object') {
+            console.warn('Missing itemRefundAmounts');
+            return NextResponse.json({ error: 'Missing itemRefundAmounts' }, { status: 400 });
         }
 
         if (refundMethod === 'store_credit' && !customerId) {
@@ -154,10 +160,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Update line_items with refundedAmount for each item
+        const existingLineItems = orderData?.raw?.line_items || [];
+        const updatedLineItems = existingLineItems.map((item: any) => {
+            const itemId = item.variant_id || item.id;
+            // Get the refund amount for this item, default to 0 if not in the map
+            const itemRefundAmount = itemRefundAmounts[itemId] ?? itemRefundAmounts[String(itemId)] ?? 0;
+            return {
+                ...item,
+                refundedAmount: itemRefundAmount,
+            };
+        });
+
         // Update Firestore order document
         const updateData: any = {
             refundedAmount: refundAmount,
             refundMethod: refundMethod,
+            'raw.line_items': updatedLineItems,
             customStatus: 'DTO Refunded',
             lastStatusUpdate: FieldValue.serverTimestamp(),
             customStatusesLogs: FieldValue.arrayUnion({
@@ -185,6 +204,7 @@ export async function POST(req: NextRequest) {
                 ? 'Refund processed and added to customer\'s store credits successfully'
                 : 'Refund marked as manually paid successfully',
             refundAmount,
+            itemRefundAmounts,
             refundMethod,
             shopifyRefund: refundResult,
         });

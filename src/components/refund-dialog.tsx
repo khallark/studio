@@ -49,7 +49,8 @@ export function RefundDialog({
 }: RefundDialogProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string | number>>(new Set());
   const [refundMethod, setRefundMethod] = useState<RefundMethod>('store_credit');
-  const [manualRefundAmount, setManualRefundAmount] = useState<string>('');
+  // Track refund amount for each item: { [itemId]: amount }
+  const [itemRefundAmounts, setItemRefundAmounts] = useState<Record<string | number, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   // Media states
@@ -132,50 +133,84 @@ export function RefundDialog({
     }
   }, [isOpen, fetchMedia]);
 
-  // Calculate suggested refund amount based on selected items
-  const calculatedAmount = useMemo(() => {
-    return lineItems
-      .filter((item: any) => selectedItems.has(item.variant_id || item.id))
-      .reduce((sum: number, item: any) => {
-        return sum + (parseFloat(item.price) * item.quantity - item.discount_allocations.reduce((a: any, i: any) => a + Number(i.amount), 0));
-      }, 0);
-  }, [selectedItems, lineItems]);
+  // Helper function to calculate item total (price * qty - discounts)
+  const getItemTotal = useCallback((item: any) => {
+    return parseFloat(item.price) * item.quantity -
+      item.discount_allocations.reduce((a: any, i: any) => a + Number(i.amount), 0);
+  }, []);
 
-  // Update manual amount when calculated amount changes
-  React.useEffect(() => {
-    if (calculatedAmount > 0) {
-      setManualRefundAmount(calculatedAmount.toFixed(2));
-    } else {
-      setManualRefundAmount('');
-    }
-  }, [calculatedAmount]);
-
-  // Parse manual refund amount
-  const refundAmount = parseFloat(manualRefundAmount) || 0;
-
-  // Validate refund amount
-  const isValidAmount = refundAmount >= 0 && refundAmount <= Number(order.raw.total_price);
+  // Calculate total refund amount from all item amounts
+  const totalRefundAmount = useMemo(() => {
+    return Object.values(itemRefundAmounts).reduce((sum, amount) => {
+      const parsed = parseFloat(amount) || 0;
+      return sum + parsed;
+    }, 0);
+  }, [itemRefundAmounts]);
 
   // Handle item selection toggle
-  const handleItemToggle = (itemId: string | number) => {
+  const handleItemToggle = (itemId: string | number, item: any) => {
     setSelectedItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(itemId)) {
+        // Deselecting - set refund amount to empty (will be treated as 0)
         newSet.delete(itemId);
+        setItemRefundAmounts(prev => {
+          const updated = { ...prev };
+          delete updated[itemId];
+          return updated;
+        });
       } else {
+        // Selecting - auto-fill with suggested amount
         newSet.add(itemId);
+        const suggestedAmount = getItemTotal(item);
+        setItemRefundAmounts(prev => ({
+          ...prev,
+          [itemId]: suggestedAmount.toFixed(2),
+        }));
       }
       return newSet;
     });
   };
 
+  // Handle individual item refund amount change
+  const handleItemAmountChange = (itemId: string | number, value: string) => {
+    setItemRefundAmounts(prev => ({
+      ...prev,
+      [itemId]: value,
+    }));
+  };
+
   // Handle select all return items
   const handleSelectAllReturnItems = () => {
-    const allReturnItemIds = lineItems
-      .filter((item: any) => returnItemIds.has(item.variant_id || item.id))
-      .map((item: any) => item.variant_id || item.id);
+    const returnItems = lineItems.filter((item: any) =>
+      returnItemIds.has(item.variant_id || item.id)
+    );
 
-    setSelectedItems(new Set(allReturnItemIds));
+    const newSelectedItems = new Set<string | number>();
+    const newAmounts: Record<string | number, string> = {};
+
+    returnItems.forEach((item: any) => {
+      const itemId = item.variant_id || item.id;
+      newSelectedItems.add(itemId);
+      newAmounts[itemId] = getItemTotal(item).toFixed(2);
+    });
+
+    setSelectedItems(newSelectedItems);
+    setItemRefundAmounts(newAmounts);
+  };
+
+  // Validate refund amount
+  const isValidAmount = totalRefundAmount >= 0 && totalRefundAmount <= Number(order.raw.total_price);
+
+  // Build itemRefundAmounts map for API (include all line items, 0 for unselected)
+  const buildItemRefundAmountsForApi = () => {
+    const result: Record<string | number, number> = {};
+    lineItems.forEach((item: any) => {
+      const itemId = item.variant_id || item.id;
+      const amount = parseFloat(itemRefundAmounts[itemId] || '0') || 0;
+      result[itemId] = amount;
+    });
+    return result;
   };
 
   // Handle refund submission
@@ -186,12 +221,17 @@ export function RefundDialog({
     }
 
     if (!isValidAmount) {
-      setError('Please enter a valid refund amount');
+      setError('Please enter valid refund amounts');
       return;
     }
 
-    if (refundAmount > Number(order.raw.total_price)) {
-      setError(`Refund amount cannot exceed order total (${new Intl.NumberFormat('en-US', {
+    if (totalRefundAmount <= 0) {
+      setError('Total refund amount must be greater than 0');
+      return;
+    }
+
+    if (totalRefundAmount > Number(order.raw.total_price)) {
+      setError(`Total refund amount cannot exceed order total (${new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: order.currency,
       }).format(Number(order.raw.total_price))})`);
@@ -205,7 +245,8 @@ export function RefundDialog({
         orderId: order.id,
         storeId: order.storeId,
         selectedItemIds: Array.from(selectedItems),
-        refundAmount,
+        refundAmount: totalRefundAmount,
+        itemRefundAmounts: buildItemRefundAmountsForApi(),
         refundMethod,
         currency: order.currency,
         customerId: Number(order.raw.customer?.id),
@@ -217,7 +258,7 @@ export function RefundDialog({
           // Reset state
           setSelectedItems(new Set());
           setRefundMethod('store_credit');
-          setManualRefundAmount('');
+          setItemRefundAmounts({});
         },
         onError: (err: any) => {
           setError(err.message || 'An unexpected error occurred');
@@ -231,7 +272,7 @@ export function RefundDialog({
     if (!processRefund.isPending) {
       setSelectedItems(new Set());
       setRefundMethod('store_credit');
-      setManualRefundAmount('');
+      setItemRefundAmounts({});
       setError(null);
       onClose();
     }
@@ -245,7 +286,7 @@ export function RefundDialog({
         <DialogHeader>
           <DialogTitle>Process Refund - {order.name}</DialogTitle>
           <DialogDescription>
-            Select items to refund and enter the refund amount. Items marked with a badge are return items.
+            Select items to refund and enter the refund amount for each item.
           </DialogDescription>
         </DialogHeader>
 
@@ -329,64 +370,95 @@ export function RefundDialog({
                 </Button>
               </div>
 
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+              <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
                 {lineItems.map((item: any, index: number) => {
                   const itemId = item.variant_id || item.id;
                   const isReturnItem = returnItemIds.has(itemId);
                   const isSelected = selectedItems.has(itemId);
-                  const itemTotal = parseFloat(item.price) * item.quantity - item.discount_allocations.reduce((a: any, i: any) => a + Number(i.amount), 0);
+                  const itemTotal = getItemTotal(item);
+                  const currentAmount = itemRefundAmounts[itemId] || '';
 
                   return (
                     <div
                       key={index}
-                      className={`p-4 flex items-start gap-4 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-muted/30' : ''
-                        }`}
+                      className={`p-4 space-y-3 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-muted/30' : ''}`}
                     >
-                      <Checkbox
-                        id={`item-${itemId}`}
-                        checked={isSelected}
-                        onCheckedChange={() => handleItemToggle(itemId)}
-                      />
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 gap-2">
-                            <Label
-                              htmlFor={`item-${itemId}`}
-                              className="font-medium cursor-pointer"
-                            >
-                              {item.name}
-                            </Label>
-                            {isReturnItem && (
-                              <Badge variant="secondary" className="ml-2">
-                                Return Item
-                              </Badge>
-                            )}
-                            {item.qc_status && (
-                              <Badge variant='success' className="ml-2">
-                                {item.qc_status}
-                              </Badge>
-                            )}
+                      <div className="flex items-start gap-4">
+                        <Checkbox
+                          id={`item-${itemId}`}
+                          checked={isSelected}
+                          onCheckedChange={() => handleItemToggle(itemId, item)}
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 gap-2">
+                              <Label
+                                htmlFor={`item-${itemId}`}
+                                className="font-medium cursor-pointer"
+                              >
+                                {item.name}
+                              </Label>
+                              {isReturnItem && (
+                                <Badge variant="secondary" className="ml-2">
+                                  Return Item
+                                </Badge>
+                              )}
+                              {item.qc_status && (
+                                <Badge variant='success' className="ml-2">
+                                  {item.qc_status}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-mono text-sm">
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: order.currency,
+                                }).format(itemTotal)}
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-mono text-sm">
-                              {new Intl.NumberFormat('en-US', {
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            {item.sku && <span>SKU: {item.sku}</span>}
+                            <span>Qty: {item.quantity}</span>
+                            <span className='font-mono'>
+                              Price: {new Intl.NumberFormat('en-US', {
                                 style: 'currency',
                                 currency: order.currency,
-                              }).format(itemTotal)}
-                            </p>
+                              }).format(parseFloat(item.price))}
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {item.sku && <span>SKU: {item.sku}</span>}
-                          <span>Qty: {item.quantity}</span>
-                          <span className='font-mono'>
-                            Price: {new Intl.NumberFormat('en-US', {
+                      </div>
+
+                      {/* Per-item refund amount input */}
+                      {isSelected && (
+                        <div className="ml-8 flex items-center gap-3">
+                          <Label htmlFor={`amount-${itemId}`} className="text-sm text-muted-foreground whitespace-nowrap">
+                            Refund Amount:
+                          </Label>
+                          <div className="flex items-center gap-2 flex-1 max-w-xs">
+                            <span className="text-sm font-medium">{order.currency}</span>
+                            <Input
+                              id={`amount-${itemId}`}
+                              type="number"
+                              min="0"
+                              max={itemTotal}
+                              step="0.01"
+                              placeholder="0.00"
+                              value={currentAmount}
+                              onChange={(e) => handleItemAmountChange(itemId, e.target.value)}
+                              className="font-mono"
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            (max: {new Intl.NumberFormat('en-US', {
                               style: 'currency',
                               currency: order.currency,
-                            }).format(parseFloat(item.price))}
+                            }).format(itemTotal)})
                           </span>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -395,9 +467,9 @@ export function RefundDialog({
 
             <Separator />
 
-            {/* Refund Amount */}
+            {/* Refund Amount Summary */}
             <div className="space-y-4">
-              <h4 className="font-semibold">Refund Amount</h4>
+              <h4 className="font-semibold">Refund Summary</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Order Total:</span>
@@ -408,40 +480,42 @@ export function RefundDialog({
                     }).format(Number(order.raw?.total_price))}
                   </span>
                 </div>
-                {calculatedAmount > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Suggested Amount (based on selection):</span>
-                    <span className="font-mono font-semibold">
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: order.currency,
-                      }).format(calculatedAmount)}
-                    </span>
+
+                {/* Show breakdown of selected items */}
+                {selectedItems.size > 0 && (
+                  <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
+                    <p className="text-sm font-medium">Selected Items Breakdown:</p>
+                    {lineItems
+                      .filter((item: any) => selectedItems.has(item.variant_id || item.id))
+                      .map((item: any, index: number) => {
+                        const itemId = item.variant_id || item.id;
+                        const amount = parseFloat(itemRefundAmounts[itemId] || '0') || 0;
+                        return (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground truncate max-w-[60%]">
+                              {item.name}
+                            </span>
+                            <span className="font-mono">
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: order.currency,
+                              }).format(amount)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    <Separator className="my-2" />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total Refund Amount:</span>
+                      <span className="font-mono text-lg">
+                        {new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: order.currency,
+                        }).format(totalRefundAmount)}
+                      </span>
+                    </div>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="refund-amount">Enter Refund Amount *</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold">{order.currency}</span>
-                    <Input
-                      id="refund-amount"
-                      type="number"
-                      min="0"
-                      max={order.raw.total_price}
-                      step="0.01"
-                      placeholder="0.00"
-                      value={manualRefundAmount}
-                      onChange={(e) => setManualRefundAmount(e.target.value)}
-                      className="flex-1 text-lg font-mono"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    You can adjust the amount as needed (max: {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: order.currency,
-                    }).format(Number(order.raw.total_price))})
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -496,7 +570,7 @@ export function RefundDialog({
           </Button>
           <Button
             onClick={handleRefund}
-            disabled={processRefund.isPending || selectedItems.size === 0 || !isValidAmount}
+            disabled={processRefund.isPending || selectedItems.size === 0 || !isValidAmount || totalRefundAmount <= 0}
             className='font-mono'
           >
             {processRefund.isPending ? (
@@ -505,10 +579,10 @@ export function RefundDialog({
                 Processing...
               </>
             ) : (
-              `Process Refund${refundAmount > 0 ? ` (${new Intl.NumberFormat('en-US', {
+              `Process Refund${totalRefundAmount > 0 ? ` (${new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: order.currency,
-              }).format(refundAmount)})` : ''}`
+              }).format(totalRefundAmount)})` : ''}`
             )}
           </Button>
         </DialogFooter>

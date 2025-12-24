@@ -87,6 +87,7 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductActivityLog } from '@/components/product-activity-log';
+import Link from 'next/link';
 
 // ============================================================
 // TYPES
@@ -557,6 +558,16 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        asChild
+                        className="gap-2"
+                    >
+                        <Link href={`/business/${businessId}/dashboard/orders`}>
+                            <ChevronLeft className="h-4 w-4" />
+                            Back to Dashboard
+                        </Link>
+                    </Button>
                     <Button
                         onClick={() => handleOpenDialog()}
                         className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"

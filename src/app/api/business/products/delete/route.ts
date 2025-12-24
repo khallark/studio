@@ -1,4 +1,4 @@
-// app/api/business/products/create/route.ts
+// app/api/business/products/delete/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase-admin';
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, product } = await req.json();
+        const { businessId, sku } = await req.json();
 
         // ============================================================
         // VALIDATION
@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (!product || typeof product !== 'object') {
+        if (!sku || typeof sku !== 'string') {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'product is required and must be an object' },
+                { error: 'Validation Error', message: 'sku is required and must be a string' },
                 { status: 400 }
             );
         }
@@ -42,61 +42,41 @@ export async function POST(req: NextRequest) {
         // CORE LOGIC
         // ============================================================
 
-        const { name, sku, weight, category }: {
-            name?: string;
-            sku?: string;
-            weight?: number;
-            category?: string;
-        } = product;
-
-        if (!name || !sku || !weight || !category) {
-            return NextResponse.json(
-                { error: 'Validation Error', message: 'Missing required fields: name, sku, weight, or category' },
-                { status: 400 }
-            );
-        }
-
         const productRef = businessDoc?.ref.collection('products').doc(sku);
         const productDoc = await productRef?.get();
 
-        if (productDoc?.exists) {
+        if (!productDoc?.exists) {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'A product with this SKU already exists' },
-                { status: 400 }
+                { error: 'Not Found', message: 'Product with this SKU does not exist' },
+                { status: 404 }
             );
         }
 
-        // Build product data
-        const productData = {
-            name: product.name,
-            sku: product.sku,
-            weight: product.weight,
-            category: product.category,
-            description: product.description || null,
-            price: product.price || null,
-            stock: product.stock !== undefined ? parseInt(product.stock) : null,
-            createdBy: userId || 'unknown',
-            createdAt: Timestamp.now(),
-        };
+        const productData = productDoc.data();
 
         // ============================================================
-        // CREATE AUDIT LOG
+        // CREATE DELETION LOG (at business level since product is deleted)
         // ============================================================
 
         const userData = userDoc?.data();
         const userEmail = userData?.email || userData?.primaryContact?.email || null;
 
-        const logEntry = {
-            action: 'created',
-            changes: [
-                { field: 'name', fieldLabel: 'Product Name', oldValue: null, newValue: productData.name },
-                { field: 'sku', fieldLabel: 'SKU', oldValue: null, newValue: productData.sku },
-                { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
-                { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
-                ...(productData.description ? [{ field: 'description', fieldLabel: 'Description', oldValue: null, newValue: productData.description }] : []),
-                ...(productData.price ? [{ field: 'price', fieldLabel: 'Price', oldValue: null, newValue: productData.price }] : []),
-                ...(productData.stock !== null ? [{ field: 'stock', fieldLabel: 'Stock', oldValue: null, newValue: productData.stock }] : []),
-            ],
+        const deletionLog = {
+            action: 'deleted',
+            entityType: 'product',
+            entityId: sku,
+            entityName: productData?.name || sku,
+            deletedData: {
+                name: productData?.name,
+                sku: productData?.sku,
+                weight: productData?.weight,
+                category: productData?.category,
+                description: productData?.description || null,
+                price: productData?.price || null,
+                stock: productData?.stock || null,
+                createdAt: productData?.createdAt,
+                createdBy: productData?.createdBy,
+            },
             performedBy: userId || 'unknown',
             performedByEmail: userEmail,
             performedAt: Timestamp.now(),
@@ -106,17 +86,23 @@ export async function POST(req: NextRequest) {
         };
 
         // ============================================================
-        // BATCH WRITE: Create product + Create log
+        // BATCH: Delete product logs, delete product, create deletion audit
         // ============================================================
 
         const batch = db.batch();
 
-        // Create the product
-        batch.set(productRef!, productData);
+        // First, get and delete all logs in the product's logs subcollection
+        const logsSnapshot = await productRef!.collection('logs').get();
+        logsSnapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
 
-        // Create the initial log entry
-        const logRef = productRef!.collection('logs').doc();
-        batch.set(logRef, logEntry);
+        // Delete the product
+        batch.delete(productRef!);
+
+        // Store deletion log at business level for audit trail
+        const deletionLogRef = businessDoc?.ref.collection('deletedProductsLog').doc();
+        batch.set(deletionLogRef!, deletionLog);
 
         await batch.commit();
 
@@ -127,11 +113,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
             {
                 success: true,
-                message: 'Product created successfully.',
-                product: productData,
-                logId: logRef.id,
+                message: 'Product deleted successfully.',
+                sku,
+                productName: productData?.name,
             },
-            { status: 201 }
+            { status: 200 }
         );
 
     } catch (error: any) {

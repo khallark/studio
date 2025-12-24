@@ -214,6 +214,18 @@ const nextConfig: NextConfig = {
         destination: '/api/business/table-data/route',
       },
       {
+        source: '/api/business/products/create',
+        destination: '/api/business/products/create/route',
+      },
+      {
+        source: '/api/business/products/update',
+        destination: '/api/business/products/update/route',
+      },
+      {
+        source: '/api/business/products/delete',
+        destination: '/api/business/products/delete/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

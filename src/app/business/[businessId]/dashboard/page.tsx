@@ -76,7 +76,7 @@ interface FirestoreTableData {
     error?: string | null;
 }
 
-type DateRangePreset = 'today' | 'last7days' | 'last30days' | 'custom';
+type DateRangePreset = 'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom';
 
 // ============================================================
 // CONSTANTS
@@ -146,6 +146,11 @@ function getDateRangeFromPreset(preset: DateRangePreset): { start: Date; end: Da
             return {
                 start: startOfDay(now),
                 end: endOfDay(now),
+            };
+        case 'yesterday':
+            return {
+                start: startOfDay(subDays(now, 6)),
+                end: endOfDay(subDays(now, 6)),
             };
         case 'last7days':
             return {
@@ -773,6 +778,7 @@ export default function Dashboard() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="yesterday">Yesterday</SelectItem>
                             <SelectItem value="last7days">Last 7 Days</SelectItem>
                             <SelectItem value="last30days">Last 30 Days</SelectItem>
                             <SelectItem value="custom">Custom</SelectItem>

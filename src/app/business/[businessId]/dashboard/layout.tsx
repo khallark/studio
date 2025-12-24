@@ -446,6 +446,33 @@ export default function BusinessLayout({
                     </CollapsibleContent>
                   </Collapsible>
                 </SidebarMenuItem>
+
+                {/* Products Section */}
+                <SidebarMenuItem>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/products`)}>
+                        <div className="flex items-center gap-2">
+                          <Users />
+                          Products
+                        </div>
+                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === `/business/${businessId}/dashboard/products`}>
+                          <Link href={`/business/${businessId}/dashboard/products`}>
+                            <Inbox className="h-4 w-4" />
+                            All Products
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarContent>
 

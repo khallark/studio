@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox, Shirt } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -453,7 +453,7 @@ export default function BusinessLayout({
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/products`)}>
                         <div className="flex items-center gap-2">
-                          <Users />
+                          <Shirt />
                           Products
                         </div>
                         <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
@@ -463,8 +463,8 @@ export default function BusinessLayout({
                       <SidebarMenuSub>
                         <SidebarMenuSubButton
                           asChild
-                          isActive={pathname === `/business/${businessId}/dashboard/products`}>
-                          <Link href={`/business/${businessId}/dashboard/products`}>
+                          isActive={pathname === `/business/${businessId}/products`}>
+                          <Link href={`/business/${businessId}/products`}>
                             <Inbox className="h-4 w-4" />
                             All Products
                           </Link>

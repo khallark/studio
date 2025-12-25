@@ -86,6 +86,28 @@ interface ShopifyImage {
 // HELPER FUNCTIONS
 // ============================================================
 
+/**
+ * Recursively removes undefined values from an object
+ * Firestore doesn't accept undefined values
+ */
+function stripUndefined<T extends Record<string, any>>(obj: T): T {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value === undefined) {
+            result[key] = null; // Convert undefined to null
+        } else if (Array.isArray(value)) {
+            result[key] = value.map(item =>
+                typeof item === 'object' && item !== null ? stripUndefined(item) : item
+            );
+        } else if (typeof value === 'object' && value !== null) {
+            result[key] = stripUndefined(value);
+        } else {
+            result[key] = value;
+        }
+    }
+    return result as T;
+}
+
 function extractProductSkus(variants: ShopifyVariant[]): string[] {
     if (!Array.isArray(variants) || variants.length === 0) {
         return [];
@@ -102,32 +124,31 @@ function extractVariants(variants: ShopifyVariant[]): any[] {
         return [];
     }
 
-    return variants.map((v) => ({
+    return variants.map((v) => stripUndefined({
         id: v.id,
         productId: v.product_id,
-        title: v.title,
+        title: v.title || null,
         sku: v.sku || null,
         barcode: v.barcode || null,
         price: v.price ? parseFloat(v.price) : null,
         compareAtPrice: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
-        position: v.position,
-        option1: v.option1,
-        option2: v.option2,
-        option3: v.option3,
-        weight: v.weight,
-        weightUnit: v.weight_unit,
-        inventoryItemId: v.inventory_item_id,
-        inventoryQuantity: v.inventory_quantity,
-        inventoryPolicy: v.inventory_policy,
-        inventoryManagement: v.inventory_management,
-        fulfillmentService: v.fulfillment_service,
-        requiresShipping: v.requires_shipping,
-        taxable: v.taxable,
-        taxCode: v.tax_code,
-        grams: v.grams,
-        imageId: v.image_id,
-        createdAt: v.created_at,
-        updatedAt: v.updated_at,
+        position: v.position || null,
+        option1: v.option1 || null,
+        option2: v.option2 || null,
+        option3: v.option3 || null,
+        weight: v.weight || null,
+        weightUnit: v.weight_unit || null,
+        inventoryItemId: v.inventory_item_id || null,
+        inventoryQuantity: v.inventory_quantity ?? null,
+        inventoryPolicy: v.inventory_policy || null,
+        inventoryManagement: v.inventory_management || null,
+        fulfillmentService: v.fulfillment_service || null,
+        requiresShipping: v.requires_shipping ?? null,
+        taxable: v.taxable ?? null,
+        grams: v.grams || null,
+        imageId: v.image_id || null,
+        createdAt: v.created_at || null,
+        updatedAt: v.updated_at || null,
     }));
 }
 
@@ -136,17 +157,17 @@ function extractImages(images: ShopifyImage[]): any[] {
         return [];
     }
 
-    return images.map((img) => ({
+    return images.map((img) => stripUndefined({
         id: img.id,
         productId: img.product_id,
         position: img.position,
         src: img.src,
         width: img.width,
         height: img.height,
-        alt: img.alt,
+        alt: img.alt || null,
         variantIds: img.variant_ids || [],
-        createdAt: img.created_at,
-        updatedAt: img.updated_at,
+        createdAt: img.created_at || null,
+        updatedAt: img.updated_at || null,
     }));
 }
 
@@ -155,7 +176,7 @@ function extractOptions(options: ShopifyOption[]): any[] {
         return [];
     }
 
-    return options.map((opt) => ({
+    return options.map((opt) => stripUndefined({
         id: opt.id,
         productId: opt.product_id,
         name: opt.name,
@@ -170,11 +191,11 @@ function buildProductData(product: ShopifyProduct, storeId: string): { [key: str
     const images = extractImages(product.images || []);
     const options = extractOptions(product.options || []);
 
-    return {
+    return stripUndefined({
         // Core identifiers
         productId: product.id,
-        title: product.title,
-        handle: product.handle,
+        title: product.title || '',
+        handle: product.handle || '',
 
         // Description & content
         bodyHtml: product.body_html || null,
@@ -206,21 +227,21 @@ function buildProductData(product: ShopifyProduct, storeId: string): { [key: str
         // Images
         images,
         featuredImage: product.image
-            ? {
-                  id: product.image.id,
-                  src: product.image.src,
-                  width: product.image.width,
-                  height: product.image.height,
-                  alt: product.image.alt,
-              }
+            ? stripUndefined({
+                id: product.image.id,
+                src: product.image.src,
+                width: product.image.width || null,
+                height: product.image.height || null,
+                alt: product.image.alt || null,
+            })
             : null,
 
         // Options (Size, Color, etc.)
         options,
 
         // Timestamps from Shopify
-        shopifyCreatedAt: product.created_at,
-        shopifyUpdatedAt: product.updated_at,
+        shopifyCreatedAt: product.created_at || null,
+        shopifyUpdatedAt: product.updated_at || null,
 
         // Store reference
         storeId,
@@ -229,7 +250,7 @@ function buildProductData(product: ShopifyProduct, storeId: string): { [key: str
         isDeleted: false,
         lastSyncedAt: FieldValue.serverTimestamp(),
         syncSource: 'manual',
-    };
+    });
 }
 
 // ============================================================

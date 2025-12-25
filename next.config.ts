@@ -162,6 +162,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/split-order/route',
       },
       {
+        source: '/api/shopify/products/sync',
+        destination: '/api/shopify/products/sync/route',
+      },
+      {
         source: '/proxy/api/checkout/customer',
         destination: '/proxy/api/checkout/customer/route',
       },

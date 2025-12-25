@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase-admin';
 import crypto from 'crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
+import { buildProductData } from '@/lib/shopify/product-utils';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -50,21 +51,6 @@ async function logWebhookToCentralCollection(
   } catch (error) {
     console.error('Failed to write webhook log to central collection:', error);
   }
-}
-
-function createOrderLogEntry(topic: string, orderData: any): any {
-  const now = new Date();
-  return {
-    type: 'WEBHOOK',
-    action: topic.toUpperCase().replace('/', '_'), // e.g., ORDERS_CREATE
-    timestamp: now, // Use JS Date object for arrayUnion
-    details: {
-      topic: topic,
-      orderId: String(orderData.id),
-      orderName: orderData.name,
-    },
-    user: { displayName: 'Shopify' } // System-generated action
-  };
 }
 
 // ============================================================
@@ -245,172 +231,6 @@ function extractSplitMetadata(orderData: any): {
   }
 
   return metadata;
-}
-
-// ============================================================
-// PRODUCT HELPERS
-// ============================================================
-
-/**
- * Extracts all SKUs from product variants
- */
-function extractProductSkus(variants: any[]): string[] {
-  if (!Array.isArray(variants) || variants.length === 0) {
-    return [];
-  }
-
-  return variants
-    .map((v: any) => v.sku)
-    .filter((sku: any) => sku && typeof sku === 'string' && sku.trim().length > 0)
-    .map((sku: string) => sku.trim());
-}
-
-/**
- * Extracts variant data in a clean format
- */
-function extractVariants(variants: any[]): any[] {
-  if (!Array.isArray(variants) || variants.length === 0) {
-    return [];
-  }
-
-  return variants.map((v: any) => ({
-    id: v.id,
-    productId: v.product_id,
-    title: v.title,
-    sku: v.sku || null,
-    barcode: v.barcode || null,
-    price: v.price ? parseFloat(v.price) : null,
-    compareAtPrice: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
-    position: v.position,
-    option1: v.option1,
-    option2: v.option2,
-    option3: v.option3,
-    weight: v.weight,
-    weightUnit: v.weight_unit,
-    inventoryItemId: v.inventory_item_id,
-    inventoryQuantity: v.inventory_quantity,
-    inventoryPolicy: v.inventory_policy,
-    inventoryManagement: v.inventory_management,
-    fulfillmentService: v.fulfillment_service,
-    requiresShipping: v.requires_shipping,
-    taxable: v.taxable,
-    taxCode: v.tax_code,
-    grams: v.grams,
-    imageId: v.image_id,
-    createdAt: v.created_at,
-    updatedAt: v.updated_at,
-  }));
-}
-
-/**
- * Extracts image data from product
- */
-function extractImages(images: any[]): any[] {
-  if (!Array.isArray(images) || images.length === 0) {
-    return [];
-  }
-
-  return images.map((img: any) => ({
-    id: img.id,
-    productId: img.product_id,
-    position: img.position,
-    src: img.src,
-    width: img.width,
-    height: img.height,
-    alt: img.alt,
-    variantIds: img.variant_ids || [],
-    createdAt: img.created_at,
-    updatedAt: img.updated_at,
-  }));
-}
-
-/**
- * Extracts product options (like Size, Color)
- */
-function extractOptions(options: any[]): any[] {
-  if (!Array.isArray(options) || options.length === 0) {
-    return [];
-  }
-
-  return options.map((opt: any) => ({
-    id: opt.id,
-    productId: opt.product_id,
-    name: opt.name,
-    position: opt.position,
-    values: opt.values || [],
-  }));
-}
-
-/**
- * Builds the product data object to save to Firestore
- */
-function buildProductData(productData: any, topic: string): { [key: string]: any } {
-  const variants = extractVariants(productData.variants || []);
-  const skus = extractProductSkus(productData.variants || []);
-  const images = extractImages(productData.images || []);
-  const options = extractOptions(productData.options || []);
-
-  return {
-    // Core identifiers
-    productId: productData.id,
-    title: productData.title,
-    handle: productData.handle,
-
-    // Description & content
-    bodyHtml: productData.body_html || null,
-
-    // Vendor & type
-    vendor: productData.vendor || null,
-    productType: productData.product_type || null,
-
-    // Tags (as array)
-    tags: productData.tags
-      ? (typeof productData.tags === 'string'
-        ? productData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-        : productData.tags)
-      : [],
-
-    // Status & visibility
-    status: productData.status || 'active',
-    publishedAt: productData.published_at || null,
-    publishedScope: productData.published_scope || null,
-
-    // Template
-    templateSuffix: productData.template_suffix || null,
-
-    // SEO
-    metafieldsGlobalTitleTag: productData.metafields_global_title_tag || null,
-    metafieldsGlobalDescriptionTag: productData.metafields_global_description_tag || null,
-
-    // Variants data
-    variants,
-    variantCount: variants.length,
-    skus, // All SKUs from variants for easy querying
-
-    // Images
-    images,
-    featuredImage: productData.image ? {
-      id: productData.image.id,
-      src: productData.image.src,
-      width: productData.image.width,
-      height: productData.image.height,
-      alt: productData.image.alt,
-    } : null,
-
-    // Options (Size, Color, etc.)
-    options,
-
-    // Timestamps from Shopify
-    shopifyCreatedAt: productData.created_at,
-    shopifyUpdatedAt: productData.updated_at,
-
-    // Store the raw payload for reference
-    raw: productData,
-
-    // Webhook metadata
-    lastWebhookTopic: topic,
-    receivedAt: FieldValue.serverTimestamp(),
-  };
 }
 
 // ============================================================
@@ -668,7 +488,7 @@ async function handleProductWebhook(
     }
 
     // Build the product data to save
-    const dataToSave = buildProductData(productData, topic);
+    const dataToSave = buildProductData(productData, shopDomain, 'webhook', topic);
 
     // 2) Create → create new product doc
     if (topic === 'products/create') {

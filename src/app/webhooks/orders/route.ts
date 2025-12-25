@@ -1,4 +1,4 @@
-// webhook -> single order fetching and storing.
+// webhook -> orders and products fetching and storing.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
@@ -8,6 +8,10 @@ import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessage
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
+
+// ============================================================
+// HMAC VERIFICATION
+// ============================================================
 
 function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string): boolean {
   // Shopify webhook HMAC header is base64
@@ -19,18 +23,22 @@ function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string):
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
 }
 
+// ============================================================
+// LOGGING HELPERS
+// ============================================================
+
 async function logWebhookToCentralCollection(
   db: FirebaseFirestore.Firestore,
   shopDomain: string,
   topic: string,
-  orderId: string,
+  entityId: string,
   payload: any,
   hmac: string
 ) {
   const logEntry = {
     type: 'WEBHOOK',
     topic,
-    orderId,
+    entityId,
     timestamp: FieldValue.serverTimestamp(),
     payload,
     hmacVerified: true,
@@ -58,6 +66,10 @@ function createOrderLogEntry(topic: string, orderData: any): any {
     user: { displayName: 'Shopify' } // System-generated action
   };
 }
+
+// ============================================================
+// ORDER HELPERS
+// ============================================================
 
 function normalizePhoneNumber(phoneNumber: string): string {
   // Remove all whitespace characters from the phone number
@@ -235,6 +247,492 @@ function extractSplitMetadata(orderData: any): {
   return metadata;
 }
 
+// ============================================================
+// PRODUCT HELPERS
+// ============================================================
+
+/**
+ * Extracts all SKUs from product variants
+ */
+function extractProductSkus(variants: any[]): string[] {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return [];
+  }
+
+  return variants
+    .map((v: any) => v.sku)
+    .filter((sku: any) => sku && typeof sku === 'string' && sku.trim().length > 0)
+    .map((sku: string) => sku.trim());
+}
+
+/**
+ * Extracts variant data in a clean format
+ */
+function extractVariants(variants: any[]): any[] {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return [];
+  }
+
+  return variants.map((v: any) => ({
+    id: v.id,
+    productId: v.product_id,
+    title: v.title,
+    sku: v.sku || null,
+    barcode: v.barcode || null,
+    price: v.price ? parseFloat(v.price) : null,
+    compareAtPrice: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
+    position: v.position,
+    option1: v.option1,
+    option2: v.option2,
+    option3: v.option3,
+    weight: v.weight,
+    weightUnit: v.weight_unit,
+    inventoryItemId: v.inventory_item_id,
+    inventoryQuantity: v.inventory_quantity,
+    inventoryPolicy: v.inventory_policy,
+    inventoryManagement: v.inventory_management,
+    fulfillmentService: v.fulfillment_service,
+    requiresShipping: v.requires_shipping,
+    taxable: v.taxable,
+    taxCode: v.tax_code,
+    grams: v.grams,
+    imageId: v.image_id,
+    createdAt: v.created_at,
+    updatedAt: v.updated_at,
+  }));
+}
+
+/**
+ * Extracts image data from product
+ */
+function extractImages(images: any[]): any[] {
+  if (!Array.isArray(images) || images.length === 0) {
+    return [];
+  }
+
+  return images.map((img: any) => ({
+    id: img.id,
+    productId: img.product_id,
+    position: img.position,
+    src: img.src,
+    width: img.width,
+    height: img.height,
+    alt: img.alt,
+    variantIds: img.variant_ids || [],
+    createdAt: img.created_at,
+    updatedAt: img.updated_at,
+  }));
+}
+
+/**
+ * Extracts product options (like Size, Color)
+ */
+function extractOptions(options: any[]): any[] {
+  if (!Array.isArray(options) || options.length === 0) {
+    return [];
+  }
+
+  return options.map((opt: any) => ({
+    id: opt.id,
+    productId: opt.product_id,
+    name: opt.name,
+    position: opt.position,
+    values: opt.values || [],
+  }));
+}
+
+/**
+ * Builds the product data object to save to Firestore
+ */
+function buildProductData(productData: any, topic: string): { [key: string]: any } {
+  const variants = extractVariants(productData.variants || []);
+  const skus = extractProductSkus(productData.variants || []);
+  const images = extractImages(productData.images || []);
+  const options = extractOptions(productData.options || []);
+
+  return {
+    // Core identifiers
+    productId: productData.id,
+    title: productData.title,
+    handle: productData.handle,
+
+    // Description & content
+    bodyHtml: productData.body_html || null,
+
+    // Vendor & type
+    vendor: productData.vendor || null,
+    productType: productData.product_type || null,
+
+    // Tags (as array)
+    tags: productData.tags
+      ? (typeof productData.tags === 'string'
+        ? productData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : productData.tags)
+      : [],
+
+    // Status & visibility
+    status: productData.status || 'active',
+    publishedAt: productData.published_at || null,
+    publishedScope: productData.published_scope || null,
+
+    // Template
+    templateSuffix: productData.template_suffix || null,
+
+    // SEO
+    metafieldsGlobalTitleTag: productData.metafields_global_title_tag || null,
+    metafieldsGlobalDescriptionTag: productData.metafields_global_description_tag || null,
+
+    // Variants data
+    variants,
+    variantCount: variants.length,
+    skus, // All SKUs from variants for easy querying
+
+    // Images
+    images,
+    featuredImage: productData.image ? {
+      id: productData.image.id,
+      src: productData.image.src,
+      width: productData.image.width,
+      height: productData.image.height,
+      alt: productData.image.alt,
+    } : null,
+
+    // Options (Size, Color, etc.)
+    options,
+
+    // Timestamps from Shopify
+    shopifyCreatedAt: productData.created_at,
+    shopifyUpdatedAt: productData.updated_at,
+
+    // Store the raw payload for reference
+    raw: productData,
+
+    // Webhook metadata
+    lastWebhookTopic: topic,
+    receivedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+// ============================================================
+// ORDER WEBHOOK HANDLER
+// ============================================================
+
+async function handleOrderWebhook(
+  shopDomain: string,
+  topic: string,
+  orderData: any,
+  hmacHeader: string
+): Promise<void> {
+  const orderId = String(orderData?.id ?? '');
+  if (!orderId) {
+    console.warn('Missing order id in webhook payload', { topic, shopDomain });
+    return;
+  }
+
+  const accountRef = db.collection('accounts').doc(shopDomain);
+  const orderRef = accountRef.collection('orders').doc(orderId);
+
+  // Extract vendors from line items
+  const vendors = extractVendors(orderData.line_items || []);
+
+  // Check if this is a split order
+  const isSplit = isSplitOrder(orderData);
+  const splitMetadata = isSplit ? extractSplitMetadata(orderData) : null;
+
+  if (isSplit) {
+    console.log(`Detected split order ${orderId} for vendor: ${splitMetadata?.splitVendor}`);
+    console.log(`  Original order: ${splitMetadata?.originalOrderName} (${splitMetadata?.originalOrderId})`);
+    console.log(`  Split: ${splitMetadata?.splitIndex}/${splitMetadata?.totalSplits}`);
+  }
+
+  const dataToSave: { [key: string]: any } = {
+    storeId: shopDomain,
+    orderId: orderData.id,
+    name: orderData.name,
+    email: orderData.customer?.email ?? 'N/A',
+    createdAt: orderData.created_at,
+    updatedAt: orderData.updated_at,
+    financialStatus: orderData.financial_status,
+    fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
+    totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
+    currency: orderData.currency,
+    vendors,
+    raw: orderData,
+    lastWebhookTopic: topic,
+    receivedAt: FieldValue.serverTimestamp(),
+  };
+
+  // Add split metadata if applicable
+  if (isSplit && splitMetadata) {
+    dataToSave.isSplitOrder = true;
+    dataToSave.splitMetadata = splitMetadata;
+  }
+
+  let created = false;
+
+  // Use a transaction so we never "create on update" due to races.
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(orderRef);
+
+    // 1) Delete → tombstone if exists
+    if (topic === 'orders/delete') {
+      if (snap.exists) {
+        tx.update(orderRef, {
+          isDeleted: true,
+          deletedAt: FieldValue.serverTimestamp(),
+          lastWebhookTopic: topic,
+        });
+        console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
+        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+      }
+      return;
+    }
+
+    // 2) Ignore all writes to already-deleted orders
+    if (snap.exists && snap.data()?.isDeleted) {
+      console.log(`Ignoring ${topic} for already deleted order ${orderId}`);
+      return;
+    }
+
+    // 3) Create → only here do we create the doc
+    if (topic === 'orders/create') {
+      created = true;
+
+      // Different handling for split orders
+      let log;
+      let customStatus;
+
+      if (isSplit) {
+        // Split order: Mark as Confirmed
+        customStatus = 'Confirmed';
+        log = [{
+          status: "Confirmed",
+          createdAt: Timestamp.now(),
+          remarks: `This order was confirmed and splitted successfully`
+        }];
+        console.log(`Created SPLIT order ${orderId} with status: Confirmed`);
+      } else {
+        // Normal order: Mark as New
+        customStatus = 'New';
+        log = [{
+          status: "New",
+          createdAt: Timestamp.now(),
+          remarks: `This order was newly created on Shopify`
+        }];
+        console.log(`Created order ${orderId} for ${shopDomain}`);
+      }
+
+      tx.set(orderRef, {
+        ...dataToSave,
+        customStatus,
+        isDeleted: false,
+        createdByTopic: topic,
+        customStatusesLogs: log, // Initialize logs array
+      });
+
+      await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+      return;
+    }
+
+    // 4) Updated → never create if missing
+    if (topic === 'orders/updated') {
+      if (!snap.exists) {
+        console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
+        return;
+      }
+
+      // Check if the order was cancelled
+      const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
+
+      let log;
+      let updateData: { [key: string]: any } = {
+        ...dataToSave,
+        updatedByTopic: topic,
+      };
+
+      if (isCancelled) {
+        log = {
+          status: "Cancelled",
+          createdAt: Timestamp.now(),
+          remarks: `This order was cancelled on Shopify`
+        };
+        updateData.customStatus = 'Cancelled';
+        console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
+      } else {
+        log = {
+          status: "Updated By Shopify",
+          createdAt: Timestamp.now(),
+          remarks: `This order was updated on shopify`
+        };
+        console.log(`Updated order ${orderId} for ${shopDomain}`);
+      }
+
+      updateData.customStatusesLogs = FieldValue.arrayUnion(log);
+
+      tx.update(orderRef, updateData);
+      await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+    }
+  });
+
+  // Post-transaction side effects: Skip for split orders
+  if (created && !isSplit) {
+    // WhatsApp message: Only for non-split orders
+    const customerPhone = orderData?.shipping_address?.phone || orderData?.billing_address?.phone || orderData?.customer?.phone;
+    const cleanPhone = normalizePhoneNumber(customerPhone);
+
+    if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
+      const shopDoc = (await accountRef.get()).data() as any;
+      console.log('Trying to send message');
+      await sendNewOrderWhatsAppMessage(shopDoc, {
+        orderId: dataToSave.orderId,
+        createdAt: dataToSave.createdAt,
+        name: dataToSave.name,
+        raw: orderData
+      });
+    } else {
+      console.log('No valid phone number found for order, skipping WhatsApp message sending. Phone:', customerPhone, 'Normalized:', cleanPhone);
+    }
+
+    // Shopify Credit capture
+    if (
+      Array.isArray(orderData.payment_gateway_names) &&
+      (orderData.payment_gateway_names.includes('shopify_credit') ||
+        orderData.payment_gateway_names.includes('shopify_store_credit'))
+    ) {
+      console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
+
+      const accountDoc = await accountRef.get();
+      const accessToken = accountDoc.data()?.accessToken;
+
+      if (accessToken) {
+        const result = await captureShopifyCreditPayment(
+          shopDomain,
+          orderId,
+          accessToken,
+          orderData.financial_status
+        );
+
+        if (!result.success) {
+          // Optionally: Queue for retry or log to a failures collection
+          console.error(`Capture failed for ${orderId}:`, result.error);
+        }
+      }
+    }
+  } else if (created && isSplit) {
+    console.log(`Split order ${orderId}: Skipping WhatsApp message and Shopify Credit capture`);
+  }
+}
+
+// ============================================================
+// PRODUCT WEBHOOK HANDLER
+// ============================================================
+
+async function handleProductWebhook(
+  shopDomain: string,
+  topic: string,
+  productData: any,
+  hmacHeader: string
+): Promise<void> {
+  const productId = String(productData?.id ?? '');
+  if (!productId) {
+    console.warn('Missing product id in webhook payload', { topic, shopDomain });
+    return;
+  }
+
+  const accountRef = db.collection('accounts').doc(shopDomain);
+  const productRef = accountRef.collection('products').doc(productId);
+
+  // Use a transaction for consistency
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(productRef);
+
+    // 1) Delete → tombstone or hard delete
+    if (topic === 'products/delete') {
+      if (snap.exists) {
+        // Option A: Soft delete (tombstone)
+        tx.update(productRef, {
+          isDeleted: true,
+          deletedAt: FieldValue.serverTimestamp(),
+          lastWebhookTopic: topic,
+        });
+        console.log(`🗑️ Tombstoned product ${productId} (${productData.title || 'Unknown'}) for shop ${shopDomain}`);
+
+        // Option B: Hard delete (uncomment if you prefer)
+        // tx.delete(productRef);
+        // console.log(`🗑️ Deleted product ${productId} for shop ${shopDomain}`);
+      } else {
+        console.log(`Product ${productId} not found for deletion, skipping.`);
+      }
+      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+      return;
+    }
+
+    // Build the product data to save
+    const dataToSave = buildProductData(productData, topic);
+
+    // 2) Create → create new product doc
+    if (topic === 'products/create') {
+      // Check if already exists (race condition handling)
+      if (snap.exists && !snap.data()?.isDeleted) {
+        console.log(`Product ${productId} already exists, updating instead of creating.`);
+        tx.update(productRef, {
+          ...dataToSave,
+          updatedByTopic: topic,
+        });
+      } else {
+        tx.set(productRef, {
+          ...dataToSave,
+          storeId: shopDomain,
+          isDeleted: false,
+          createdByTopic: topic,
+          firestoreCreatedAt: FieldValue.serverTimestamp(),
+        });
+        console.log(`✅ Created product ${productId} (${productData.title}) for ${shopDomain}`);
+        console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
+      }
+      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+      return;
+    }
+
+    // 3) Update → update existing product
+    if (topic === 'products/update') {
+      if (!snap.exists) {
+        // Product doesn't exist - create it (might have missed the create webhook)
+        console.warn(`Received 'products/update' for non-existent product ${productId}. Creating it.`);
+        tx.set(productRef, {
+          ...dataToSave,
+          storeId: shopDomain,
+          isDeleted: false,
+          createdByTopic: topic, // Mark that it was created via update
+          firestoreCreatedAt: FieldValue.serverTimestamp(),
+        });
+      } else if (snap.data()?.isDeleted) {
+        // Product was deleted but now being updated - restore it
+        console.log(`Restoring previously deleted product ${productId}`);
+        tx.update(productRef, {
+          ...dataToSave,
+          isDeleted: false,
+          restoredAt: FieldValue.serverTimestamp(),
+          updatedByTopic: topic,
+        });
+      } else {
+        // Normal update
+        tx.update(productRef, {
+          ...dataToSave,
+          updatedByTopic: topic,
+        });
+      }
+      console.log(`📝 Updated product ${productId} (${productData.title}) for ${shopDomain}`);
+      console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
+      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+    }
+  });
+}
+
+// ============================================================
+// MAIN WEBHOOK HANDLER
+// ============================================================
+
 export async function POST(req: NextRequest) {
   try {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
@@ -259,215 +757,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Shop domain is required' }, { status: 400 });
     }
 
-    // Only handle the three topics we expect
-    const allowed = new Set(['orders/create', 'orders/updated', 'orders/delete']);
-    if (!allowed.has(topic)) {
+    // Define allowed topics
+    const orderTopics = new Set(['orders/create', 'orders/updated', 'orders/delete']);
+    const productTopics = new Set(['products/create', 'products/update', 'products/delete']);
+    const allAllowedTopics = new Set([...orderTopics, ...productTopics]);
+
+    if (!allAllowedTopics.has(topic)) {
       console.warn('Ignoring unexpected topic', { topic, shopDomain });
       return new NextResponse(null, { status: 200 });
     }
 
-    const orderData = JSON.parse(raw);
-    const orderId = String(orderData?.id ?? '');
-    if (!orderId) {
-      console.warn('Missing order id in webhook payload', { topic, shopDomain });
-      // Acknowledge to stop retries, but do nothing.
-      return new NextResponse(null, { status: 200 });
-    }
+    const payload = JSON.parse(raw);
 
-    const accountRef = db.collection('accounts').doc(shopDomain);
-    const orderRef = accountRef.collection('orders').doc(orderId);
-    const orderLogEntry = createOrderLogEntry(topic, orderData);
-
-    // ✅ Extract vendors from line items
-    const vendors = extractVendors(orderData.line_items || []);
-
-    // ✅ Check if this is a split order
-    const isSplit = isSplitOrder(orderData);
-    const splitMetadata = isSplit ? extractSplitMetadata(orderData) : null;
-
-    if (isSplit) {
-      console.log(`Detected split order ${orderId} for vendor: ${splitMetadata?.splitVendor}`);
-      console.log(`  Original order: ${splitMetadata?.originalOrderName} (${splitMetadata?.originalOrderId})`);
-      console.log(`  Split: ${splitMetadata?.splitIndex}/${splitMetadata?.totalSplits}`);
-    }
-
-    const dataToSave: { [key: string]: any } = {
-      storeId: shopDomain,
-      orderId: orderData.id,
-      name: orderData.name,
-      email: orderData.customer?.email ?? 'N/A',
-      createdAt: orderData.created_at,
-      updatedAt: orderData.updated_at,
-      // createdAt: Timestamp.fromDate(new Date(orderData.created_at)),
-      // updatedAt: Timestamp.fromDate(new Date(orderData.updated_at)),
-      financialStatus: orderData.financial_status,
-      fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
-      totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
-      currency: orderData.currency,
-      vendors,
-      raw: orderData,
-      lastWebhookTopic: topic,
-      receivedAt: FieldValue.serverTimestamp(),
-    };
-
-    // ✅ Add split metadata if applicable
-    if (isSplit && splitMetadata) {
-      dataToSave.isSplitOrder = true;
-      dataToSave.splitMetadata = splitMetadata;
-    }
-
-    let created = false;
-
-    // Use a transaction so we never "create on update" due to races.
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(orderRef);
-
-      // 1) Delete → tombstone if exists
-      if (topic === 'orders/delete') {
-        if (snap.exists) {
-          tx.update(orderRef, {
-            isDeleted: true,
-            deletedAt: FieldValue.serverTimestamp(),
-            lastWebhookTopic: topic,
-          });
-          console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
-          await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
-        }
-        return;
-      }
-
-      // 2) Ignore all writes to already-deleted orders
-      if (snap.exists && snap.data()?.isDeleted) {
-        console.log(`Ignoring ${topic} for already deleted order ${orderId}`);
-        return;
-      }
-
-      // 3) Create → only here do we create the doc
-      if (topic === 'orders/create') {
-        created = true;
-
-        // ✅ Different handling for split orders
-        let log;
-        let customStatus;
-
-        if (isSplit) {
-          // Split order: Mark as Confirmed
-          customStatus = 'Confirmed';
-          log = [{
-            status: "Confirmed",
-            createdAt: Timestamp.now(),
-            remarks: `This order was confirmed and splitted successfully`
-          }];
-          console.log(`Created SPLIT order ${orderId} with status: Confirmed`);
-        } else {
-          // Normal order: Mark as New
-          customStatus = 'New';
-          log = [{
-            status: "New",
-            createdAt: Timestamp.now(),
-            remarks: `This order was newly created on Shopify`
-          }];
-          console.log(`Created order ${orderId} for ${shopDomain}`);
-        }
-
-        tx.set(orderRef, {
-          ...dataToSave,
-          customStatus,
-          isDeleted: false,
-          createdByTopic: topic,
-          customStatusesLogs: log, // Initialize logs array
-        });
-
-        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
-        return;
-      }
-
-      // 4) Updated → never create if missing
-      if (topic === 'orders/updated') {
-        if (!snap.exists) {
-          console.warn(`Received 'orders/updated' for non-existent order ${orderId}. Skipping.`);
-          return;
-        }
-
-        // Check if the order was cancelled
-        const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
-
-        let log;
-        let updateData: { [key: string]: any } = {
-          ...dataToSave,
-          updatedByTopic: topic,
-        };
-
-        if (isCancelled) {
-          log = {
-            status: "Cancelled",
-            createdAt: Timestamp.now(),
-            remarks: `This order was cancelled on Shopify`
-          };
-          updateData.customStatus = 'Cancelled';
-          console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
-        } else {
-          log = {
-            status: "Updated By Shopify",
-            createdAt: Timestamp.now(),
-            remarks: `This order was updated on shopify`
-          };
-          console.log(`Updated order ${orderId} for ${shopDomain}`);
-        }
-
-        updateData.customStatusesLogs = FieldValue.arrayUnion(log);
-
-        tx.update(orderRef, updateData);
-        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
-      }
-    });
-
-    // ✅ Post-transaction side effects: Skip for split orders
-    if (created && !isSplit) {
-      // WhatsApp message: Only for non-split orders
-      const customerPhone = orderData?.shipping_address?.phone || orderData?.billing_address?.phone || orderData?.customer?.phone;
-      const cleanPhone = normalizePhoneNumber(customerPhone);
-
-      if (!String(orderData.tags).toLowerCase().includes('split-order') && customerPhone && cleanPhone.length === 10) {
-        const shopDoc = (await accountRef.get()).data() as any;
-        console.log('Trying to send message');
-        await sendNewOrderWhatsAppMessage(shopDoc, {
-          orderId: dataToSave.orderId,
-          createdAt: dataToSave.createdAt,
-          name: dataToSave.name,
-          raw: orderData
-        });
-      } else {
-        console.log('No valid phone number found for order, skipping WhatsApp message sending. Phone:', customerPhone, 'Normalized:', cleanPhone);
-      }
-
-      // Shopify Credit capture
-      if (
-        Array.isArray(orderData.payment_gateway_names) &&
-        (orderData.payment_gateway_names.includes('shopify_credit') ||
-          orderData.payment_gateway_names.includes('shopify_store_credit'))
-      ) {
-        console.log(`Order ${orderId} used Shopify Credit. Attempting to capture payment.`);
-
-        const accountDoc = await accountRef.get();
-        const accessToken = accountDoc.data()?.accessToken;
-
-        if (accessToken) {
-          const result = await captureShopifyCreditPayment(
-            shopDomain,
-            orderId,
-            accessToken,
-            orderData.financial_status
-          );
-
-          if (!result.success) {
-            // Optionally: Queue for retry or log to a failures collection
-            console.error(`Capture failed for ${orderId}:`, result.error);
-          }
-        }
-      }
-    } else if (created && isSplit) {
-      console.log(`Split order ${orderId}: Skipping WhatsApp message and Shopify Credit capture`);
+    // Route to appropriate handler
+    if (orderTopics.has(topic)) {
+      await handleOrderWebhook(shopDomain, topic, payload, hmacHeader);
+    } else if (productTopics.has(topic)) {
+      await handleProductWebhook(shopDomain, topic, payload, hmacHeader);
     }
 
     return new NextResponse(null, { status: 200 });

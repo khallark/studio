@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
@@ -23,10 +22,17 @@ async function registerWebhooks(shop: string, accessToken: string) {
     }
 
     const webhookUrl = `${appUrl}/webhooks/orders`;
+    
+    // ✅ UPDATED: Now includes product webhooks
     const webhooks = [
+        // Order webhooks
         { topic: 'orders/create', address: webhookUrl },
         { topic: 'orders/updated', address: webhookUrl },
         { topic: 'orders/delete', address: webhookUrl },
+        // Product webhooks (NEW!)
+        { topic: 'products/create', address: webhookUrl },
+        { topic: 'products/update', address: webhookUrl },
+        { topic: 'products/delete', address: webhookUrl },
     ];
 
     for (const webhook of webhooks) {
@@ -41,12 +47,17 @@ async function registerWebhooks(shop: string, accessToken: string) {
             });
             const data = await response.json();
             if (!response.ok) {
-                console.error(`Failed to register ${webhook.topic} webhook:`, data);
+                // ✅ Handle "already exists" gracefully
+                if (response.status === 422 && JSON.stringify(data.errors).includes('has already been taken')) {
+                    console.log(`⏭️ Webhook ${webhook.topic} already registered for ${shop}`);
+                } else {
+                    console.error(`❌ Failed to register ${webhook.topic} webhook:`, data);
+                }
             } else {
-                console.log(`Successfully registered ${webhook.topic} webhook.`);
+                console.log(`✅ Successfully registered ${webhook.topic} webhook for ${shop}`);
             }
         } catch (error) {
-            console.error(`Error registering ${webhook.topic} webhook:`, error);
+            console.error(`❌ Error registering ${webhook.topic} webhook:`, error);
         }
     }
 }
@@ -141,8 +152,9 @@ export async function GET(req: NextRequest) {
 
     // --- Create Account and link to User ---
 
-    // 1. Create a new document in the 'accounts' collection
-    const accountRef = db.collection('accounts').doc(shop); // Using shop name as a unique ID for the account
+    // 1. Create/Update the account document
+    // NOTE: {merge: true} ensures existing data (orders, products, etc.) is preserved!
+    const accountRef = db.collection('accounts').doc(shop);
     await accountRef.set({
       type: 'shopify',
       shopName: shop,
@@ -150,22 +162,8 @@ export async function GET(req: NextRequest) {
       installedAt: FieldValue.serverTimestamp(),
       installedBy: userId,
     }, {merge: true});
-
-    // 2. Update the user's document
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      
-      const updateData: { [key: string]: any } = {
-        stores: FieldValue.arrayUnion(shop),
-      };
-      
-      await userRef.update(updateData);
-    }
     
-    // 3. Register Webhooks
+    // 2. Register Webhooks (now includes products!)
     await registerWebhooks(shop, accessToken);
 
 

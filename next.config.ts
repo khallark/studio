@@ -166,6 +166,22 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/products/sync/route',
       },
       {
+        source: '/api/shopify/products/store-variants',
+        destination: '/api/shopify/products/store-variants/route',
+      },
+      {
+        source: '/api/shopify/products/search-business-products',
+        destination: '/api/shopify/products/search-business-products/route',
+      },
+      {
+        source: '/api/shopify/products/create-mapping',
+        destination: '/api/shopify/products/create-mapping/route',
+      },
+      {
+        source: '/api/shopify/products/remove-mapping',
+        destination: '/api/shopify/products/remove-mapping/route',
+      },
+      {
         source: '/proxy/api/checkout/customer',
         destination: '/proxy/api/checkout/customer/route',
       },

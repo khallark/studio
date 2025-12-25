@@ -83,10 +83,12 @@ import {
     PackageOpen,
     Sparkles,
     History,
+    Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductActivityLog } from '@/components/product-activity-log';
+import { ProductMappingsDialog } from '@/components/product-mappings-dialog';
 import Link from 'next/link';
 
 // ============================================================
@@ -105,6 +107,11 @@ interface Product {
     price?: number;
     stock?: number;
     status?: 'active' | 'draft' | 'archived';
+    mappedStoreProducts?: Array<{
+        storeId: string;
+        storeProductId: string;
+        storeProductTitle: string;
+    }>;
 }
 
 interface ProductFormData {
@@ -198,6 +205,9 @@ export default function ProductsPage() {
     // Activity Log state
     const [activityLogOpen, setActivityLogOpen] = useState(false);
     const [activityLogProduct, setActivityLogProduct] = useState<Product | null>(null);
+
+    // Product Mappings Dialog state
+    const [mappingsDialogOpen, setMappingsDialogOpen] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
@@ -305,6 +315,11 @@ export default function ProductsPage() {
             counts[p.category] = (counts[p.category] || 0) + 1;
         });
         return counts;
+    }, [products]);
+
+    // Count products with mappings
+    const mappedProductsCount = useMemo(() => {
+        return products.filter((p) => p.mappedStoreProducts && p.mappedStoreProducts.length > 0).length;
     }, [products]);
 
     // ============================================================
@@ -557,7 +572,7 @@ export default function ProductsPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     <Button
                         variant="outline"
                         asChild
@@ -568,6 +583,22 @@ export default function ProductsPage() {
                             Back to Dashboard
                         </Link>
                     </Button>
+
+                    {/* Product Mappings Button */}
+                    <Button
+                        variant="outline"
+                        onClick={() => setMappingsDialogOpen(true)}
+                        className="gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 transition-all duration-300"
+                    >
+                        <Link2 className="h-4 w-4 text-primary" />
+                        Product Mappings
+                        {mappedProductsCount > 0 && (
+                            <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
+                                {mappedProductsCount}
+                            </Badge>
+                        )}
+                    </Button>
+
                     <Button
                         onClick={() => handleOpenDialog()}
                         className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
@@ -652,12 +683,12 @@ export default function ProductsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Filtered
+                                    Mapped
                                 </p>
-                                <p className="text-2xl font-bold mt-1">{filteredProducts.length}</p>
+                                <p className="text-2xl font-bold mt-1">{mappedProductsCount}</p>
                             </div>
                             <div className="p-2 rounded-lg bg-violet-500/10">
-                                <Filter className="h-5 w-5 text-violet-600" />
+                                <Link2 className="h-5 w-5 text-violet-600" />
                             </div>
                         </div>
                     </CardContent>
@@ -856,9 +887,17 @@ export default function ProductsPage() {
                                                             <Package className="h-5 w-5 text-primary" />
                                                         </div>
                                                         <div>
-                                                            <p className="font-medium leading-none">
-                                                                {product.name}
-                                                            </p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-medium leading-none">
+                                                                    {product.name}
+                                                                </p>
+                                                                {product.mappedStoreProducts && product.mappedStoreProducts.length > 0 && (
+                                                                    <Badge variant="outline" className="h-5 gap-1 text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
+                                                                        <Link2 className="h-2.5 w-2.5" />
+                                                                        {product.mappedStoreProducts.length}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
                                                             {product.description && (
                                                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-1 max-w-[200px]">
                                                                     {product.description}
@@ -1226,6 +1265,14 @@ export default function ProductsPage() {
                     user={user}
                 />
             )}
+
+            {/* Product Mappings Dialog */}
+            <ProductMappingsDialog
+                open={mappingsDialogOpen}
+                onOpenChange={setMappingsDialogOpen}
+                businessId={businessId}
+                user={user}
+            />
         </div>
     );
 }

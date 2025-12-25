@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useBusinessContext } from '../../layout';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import Link from 'next/link';
 import {
@@ -40,6 +40,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DialogFooter,
 } from '@/components/ui/dialog';
 import {
     Tooltip,
@@ -74,6 +75,9 @@ import {
     Barcode,
     Eye,
     RefreshCw,
+    Download,
+    CheckCircle2,
+    AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -414,6 +418,17 @@ function StoreProductsContent() {
     const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
+    // Sync state
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncingStore, setSyncingStore] = useState<string | null>(null);
+    const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+    const [syncResult, setSyncResult] = useState<{
+        success: boolean;
+        store: string;
+        stats?: { total: number; created: number; updated: number; deleted: number; errors: number };
+        error?: string;
+    } | null>(null);
+
     // ============================================================
     // EFFECTS
     // ============================================================
@@ -618,6 +633,81 @@ function StoreProductsContent() {
 
     const hasActiveFilters = searchQuery || storeFilter !== 'all' || statusFilter !== 'all' || vendorFilter !== 'all';
 
+    const handleSyncProducts = async (storeId: string) => {
+        if (!user || !businessId) {
+            toast({
+                title: 'Error',
+                description: 'You must be logged in to sync products.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsSyncing(true);
+        setSyncingStore(storeId);
+        setSyncResult(null);
+
+        try {
+            const idToken = await user.getIdToken();
+
+            const response = await fetch('/api/shopify/products/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    store: storeId,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || data.error || 'Failed to sync products');
+            }
+
+            setSyncResult({
+                success: true,
+                store: storeId,
+                stats: data.stats,
+            });
+
+            toast({
+                title: 'Sync Complete',
+                description: `Synced ${data.stats.total} products from ${formatStoreName(storeId)}`,
+            });
+        } catch (error: any) {
+            console.error('Sync error:', error);
+
+            setSyncResult({
+                success: false,
+                store: storeId,
+                error: error.message || 'An unexpected error occurred',
+            });
+
+            toast({
+                title: 'Sync Failed',
+                description: error.message || 'Failed to sync products from store.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsSyncing(false);
+            setSyncingStore(null);
+        }
+    };
+
+    const handleSyncAllStores = async () => {
+        if (!stores || stores.length === 0) return;
+
+        setIsSyncDialogOpen(false);
+
+        for (const storeId of stores) {
+            await handleSyncProducts(storeId);
+        }
+    };
+
     // ============================================================
     // LOADING / AUTH STATES
     // ============================================================
@@ -674,11 +764,63 @@ function StoreProductsContent() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Box className="h-4 w-4" />
-                    <span>
-                        {products.length} products from {stores?.length || 0} stores
-                    </span>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Box className="h-4 w-4" />
+                        <span>
+                            {products.length} products from {stores?.length || 0} stores
+                        </span>
+                    </div>
+
+                    {/* Sync Button */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isSyncing || !stores || stores.length === 0}
+                                className="gap-2"
+                            >
+                                {isSyncing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                )}
+                                {isSyncing ? `Syncing ${formatStoreName(syncingStore || '')}...` : 'Sync Products'}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Select Store to Sync</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {stores?.map((storeId) => (
+                                <DropdownMenuItem
+                                    key={storeId}
+                                    onClick={() => handleSyncProducts(storeId)}
+                                    disabled={isSyncing}
+                                    className="gap-2"
+                                >
+                                    <Store className="h-4 w-4" />
+                                    {formatStoreName(storeId)}
+                                    {syncingStore === storeId && (
+                                        <Loader2 className="h-3 w-3 animate-spin ml-auto" />
+                                    )}
+                                </DropdownMenuItem>
+                            ))}
+                            {stores && stores.length > 1 && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => setIsSyncDialogOpen(true)}
+                                        disabled={isSyncing}
+                                        className="gap-2"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Sync All Stores
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </motion.div>
 
@@ -1161,6 +1303,94 @@ function StoreProductsContent() {
                 open={isDetailDialogOpen}
                 onOpenChange={setIsDetailDialogOpen}
             />
+
+            {/* Sync All Confirmation Dialog */}
+            <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Sync All Stores</DialogTitle>
+                        <DialogDescription>
+                            This will sync products from all {stores?.length || 0} stores. This may take a few minutes depending on the number of products.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <p className="text-sm text-muted-foreground">Stores to sync:</p>
+                        <ul className="mt-2 space-y-1">
+                            {stores?.map((storeId) => (
+                                <li key={storeId} className="flex items-center gap-2 text-sm">
+                                    <Store className="h-4 w-4 text-muted-foreground" />
+                                    {formatStoreName(storeId)}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSyncDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSyncAllStores} className="gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            Sync All Stores
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sync Result Dialog */}
+            <Dialog open={syncResult !== null} onOpenChange={() => setSyncResult(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            {syncResult?.success ? (
+                                <>
+                                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                    Sync Complete
+                                </>
+                            ) : (
+                                <>
+                                    <AlertCircle className="h-5 w-5 text-red-600" />
+                                    Sync Failed
+                                </>
+                            )}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {syncResult?.success
+                                ? `Products from ${formatStoreName(syncResult.store)} have been synced.`
+                                : syncResult?.error}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {syncResult?.success && syncResult.stats && (
+                        <div className="py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 rounded-lg bg-muted/50">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
+                                    <p className="text-2xl font-bold">{syncResult.stats.total}</p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-emerald-500/10">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Created</p>
+                                    <p className="text-2xl font-bold text-emerald-600">{syncResult.stats.created}</p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-blue-500/10">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Updated</p>
+                                    <p className="text-2xl font-bold text-blue-600">{syncResult.stats.updated}</p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-amber-500/10">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Deleted</p>
+                                    <p className="text-2xl font-bold text-amber-600">{syncResult.stats.deleted}</p>
+                                </div>
+                            </div>
+                            {syncResult.stats.errors > 0 && (
+                                <p className="mt-3 text-sm text-red-600">
+                                    {syncResult.stats.errors} products failed to sync
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setSyncResult(null)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

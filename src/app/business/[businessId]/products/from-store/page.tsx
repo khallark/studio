@@ -233,8 +233,8 @@ function ProductDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-                <DialogHeader>
+            <DialogContent className="h-[85vh] max-w-3xl flex flex-col p-0">
+                <DialogHeader className="shrink-0 px-6 pt-6">
                     <div className="flex items-start gap-4">
                         {product.featuredImage ? (
                             <img
@@ -266,8 +266,8 @@ function ProductDetailDialog({
                     </div>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1 -mx-6 px-6">
-                    <div className="space-y-6 py-4">
+                <ScrollArea className="flex-1 h-full px-6 pb-6">
+                    <div className="space-y-6">
                         {/* Store Info */}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Store className="h-4 w-4" />

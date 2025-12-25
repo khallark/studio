@@ -133,6 +133,14 @@ function SkuMapperCell({ variant, businessId, user, onMappingChange }: SkuMapper
     const [isMapping, setIsMapping] = useState(false);
     const [isUnmapping, setIsUnmapping] = useState(false);
 
+    // Reset search when popover closes
+    useEffect(() => {
+        if (!open) {
+            setSearchQuery('');
+            setSearchResults([]);
+        }
+    }, [open]);
+
     // Search for business products
     useEffect(() => {
         const searchBusinessProducts = async () => {
@@ -289,7 +297,7 @@ function SkuMapperCell({ variant, businessId, user, onMappingChange }: SkuMapper
     }
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={setOpen} modal={true}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -314,7 +322,12 @@ function SkuMapperCell({ variant, businessId, user, onMappingChange }: SkuMapper
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-0" align="start">
+            <PopoverContent
+                className="w-[280px] p-0 pointer-events-auto"
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                sideOffset={5}
+            >
                 <Command shouldFilter={false}>
                     <CommandInput
                         placeholder="Search by name or SKU..."

@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         }
 
         const businessData = businessDoc.data();
-        const linkedStores: string[] = businessData?.linkedStores || [];
+        const linkedStores: string[] = businessData?.stores || [];
 
         if (!linkedStores.includes(storeId)) {
             return NextResponse.json(

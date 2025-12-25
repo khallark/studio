@@ -1258,7 +1258,15 @@ export default function ProductsPage() {
             {activityLogProduct && (
                 <ProductActivityLog
                     open={activityLogOpen}
-                    onOpenChange={setActivityLogOpen}
+                    onOpenChange={(open) => {
+                        setActivityLogOpen(open);
+                        if (!open) {
+                            // Force cleanup of any lingering pointer-events
+                            document.body.style.pointerEvents = '';
+                            // Clear the product after animation completes
+                            setTimeout(() => setActivityLogProduct(null), 300);
+                        }
+                    }}
                     businessId={businessId}
                     sku={activityLogProduct.sku}
                     productName={activityLogProduct.name}

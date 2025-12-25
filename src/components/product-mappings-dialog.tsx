@@ -24,19 +24,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -132,12 +119,22 @@ function SkuMapperCell({ variant, businessId, user, onMappingChange }: SkuMapper
     const [isSearching, setIsSearching] = useState(false);
     const [isMapping, setIsMapping] = useState(false);
     const [isUnmapping, setIsUnmapping] = useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
 
-    // Reset search when popover closes
+    // Reset search when dropdown closes
     useEffect(() => {
         if (!open) {
             setSearchQuery('');
             setSearchResults([]);
+        }
+    }, [open]);
+
+    // Focus input when dropdown opens
+    useEffect(() => {
+        if (open) {
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 0);
         }
     }, [open]);
 
@@ -297,82 +294,107 @@ function SkuMapperCell({ variant, businessId, user, onMappingChange }: SkuMapper
     }
 
     return (
-        <Popover open={open} onOpenChange={setOpen} modal={true}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-[200px] justify-between text-muted-foreground font-normal h-8 text-xs"
-                    disabled={isMapping}
-                >
-                    {isMapping ? (
-                        <span className="flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Mapping...
-                        </span>
-                    ) : (
-                        <>
-                            <span className="flex items-center gap-1.5">
-                                <Link2Off className="h-3 w-3" />
-                                Select SKU...
-                            </span>
-                            <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50" />
-                        </>
-                    )}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[280px] p-0 pointer-events-auto"
-                align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()}
-                sideOffset={5}
+        <div className="relative">
+            <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-[200px] justify-between text-muted-foreground font-normal h-8 text-xs"
+                disabled={isMapping}
+                onClick={() => setOpen(!open)}
             >
-                <Command shouldFilter={false}>
-                    <CommandInput
-                        placeholder="Search by name or SKU..."
-                        value={searchQuery}
-                        onValueChange={setSearchQuery}
-                        className="h-9"
+                {isMapping ? (
+                    <span className="flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Mapping...
+                    </span>
+                ) : (
+                    <>
+                        <span className="flex items-center gap-1.5">
+                            <Link2Off className="h-3 w-3" />
+                            Select SKU...
+                        </span>
+                        <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50" />
+                    </>
+                )}
+            </Button>
+
+            {open && (
+                <>
+                    {/* Backdrop to close dropdown */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setOpen(false)}
                     />
-                    <CommandList>
-                        {searchQuery.trim().length < 2 ? (
-                            <div className="py-6 text-center text-sm text-muted-foreground">
-                                <PackageSearch className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                Type at least 2 characters to search
-                            </div>
-                        ) : isSearching ? (
-                            <div className="py-6 text-center text-sm text-muted-foreground">
-                                <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin" />
-                                Searching...
-                            </div>
-                        ) : searchResults.length === 0 ? (
-                            <CommandEmpty>No products found.</CommandEmpty>
-                        ) : (
-                            <CommandGroup heading="Business Products">
-                                {searchResults.map((product) => (
-                                    <CommandItem
-                                        key={product.sku}
-                                        value={product.sku}
-                                        onSelect={() => handleSelectSku(product.sku)}
-                                        className="flex flex-col items-start gap-0.5 py-2"
-                                    >
-                                        <div className="flex items-center gap-2 w-full">
-                                            <code className="text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                {product.sku}
-                                            </code>
-                                        </div>
-                                        <span className="text-xs text-muted-foreground truncate max-w-full">
-                                            {product.name}
-                                        </span>
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
-                        )}
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
+
+                    {/* Dropdown */}
+                    <div className="absolute top-full left-0 mt-1 w-[280px] z-50 bg-popover border rounded-md shadow-lg">
+                        {/* Search Input */}
+                        <div className="flex items-center border-b px-3 py-2">
+                            <Search className="h-4 w-4 shrink-0 text-muted-foreground mr-2" />
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                placeholder="Search by name or SKU..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                autoFocus
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Results */}
+                        <div className="max-h-[200px] overflow-y-auto">
+                            {searchQuery.trim().length < 2 ? (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                    <PackageSearch className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                    Type at least 2 characters to search
+                                </div>
+                            ) : isSearching ? (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                    <Loader2 className="h-5 w-5 mx-auto mb-2 animate-spin" />
+                                    Searching...
+                                </div>
+                            ) : searchResults.length === 0 ? (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                    No products found.
+                                </div>
+                            ) : (
+                                <div className="p-1">
+                                    <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                                        Business Products
+                                    </p>
+                                    {searchResults.map((product) => (
+                                        <button
+                                            key={product.sku}
+                                            onClick={() => handleSelectSku(product.sku)}
+                                            className="w-full flex flex-col items-start gap-0.5 py-2 px-2 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
+                                        >
+                                            <div className="flex items-center gap-2 w-full">
+                                                <code className="text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                    {product.sku}
+                                                </code>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground truncate max-w-full">
+                                                {product.name}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
     );
 }
 

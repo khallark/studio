@@ -735,6 +735,10 @@ async function handleProductWebhook(
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('🔥 WEBHOOK HIT', {
+      topic: req.headers.get('x-shopify-topic'),
+      shop: req.headers.get('x-shopify-shop-domain'),
+    });
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
     const rawTopic = req.headers.get('x-shopify-topic') || '';
     const topic = rawTopic.trim().toLowerCase(); // normalize once

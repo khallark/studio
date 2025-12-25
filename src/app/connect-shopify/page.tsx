@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,9 +16,14 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
+import { Loader2 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
-export default function ConnectStorePage() {
+// ============================================================
+// INNER COMPONENT (uses useSearchParams)
+// ============================================================
+
+function ConnectStoreContent() {
   const [storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -27,7 +32,7 @@ export default function ConnectStorePage() {
 
   useEffect(() => {
     document.title = "Connect your shopify store!";
-  })
+  }, []);
 
   useEffect(() => {
     // Store user UID in a cookie to be accessed by the server-side callback
@@ -102,43 +107,77 @@ export default function ConnectStorePage() {
   };
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center p-4 md:p-6">
-      <Card className="w-full max-w-md">
-        <form onSubmit={handleConnect}>
-          <CardHeader>
-            <CardTitle>Connect to Shopify</CardTitle>
-            <CardDescription>
-              Enter your store name to begin the connection process.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="store-name">Store Name</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="store-name"
-                    placeholder="your-store"
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value.replace(/\s+/g, '-'))}
-                    required
-                    disabled={loading}
-                    className="rounded-r-none"
-                  />
-                  <span className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
-                    .myshopify.com
-                  </span>
-                </div>
+    <Card className="w-full max-w-md">
+      <form onSubmit={handleConnect}>
+        <CardHeader>
+          <CardTitle>Connect to Shopify</CardTitle>
+          <CardDescription>
+            Enter your store name to begin the connection process.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="store-name">Store Name</Label>
+              <div className="flex items-center">
+                <Input
+                  id="store-name"
+                  placeholder="your-store"
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value.replace(/\s+/g, '-'))}
+                  required
+                  disabled={loading}
+                  className="rounded-r-none"
+                />
+                <span className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                  .myshopify.com
+                </span>
               </div>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Redirecting to Shopify...' : 'Connect to Shopify'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? 'Redirecting to Shopify...' : 'Connect to Shopify'}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
+// ============================================================
+// LOADING FALLBACK
+// ============================================================
+
+function ConnectStoreLoading() {
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Connect to Shopify</CardTitle>
+        <CardDescription>
+          Enter your store name to begin the connection process.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
+// MAIN EXPORT (wraps content in Suspense)
+// ============================================================
+
+export default function ConnectStorePage() {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center p-4 md:p-6">
+      <Suspense fallback={<ConnectStoreLoading />}>
+        <ConnectStoreContent />
+      </Suspense>
     </main>
   );
 }

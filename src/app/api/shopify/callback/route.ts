@@ -7,59 +7,60 @@ import crypto from 'crypto';
 // This is a simplified way to get the user.
 // In a real app, you'd use a more robust session management solution.
 async function getCurrentUserId() {
-    // This is not a secure way to get the user, but it works for this prototype
-    // It relies on the client sending the UID in a cookie
-    const cookieStore = cookies();
-    const userCookie = cookieStore.get('user_uid');
-    return userCookie?.value || null;
+  // This is not a secure way to get the user, but it works for this prototype
+  // It relies on the client sending the UID in a cookie
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get('user_uid');
+  return userCookie?.value || null;
 }
 
 async function registerWebhooks(shop: string, accessToken: string) {
-    const appUrl = process.env.SHOPIFY_APP_URL;
-    if (!appUrl) {
-        console.error('SHOPIFY_APP_URL is not defined. Cannot register webhooks.');
-        return;
-    }
+  const appUrl = process.env.SHOPIFY_APP_URL; // https://www.majime.in
+  const webhookUrl = `${appUrl}/webhooks/orders`;
 
-    const webhookUrl = `${appUrl}/webhooks/orders`;
-    
-    // ✅ UPDATED: Now includes product webhooks
-    const webhooks = [
-        // Order webhooks
-        { topic: 'orders/create', address: webhookUrl },
-        { topic: 'orders/updated', address: webhookUrl },
-        { topic: 'orders/delete', address: webhookUrl },
-        // Product webhooks (NEW!)
-        { topic: 'products/create', address: webhookUrl },
-        { topic: 'products/update', address: webhookUrl },
-        { topic: 'products/delete', address: webhookUrl },
-    ];
+  const topics = [
+    'orders/create', 'orders/updated', 'orders/delete',
+    'products/create', 'products/update', 'products/delete',
+  ];
 
-    for (const webhook of webhooks) {
-        try {
-            const response = await fetch(`https://${shop}/admin/api/2025-07/webhooks.json`, {
-                method: 'POST',
-                headers: {
-                    'X-Shopify-Access-Token': accessToken,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ webhook: { ...webhook, format: 'json' } }),
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                // ✅ Handle "already exists" gracefully
-                if (response.status === 422 && JSON.stringify(data.errors).includes('has already been taken')) {
-                    console.log(`⏭️ Webhook ${webhook.topic} already registered for ${shop}`);
-                } else {
-                    console.error(`❌ Failed to register ${webhook.topic} webhook:`, data);
-                }
-            } else {
-                console.log(`✅ Successfully registered ${webhook.topic} webhook for ${shop}`);
-            }
-        } catch (error) {
-            console.error(`❌ Error registering ${webhook.topic} webhook:`, error);
-        }
+  // 1. Get existing webhooks
+  const res = await fetch(`https://${shop}/admin/api/2025-07/webhooks.json`, {
+    headers: { 'X-Shopify-Access-Token': accessToken },
+  });
+  const { webhooks: existing } = await res.json();
+
+  for (const topic of topics) {
+    const existingWebhook = existing?.find((w: any) => w.topic === topic);
+
+    if (existingWebhook) {
+      // Already exists - check if URL needs updating
+      if (existingWebhook.address !== webhookUrl) {
+        // UPDATE existing webhook
+        await fetch(`https://${shop}/admin/api/2025-07/webhooks/${existingWebhook.id}.json`, {
+          method: 'PUT',
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ webhook: { address: webhookUrl } }),
+        });
+        console.log(`🔄 Updated ${topic} → ${webhookUrl}`);
+      } else {
+        console.log(`✅ ${topic} already correct`);
+      }
+    } else {
+      // CREATE new webhook
+      await fetch(`https://${shop}/admin/api/2025-07/webhooks.json`, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ webhook: { topic, address: webhookUrl, format: 'json' } }),
+      });
+      console.log(`✨ Created ${topic} → ${webhookUrl}`);
     }
+  }
 }
 
 
@@ -69,14 +70,14 @@ export async function GET(req: NextRequest) {
   const shop = searchParams.get('shop');
   const hmac = searchParams.get('hmac');
   const state = searchParams.get('state');
-  
+
   const cookieStore = cookies();
   const savedState = cookieStore.get('shopify_oauth_state')?.value;
 
   // 1. State Validation for CSRF protection
   if (!state || !savedState || state !== savedState) {
-      console.error('State validation failed');
-      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_state', req.url)); 
+    console.error('State validation failed');
+    return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_state', req.url));
   }
 
   // Clear the state cookie after validation
@@ -89,13 +90,13 @@ export async function GET(req: NextRequest) {
     console.error('Shopify API secret is not set.');
     return NextResponse.redirect(new URL('/dashboard/connect?error=config_error', req.url));
   }
-  
+
   // 2. HMAC Validation
   if (hmac) {
     const map = Object.fromEntries(searchParams.entries());
     delete map['hmac'];
     const message = new URLSearchParams(map).toString();
-    
+
     const generatedHmac = crypto
       .createHmac('sha256', shopifyApiSecret)
       .update(message)
@@ -106,8 +107,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_hmac', req.url));
     }
   } else {
-      console.error('HMAC missing from callback');
-      return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_hmac', req.url));
+    console.error('HMAC missing from callback');
+    return NextResponse.redirect(new URL('/dashboard/connect?error=invalid_hmac', req.url));
   }
 
 
@@ -146,8 +147,8 @@ export async function GET(req: NextRequest) {
 
     const userId = await getCurrentUserId();
     if (!userId) {
-        console.error('Could not determine user ID during Shopify callback.');
-        return NextResponse.redirect(new URL('/login?error=unauthenticated', req.url));
+      console.error('Could not determine user ID during Shopify callback.');
+      return NextResponse.redirect(new URL('/login?error=unauthenticated', req.url));
     }
 
     // --- Create Account and link to User ---
@@ -161,8 +162,8 @@ export async function GET(req: NextRequest) {
       accessToken: accessToken, // IMPORTANT: In a real app, encrypt this token!
       installedAt: FieldValue.serverTimestamp(),
       installedBy: userId,
-    }, {merge: true});
-    
+    }, { merge: true });
+
     // 2. Register Webhooks (now includes products!)
     await registerWebhooks(shop, accessToken);
 

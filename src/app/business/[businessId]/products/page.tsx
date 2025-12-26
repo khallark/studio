@@ -1257,13 +1257,7 @@ export default function ProductsPage() {
             {/* Activity Log Sheet */}
             <ProductActivityLog
                 open={activityLogOpen}
-                onOpenChange={(open) => {
-                    setActivityLogOpen(open);
-                    if (!open) {
-                        // Clear after the sheet is fully closed (animation duration)
-                        setTimeout(() => setActivityLogProduct(null), 300);
-                    }
-                }}
+                onOpenChange={setActivityLogOpen}
                 businessId={businessId}
                 sku={activityLogProduct?.sku ?? ''}
                 productName={activityLogProduct?.name ?? ''}

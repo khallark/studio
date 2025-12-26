@@ -341,6 +341,23 @@ export function ProductActivityLog({
         }
     };
 
+    // Add this useEffect inside ProductActivityLog
+    useEffect(() => {
+        if (!open) {
+            // Force cleanup when sheet closes
+            const cleanup = () => {
+                document.body.style.pointerEvents = '';
+            };
+
+            // Try immediate cleanup
+            cleanup();
+
+            // Also cleanup after animation
+            const timer = setTimeout(cleanup, 350);
+            return () => clearTimeout(timer);
+        }
+    }, [open]);
+
     useEffect(() => {
         if (open && businessId && sku) {
             fetchLogs();

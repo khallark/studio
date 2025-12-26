@@ -1,8 +1,26 @@
 // app/api/business/products/delete/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface MappedVariant {
+    storeId: string;
+    productId: string;
+    productTitle?: string;
+    variantId: number;
+    variantTitle?: string;
+    variantSku?: string | null;
+    mappedAt?: string;
+}
+
+// ============================================================
+// MAIN HANDLER
+// ============================================================
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,7 +57,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ============================================================
-        // CORE LOGIC
+        // GET PRODUCT
         // ============================================================
 
         const productRef = businessDoc?.ref.collection('products').doc(sku);
@@ -53,9 +71,10 @@ export async function POST(req: NextRequest) {
         }
 
         const productData = productDoc.data();
+        const mappedVariants: MappedVariant[] = productData?.mappedVariants || [];
 
         // ============================================================
-        // CREATE DELETION LOG (at business level since product is deleted)
+        // CREATE DELETION LOG
         // ============================================================
 
         const userData = userDoc?.data();
@@ -76,6 +95,9 @@ export async function POST(req: NextRequest) {
                 stock: productData?.stock || null,
                 createdAt: productData?.createdAt,
                 createdBy: productData?.createdBy,
+                // Include mapping info for audit trail
+                mappedVariantsCount: mappedVariants.length,
+                mappedVariants: mappedVariants,
             },
             performedBy: userId || 'unknown',
             performedByEmail: userEmail,
@@ -86,21 +108,45 @@ export async function POST(req: NextRequest) {
         };
 
         // ============================================================
-        // BATCH: Delete product logs, delete product, create deletion audit
+        // BATCH OPERATIONS
         // ============================================================
 
         const batch = db.batch();
+        let mappingsRemoved = 0;
 
-        // First, get and delete all logs in the product's logs subcollection
+        // 1. Remove all variant mappings from store products
+        for (const mapping of mappedVariants) {
+            try {
+                const storeProductRef = db
+                    .collection('accounts')
+                    .doc(mapping.storeId)
+                    .collection('products')
+                    .doc(mapping.productId);
+
+                // Remove the specific variant mapping
+                batch.update(storeProductRef, {
+                    [`variantMappings.${mapping.variantId}`]: FieldValue.delete(),
+                    [`variantMappingDetails.${mapping.variantId}`]: FieldValue.delete(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                });
+
+                mappingsRemoved++;
+            } catch (error) {
+                // Log but don't fail if a store product doesn't exist
+                console.warn(`Could not remove mapping for store ${mapping.storeId}, product ${mapping.productId}:`, error);
+            }
+        }
+
+        // 2. Delete all logs in the product's logs subcollection
         const logsSnapshot = await productRef!.collection('logs').get();
         logsSnapshot.docs.forEach(doc => {
             batch.delete(doc.ref);
         });
 
-        // Delete the product
+        // 3. Delete the product
         batch.delete(productRef!);
 
-        // Store deletion log at business level for audit trail
+        // 4. Store deletion log at business level for audit trail
         const deletionLogRef = businessDoc?.ref.collection('deletedProductsLog').doc();
         batch.set(deletionLogRef!, deletionLog);
 
@@ -113,9 +159,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
             {
                 success: true,
-                message: 'Product deleted successfully.',
+                message: mappingsRemoved > 0
+                    ? `Product deleted successfully. ${mappingsRemoved} variant mapping(s) were also removed.`
+                    : 'Product deleted successfully.',
                 sku,
                 productName: productData?.name,
+                mappingsRemoved,
             },
             { status: 200 }
         );

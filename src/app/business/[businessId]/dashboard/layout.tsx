@@ -2,7 +2,28 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox, Shirt, BriefcaseBusiness, Store, StoreIcon } from 'lucide-react';
+import {
+  Home,
+  Package,
+  Settings,
+  Users,
+  ChevronDown,
+  MoveRight,
+  Building2,
+  Check,
+  Menu,
+  X,
+  UserPlus,
+  Inbox,
+  Shirt,
+  BriefcaseBusiness,
+  StoreIcon,
+  LogOut,
+  User,
+  Sparkles,
+  ChevronRight,
+  Zap,
+} from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -37,8 +58,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+
+// ============================================================
+// BUSINESS SWITCHER COMPONENT
+// ============================================================
 
 function BusinessSwitcher({
   businesses,
@@ -54,7 +80,6 @@ function BusinessSwitcher({
 
   const currentBusiness = businesses.find(b => b.currentlySelected);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -70,7 +95,6 @@ function BusinessSwitcher({
 
   const handleBusinessSwitch = (businessId: string) => {
     setIsOpen(false);
-    // Replace the current businessId with the new one, keeping the rest of the path
     const newPath = pathname.replace(/\/business\/[^\/]+/, `/business/${businessId}`);
     router.push(newPath);
   };
@@ -78,60 +102,97 @@ function BusinessSwitcher({
   if (!currentBusiness) return null;
 
   return (
-    <div className="relative px-2 pb-2" ref={dropdownRef}>
+    <div className="relative px-3 pb-3" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-sidebar-accent/50 hover:bg-sidebar-accent rounded-md transition-colors w-full group"
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 w-full rounded-xl transition-all duration-200",
+          "bg-gradient-to-r from-sidebar-accent/60 to-sidebar-accent/40",
+          "hover:from-sidebar-accent hover:to-sidebar-accent/60",
+          "border border-sidebar-border/50 hover:border-sidebar-border",
+          "group shadow-sm"
+        )}
       >
-        <Building2 className="w-4 h-4 text-sidebar-foreground/70 flex-shrink-0" />
-        <span className="font-medium text-sm text-sidebar-foreground truncate flex-1 text-left">
-          {currentBusiness.name}
-        </span>
+        <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+          <Building2 className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-xs text-sidebar-foreground/60 font-medium">Current Business</p>
+          <p className="text-sm font-semibold text-sidebar-foreground truncate">
+            {currentBusiness.name}
+          </p>
+        </div>
         <ChevronDown
           className={cn(
-            "w-4 h-4 text-sidebar-foreground/70 flex-shrink-0 transition-transform",
+            "w-4 h-4 text-sidebar-foreground/50 transition-transform duration-200",
             isOpen && "rotate-180"
           )}
         />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 bottom-full mb-1 left-2 right-2 bg-popover border border-border rounded-md shadow-lg max-h-[280px] overflow-y-auto">
-          <div className="py-1">
-            {businesses.map((business) => (
-              <button
-                key={business.id}
-                onClick={() => handleBusinessSwitch(business.id)}
-                disabled={business.currentlySelected}
-                className={cn(
-                  "w-full px-3 py-2 flex items-center gap-2 transition-colors text-left text-sm",
-                  business.currentlySelected
-                    ? "bg-accent/20 cursor-default text-muted-foreground"
-                    : "hover:bg-accent cursor-pointer text-foreground"
-                )}
-              >
-                <Building2
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute z-50 bottom-full mb-2 left-3 right-3 bg-popover/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-xl shadow-black/10 overflow-hidden"
+          >
+            <div className="p-1.5">
+              <p className="px-2.5 py-2 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                Switch Business
+              </p>
+              {businesses.map((business, index) => (
+                <motion.button
+                  key={business.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  onClick={() => handleBusinessSwitch(business.id)}
+                  disabled={business.currentlySelected}
                   className={cn(
-                    "w-4 h-4 flex-shrink-0",
-                    business.currentlySelected ? "text-muted-foreground" : "text-foreground/70"
+                    "w-full px-2.5 py-2.5 flex items-center gap-3 rounded-lg transition-all duration-150 text-left",
+                    business.currentlySelected
+                      ? "bg-primary/10 cursor-default"
+                      : "hover:bg-accent cursor-pointer"
                   )}
-                />
-                <span
-                  className="flex-1 truncate"
                 >
-                  {business.name}
-                </span>
-                {business.currentlySelected && (
-                  <Check className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+                  <div className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    business.currentlySelected ? "bg-primary/20" : "bg-muted"
+                  )}>
+                    <Building2
+                      className={cn(
+                        "w-3.5 h-3.5",
+                        business.currentlySelected ? "text-primary" : "text-muted-foreground"
+                      )}
+                    />
+                  </div>
+                  <span className={cn(
+                    "flex-1 truncate text-sm font-medium",
+                    business.currentlySelected ? "text-primary" : "text-foreground"
+                  )}>
+                    {business.name}
+                  </span>
+                  {business.currentlySelected && (
+                    <div className="p-1 rounded-full bg-primary/20">
+                      <Check className="w-3 h-3 text-primary" />
+                    </div>
+                  )}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+// ============================================================
+// SIDEBAR CLOSE BUTTON
+// ============================================================
 
 function SidebarCloseButton() {
   const { toggleSidebar } = useSidebar();
@@ -140,13 +201,122 @@ function SidebarCloseButton() {
     <Button
       variant="ghost"
       size="icon"
-      className="md:hidden absolute top-4 right-4"
+      className="md:hidden absolute top-4 right-4 h-8 w-8 rounded-lg hover:bg-sidebar-accent"
       onClick={toggleSidebar}
     >
-      <X className="h-5 w-5" />
+      <X className="h-4 w-4" />
     </Button>
   );
 }
+
+// ============================================================
+// NAV SECTION COMPONENT
+// ============================================================
+
+interface NavSectionProps {
+  icon: React.ElementType;
+  label: string;
+  isActive: boolean;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}
+
+function NavSection({ icon: Icon, label, isActive, children, defaultOpen = false }: NavSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen || isActive);
+
+  useEffect(() => {
+    if (isActive) setIsOpen(true);
+  }, [isActive]);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <SidebarMenuButton
+          className={cn(
+            "w-full justify-between pr-2 group/nav transition-all duration-200",
+            isActive && "bg-sidebar-accent/50"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "p-1.5 rounded-lg transition-all duration-200",
+              isActive
+                ? "bg-primary/15 text-primary"
+                : "bg-sidebar-accent/50 text-sidebar-foreground/70 group-hover/nav:bg-sidebar-accent group-hover/nav:text-sidebar-foreground"
+            )}>
+              <Icon className="h-4 w-4" />
+            </div>
+            <span className={cn(
+              "font-medium",
+              isActive && "text-primary"
+            )}>
+              {label}
+            </span>
+          </div>
+          <ChevronDown className={cn(
+            "h-4 w-4 text-sidebar-foreground/50 transition-transform duration-200",
+            isOpen && "rotate-180"
+          )} />
+        </SidebarMenuButton>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-1">
+        <SidebarMenuSub className="border-l-2 border-sidebar-accent ml-[22px] pl-3 space-y-0.5">
+          {children}
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// ============================================================
+// NAV ITEM COMPONENT
+// ============================================================
+
+interface NavItemProps {
+  href: string;
+  icon?: React.ElementType;
+  label: string;
+  isActive: boolean;
+  badge?: string;
+}
+
+function NavItem({ href, icon: Icon, label, isActive, badge }: NavItemProps) {
+  return (
+    <SidebarMenuSubButton
+      asChild
+      className={cn(
+        "relative transition-all duration-200 py-2",
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+      )}
+    >
+      <Link href={href} className="flex items-center gap-2">
+        {Icon && <Icon className="h-3.5 w-3.5" />}
+        <span>{label}</span>
+        {badge && (
+          <span className={cn(
+            "ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded-full",
+            isActive ? "bg-primary/20 text-primary" : "bg-sidebar-accent text-sidebar-foreground/60"
+          )}>
+            {badge}
+          </span>
+        )}
+        {isActive && (
+          <motion.div
+            layoutId="activeIndicator"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-primary rounded-full"
+            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+          />
+        )}
+      </Link>
+    </SidebarMenuSubButton>
+  );
+}
+
+// ============================================================
+// MAIN LAYOUT
+// ============================================================
 
 export default function BusinessLayout({
   children,
@@ -166,7 +336,7 @@ export default function BusinessLayout({
 
   const getInitials = (name?: string | null, email?: string | null) => {
     if (name) {
-      return name.split(' ').map((n) => n[0]).join('');
+      return name.split(' ').map((n) => n[0]).join('').slice(0, 2);
     }
     if (email) {
       return email.charAt(0).toUpperCase();
@@ -328,8 +498,20 @@ export default function BusinessLayout({
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading business...</div>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-background via-background to-muted/30">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse" />
+            <div className="relative p-4 rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-xl shadow-primary/25">
+              <Zap className="h-8 w-8 text-primary-foreground animate-pulse" />
+            </div>
+          </div>
+          <p className="text-muted-foreground font-medium">Loading business...</p>
+        </motion.div>
       </div>
     );
   }
@@ -337,242 +519,306 @@ export default function BusinessLayout({
   // Not authorized - show 404
   if (!isAuthorized) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <div className="text-center space-y-4">
-          <h1 className="text-6xl font-bold text-gray-300">404</h1>
-          <h2 className="text-2xl font-semibold text-gray-700">Business Not Found</h2>
-          <p className="text-gray-500">You don't have access to this business.</p>
-          <Button onClick={() => router.push('/')}>Go Home</Button>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-background via-background to-muted/30">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-6"
+        >
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-destructive/10 blur-3xl rounded-full" />
+            <h1 className="relative text-8xl font-bold bg-gradient-to-b from-muted-foreground/30 to-muted-foreground/10 bg-clip-text text-transparent">
+              404
+            </h1>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold">Business Not Found</h2>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              You don't have access to this business or it doesn't exist.
+            </p>
+          </div>
+          <Button
+            onClick={() => router.push('/')}
+            className="gap-2 shadow-lg shadow-primary/20"
+          >
+            <Home className="h-4 w-4" />
+            Go Home
+          </Button>
+        </motion.div>
       </div>
     );
   }
 
-  // Check if this is the super admin business
   const isSuperAdmin = businessId === SUPER_ADMIN_ID;
 
   return (
-    <>
-      <ProcessingQueueProvider
-        businessId={businessId}
-        processAwbAssignments={processAwbAssignments}
-      >
-        <SidebarProvider>
-          <Sidebar>
-            <SidebarContent className="relative">
-              {/* Close button for mobile */}
-              <SidebarCloseButton />
+    <ProcessingQueueProvider
+      businessId={businessId}
+      processAwbAssignments={processAwbAssignments}
+    >
+      <SidebarProvider>
+        <Sidebar className="border-r border-sidebar-border/50">
+          <SidebarContent className="relative bg-gradient-to-b from-sidebar via-sidebar to-sidebar-accent/20">
+            <SidebarCloseButton />
 
-              <SidebarHeader>
+            {/* Header */}
+            <SidebarHeader className="p-4 pb-6">
+              <div className="flex items-center gap-3">
                 <Logo />
-              </SidebarHeader>
+              </div>
+            </SidebarHeader>
 
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === `/business/${businessId}/dashboard`}
-                  >
-                    <Link href={`/business/${businessId}/dashboard`}>
-                      <Home />
-                      Dashboard
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+            {/* Main Navigation */}
+            <SidebarMenu className="px-3 space-y-1">
+              {/* Dashboard */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  className={cn(
+                    "group/item transition-all duration-200",
+                    pathname === `/business/${businessId}/dashboard` && "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                  )}
+                >
+                  <Link href={`/business/${businessId}/dashboard`} className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200",
+                      pathname === `/business/${businessId}/dashboard`
+                        ? "bg-primary-foreground/20"
+                        : "bg-sidebar-accent/50 group-hover/item:bg-sidebar-accent"
+                    )}>
+                      <Home className="h-4 w-4" />
+                    </div>
+                    <span className="font-medium">Dashboard</span>
+                    {pathname === `/business/${businessId}/dashboard` && (
+                      <ChevronRight className="h-4 w-4 ml-auto opacity-70" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/orders`)}>
-                        <div className="flex items-center gap-2">
-                          <Package />
-                          Orders
-                        </div>
-                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/dashboard/orders`}
-                        >
-                          <Link href={`/business/${businessId}/dashboard/orders`}>All Orders</Link>
-                        </SidebarMenuSubButton>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/dashboard/orders/awb-processing`}>
-                          <Link href={`/business/${businessId}/dashboard/orders/awb-processing`}>AWB Processing</Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </SidebarMenuItem>
+              {/* Orders Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={Package}
+                  label="Orders"
+                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/orders`)}
+                >
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/orders`}
+                    label="All Orders"
+                    isActive={pathname === `/business/${businessId}/dashboard/orders`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/orders/awb-processing`}
+                    label="AWB Processing"
+                    isActive={pathname === `/business/${businessId}/dashboard/orders/awb-processing`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
 
-                {/* Members Section */}
-                <SidebarMenuItem>
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}>
-                        <div className="flex items-center gap-2">
-                          <Users />
-                          Members
-                        </div>
-                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {/* Only show Requests for super admin */}
-                        {isSuperAdmin && (
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={pathname === `/business/${businessId}/dashboard/members/requests`}>
-                            <Link href={`/business/${businessId}/dashboard/members/requests`}>
-                              <Inbox className="h-4 w-4" />
-                              Requests
-                            </Link>
-                          </SidebarMenuSubButton>
-                        )}
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/dashboard/members/invite`}>
-                          <Link href={`/business/${businessId}/dashboard/members/invite`}>
-                            <UserPlus className="h-4 w-4" />
-                            Invite
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </SidebarMenuItem>
+              {/* Members Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={Users}
+                  label="Members"
+                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}
+                >
+                  {isSuperAdmin && (
+                    <NavItem
+                      href={`/business/${businessId}/dashboard/members/requests`}
+                      icon={Inbox}
+                      label="Requests"
+                      isActive={pathname === `/business/${businessId}/dashboard/members/requests`}
+                    />
+                  )}
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/members/invite`}
+                    icon={UserPlus}
+                    label="Invite"
+                    isActive={pathname === `/business/${businessId}/dashboard/members/invite`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
 
-                {/* Products Section */}
-                <SidebarMenuItem>
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="w-full justify-between pr-2" isActive={pathname.startsWith(`/business/${businessId}/dashboard/products`)}>
-                        <div className="flex items-center gap-2">
-                          <Shirt />
-                          Products
-                        </div>
-                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/products`}>
-                          <Link href={`/business/${businessId}/products`}>
-                            <BriefcaseBusiness className="h-4 w-4" />
-                            Business Products
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={pathname === `/business/${businessId}/products`}>
-                          <Link href={`/business/${businessId}/products/from-store`}>
-                            <StoreIcon className="h-4 w-4" />
-                            Store Products
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarContent>
+              {/* Products Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={Shirt}
+                  label="Products"
+                  isActive={pathname.startsWith(`/business/${businessId}/products`)}
+                >
+                  <NavItem
+                    href={`/business/${businessId}/products`}
+                    icon={BriefcaseBusiness}
+                    label="Business Products"
+                    isActive={pathname === `/business/${businessId}/products`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/products/from-store`}
+                    icon={StoreIcon}
+                    label="Store Products"
+                    isActive={pathname === `/business/${businessId}/products/from-store`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
+            </SidebarMenu>
 
-            <SidebarFooter>
-              {/* Business Switcher - Above Settings */}
-              {joinedBusinesses && joinedBusinesses.length > 0 && (
-                <BusinessSwitcher
-                  businesses={joinedBusinesses}
-                  currentBusinessId={businessId}
-                />
-              )}
+            {/* Spacer */}
+            <div className="flex-1" />
 
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(`/business/${businessId}/settings`)}
-                  >
-                    <Link href={`/business/${businessId}/settings`}>
-                      <Settings />
-                      Settings
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
+            {/* Pro Tip Card */}
+            <div className="px-3 pb-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-primary/15 shrink-0">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Quick Tip</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                      Use keyboard shortcuts for faster navigation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SidebarContent>
 
-              {user && (
+          <SidebarFooter className="border-t border-sidebar-border/50 bg-sidebar-accent/30">
+            {/* Business Switcher */}
+            {joinedBusinesses && joinedBusinesses.length > 1 && (
+              <BusinessSwitcher
+                businesses={joinedBusinesses}
+                currentBusinessId={businessId}
+              />
+            )}
+
+            {/* Settings */}
+            <SidebarMenu className="px-3">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  className={cn(
+                    "group/item transition-all duration-200",
+                    pathname.startsWith(`/business/${businessId}/settings`) && "bg-sidebar-accent"
+                  )}
+                >
+                  <Link href={`/business/${businessId}/settings`} className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200",
+                      pathname.startsWith(`/business/${businessId}/settings`)
+                        ? "bg-primary/15 text-primary"
+                        : "bg-sidebar-accent/50 group-hover/item:bg-sidebar-accent"
+                    )}>
+                      <Settings className="h-4 w-4" />
+                    </div>
+                    <span className="font-medium">Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+
+            {/* User Profile */}
+            {user && (
+              <div className="p-3 pt-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="justify-start gap-3 w-full px-2 h-12">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage
-                          src={user.photoURL ?? "https://picsum.photos/seed/user/32/32"}
-                          alt={user.displayName ?? "User"}
-                        />
-                        <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <p className="text-sm font-medium leading-none">
-                          {user.displayName || 'User Name'}
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start gap-3 h-auto p-2.5 rounded-xl",
+                        "bg-sidebar-accent/50 hover:bg-sidebar-accent",
+                        "border border-transparent hover:border-sidebar-border/50",
+                        "transition-all duration-200"
+                      )}
+                    >
+                      <div className="relative">
+                        <Avatar className="h-9 w-9 ring-2 ring-background shadow-sm">
+                          <AvatarImage
+                            src={user.photoURL ?? undefined}
+                            alt={user.displayName ?? "User"}
+                          />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-semibold">
+                            {getInitials(user.displayName, user.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-sidebar" />
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-none truncate">
+                          {user.displayName || 'User'}
                         </p>
-                        <p className="text-xs leading-none text-muted-foreground">
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {user.email}
                         </p>
                       </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {user.displayName || 'User Name'}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
-                        </p>
+                  <DropdownMenuContent
+                    className="w-64 p-2"
+                    align="end"
+                    side="top"
+                    sideOffset={8}
+                  >
+                    <DropdownMenuLabel className="px-2 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.photoURL ?? undefined} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+                            {getInitials(user.displayName, user.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">
+                            {user.displayName || 'User'}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {user.email}
+                          </p>
+                        </div>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>Profile</DropdownMenuItem>
-                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuItem className="gap-2 py-2 cursor-pointer">
+                      <User className="h-4 w-4" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-2 py-2 cursor-pointer">
+                      <Settings className="h-4 w-4" />
+                      Preferences
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="gap-2 py-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                    >
+                      <LogOut className="h-4 w-4" />
                       Log out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
-            </SidebarFooter>
-          </Sidebar>
+              </div>
+            )}
+          </SidebarFooter>
+        </Sidebar>
 
-          <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
-            {/* Mobile header with hamburger menu */}
-            <header className="md:hidden sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-3">
-              <SidebarTrigger>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SidebarTrigger>
-              <Logo />
-            </header>
+        <div className="flex flex-col flex-1 w-full h-screen overflow-hidden">
+          {/* Mobile header */}
+          <header className="md:hidden sticky top-0 z-50 flex items-center gap-3 border-b bg-background/80 backdrop-blur-xl px-4 py-3">
+            <SidebarTrigger>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SidebarTrigger>
+            <Logo />
+          </header>
 
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-          </div>
-        </SidebarProvider>
-      </ProcessingQueueProvider>
-    </>
+          <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
+            {children}
+          </main>
+        </div>
+      </SidebarProvider>
+    </ProcessingQueueProvider>
   );
 }

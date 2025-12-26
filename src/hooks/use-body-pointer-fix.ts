@@ -1,4 +1,6 @@
 // hooks/use-body-pointer-fix.ts
+'use client';
+
 import { useEffect } from 'react';
 
 /**

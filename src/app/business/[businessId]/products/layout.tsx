@@ -61,7 +61,7 @@ export default function ProductsLayout({
     };
 
     return (
-        <div className="flex h-full">
+        <div className="flex h-[100vh]">
             {/* Side Menu */}
             <aside className="hidden lg:flex flex-col w-[280px] border-r bg-gradient-to-b from-background via-background to-muted/20">
                 {/* Header */}

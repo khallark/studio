@@ -108,10 +108,14 @@ interface Product {
     price?: number;
     stock?: number;
     status?: 'active' | 'draft' | 'archived';
-    mappedStoreProducts?: Array<{
+    mappedVariants?: Array<{
         storeId: string;
-        storeProductId: string;
-        storeProductTitle: string;
+        productId: string;
+        productTitle: string;
+        variantId: number;
+        variantTitle: string;
+        variantSku: string;
+        mappedAt: string;
     }>;
 }
 
@@ -323,7 +327,7 @@ export default function ProductsPage() {
 
     // Count products with mappings
     const mappedProductsCount = useMemo(() => {
-        return products.filter((p) => p.mappedStoreProducts && p.mappedStoreProducts.length > 0).length;
+        return products.filter((p) => p.mappedVariants && p.mappedVariants.length > 0).length;
     }, [products]);
 
     // ============================================================
@@ -905,10 +909,10 @@ export default function ProductsPage() {
                                                                 <p className="font-medium leading-none">
                                                                     {product.name}
                                                                 </p>
-                                                                {product.mappedStoreProducts && product.mappedStoreProducts.length > 0 && (
+                                                                {product.mappedVariants && product.mappedVariants.length > 0 && (
                                                                     <Badge variant="outline" className="h-5 gap-1 text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
                                                                         <Link2 className="h-2.5 w-2.5" />
-                                                                        {product.mappedStoreProducts.length}
+                                                                        {product.mappedVariants.length}
                                                                     </Badge>
                                                                 )}
                                                             </div>
@@ -1268,12 +1272,16 @@ export default function ProductsPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
+            {/* Activity Log Sheet */}
             {activityLogProduct && (
                 <ProductActivityLog
                     open={activityLogOpen}
                     onOpenChange={(open) => {
                         setActivityLogOpen(open);
                         if (!open) {
+                            // Force cleanup of any lingering pointer-events
+                            document.body.style.pointerEvents = '';
+                            // Clear the product after animation completes
                             setTimeout(() => setActivityLogProduct(null), 300);
                         }
                     }}

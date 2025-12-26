@@ -581,17 +581,6 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Button
-                        variant="outline"
-                        asChild
-                        className="gap-2"
-                    >
-                        <Link href={`/business/${businessId}/dashboard/orders`}>
-                            <ChevronLeft className="h-4 w-4" />
-                            Back to Dashboard
-                        </Link>
-                    </Button>
-
                     {/* Bulk Upload Button */}
                     <Button
                         variant="outline"

@@ -742,16 +742,6 @@ function StoreProductsContent() {
             >
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            asChild
-                            className="h-9 w-9"
-                        >
-                            <Link href={`/business/${businessId}/dashboard/orders`}>
-                                <ChevronLeft className="h-4 w-4" />
-                            </Link>
-                        </Button>
                         <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
                             <Store className="h-6 w-6 text-primary" />
                         </div>

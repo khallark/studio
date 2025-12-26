@@ -653,12 +653,12 @@ export default function BusinessLayout({
                     label="Business Products"
                     isActive={pathname === `/business/${businessId}/products`}
                   />
-                  <NavItem
+                  {/* <NavItem
                     href={`/business/${businessId}/products/from-store`}
                     icon={StoreIcon}
                     label="Store Products"
                     isActive={pathname === `/business/${businessId}/products/from-store`}
-                  />
+                  /> */}
                 </NavSection>
               </SidebarMenuItem>
             </SidebarMenu>

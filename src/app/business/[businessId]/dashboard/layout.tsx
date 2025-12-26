@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox, Shirt } from 'lucide-react';
+import { Home, Package, Settings, Users, ChevronDown, MoveRight, Building2, Check, Menu, X, UserPlus, Inbox, Shirt, BriefcaseBusiness, Store, StoreIcon } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -465,8 +465,20 @@ export default function BusinessLayout({
                           asChild
                           isActive={pathname === `/business/${businessId}/products`}>
                           <Link href={`/business/${businessId}/products`}>
-                            <Inbox className="h-4 w-4" />
-                            All Products
+                            <BriefcaseBusiness className="h-4 w-4" />
+                            Business Products
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === `/business/${businessId}/products`}>
+                          <Link href={`/business/${businessId}/products/from-store`}>
+                            <StoreIcon className="h-4 w-4" />
+                            Store Products
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSub>

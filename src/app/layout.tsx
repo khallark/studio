@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from './providers'; // ✅ Import the Providers component
+import { useBodyPointerFix } from '@/hooks/use-body-pointer-fix';
 
 export const metadata: Metadata = {
   title: 'Majime',
@@ -13,6 +14,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  useBodyPointerFix();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

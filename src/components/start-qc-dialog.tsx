@@ -76,41 +76,41 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
     setRecordingTime(0);
 
     if (order.booked_return_images && order.booked_return_images.length > 0) {
-    setLoadingImages(true);
-    const fetchUrls = async () => {
-      const urls = await Promise.all(
-        order.booked_return_images!.map(async (imageName) => {
-          try {
-            // ✅ Try appropriate path based on store
-            let imageRef;
-            if (shopId === SHARED_STORE_ID) {
-              imageRef = ref(storage, `return-images/shared/${shopId}/${order.id}/${imageName}`);
-            } else {
-              imageRef = ref(storage, `return-images/${businessId}/${shopId}/${order.id}/${imageName}`);
-            }
-            
+      setLoadingImages(true);
+      const fetchUrls = async () => {
+        const urls = await Promise.all(
+          order.booked_return_images!.map(async (imageName) => {
             try {
-              return await getDownloadURL(imageRef);
-            } catch (err: any) {
-              // Fallback to legacy path
-              if (err.code === 'storage/object-not-found') {
-                const legacyRef = ref(storage, `return-images/${shopId}/${order.id}/${imageName}`);
-                return await getDownloadURL(legacyRef);
+              // ✅ Try appropriate path based on store
+              let imageRef;
+              if (shopId === SHARED_STORE_ID) {
+                imageRef = ref(storage, `return-images/shared/${shopId}/${order.id}/${imageName}`);
+              } else {
+                imageRef = ref(storage, `return-images/${businessId}/${shopId}/${order.id}/${imageName}`);
               }
-              throw err;
+
+              try {
+                return await getDownloadURL(imageRef);
+              } catch (err: any) {
+                // Fallback to legacy path
+                if (err.code === 'storage/object-not-found') {
+                  const legacyRef = ref(storage, `return-images/${shopId}/${order.id}/${imageName}`);
+                  return await getDownloadURL(legacyRef);
+                }
+                throw err;
+              }
+            } catch (error) {
+              console.error(`Failed to get download URL for ${imageName}`, error);
+              return null;
             }
-          } catch (error) {
-            console.error(`Failed to get download URL for ${imageName}`, error);
-            return null;
-          }
-        })
-      );
-      setCustomerImageUrls(urls.filter((url): url is string => url !== null));
-      setLoadingImages(false);
-    };
-    fetchUrls();
-  }
-}, [order, shopId, businessId]);
+          })
+        );
+        setCustomerImageUrls(urls.filter((url): url is string => url !== null));
+        setLoadingImages(false);
+      };
+      fetchUrls();
+    }
+  }, [order, shopId, businessId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -123,11 +123,13 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
       if (!isOpen) return;
       try {
         // OPTIMIZED: Lower resolution and frame rate for faster uploads
+        // Use back camera (environment) as default for mobile
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 640 },      // Reduced from 1280
-            height: { ideal: 480 },     // Reduced from 720
-            frameRate: { ideal: 15 }    // Reduced from 24
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 15 },
+            facingMode: { ideal: 'environment' }  // Back camera
           },
           audio: true
         });

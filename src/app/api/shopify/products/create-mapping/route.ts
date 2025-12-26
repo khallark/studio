@@ -183,8 +183,11 @@ export async function POST(req: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
+        const userEmail = result?.userDoc?.data()?.userData?.email ||
+            result?.userDoc?.data()?.primaryContact?.email || null;
+
         // 3. Log the mapping action
-        const mappingDescription = variantSku 
+        const mappingDescription = variantSku
             ? `${variantSku} (${variantTitle || 'Default Title'})`
             : variantTitle || 'Default Title';
 
@@ -199,6 +202,7 @@ export async function POST(req: NextRequest) {
                 },
             ],
             performedBy: result?.userId,
+            performedByEmail: userEmail,
             performedAt: Timestamp.now(),
             metadata: {
                 userAgent: req.headers.get('user-agent') || undefined,

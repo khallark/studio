@@ -1268,16 +1268,12 @@ export default function ProductsPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Activity Log Sheet */}
             {activityLogProduct && (
                 <ProductActivityLog
                     open={activityLogOpen}
                     onOpenChange={(open) => {
                         setActivityLogOpen(open);
                         if (!open) {
-                            // Force cleanup of any lingering pointer-events
-                            document.body.style.pointerEvents = '';
-                            // Clear the product after animation completes
                             setTimeout(() => setActivityLogProduct(null), 300);
                         }
                     }}

@@ -341,23 +341,6 @@ export function ProductActivityLog({
         }
     };
 
-    // Add this useEffect inside ProductActivityLog
-    useEffect(() => {
-        if (!open) {
-            // Force cleanup when sheet closes
-            const cleanup = () => {
-                document.body.style.pointerEvents = '';
-            };
-
-            // Try immediate cleanup
-            cleanup();
-
-            // Also cleanup after animation
-            const timer = setTimeout(cleanup, 350);
-            return () => clearTimeout(timer);
-        }
-    }, [open]);
-
     useEffect(() => {
         if (open && businessId && sku) {
             fetchLogs();
@@ -366,7 +349,14 @@ export function ProductActivityLog({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-lg">
+            <SheetContent
+                className="w-full sm:max-w-lg"
+                onCloseAutoFocus={(e) => {
+                    // Prevent default focus behavior and clean up pointer-events
+                    e.preventDefault();
+                    document.body.style.pointerEvents = '';
+                }}
+            >
                 <SheetHeader className="pb-4 border-b">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20">

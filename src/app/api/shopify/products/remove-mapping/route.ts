@@ -147,6 +147,9 @@ export async function POST(req: NextRequest) {
                 updatedAt: FieldValue.serverTimestamp(),
             });
 
+            const userEmail = result?.userDoc?.data()?.userData?.email ||
+                result?.userDoc?.data()?.primaryContact?.email || null;
+
             // 3. Create log entry in business product's logs subcollection
             const mappingDescription = variant?.sku
                 ? `${variant.sku} (${variant?.title || 'Default Title'})`
@@ -163,6 +166,7 @@ export async function POST(req: NextRequest) {
                     },
                 ],
                 performedBy: result.userId,
+                performedByEmail: userEmail,
                 performedAt: Timestamp.now(),
                 metadata: {
                     userAgent: req.headers.get('user-agent') || undefined,

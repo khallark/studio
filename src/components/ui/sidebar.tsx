@@ -216,7 +216,7 @@ const Sidebar = React.forwardRef<
        <div
         ref={ref}
         className={cn(
-          "hidden md:flex flex-col bg-sidebar text-sidebar-foreground border-r",
+          "hidden md:flex flex-col bg-sidebar text-sidebar-foreground border-r w-[--sidebar-width]",
           className
         )}
         data-state={state}

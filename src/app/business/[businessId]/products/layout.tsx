@@ -1,11 +1,11 @@
 // /business/[businessId]/products/layout.tsx
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Package,
     Store,
@@ -13,6 +13,9 @@ import {
     Sparkles,
     Box,
     ChevronRight,
+    Building2,
+    Check,
+    ChevronDown,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -20,6 +23,139 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useBusinessContext } from '../layout';
+
+// ============================================================
+// BUSINESS SWITCHER COMPONENT
+// ============================================================
+
+function BusinessSwitcher({
+    businesses,
+    currentBusinessId
+}: {
+    businesses: Array<{ id: string; name: string; currentlySelected: boolean }>;
+    currentBusinessId: string;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const pathname = usePathname();
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
+
+    const currentBusiness = businesses.find(b => b.currentlySelected);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    const handleBusinessSwitch = (businessId: string) => {
+        setIsOpen(false);
+        const newPath = pathname.replace(/\/business\/[^\/]+/, `/business/${businessId}`);
+        router.push(newPath);
+    };
+
+    if (!currentBusiness) return null;
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 w-full rounded-xl transition-all duration-200",
+                    "bg-gradient-to-r from-muted/80 to-muted/60",
+                    "hover:from-muted hover:to-muted/80",
+                    "border border-border/50 hover:border-border",
+                    "group shadow-sm"
+                )}
+            >
+                <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Building2 className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Business</p>
+                    <p className="text-sm font-semibold text-foreground truncate">
+                        {currentBusiness.name}
+                    </p>
+                </div>
+                <ChevronDown
+                    className={cn(
+                        "w-4 h-4 text-muted-foreground/50 transition-transform duration-200",
+                        isOpen && "rotate-180"
+                    )}
+                />
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute z-50 bottom-full mb-2 left-0 right-0 bg-popover/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-xl shadow-black/10 overflow-hidden"
+                    >
+                        <div className="p-1.5">
+                            <p className="px-2.5 py-2 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                                Switch Business
+                            </p>
+                            {businesses.map((business, index) => (
+                                <motion.button
+                                    key={business.id}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.03 }}
+                                    onClick={() => handleBusinessSwitch(business.id)}
+                                    disabled={business.currentlySelected}
+                                    className={cn(
+                                        "w-full px-2.5 py-2.5 flex items-center gap-3 rounded-lg transition-all duration-150 text-left",
+                                        business.currentlySelected
+                                            ? "bg-primary/10 cursor-default"
+                                            : "hover:bg-accent cursor-pointer"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "p-1.5 rounded-md transition-colors",
+                                        business.currentlySelected ? "bg-primary/20" : "bg-muted"
+                                    )}>
+                                        <Building2
+                                            className={cn(
+                                                "w-3.5 h-3.5",
+                                                business.currentlySelected ? "text-primary" : "text-muted-foreground"
+                                            )}
+                                        />
+                                    </div>
+                                    <span className={cn(
+                                        "flex-1 truncate text-sm font-medium",
+                                        business.currentlySelected ? "text-primary" : "text-foreground"
+                                    )}>
+                                        {business.name}
+                                    </span>
+                                    {business.currentlySelected && (
+                                        <div className="p-1 rounded-full bg-primary/20">
+                                            <Check className="w-3 h-3 text-primary" />
+                                        </div>
+                                    )}
+                                </motion.button>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ============================================================
+// NAV ITEM TYPE
+// ============================================================
 
 interface NavItem {
     label: string;
@@ -29,6 +165,10 @@ interface NavItem {
     badge?: string;
 }
 
+// ============================================================
+// MAIN LAYOUT
+// ============================================================
+
 export default function ProductsLayout({
     children,
 }: {
@@ -37,6 +177,7 @@ export default function ProductsLayout({
     const pathname = usePathname();
     const params = useParams();
     const businessId = params.businessId as string;
+    const { joinedBusinesses } = useBusinessContext();
 
     const navItems: NavItem[] = [
         {
@@ -186,7 +327,16 @@ export default function ProductsLayout({
                 </nav>
 
                 {/* Footer */}
-                <div className="p-4 border-t">
+                <div className="p-4 space-y-3 border-t">
+                    {/* Business Switcher */}
+                    {joinedBusinesses && joinedBusinesses.length > 1 && (
+                        <BusinessSwitcher
+                            businesses={joinedBusinesses}
+                            currentBusinessId={businessId}
+                        />
+                    )}
+
+                    {/* Pro Tip */}
                     <div className="p-4 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
                         <div className="flex items-start gap-3">
                             <div className="p-2 rounded-lg bg-primary/10 shrink-0">

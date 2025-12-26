@@ -676,7 +676,7 @@ export default function BusinessLayout({
                   <div>
                     <p className="text-xs font-semibold text-foreground">Quick Tip</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                      Use keyboard shortcuts for faster navigation.
+                      Use product mappings to auto-fill weights during fulfillment.
                     </p>
                   </div>
                 </div>

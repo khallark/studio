@@ -1,8 +1,14 @@
-import type {Metadata} from 'next';
+// app/layout.tsx
+import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { Providers } from './providers'; // ✅ Import the Providers component
-import { useBodyPointerFix } from '@/hooks/use-body-pointer-fix';
+import { Providers } from './providers';
+import dynamic from 'next/dynamic';
+
+const BodyPointerFixProvider = dynamic(
+  () => import('@/components/body-pointer-fix-provider').then(mod => mod.BodyPointerFixProvider),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: 'Majime',
@@ -14,7 +20,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  useBodyPointerFix();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -23,9 +28,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {/* ✅ Wrap everything with Providers */}
         <Providers>
-          {children}
+          <BodyPointerFixProvider>
+            {children}
+          </BodyPointerFixProvider>
           <Toaster />
         </Providers>
       </body>

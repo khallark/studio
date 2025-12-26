@@ -48,7 +48,9 @@ import {
     PackageSearch,
     ArrowRight,
     Layers,
+    Upload,
 } from 'lucide-react';
+import { BulkMappingDialog } from '@/components/bulk-mapping-dialog';
 
 // ============================================================
 // TYPES
@@ -81,7 +83,7 @@ interface ProductMappingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     businessId: string;
-    user: User | null | undefined;
+    user: User | null | undefined ;
 }
 
 type MappingFilter = 'all' | 'mapped' | 'unmapped';
@@ -426,6 +428,9 @@ export function ProductMappingsDialog({
     const [currentPage, setCurrentPage] = useState(1);
     const rowsPerPage = 10;
 
+    // Bulk mapping dialog state
+    const [bulkMappingOpen, setBulkMappingOpen] = useState(false);
+
     // Fetch stores and variants
     useEffect(() => {
         if (!open || !user || !businessId) return;
@@ -593,6 +598,16 @@ export function ProductMappingsDialog({
                             </SelectContent>
                         </Select>
 
+                        {/* Bulk Mapping */}
+                        <Button
+                            variant="outline"
+                            onClick={() => setBulkMappingOpen(true)}
+                            className="gap-2"
+                        >
+                            <Upload className="h-4 w-4" />
+                            <span className="hidden sm:inline">Bulk Mapping</span>
+                        </Button>
+
                         {/* Refresh */}
                         <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
                             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
@@ -758,6 +773,15 @@ export function ProductMappingsDialog({
                     </div>
                 )}
             </DialogContent>
+
+            {/* Bulk Mapping Dialog */}
+            <BulkMappingDialog
+                open={bulkMappingOpen}
+                onOpenChange={setBulkMappingOpen}
+                businessId={businessId}
+                user={user}
+                onMappingComplete={handleRefresh}
+            />
         </Dialog>
     );
 }

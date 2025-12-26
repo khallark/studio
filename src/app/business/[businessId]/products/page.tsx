@@ -89,6 +89,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductActivityLog } from '@/components/product-activity-log';
 import { ProductMappingsDialog } from '@/components/product-mappings-dialog';
+import { BulkUploadDialog } from '@/components/bulk-upload-dialog';
 import Link from 'next/link';
 
 // ============================================================
@@ -208,6 +209,9 @@ export default function ProductsPage() {
 
     // Product Mappings Dialog state
     const [mappingsDialogOpen, setMappingsDialogOpen] = useState(false);
+
+    // Bulk Upload Dialog state
+    const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
@@ -582,6 +586,16 @@ export default function ProductsPage() {
                             <ChevronLeft className="h-4 w-4" />
                             Back to Dashboard
                         </Link>
+                    </Button>
+
+                    {/* Bulk Upload Button */}
+                    <Button
+                        variant="outline"
+                        onClick={() => setBulkUploadDialogOpen(true)}
+                        className="gap-2"
+                    >
+                        <Upload className="h-4 w-4" />
+                        Bulk Upload
                     </Button>
 
                     {/* Product Mappings Button */}
@@ -1255,19 +1269,37 @@ export default function ProductsPage() {
             </AlertDialog>
 
             {/* Activity Log Sheet */}
-            <ProductActivityLog
-                open={activityLogOpen}
-                onOpenChange={setActivityLogOpen}
-                businessId={businessId}
-                sku={activityLogProduct?.sku ?? ''}
-                productName={activityLogProduct?.name ?? ''}
-                user={user}
-            />
+            {activityLogProduct && (
+                <ProductActivityLog
+                    open={activityLogOpen}
+                    onOpenChange={(open) => {
+                        setActivityLogOpen(open);
+                        if (!open) {
+                            // Force cleanup of any lingering pointer-events
+                            document.body.style.pointerEvents = '';
+                            // Clear the product after animation completes
+                            setTimeout(() => setActivityLogProduct(null), 300);
+                        }
+                    }}
+                    businessId={businessId}
+                    sku={activityLogProduct.sku}
+                    productName={activityLogProduct.name}
+                    user={user}
+                />
+            )}
 
             {/* Product Mappings Dialog */}
             <ProductMappingsDialog
                 open={mappingsDialogOpen}
                 onOpenChange={setMappingsDialogOpen}
+                businessId={businessId}
+                user={user}
+            />
+
+            {/* Bulk Product Upload Dialog */}
+            <BulkUploadDialog
+                open={bulkUploadDialogOpen}
+                onOpenChange={setBulkUploadDialogOpen}
                 businessId={businessId}
                 user={user}
             />

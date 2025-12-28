@@ -121,6 +121,13 @@ export async function POST(req: NextRequest) {
             .doc(mappedBusinessSku);
 
         const businessProductDoc = await businessProductRef.get();
+        const variantMappingDetails = businessProductDoc.data()?.variantMappingDetails?.[variantId];
+        if(variantMappingDetails.businessId !== businessId) {
+            return NextResponse.json(
+                { error: 'Bad Request', message: 'Variant is not mapped by you' },
+                { status: 400 }
+            );
+        }
 
         const batch = db.batch();
 

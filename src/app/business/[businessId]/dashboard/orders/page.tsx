@@ -273,7 +273,7 @@ function MobileOrderCard({
                 <div className="flex items-center justify-between text-xs mb-2">
                     <span className="text-muted-foreground truncate max-w-[60%]">{customerName}</span>
                     <div className="flex flex-row items-center justify-center text-xs">
-                        <span className="font-mono font-medium">
+                        <span className="font-mono font-medium gap-2">
                             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_price))}
                         </span>
                         <span className="font-mono font-medium">

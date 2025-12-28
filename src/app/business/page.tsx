@@ -7,7 +7,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2, ChevronRight, Loader2, Users, Crown, Sparkles, ArrowRight, Package, TrendingUp, Zap, Contact } from 'lucide-react';
+import { Building2, ChevronRight, Users, Crown, Sparkles, ArrowRight, Package, Zap, Contact } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/logo';
 import { doc, getDoc } from 'firebase/firestore';
@@ -20,6 +20,205 @@ interface BusinessMembership {
   businessName: string;
   memberCount: number;
   isOwnBusiness: boolean;
+}
+
+// Skeleton Components
+function SkeletonPulse({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse bg-gradient-to-r from-muted via-muted/80 to-muted bg-[length:200%_100%] animate-shimmer rounded ${className}`} />
+  );
+}
+
+function BusinessCardSkeleton() {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 flex-1">
+            <SkeletonPulse className="w-10 h-10 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <SkeletonPulse className="h-5 w-3/4" />
+              <SkeletonPulse className="h-3 w-1/2" />
+            </div>
+          </div>
+          <SkeletonPulse className="w-5 h-5 rounded" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <SkeletonPulse className="h-4 w-24" />
+          <SkeletonPulse className="h-5 w-20 rounded-full" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PromoBannerSkeleton() {
+  return (
+    <Card className="mb-8 border-2 border-muted overflow-hidden">
+      <CardHeader className="pb-4">
+        <div className="flex items-start gap-4">
+          <SkeletonPulse className="w-14 h-14 rounded-xl" />
+          <div className="flex-1 space-y-3">
+            <SkeletonPulse className="h-7 w-2/3" />
+            <SkeletonPulse className="h-4 w-1/2" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-4 rounded-lg border">
+              <div className="flex items-start gap-3">
+                <SkeletonPulse className="w-9 h-9 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <SkeletonPulse className="h-4 w-3/4" />
+                  <SkeletonPulse className="h-3 w-full" />
+                  <SkeletonPulse className="h-3 w-2/3" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="p-6 rounded-xl border">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <SkeletonPulse className="h-5 w-48" />
+              <SkeletonPulse className="h-4 w-64" />
+            </div>
+            <SkeletonPulse className="h-11 w-40 rounded-md" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LoadingScreen({ message, submessage }: { message: string; submessage?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Ambient background effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '700ms' }} />
+      </div>
+
+      {/* Main loader */}
+      <div className="relative z-10 flex flex-col items-center">
+        {/* Animated logo container */}
+        <div className="relative mb-8">
+          {/* Outer rotating ring */}
+          <div
+            className="absolute inset-0 w-20 h-20 rounded-full border-2 border-primary/20 border-t-primary animate-spin"
+            style={{ animationDuration: '1.5s' }}
+          />
+
+          {/* Middle ring - counter rotation */}
+          <div
+            className="absolute inset-1.5 w-[68px] h-[68px] rounded-full border border-primary/10 border-b-primary/40 animate-spin"
+            style={{ animationDuration: '2s', animationDirection: 'reverse' }}
+          />
+
+          {/* Inner pulsing circle */}
+          <div className="absolute inset-3 w-14 h-14 rounded-full bg-primary/10 animate-pulse" />
+
+          {/* Icon */}
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            <Building2 className="h-7 w-7 text-primary" />
+          </div>
+        </div>
+
+        {/* Text content */}
+        <div className="text-center space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            {message}
+          </h2>
+          {submessage && (
+            <p className="text-sm text-muted-foreground">
+              {submessage}
+            </p>
+          )}
+        </div>
+
+        {/* Animated progress bar */}
+        <div className="mt-6 w-48 h-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full animate-progress"
+            style={{
+              animation: 'progress 1.5s ease-in-out infinite',
+            }}
+          />
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes progress {
+          0% { width: 0%; margin-left: 0%; }
+          50% { width: 60%; margin-left: 20%; }
+          100% { width: 0%; margin-left: 100%; }
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function ContentSkeleton({ showPromo }: { showPromo: boolean }) {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <Logo />
+              <div className="h-8 w-px bg-border" />
+              <h1 className="text-xl font-semibold text-foreground">Businesses</h1>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Promo Banner Skeleton */}
+          {showPromo && <PromoBannerSkeleton />}
+
+          {/* Page Title */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2">
+              Your Businesses
+            </h2>
+            <p className="text-muted-foreground">
+              Select a business to manage orders, settings, and team members.
+            </p>
+          </div>
+
+          {/* Business Grid Skeleton */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <BusinessCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </main>
+
+      <style jsx global>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
 }
 
 export default function BusinessListPage() {
@@ -45,14 +244,12 @@ export default function BusinessListPage() {
       }
 
       try {
-        // Check if user is super admin
         if (user.uid === SUPER_ADMIN_ID) {
           setShowJoinMajime(false);
           setCheckingAccess(false);
           return;
         }
 
-        // Get user document to check stores
         const userDocRef = doc(db, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -60,7 +257,6 @@ export default function BusinessListPage() {
           const userData = userDocSnap.data();
           const userStores = userData.stores || [];
 
-          // Check if user has the shared store
           if (userStores.includes(SHARED_STORE_ID)) {
             setShowJoinMajime(false);
           } else {
@@ -125,10 +321,10 @@ export default function BusinessListPage() {
   // Show loading while checking auth
   if (loadingAuth) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Checking authentication...</p>
-      </div>
+      <LoadingScreen
+        message="Authenticating"
+        submessage="Verifying your credentials..."
+      />
     );
   }
 
@@ -137,26 +333,40 @@ export default function BusinessListPage() {
     return null;
   }
 
+  // Show skeleton while loading data
   if (loading || checkingAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your businesses...</p>
-      </div>
-    );
+    return <ContentSkeleton showPromo={!checkingAccess && showJoinMajime} />;
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="rounded-full bg-destructive/10 p-4 w-16 h-16 mx-auto flex items-center justify-center">
-            <Building2 className="h-8 w-8 text-destructive" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-destructive/5">
+        {/* Ambient background effects */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-destructive/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 text-center space-y-6 max-w-md px-4">
+          {/* Error icon with animation */}
+          <div className="relative mx-auto w-20 h-20">
+            <div className="absolute inset-0 rounded-full bg-destructive/10 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="relative rounded-full bg-destructive/10 p-5 w-20 h-20 flex items-center justify-center">
+              <Building2 className="h-10 w-10 text-destructive" />
+            </div>
           </div>
-          <h2 className="text-2xl font-semibold">Failed to Load Businesses</h2>
-          <p className="text-muted-foreground">{error}</p>
-          <Button onClick={() => window.location.reload()}>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-foreground">Failed to Load Businesses</h2>
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+
+          <Button
+            onClick={() => window.location.reload()}
+            size="lg"
+            className="gap-2"
+          >
             Try Again
+            <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
       </div>

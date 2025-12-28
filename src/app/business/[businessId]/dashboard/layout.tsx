@@ -23,6 +23,7 @@ import {
   Sparkles,
   ChevronRight,
   Zap,
+  Warehouse,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -653,12 +654,12 @@ export default function BusinessLayout({
                     label="Business Products"
                     isActive={pathname === `/business/${businessId}/products`}
                   />
-                  {/* <NavItem
-                    href={`/business/${businessId}/products/from-store`}
-                    icon={StoreIcon}
-                    label="Store Products"
-                    isActive={pathname === `/business/${businessId}/products/from-store`}
-                  /> */}
+                  <NavItem
+                    href={`/business/${businessId}/inventory`}
+                    icon={Warehouse}
+                    label="Inventory"
+                    isActive={pathname === `/business/${businessId}/inventory`}
+                  />
                 </NavSection>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -188,7 +188,7 @@ export default function InventoryLayout({
         {
             label: 'Inventory',
             href: `/business/${businessId}/inventory`,
-            icon: Package,
+            icon: Warehouse,
             description: 'Manage stock levels',
         },
     ];

@@ -16,6 +16,7 @@ import {
     Building2,
     Check,
     ChevronDown,
+    Warehouse,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -189,7 +190,7 @@ export default function ProductsLayout({
         {
             label: 'Inventory',
             href: `/business/${businessId}/inventory`,
-            icon: Package,
+            icon: Warehouse,
             description: 'Manage stock levels',
         },
     ];

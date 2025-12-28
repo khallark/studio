@@ -96,7 +96,7 @@ function normalizeColumnNames(row: any): ProductRow {
             normalized['Description'] = value as string;
         } else if (/^price(\s*\(₹\))?$/i.test(normalizedKey)) {
             normalized['Price'] = value as number;
-        } else if (/^stock$/i.test(normalizedKey)) {
+        } else if (/^stock$/i.test(normalizedKey) || /^opening\s*stock$/i.test(normalizedKey)) {
             normalized['Stock'] = value as number;
         } else {
             normalized[normalizedKey] = value;
@@ -440,7 +440,12 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
-                // Create new product
+                // Parse stock value for inventory initialization
+                const stockValue = row['Stock'] !== undefined && row['Stock'] !== ''
+                    ? parseInt(row['Stock'].toString())
+                    : 0;
+
+                // Create new product with inventory data
                 const productData: any = {
                     name: row['Product Name']?.toString().trim(),
                     sku: skuUpper,
@@ -449,6 +454,15 @@ export async function POST(req: NextRequest) {
                     createdBy: userId,
                     createdAt: Timestamp.now(),
                     updatedAt: Timestamp.now(),
+                    // Initialize inventory data
+                    inventory: {
+                        openingStock: stockValue,
+                        inwardAddition: 0,
+                        deduction: 0,
+                        autoAddition: 0,
+                        autoDeduction: 0,
+                        blockedStock: 0,
+                    },
                 };
 
                 if (row['Description']) {
@@ -457,8 +471,8 @@ export async function POST(req: NextRequest) {
                 if (row['Price'] !== undefined && row['Price'] !== '') {
                     productData.price = parseFloat(row['Price'].toString());
                 }
-                if (row['Stock'] !== undefined && row['Stock'] !== '') {
-                    productData.stock = parseInt(row['Stock'].toString());
+                if (stockValue > 0) {
+                    productData.stock = stockValue;
                 }
 
                 batch.set(productRef!, productData);
@@ -466,13 +480,19 @@ export async function POST(req: NextRequest) {
 
                 // Also create a log entry
                 const logRef = productRef!.collection('logs').doc();
+                const logChanges = [
+                    { field: 'name', fieldLabel: 'Product Name', oldValue: null, newValue: productData.name },
+                    { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
+                    { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
+                ];
+
+                if (stockValue > 0) {
+                    logChanges.push({ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue });
+                }
+
                 batch.set(logRef, {
                     action: 'created',
-                    changes: [
-                        { field: 'name', fieldLabel: 'Product Name', oldValue: null, newValue: productData.name },
-                        { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
-                        { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
-                    ],
+                    changes: logChanges,
                     performedBy: userId,
                     performedByEmail: userEmail,
                     performedAt: Timestamp.now(),
@@ -527,6 +547,8 @@ export async function POST(req: NextRequest) {
                     updateData.price = parseFloat(row['Price'].toString());
                     changes.push({ field: 'price', fieldLabel: 'Price', oldValue: '(previous)', newValue: updateData.price });
                 }
+                // Note: Stock updates in update mode don't affect inventory.openingStock
+                // Use the inventory adjustment API for stock changes
                 if (row['Stock'] !== undefined && row['Stock'] !== '') {
                     updateData.stock = parseInt(row['Stock'].toString());
                     changes.push({ field: 'stock', fieldLabel: 'Stock', oldValue: '(previous)', newValue: updateData.stock });

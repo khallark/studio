@@ -66,7 +66,12 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Build product data
+        // Parse stock value for inventory initialization
+        const stockValue = product.stock !== undefined && product.stock !== null && product.stock !== ''
+            ? parseInt(product.stock)
+            : 0;
+
+        // Build product data with inventory
         const productData = {
             name: product.name,
             sku: product.sku,
@@ -74,9 +79,18 @@ export async function POST(req: NextRequest) {
             category: product.category,
             description: product.description || null,
             price: product.price || null,
-            stock: product.stock !== undefined ? parseInt(product.stock) : null,
+            stock: stockValue || null,
             createdBy: userId || 'unknown',
             createdAt: Timestamp.now(),
+            // Initialize inventory data
+            inventory: {
+                openingStock: stockValue,
+                inwardAddition: 0,
+                deduction: 0,
+                autoAddition: 0,
+                autoDeduction: 0,
+                blockedStock: 0,
+            },
         };
 
         // ============================================================
@@ -95,7 +109,7 @@ export async function POST(req: NextRequest) {
                 { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
                 ...(productData.description ? [{ field: 'description', fieldLabel: 'Description', oldValue: null, newValue: productData.description }] : []),
                 ...(productData.price ? [{ field: 'price', fieldLabel: 'Price', oldValue: null, newValue: productData.price }] : []),
-                ...(productData.stock !== null ? [{ field: 'stock', fieldLabel: 'Stock', oldValue: null, newValue: productData.stock }] : []),
+                ...(stockValue > 0 ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }] : []),
             ],
             performedBy: userId || 'unknown',
             performedByEmail: userEmail,

@@ -445,6 +445,7 @@ export async function POST(req: NextRequest) {
                 [`variantMappings.${variantInfo.variantId}`]: businessProductSku,
                 [`variantMappingDetails.${variantInfo.variantId}`]: {
                     businessProductSku: businessProductSku,
+                    businessId: businessId,
                     mappedAt: new Date().toISOString(),
                     mappedBy: userId,
                 },

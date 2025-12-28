@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
         const storeProductData = storeProductDoc.data();
         const variantMappingDetails = storeProductData?.variantMappingDetails?.[variantId];
-        if(variantMappingDetails.businessId !== businessId) {
+        if(variantMappingDetails?.businessId !== businessId) {
             return NextResponse.json(
                 { error: 'Bad Request', message: 'Variant is not mapped by you' },
                 { status: 400 }

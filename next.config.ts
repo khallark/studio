@@ -246,6 +246,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/products/delete/route',
       },
       {
+        source: '/api/business/inventory/adjust',
+        destination: '/api/business/inventory/adjust/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

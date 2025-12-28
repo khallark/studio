@@ -186,12 +186,12 @@ export default function ProductsLayout({
             icon: Package,
             description: 'Your product catalog',
         },
-        // {
-        //     label: 'Store Products',
-        //     href: `/business/${businessId}/products/from-store`,
-        //     icon: Store,
-        //     description: 'Synced from Shopify',
-        // },
+        {
+            label: 'Inventory',
+            href: `/business/${businessId}/inventory`,
+            icon: Package,
+            description: 'Manage stock levels',
+        },
     ];
 
     const isActive = (href: string) => {

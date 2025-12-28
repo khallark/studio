@@ -180,6 +180,12 @@ export default function InventoryLayout({
 
     const navItems: NavItem[] = [
         {
+            label: 'Business Products',
+            href: `/business/${businessId}/products`,
+            icon: Package,
+            description: 'Your product catalog',
+        },
+        {
             label: 'Inventory',
             href: `/business/${businessId}/inventory`,
             icon: Package,

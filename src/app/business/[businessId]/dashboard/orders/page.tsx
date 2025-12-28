@@ -273,7 +273,7 @@ function MobileOrderCard({
                 <div className="flex items-center justify-between text-xs mb-2">
                     <span className="text-muted-foreground truncate max-w-[60%]">{customerName}</span>
                     <span className="font-mono font-medium">
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_price))}
                     </span>
                 </div>
 
@@ -1481,7 +1481,10 @@ export default function BusinessOrdersPage() {
                                                     )}
                                                     <TableCell className="max-w-[150px] truncate text-sm">{customerName}</TableCell>
                                                     <TableCell className="text-right font-mono text-sm">
-                                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+                                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_price))}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-xs md:text-sm font-mono">
+                                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge variant={getPaymentBadgeVariant(order.financialStatus) as any} className="text-xs capitalize">
@@ -1804,7 +1807,7 @@ export default function BusinessOrdersPage() {
                                             <div className="flex justify-between items-center mt-3 pt-3 border-t font-semibold">
                                                 <span>Total</span>
                                                 <span className="font-mono">
-                                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}
+                                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: viewingOrder.currency }).format(Number(viewingOrder.raw.total_price))}
                                                 </span>
                                             </div>
                                         </div>
@@ -3783,7 +3786,7 @@ export default function BusinessOrdersPage() {
 //                                                     )}
 //                                                     <TableCell className="text-xs md:text-sm">{customerName || order.email}</TableCell>
 //                                                     <TableCell className="text-right text-xs md:text-sm font-mono">
-//                                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.totalPrice)}
+//                                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(order.raw.total_price)}
 //                                                     </TableCell>
 //                                                     <TableCell className="text-right text-xs md:text-sm font-mono">
 //                                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(Number(order.raw.total_outstanding) || 0)}
@@ -4120,7 +4123,7 @@ export default function BusinessOrdersPage() {
 //                                     <Separator />
 //                                     <div className="flex justify-end items-center gap-4 text-lg font-bold">
 //                                         <span>Total:</span>
-//                                         <span className="font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.totalPrice)}</span>
+//                                         <span className="font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: viewingOrder.currency }).format(viewingOrder.raw.total_price)}</span>
 //                                     </div>
 //                                 </div>
 

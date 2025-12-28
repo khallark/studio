@@ -163,6 +163,7 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
 // ============================================================
 
 interface MobileOrderCardProps {
+    businessId: string;
     order: Order;
     isSelected: boolean;
     onSelect: () => void;
@@ -174,6 +175,7 @@ interface MobileOrderCardProps {
 }
 
 function MobileOrderCard({
+    businessId,
     order,
     isSelected,
     onSelect,
@@ -240,11 +242,12 @@ function MobileOrderCard({
                                     Confirm Order
                                 </DropdownMenuItem>
                             )}
-                            {order.customStatus === 'Confirmed' && (
-                                <DropdownMenuItem onClick={() => onAction('assign-awb')}>
-                                    Assign AWB
-                                </DropdownMenuItem>
-                            )}
+                            {order.customStatus === 'Confirmed' &&
+                                (businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) && (
+                                    <DropdownMenuItem onClick={() => onAction('assign-awb')}>
+                                        Assign AWB
+                                    </DropdownMenuItem>
+                                )}
                             {order.customStatus === 'Ready To Dispatch' && (
                                 <>
                                     <DropdownMenuItem onClick={() => onAction('dispatch')}>
@@ -1232,9 +1235,12 @@ export default function BusinessOrdersPage() {
                                         <Button size="sm" variant="outline" onClick={handleGeneratePOClick}>
                                             Generate PO
                                         </Button>
-                                        <Button size="sm" variant="outline" onClick={handleAssignAwbClick} disabled={isAnyOperationInProgress}>
+                                        {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
+                                            const order = orders.find(o => o.id === orderId);
+                                            return order?.storeId === SHARED_STORE_ID;
+                                        })) && (<Button size="sm" variant="outline" onClick={handleAssignAwbClick} disabled={isAnyOperationInProgress}>
                                             Assign AWB
-                                        </Button>
+                                        </Button>)}
                                     </>
                                 )}
                                 {activeTab === 'Ready To Dispatch' && (
@@ -1281,10 +1287,11 @@ export default function BusinessOrdersPage() {
                                         {downloadExcel.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                         Download Excel
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleDownloadSlips} disabled={downloadSlips.isPending}>
-                                        {downloadSlips.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                        Download Slips
-                                    </DropdownMenuItem>
+                                    {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) &&
+                                        (<DropdownMenuItem onClick={handleDownloadSlips} disabled={downloadSlips.isPending}>
+                                            {downloadSlips.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                            Download Slips
+                                        </DropdownMenuItem>)}
                                     {activeTab === 'Confirmed' && (
                                         <DropdownMenuItem onClick={handleDownloadProductsExcel} disabled={downloadProductsExcel.isPending}>
                                             {downloadProductsExcel.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1316,9 +1323,12 @@ export default function BusinessOrdersPage() {
                                             <DropdownMenuItem onClick={handleGeneratePOClick}>
                                                 Generate PO
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handleAssignAwbClick}>
+                                            {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
+                                                const order = orders.find(o => o.id === orderId);
+                                                return order?.storeId === SHARED_STORE_ID;
+                                            })) && (<DropdownMenuItem onClick={handleAssignAwbClick}>
                                                 Assign AWB
-                                            </DropdownMenuItem>
+                                            </DropdownMenuItem>)}
                                         </>
                                     )}
                                     {activeTab === 'Ready To Dispatch' && (
@@ -1385,6 +1395,7 @@ export default function BusinessOrdersPage() {
                             <div className="md:hidden overflow-y-auto h-full p-3 space-y-2">
                                 {orders.map((order) => (
                                     <MobileOrderCard
+                                        businessId={businessId}
                                         key={order.id}
                                         order={order}
                                         isSelected={selectedOrders.includes(order.id)}
@@ -1717,14 +1728,31 @@ export default function BusinessOrdersPage() {
                                             </div>
                                         </div>
 
+                                        {viewingOrder.vendors && viewingOrder.vendors.length > 0 && (
+                                            <div>
+                                                <h4 className="font-semibold">Vendors</h4>
+                                                <div className="flex flex-wrap gap-2 mt-1">
+                                                    {viewingOrder.vendors.map((vendor: string, index: number) => (
+                                                        <span
+                                                            key={index}
+                                                            className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                                                        >
+                                                            {vendor}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {(viewingOrder.awb || viewingOrder.courier) && (
                                             <div>
                                                 <h4 className="text-sm font-semibold mb-2">Shipment</h4>
                                                 <div className="text-sm space-y-1">
                                                     {viewingOrder.courier && <p>Courier: {viewingOrder.courier}</p>}
-                                                    {viewingOrder.awb && <p className="font-mono">AWB: {viewingOrder.awb}</p>}
+                                                    {viewingOrder.awb && <p>AWB: {viewingOrder.awb}</p>}
+                                                    {viewingOrder.courierReverseProvider && <p>Return Courier: {viewingOrder.courierReverseProvider}</p>}
                                                     {viewingOrder.awb_reverse && (
-                                                        <p className="font-mono">Return: {viewingOrder.awb_reverse}</p>
+                                                        <p>Return: {viewingOrder.awb_reverse}</p>
                                                     )}
                                                 </div>
                                             </div>

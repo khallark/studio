@@ -56,6 +56,7 @@ export interface Order {
   courier?: string;
   courierProvider?: string;
   courier_reverse?: string;
+  courierReverseProvider?: string;
   isDeleted?: boolean;
   tags_confirmed?: string[];
   tags_rtoInTransit?: string[];

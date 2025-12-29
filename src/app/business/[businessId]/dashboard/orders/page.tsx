@@ -1750,7 +1750,10 @@ export default function BusinessOrdersPage() {
                 return (
                     <GeneratePODialog
                         isOpen={isGeneratePODialogOpen}
-                        onClose={() => setIsGeneratePODialogOpen(false)}
+                        onClose={() => {
+                            setIsGeneratePODialogOpen(false);
+                            setSelectedOrders([]);
+                        }}
                         selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
                         shopId={validation.storeId}
                         user={user}

@@ -782,12 +782,10 @@ export default function BusinessLayout({
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="gap-2 py-2 cursor-pointer">
-                      <User className="h-4 w-4" />
-                      Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2 py-2 cursor-pointer">
-                      <Settings className="h-4 w-4" />
-                      Preferences
+                      <Link href='/business'>
+                        <BriefcaseBusiness className="h-4 w-4" />
+                        Your Businesses
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

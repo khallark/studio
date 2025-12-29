@@ -956,6 +956,14 @@ export default function BusinessOrdersPage() {
                                         Tax Report
                                     </Button>
                                 )}
+                                {activeTab === 'Confirmed' && (<Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsAvailabilityDialogOpen(true)}
+                                    disabled={isAnyOperationInProgress}
+                                >
+                                    Perform Items availability
+                                </Button>)}
                                 <Button variant="outline" size="sm" onClick={() => refetchOrders()} disabled={isFetching}>
                                     <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
                                     Refresh
@@ -980,6 +988,14 @@ export default function BusinessOrdersPage() {
                                                 Tax Report
                                             </DropdownMenuItem>
                                         )}
+                                        {activeTab === 'Confirmed' && (<Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setIsAvailabilityDialogOpen(true)}
+                                            disabled={isAnyOperationInProgress}
+                                        >
+                                            Perform Items availability
+                                        </Button>)}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>

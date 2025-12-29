@@ -1379,11 +1379,9 @@ export default function BusinessOrdersPage() {
                                         </>
                                     )}
                                     {activeTab === 'Ready To Dispatch' && (
-                                        <>
-                                            <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                                                Dispatch
-                                            </DropdownMenuItem>
-                                        </>
+                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                                            Dispatch
+                                        </DropdownMenuItem>
                                     )}
                                     {activeTab === 'Delivered' && (
                                         <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Closed')}>

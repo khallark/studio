@@ -782,7 +782,7 @@ export default function BusinessLayout({
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="gap-2 py-2 cursor-pointer">
-                      <Link href='/business'>
+                      <Link href='/business' className="flex items-center gap-3">
                         <BriefcaseBusiness className="h-4 w-4" />
                         Your Businesses
                       </Link>

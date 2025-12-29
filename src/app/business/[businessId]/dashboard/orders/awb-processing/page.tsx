@@ -693,32 +693,6 @@ export default function BusinessAwbProcessingPage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="p-4 md:p-6 pb-0">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            <StatsCard
-              icon={Package}
-              label="Available AWBs"
-              value={unusedAwbsCount}
-            />
-            <StatsCard
-              icon={Clock}
-              label="Active Batches"
-              value={stats.ongoingCount}
-            />
-            <StatsCard
-              icon={CheckCircle}
-              label="Total Processed"
-              value={stats.totalProcessed}
-            />
-            <StatsCard
-              icon={TrendingUp}
-              label="Success Rate"
-              value={`${stats.successRate}%`}
-            />
-          </div>
-        </div>
-
         {/* Main Content */}
         <div className="flex-1 p-4 md:p-6 min-h-0">
           <Card className="h-full flex flex-col">

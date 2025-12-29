@@ -79,6 +79,7 @@ import {
     BoxIcon,
     ShoppingBag,
     Shirt,
+    AlignLeft,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -436,6 +437,24 @@ export default function BusinessOrdersPage() {
         downloadSlips.isPending ||
         downloadExcel.isPending ||
         downloadProductsExcel.isPending;
+
+    const isAnyOrderSelected = selectedOrders.length > 0;
+    const isDisabled = !isAnyOrderSelected;
+    const isSharedStoreAdmin = businessId === SUPER_ADMIN_ID;
+
+    // ✅ Check if any selected order is from SHARED_STORE_ID
+    const hasSharedStoreOrder = selectedOrders.some(orderId => {
+        const order = orders.find(o => o.id === orderId);
+        return order?.storeId === SHARED_STORE_ID;
+    });
+
+    // ✅ Track loading states from mutations
+    const isDispatching = dispatchOrders.isPending;
+    const isBulkUpdating = bulkUpdate.isPending;
+    const isBookingReturn = bookReturn.isPending;
+    const isDownloadingSlips = downloadSlips.isPending;
+    const isDownloadingExcel = downloadExcel.isPending;
+    const isDownloadingProducts = downloadProductsExcel.isPending;
 
     // ============================================================
     // HANDLERS
@@ -1000,10 +1019,14 @@ export default function BusinessOrdersPage() {
                                             </DropdownMenuItem>
                                         )}
                                         {['Ready To Dispatch', 'RTO Delivered'].includes(activeTab) && (
-                                            <DropdownMenuItem onClick={() => {
-                                                setIsAwbBulkSelectOpen(true);
-                                                setAwbBulkSelectStatus(activeTab);
-                                            }}>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    setIsAwbBulkSelectOpen(true);
+                                                    setAwbBulkSelectStatus(activeTab);
+                                                }}
+                                                disabled={isAnyOperationInProgress}
+                                            >
+                                                <AlignLeft className="h-4 w-4 mr-2" />
                                                 AWB Bulk Select
                                             </DropdownMenuItem>
                                         )}
@@ -1312,18 +1335,27 @@ export default function BusinessOrdersPage() {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={handleDownloadExcel} disabled={downloadExcel.isPending}>
-                                        {downloadExcel.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                    <DropdownMenuItem
+                                        onClick={handleDownloadExcel}
+                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
+                                    >
+                                        {isDownloadingExcel && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                         Download Excel
                                     </DropdownMenuItem>
                                     {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) &&
-                                        (<DropdownMenuItem onClick={handleDownloadSlips} disabled={downloadSlips.isPending}>
-                                            {downloadSlips.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                        (<DropdownMenuItem
+                                            onClick={handleDownloadSlips}
+                                            disabled={isDisabled || isDownloadingSlips || isAnyOperationInProgress}
+                                        >
+                                            {isDownloadingSlips && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Download Slips
                                         </DropdownMenuItem>)}
-                                    {activeTab === 'Confirmed' && (
-                                        <DropdownMenuItem onClick={handleDownloadProductsExcel} disabled={downloadProductsExcel.isPending}>
-                                            {downloadProductsExcel.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                    {['Confirmed', 'Ready To Dispatch'].includes(activeTab) && (
+                                        <DropdownMenuItem
+                                            onClick={handleDownloadProductsExcel}
+                                            disabled={isDisabled || isDownloadingProducts || isAnyOperationInProgress}
+                                        >
+                                            {isDownloadingProducts && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Download Products
                                         </DropdownMenuItem>
                                     )}
@@ -1340,42 +1372,70 @@ export default function BusinessOrdersPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     {activeTab === 'New' && (
-                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Confirmed')}>
-                                            Confirm Orders
+                                        <DropdownMenuItem
+                                            onClick={() => handleBulkUpdateStatus('Confirmed')}
+                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        >
+                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                            Confirm
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'Confirmed' && (
                                         <>
-                                            <DropdownMenuItem onClick={handleGeneratePOClick}>
+                                            <DropdownMenuItem
+                                                onClick={handleGeneratePOClick}
+                                                disabled={isDisabled || isAnyOperationInProgress}
+                                            >
                                                 Generate PO
                                             </DropdownMenuItem>
                                             {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
                                                 const order = orders.find(o => o.id === orderId);
                                                 return order?.storeId === SHARED_STORE_ID;
-                                            })) && (<DropdownMenuItem onClick={handleAssignAwbClick}>
-                                                Assign AWBs
-                                            </DropdownMenuItem>)}
+                                            })) && (
+                                                    <DropdownMenuItem
+                                                        onClick={handleAssignAwbClick}
+                                                        disabled={isDisabled || (!isSharedStoreAdmin && hasSharedStoreOrder) || isAnyOperationInProgress}
+                                                    >
+                                                        Assign AWBs
+                                                    </DropdownMenuItem>
+                                                )}
                                         </>
                                     )}
                                     {activeTab === 'Ready To Dispatch' && (
                                         <>
-                                            <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                                            <DropdownMenuItem
+                                                onClick={() => handleBulkUpdateStatus('Dispatched')}
+                                                disabled={isDisabled || isDispatching || isAnyOperationInProgress}
+                                            >
+                                                {isDispatching && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                                 Dispatch
                                             </DropdownMenuItem>
                                         </>
                                     )}
                                     {activeTab === 'Delivered' && (
-                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Closed')}>
+                                        <DropdownMenuItem
+                                            onClick={() => handleBulkUpdateStatus('Closed')}
+                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        >
+                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Close Orders
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'RTO Delivered' && (
-                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('RTO Closed')}>
+                                        <DropdownMenuItem
+                                            onClick={() => handleBulkUpdateStatus('RTO Closed')}
+                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        >
+                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             RTO Close
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'DTO Requested' && (
-                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('DTO Requested')}>
+                                        <DropdownMenuItem
+                                        onClick={() => handleBulkUpdateStatus('DTO Requested')}
+                                        disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
+                                        >
+                                            {isBookingReturn && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Book Returns
                                         </DropdownMenuItem>
                                     )}

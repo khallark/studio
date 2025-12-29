@@ -999,6 +999,14 @@ export default function BusinessOrdersPage() {
                                                 Perform Items availability
                                             </DropdownMenuItem>
                                         )}
+                                        {['Ready To Dispatch', 'RTO Delivered'].includes(activeTab) && (
+                                            <DropdownMenuItem onClick={() => {
+                                                setIsAwbBulkSelectOpen(true);
+                                                setAwbBulkSelectStatus(activeTab);
+                                            }}>
+                                                AWB Bulk Select
+                                            </DropdownMenuItem>
+                                        )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -1351,9 +1359,6 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'Ready To Dispatch' && (
                                         <>
-                                            <DropdownMenuItem onClick={() => { setIsAwbBulkSelectOpen(true); setAwbBulkSelectStatus('Ready To Dispatch'); }}>
-                                                AWB Bulk Select
-                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
                                                 Dispatch
                                             </DropdownMenuItem>

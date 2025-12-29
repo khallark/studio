@@ -950,7 +950,7 @@ export default function BusinessOrdersPage() {
                             </div>
 
                             {/* Desktop Actions */}
-                            {/* <div className="hidden md:flex items-center gap-2">
+                            <div className="hidden md:flex items-center gap-2">
                                 {businessId === SUPER_ADMIN_ID && (
                                     <Button variant="outline" size="sm" onClick={() => setIsTaxReportDialogOpen(true)}>
                                         <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -970,24 +970,10 @@ export default function BusinessOrdersPage() {
                                     <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
                                     Refresh
                                 </Button>
-                                {['Ready To Dispatch', 'RTO Closed'].includes(activeTab) && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setIsAwbBulkSelectOpen(true);
-                                            setAwbBulkSelectStatus("Ready To Dispatch");
-                                        }}
-                                        disabled={isAnyOperationInProgress}
-                                    >
-                                        <ScanBarcode className="mr-2 h-4 w-4" />
-                                        AWB Bulk Selection
-                                    </Button>
-                                )}
-                            </div> */}
+                            </div>
 
                             {/* Mobile Actions */}
-                            <div className="flex items-center gap-1">
+                            <div className="flex md:hidden items-center gap-1">
                                 <Button variant="ghost" size="icon" onClick={() => refetchOrders()} disabled={isFetching}>
                                     <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                                 </Button>
@@ -1014,18 +1000,6 @@ export default function BusinessOrdersPage() {
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
-                                    {['Ready To Dispatch', 'RTO Delivered'].includes(activeTab) && (
-                                        <DropdownMenuItem
-                                            onClick={() => {
-                                                setIsAwbBulkSelectOpen(true);
-                                                setAwbBulkSelectStatus("Ready To Dispatch");
-                                            }}
-                                            disabled={isAnyOperationInProgress}
-                                        >
-                                            <ScanBarcode className="mr-2 h-4 w-4" />
-                                            {activeTab === 'Ready To Dispatch' ? 'AWB' : null} Bulk Selection
-                                        </DropdownMenuItem>
-                                    )}
                                 </DropdownMenu>
                             </div>
                         </div>
@@ -1366,22 +1340,30 @@ export default function BusinessOrdersPage() {
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'Confirmed' && (
-                                        <DropdownMenuItem onClick={handleGeneratePOClick}>
-                                            Generate PO
-                                        </DropdownMenuItem>
-                                    )}
-                                    {activeTab === 'Confirmed' && businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                        const order = orders.find(o => o.id === orderId);
-                                        return order?.storeId === SHARED_STORE_ID;
-                                    }) && (
-                                            <DropdownMenuItem onClick={handleAssignAwbClick}>
-                                                Assign AWB
+                                        <>
+                                            <DropdownMenuItem onClick={() => setIsAvailabilityDialogOpen(true)}>
+                                                Check Availability
                                             </DropdownMenuItem>
-                                        )}
+                                            <DropdownMenuItem onClick={handleGeneratePOClick}>
+                                                Generate PO
+                                            </DropdownMenuItem>
+                                            {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
+                                                const order = orders.find(o => o.id === orderId);
+                                                return order?.storeId === SHARED_STORE_ID;
+                                            })) && (<DropdownMenuItem onClick={handleAssignAwbClick}>
+                                                Assign AWB
+                                            </DropdownMenuItem>)}
+                                        </>
+                                    )}
                                     {activeTab === 'Ready To Dispatch' && (
-                                        <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
-                                            Dispatch
-                                        </DropdownMenuItem>
+                                        <>
+                                            <DropdownMenuItem onClick={() => { setIsAwbBulkSelectOpen(true); setAwbBulkSelectStatus('Ready To Dispatch'); }}>
+                                                AWB Bulk Select
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
+                                                Dispatch
+                                            </DropdownMenuItem>
+                                        </>
                                     )}
                                     {activeTab === 'Delivered' && (
                                         <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Closed')}>

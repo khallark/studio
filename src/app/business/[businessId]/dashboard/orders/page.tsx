@@ -1324,7 +1324,7 @@ export default function BusinessOrdersPage() {
 
                             {/* Mobile Bulk Actions Dropdown */}
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild className="md:hidden">
+                                <DropdownMenuTrigger asChild>
                                     <Button size="sm" variant="default">
                                         Actions
                                         <ChevronDown className="h-3 w-3 ml-1" />

@@ -334,21 +334,6 @@ export default function InventoryLayout({
                             currentBusinessId={businessId}
                         />
                     )}
-
-                    {/* Pro Tip */}
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-                                <Sparkles className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium">Pro Tip</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    Keep track of your stock levels to avoid overselling and ensure timely fulfillment.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </aside>
 

@@ -666,23 +666,6 @@ export default function BusinessLayout({
 
             {/* Spacer */}
             <div className="flex-1" />
-
-            {/* Pro Tip Card */}
-            <div className="px-3 pb-3">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
-                <div className="flex items-start gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-primary/15 shrink-0">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">Quick Tip</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                      Use product mappings to auto-fill weights during fulfillment.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </SidebarContent>
 
           <SidebarFooter className="border-t border-sidebar-border/50 bg-sidebar-accent/30">

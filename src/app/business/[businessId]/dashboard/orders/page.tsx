@@ -1366,18 +1366,18 @@ export default function BusinessOrdersPage() {
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'Confirmed' && (
-                                        <>
-                                            <DropdownMenuItem onClick={handleGeneratePOClick}>
-                                                Generate PO
-                                            </DropdownMenuItem>
-                                            {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                                const order = orders.find(o => o.id === orderId);
-                                                return order?.storeId === SHARED_STORE_ID;
-                                            })) && (<DropdownMenuItem onClick={handleAssignAwbClick}>
-                                                Assign AWB
-                                            </DropdownMenuItem>)}
-                                        </>
+                                        <DropdownMenuItem onClick={handleGeneratePOClick}>
+                                            Generate PO
+                                        </DropdownMenuItem>
                                     )}
+                                    {activeTab === 'Confirmed' && businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
+                                        const order = orders.find(o => o.id === orderId);
+                                        return order?.storeId === SHARED_STORE_ID;
+                                    }) && (
+                                            <DropdownMenuItem onClick={handleAssignAwbClick}>
+                                                Assign AWB
+                                            </DropdownMenuItem>
+                                        )}
                                     {activeTab === 'Ready To Dispatch' && (
                                         <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
                                             Dispatch

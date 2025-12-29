@@ -78,6 +78,7 @@ import {
     Truck,
     BoxIcon,
     ShoppingBag,
+    Shirt,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -949,29 +950,44 @@ export default function BusinessOrdersPage() {
                             </div>
 
                             {/* Desktop Actions */}
-                            <div className="hidden md:flex items-center gap-2">
+                            {/* <div className="hidden md:flex items-center gap-2">
                                 {businessId === SUPER_ADMIN_ID && (
                                     <Button variant="outline" size="sm" onClick={() => setIsTaxReportDialogOpen(true)}>
                                         <FileSpreadsheet className="h-4 w-4 mr-2" />
                                         Tax Report
                                     </Button>
                                 )}
-                                {activeTab === 'Confirmed' && (<Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsAvailabilityDialogOpen(true)}
-                                    disabled={isAnyOperationInProgress}
-                                >
-                                    Perform Items availability
-                                </Button>)}
+                                {activeTab === 'Confirmed' && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsAvailabilityDialogOpen(true)}
+                                        disabled={isAnyOperationInProgress}
+                                    >
+                                        Perform Items availability
+                                    </Button>)}
                                 <Button variant="outline" size="sm" onClick={() => refetchOrders()} disabled={isFetching}>
                                     <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
                                     Refresh
                                 </Button>
-                            </div>
+                                {['Ready To Dispatch', 'RTO Closed'].includes(activeTab) && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsAwbBulkSelectOpen(true);
+                                            setAwbBulkSelectStatus("Ready To Dispatch");
+                                        }}
+                                        disabled={isAnyOperationInProgress}
+                                    >
+                                        <ScanBarcode className="mr-2 h-4 w-4" />
+                                        AWB Bulk Selection
+                                    </Button>
+                                )}
+                            </div> */}
 
                             {/* Mobile Actions */}
-                            <div className="flex md:hidden items-center gap-1">
+                            <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" onClick={() => refetchOrders()} disabled={isFetching}>
                                     <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
                                 </Button>
@@ -988,15 +1004,28 @@ export default function BusinessOrdersPage() {
                                                 Tax Report
                                             </DropdownMenuItem>
                                         )}
-                                        {activeTab === 'Confirmed' && (<Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setIsAvailabilityDialogOpen(true)}
+                                        {activeTab === 'Confirmed' && (
+                                            <DropdownMenuItem
+                                                onClick={() => setIsAvailabilityDialogOpen(true)}
+                                                disabled={isAnyOperationInProgress}
+                                            >
+                                                <Shirt className="h-4 w-4 mr-2" />
+                                                Perform Items availability
+                                            </DropdownMenuItem>
+                                        )}
+                                    </DropdownMenuContent>
+                                    {['Ready To Dispatch', 'RTO Delivered'].includes(activeTab) && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                setIsAwbBulkSelectOpen(true);
+                                                setAwbBulkSelectStatus("Ready To Dispatch");
+                                            }}
                                             disabled={isAnyOperationInProgress}
                                         >
-                                            Perform Items availability
-                                        </Button>)}
-                                    </DropdownMenuContent>
+                                            <ScanBarcode className="mr-2 h-4 w-4" />
+                                            {activeTab === 'Ready To Dispatch' ? 'AWB' : null} Bulk Selection
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenu>
                             </div>
                         </div>
@@ -1338,9 +1367,6 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'Confirmed' && (
                                         <>
-                                            <DropdownMenuItem onClick={() => setIsAvailabilityDialogOpen(true)}>
-                                                Check Availability
-                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={handleGeneratePOClick}>
                                                 Generate PO
                                             </DropdownMenuItem>
@@ -1354,9 +1380,6 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'Ready To Dispatch' && (
                                         <>
-                                            <DropdownMenuItem onClick={() => { setIsAwbBulkSelectOpen(true); setAwbBulkSelectStatus('Ready To Dispatch'); }}>
-                                                AWB Bulk Select
-                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleBulkUpdateStatus('Dispatched')}>
                                                 Dispatch
                                             </DropdownMenuItem>

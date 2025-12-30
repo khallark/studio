@@ -52,7 +52,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/logo';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { ProcessingQueueProvider } from '@/contexts/processing-queue-context';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -76,6 +76,7 @@ function BusinessSwitcher({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -97,7 +98,8 @@ function BusinessSwitcher({
   const handleBusinessSwitch = (businessId: string) => {
     setIsOpen(false);
     const newPath = pathname.replace(/\/business\/[^\/]+/, `/business/${businessId}`);
-    router.push(newPath);
+    const query = searchParams.toString();
+    router.push(query ? `${newPath}?${query}` : newPath);
   };
 
   if (!currentBusiness) return null;

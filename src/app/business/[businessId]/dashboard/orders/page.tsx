@@ -170,7 +170,7 @@ interface MobileOrderCardProps {
     isSelected: boolean;
     onSelect: () => void;
     onView: () => void;
-    onAction: (action: string) => void;
+    renderActionItems: (order: Order) => React.ReactNode; // Add this
     activeTab: CustomStatus | 'All Orders';
     getStatusBadgeVariant: (status: CustomStatus | string | null) => "default" | "secondary" | "destructive" | "outline" | "success";
     getPaymentBadgeVariant: (status: string | null) => string;
@@ -182,7 +182,7 @@ function MobileOrderCard({
     isSelected,
     onSelect,
     onView,
-    onAction,
+    renderActionItems, // Add this
     activeTab,
     getStatusBadgeVariant,
     getPaymentBadgeVariant,
@@ -238,33 +238,7 @@ function MobileOrderCard({
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={onView}>View Details</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {/* Dynamic actions based on status */}
-                            {order.customStatus === 'New' && (
-                                <DropdownMenuItem onClick={() => onAction('confirm')}>
-                                    Confirm Order
-                                </DropdownMenuItem>
-                            )}
-                            {order.customStatus === 'Confirmed' &&
-                                (businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) && (
-                                    <DropdownMenuItem onClick={() => onAction('assign-awb')}>
-                                        Assign AWB
-                                    </DropdownMenuItem>
-                                )}
-                            {order.customStatus === 'Ready To Dispatch' && (
-                                <>
-                                    <DropdownMenuItem onClick={() => onAction('dispatch')}>
-                                        Dispatch
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onAction('revert-confirmed')}>
-                                        Back to Confirmed
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                            {order.customStatus === 'Delivered' && (
-                                <DropdownMenuItem onClick={() => onAction('book-return')}>
-                                    Book Return
-                                </DropdownMenuItem>
-                            )}
+                            {renderActionItems(order)}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -1432,8 +1406,8 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'DTO Requested' && (
                                         <DropdownMenuItem
-                                        onClick={() => handleBulkUpdateStatus('DTO Requested')}
-                                        disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
+                                            onClick={() => handleBulkUpdateStatus('DTO Requested')}
+                                            disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
                                         >
                                             {isBookingReturn && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Book Returns
@@ -1475,22 +1449,20 @@ export default function BusinessOrdersPage() {
                     ) : (
                         <>
                             {/* Mobile View - Cards */}
-                            <div className="md:hidden overflow-y-auto h-full p-3 space-y-2">
-                                {orders.map((order) => (
-                                    <MobileOrderCard
-                                        businessId={businessId}
-                                        key={order.id}
-                                        order={order}
-                                        isSelected={selectedOrders.includes(order.id)}
-                                        onSelect={() => handleSelectOrder(order.id)}
-                                        onView={() => setViewingOrder(order)}
-                                        onAction={(action) => handleOrderAction(order, action)}
-                                        activeTab={activeTab}
-                                        getStatusBadgeVariant={getStatusBadgeVariant}
-                                        getPaymentBadgeVariant={getPaymentBadgeVariant}
-                                    />
-                                ))}
-                            </div>
+                            {orders.map((order) => (
+                                <MobileOrderCard
+                                    businessId={businessId}
+                                    key={order.id}
+                                    order={order}
+                                    isSelected={selectedOrders.includes(order.id)}
+                                    onSelect={() => handleSelectOrder(order.id)}
+                                    onView={() => setViewingOrder(order)}
+                                    renderActionItems={renderActionItems} // Pass it here
+                                    activeTab={activeTab}
+                                    getStatusBadgeVariant={getStatusBadgeVariant}
+                                    getPaymentBadgeVariant={getPaymentBadgeVariant}
+                                />
+                            ))}
 
                             {/* Desktop View - Table */}
                             <div className="hidden md:block overflow-auto h-full">

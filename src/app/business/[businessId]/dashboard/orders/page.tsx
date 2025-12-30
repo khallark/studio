@@ -1449,20 +1449,22 @@ export default function BusinessOrdersPage() {
                     ) : (
                         <>
                             {/* Mobile View - Cards */}
-                            {orders.map((order) => (
-                                <MobileOrderCard
-                                    businessId={businessId}
-                                    key={order.id}
-                                    order={order}
-                                    isSelected={selectedOrders.includes(order.id)}
-                                    onSelect={() => handleSelectOrder(order.id)}
-                                    onView={() => setViewingOrder(order)}
-                                    renderActionItems={renderActionItems} // Pass it here
-                                    activeTab={activeTab}
-                                    getStatusBadgeVariant={getStatusBadgeVariant}
-                                    getPaymentBadgeVariant={getPaymentBadgeVariant}
-                                />
-                            ))}
+                            <div className="md:hidden overflow-y-auto h-full p-3 space-y-2">
+                                {orders.map((order) => (
+                                    <MobileOrderCard
+                                        businessId={businessId}
+                                        key={order.id}
+                                        order={order}
+                                        isSelected={selectedOrders.includes(order.id)}
+                                        onSelect={() => handleSelectOrder(order.id)}
+                                        onView={() => setViewingOrder(order)}
+                                        renderActionItems={renderActionItems} // Pass it here
+                                        activeTab={activeTab}
+                                        getStatusBadgeVariant={getStatusBadgeVariant}
+                                        getPaymentBadgeVariant={getPaymentBadgeVariant}
+                                    />
+                                ))}
+                            </div>
 
                             {/* Desktop View - Table */}
                             <div className="hidden md:block overflow-auto h-full">

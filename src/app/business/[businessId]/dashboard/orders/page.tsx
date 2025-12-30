@@ -1811,11 +1811,11 @@ export default function BusinessOrdersPage() {
                                             <div>
                                                 <h4 className="text-sm font-semibold mb-2">Shipment</h4>
                                                 <div className="text-sm space-y-1">
-                                                    {viewingOrder.courier && <p>Courier&npsb;:&npsb;&npsb; <u>{viewingOrder.courier}</u></p>}
-                                                    {viewingOrder.awb && <p>AWB&npsb;:&npsb;&npsb; <u>{viewingOrder.awb}</u></p>}
-                                                    {viewingOrder.courierReverseProvider && <p>Return Courier&npsb;:&npsb;&npsb; <u>{viewingOrder.courierReverseProvider}</u></p>}
+                                                    {viewingOrder.courier && <p>Courier: <b><u><i>{viewingOrder.courier}</i></u></b></p>}
+                                                    {viewingOrder.awb && <p>AWB: <b><u><i>{viewingOrder.awb}</i></u></b></p>}
+                                                    {viewingOrder.courierReverseProvider && <p>Return Courier: <b><u><i>{viewingOrder.courierReverseProvider}</i></u></b></p>}
                                                     {viewingOrder.awb_reverse && (
-                                                        <p>Return&npsb;:&npsb;&npsb; <u>{viewingOrder.awb_reverse}</u></p>
+                                                        <p>Return: <b><u><i>{viewingOrder.awb_reverse}</i></u></b></p>
                                                     )}
                                                 </div>
                                             </div>

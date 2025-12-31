@@ -1489,7 +1489,7 @@ export default function BusinessOrdersPage() {
                                             )}
                                             <TableHead>Customer</TableHead>
                                             <TableHead className="text-right">Total</TableHead>
-                                            <TableHead>Payment</TableHead>
+                                            <TableHead>Outstanding</TableHead>
                                             <TableHead>Fulfillment</TableHead>
                                             <TableHead className="text-center">Items</TableHead>
                                             <TableHead className="w-12"></TableHead>

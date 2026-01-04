@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
         // If specific entity requested
         if (entityType && entityId) {
-            const collectionPath = `users/${businessId}/${entityType}s/${entityId}/logs`;
+            const collectionPath = `users/${businessId}/${entityType === 'shelf' ? 'shelve' : entityType}s/${entityId}/logs`;
             const logsSnapshot = await db
                 .collection(collectionPath)
                 .orderBy('timestamp', 'desc')
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
                 .get();
 
             // Get entity name
-            const entityDoc = await db.doc(`${businessId}/${entityType}s/${entityId}`).get();
+            const entityDoc = await db.doc(`users/${businessId}/${entityType}s/${entityId}`).get();
             const entityName = entityDoc.data()?.name || entityDoc.data()?.productSKU || 'Unknown';
 
             logsSnapshot.docs.forEach((doc) => {
@@ -94,14 +94,14 @@ export async function GET(request: NextRequest) {
 
             for (const type of entityTypes) {
                 const entitiesSnapshot = await db
-                    .collection(`${businessId}/${type}`)
+                    .collection(`users/${businessId}/${type}`)
                     .where('isDeleted', '==', false)
                     .limit(20)
                     .get();
 
                 for (const entityDoc of entitiesSnapshot.docs) {
                     const logsSnapshot = await db
-                        .collection(`${businessId}/${type}/${entityDoc.id}/logs`)
+                        .collection(`users/${businessId}/${type}/${entityDoc.id}/logs`)
                         .orderBy('timestamp', 'desc')
                         .limit(5)
                         .get();

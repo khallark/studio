@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (startAfter) {
-            const startAfterDoc = await db.doc(`${businessId}/movements/${startAfter}`).get();
+            const startAfterDoc = await db.doc(`users/${businessId}/movements/${startAfter}`).get();
             if (startAfterDoc.exists) {
                 query = query.startAfter(startAfterDoc);
             }

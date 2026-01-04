@@ -250,6 +250,30 @@ const nextConfig: NextConfig = {
         destination: '/api/business/inventory/adjust/route',
       },
       {
+        source: '/api/business/warehouse/create-warehouse',
+        destination: '/api/business/warehouse/create-warehouse/route',
+      },
+      {
+        source: '/api/business/warehouse/list-warehouses',
+        destination: '/api/business/warehouse/list-warehouses/route',
+      },
+      {
+        source: '/api/business/warehouse/list-zones',
+        destination: '/api/business/warehouse/list-zones/route',
+      },
+      {
+        source: '/api/business/warehouse/list-racks',
+        destination: '/api/business/warehouse/list-racks/route',
+      },
+      {
+        source: '/api/business/warehouse/list-shelves',
+        destination: '/api/business/warehouse/list-shelves/route',
+      },
+      {
+        source: '/api/business/warehouse/list-placements',
+        destination: '/api/business/warehouse/list-placements/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

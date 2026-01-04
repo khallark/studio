@@ -35,11 +35,68 @@ export async function PUT(request: NextRequest) {
         }
 
         const shelfRef = db.doc(`users/${businessId}/shelves/${shelfId}`);
+        const shelfDoc = await shelfRef.get();
 
+        if (!shelfDoc.exists) {
+            return NextResponse.json({ error: 'Shelf not found' }, { status: 404 });
+        }
+
+        const currentShelf = shelfDoc.data()!;
+        const oldPosition = currentShelf.position || 0;
+        const newPosition = position || 0;
+        const rackId = currentShelf.rackId;
+
+        const batch = db.batch();
+
+        // Handle position rebalancing if position changed
+        if (oldPosition !== newPosition) {
+            // Get all shelves in the same rack (excluding current shelf)
+            const shelvesSnapshot = await db
+                .collection(`users/${businessId}/shelves`)
+                .where('rackId', '==', rackId)
+                .where('isDeleted', '==', false)
+                .get();
+
+            const otherShelves = shelvesSnapshot.docs.filter(doc => doc.id !== shelfId);
+
+            if (newPosition > oldPosition) {
+                // Moving down (e.g., pos 1 → 3)
+                // Shift shelves in range (oldPosition, newPosition] up by -1
+                for (const doc of otherShelves) {
+                    const shelfData = doc.data();
+                    const shelfPos = shelfData.position || 0;
+
+                    if (shelfPos > oldPosition && shelfPos <= newPosition) {
+                        batch.update(doc.ref, {
+                            position: shelfPos - 1,
+                            updatedAt: Timestamp.now(),
+                            updatedBy: userId,
+                        });
+                    }
+                }
+            } else {
+                // Moving up (e.g., pos 3 → 1)
+                // Shift shelves in range [newPosition, oldPosition) down by +1
+                for (const doc of otherShelves) {
+                    const shelfData = doc.data();
+                    const shelfPos = shelfData.position || 0;
+
+                    if (shelfPos >= newPosition && shelfPos < oldPosition) {
+                        batch.update(doc.ref, {
+                            position: shelfPos + 1,
+                            updatedAt: Timestamp.now(),
+                            updatedBy: userId,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Update the shelf itself
         const updateData: Record<string, any> = {
             name: name.trim(),
             code: code?.trim() || '',
-            position: position || 0,
+            position: newPosition,
             capacity: capacity || null,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
@@ -49,7 +106,9 @@ export async function PUT(request: NextRequest) {
             updateData.coordinates = coordinates;
         }
 
-        await shelfRef.update(updateData);
+        batch.update(shelfRef, updateData);
+
+        await batch.commit();
 
         return NextResponse.json({ success: true });
     } catch (error) {

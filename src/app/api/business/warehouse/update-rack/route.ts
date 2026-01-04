@@ -35,13 +35,73 @@ export async function PUT(request: NextRequest) {
         }
 
         const rackRef = db.doc(`users/${businessId}/racks/${rackId}`);
-        await rackRef.update({
+        const rackDoc = await rackRef.get();
+
+        if (!rackDoc.exists) {
+            return NextResponse.json({ error: 'Rack not found' }, { status: 404 });
+        }
+
+        const currentRack = rackDoc.data()!;
+        const oldPosition = currentRack.position || 0;
+        const newPosition = position || 0;
+        const zoneId = currentRack.zoneId;
+
+        const batch = db.batch();
+
+        // Handle position rebalancing if position changed
+        if (oldPosition !== newPosition) {
+            // Get all racks in the same zone (excluding current rack)
+            const racksSnapshot = await db
+                .collection(`users/${businessId}/racks`)
+                .where('zoneId', '==', zoneId)
+                .where('isDeleted', '==', false)
+                .get();
+
+            const otherRacks = racksSnapshot.docs.filter(doc => doc.id !== rackId);
+
+            if (newPosition > oldPosition) {
+                // Moving down (e.g., pos 1 → 3)
+                // Shift racks in range (oldPosition, newPosition] up by -1
+                for (const doc of otherRacks) {
+                    const rackData = doc.data();
+                    const rackPos = rackData.position || 0;
+
+                    if (rackPos > oldPosition && rackPos <= newPosition) {
+                        batch.update(doc.ref, {
+                            position: rackPos - 1,
+                            updatedAt: Timestamp.now(),
+                            updatedBy: userId,
+                        });
+                    }
+                }
+            } else {
+                // Moving up (e.g., pos 3 → 1)
+                // Shift racks in range [newPosition, oldPosition) down by +1
+                for (const doc of otherRacks) {
+                    const rackData = doc.data();
+                    const rackPos = rackData.position || 0;
+
+                    if (rackPos >= newPosition && rackPos < oldPosition) {
+                        batch.update(doc.ref, {
+                            position: rackPos + 1,
+                            updatedAt: Timestamp.now(),
+                            updatedBy: userId,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Update the rack itself
+        batch.update(rackRef, {
             name: name.trim(),
             code: code?.trim() || '',
-            position: position || 0,
+            position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
         });
+
+        await batch.commit();
 
         return NextResponse.json({ success: true });
     } catch (error) {

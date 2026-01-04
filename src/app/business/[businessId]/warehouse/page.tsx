@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -22,6 +21,7 @@ import {
     PackageOpen,
     FolderTree,
     AlertTriangle,
+    MoveRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    SelectGroup,
+    SelectLabel,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -156,6 +165,32 @@ interface DeleteTarget {
     childCount: number;
 }
 
+interface MoveTarget {
+    type: 'zone' | 'rack' | 'shelf';
+    id: string;
+    name: string;
+    currentParentId: string;
+    currentParentName: string;
+}
+
+interface ZoneOption {
+    id: string;
+    name: string;
+    code: string;
+    warehouseId: string;
+    warehouseName: string;
+}
+
+interface RackOption {
+    id: string;
+    name: string;
+    code: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+}
+
 // ============================================================
 // TREE NODE COMPONENT
 // ============================================================
@@ -175,6 +210,7 @@ interface TreeNodeProps {
     onAdd?: () => void;
     addLabel?: string;
     onEdit?: () => void;
+    onMove?: () => void;
     onDelete?: () => void;
     children?: React.ReactNode;
 }
@@ -194,6 +230,7 @@ function TreeNode({
     onAdd,
     addLabel,
     onEdit,
+    onMove,
     onDelete,
     children,
 }: TreeNodeProps) {
@@ -267,7 +304,13 @@ function TreeNode({
                                 Edit
                             </DropdownMenuItem>
                         )}
-                        {(onAdd || onEdit) && onDelete && <DropdownMenuSeparator />}
+                        {onMove && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onMove(); }}>
+                                <MoveRight className="h-4 w-4 mr-2" />
+                                Move
+                            </DropdownMenuItem>
+                        )}
+                        {(onAdd || onEdit || onMove) && onDelete && <DropdownMenuSeparator />}
                         {onDelete && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive focus:text-destructive">
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -358,10 +401,7 @@ function WarehouseDialog({ open, onOpenChange, onSuccess, businessId, editData, 
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({ businessId, warehouseId: editData?.id, name, address }),
             });
             if (!res.ok) throw new Error('Failed to save warehouse');
@@ -457,10 +497,7 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({ businessId, zoneId: editData?.id, warehouseId, warehouseName, name, code, description }),
             });
             if (!res.ok) throw new Error('Failed to save zone');
@@ -562,10 +599,7 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({ businessId, rackId: editData?.id, zoneId, zoneName, warehouseId, warehouseName, name, code, position: position ? parseInt(position) : 0 }),
             });
             if (!res.ok) throw new Error('Failed to save rack');
@@ -684,10 +718,7 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({
                     businessId, shelfId: editData?.id, rackId, rackName, zoneId, zoneName, warehouseId, warehouseName,
                     name, code, position: position ? parseInt(position) : 0, capacity: capacity ? parseInt(capacity) : null, coordinates,
@@ -769,7 +800,7 @@ interface DeleteDialogProps {
     onSuccess: () => void;
     businessId: string;
     target: DeleteTarget | null;
-    user: User | null | undefined
+    user: User | null | undefined;
 }
 
 function DeleteDialog({ open, onOpenChange, onSuccess, businessId, target, user }: DeleteDialogProps) {
@@ -784,10 +815,7 @@ function DeleteDialog({ open, onOpenChange, onSuccess, businessId, target, user 
             const idToken = await user?.getIdToken();
             const res = await fetch(`/api/business/warehouse/delete-${target.type}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({ businessId, [`${target.type}Id`]: target.id }),
             });
 
@@ -844,6 +872,210 @@ function DeleteDialog({ open, onOpenChange, onSuccess, businessId, target, user 
 }
 
 // ============================================================
+// MOVE DIALOG
+// ============================================================
+
+interface MoveDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSuccess: () => void;
+    businessId: string;
+    target: MoveTarget | null;
+    warehouses: WarehouseData[];
+    user: User | null | undefined;
+}
+
+function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, warehouses, user }: MoveDialogProps) {
+    const [selectedId, setSelectedId] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+    const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
+    const [rackOptions, setRackOptions] = useState<RackOption[]>([]);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (!open || !target) return;
+        setSelectedId('');
+
+        const fetchOptions = async () => {
+            setIsLoadingOptions(true);
+            try {
+                const idToken = await user?.getIdToken();
+                if (target.type === 'rack') {
+                    const res = await fetch(`/api/business/warehouse/list-all-zones?businessId=${businessId}`, {
+                        headers: { Authorization: `Bearer ${idToken}` },
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setZoneOptions(data.zones || []);
+                    }
+                } else if (target.type === 'shelf') {
+                    const res = await fetch(`/api/business/warehouse/list-all-racks?businessId=${businessId}`, {
+                        headers: { Authorization: `Bearer ${idToken}` },
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setRackOptions(data.racks || []);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading options:', error);
+            } finally {
+                setIsLoadingOptions(false);
+            }
+        };
+
+        if (target.type !== 'zone') fetchOptions();
+    }, [open, target, businessId, user]);
+
+    if (!target) return null;
+
+    const handleMove = async () => {
+        if (!selectedId) return;
+
+        setIsSubmitting(true);
+        try {
+            const idToken = await user?.getIdToken();
+            let endpoint = '';
+            let body: any = { businessId };
+
+            if (target.type === 'zone') {
+                const selectedWarehouse = warehouses.find(w => w.id === selectedId);
+                endpoint = '/api/business/warehouse/move-zone';
+                body = { ...body, zoneId: target.id, targetWarehouseId: selectedId, targetWarehouseName: selectedWarehouse?.name || '' };
+            } else if (target.type === 'rack') {
+                const selectedZone = zoneOptions.find(z => z.id === selectedId);
+                endpoint = '/api/business/warehouse/move-rack';
+                body = { ...body, rackId: target.id, targetZoneId: selectedId, targetZoneName: selectedZone?.name || '', targetWarehouseId: selectedZone?.warehouseId || '', targetWarehouseName: selectedZone?.warehouseName || '' };
+            } else if (target.type === 'shelf') {
+                const selectedRack = rackOptions.find(r => r.id === selectedId);
+                endpoint = '/api/business/warehouse/move-shelf';
+                body = { ...body, shelfId: target.id, targetRackId: selectedId, targetRackName: selectedRack?.name || '', targetZoneId: selectedRack?.zoneId || '', targetZoneName: selectedRack?.zoneName || '', targetWarehouseId: selectedRack?.warehouseId || '', targetWarehouseName: selectedRack?.warehouseName || '' };
+            }
+
+            const res = await fetch(endpoint, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to move');
+            }
+
+            toast({ title: 'Moved successfully', description: `${target.name} has been moved.` });
+            onOpenChange(false);
+            onSuccess();
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message || 'Failed to move.', variant: 'destructive' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const getDialogContent = () => {
+        if (target.type === 'zone') return { title: 'Move Zone', description: `Move "${target.name}" to a different warehouse`, label: 'Select Warehouse', icon: <MapPin className="h-5 w-5 text-emerald-600" />, iconBg: 'bg-emerald-500/10' };
+        if (target.type === 'rack') return { title: 'Move Rack', description: `Move "${target.name}" to a different zone`, label: 'Select Zone', icon: <Grid3X3 className="h-5 w-5 text-amber-600" />, iconBg: 'bg-amber-500/10' };
+        return { title: 'Move Shelf', description: `Move "${target.name}" to a different rack`, label: 'Select Rack', icon: <Layers className="h-5 w-5 text-purple-600" />, iconBg: 'bg-purple-500/10' };
+    };
+
+    const content = getDialogContent();
+
+    const groupedZoneOptions = zoneOptions.reduce((acc, zone) => {
+        if (!acc[zone.warehouseName]) acc[zone.warehouseName] = [];
+        acc[zone.warehouseName].push(zone);
+        return acc;
+    }, {} as Record<string, ZoneOption[]>);
+
+    const groupedRackOptions = rackOptions.reduce((acc, rack) => {
+        const key = `${rack.warehouseName} > ${rack.zoneName}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(rack);
+        return acc;
+    }, {} as Record<string, RackOption[]>);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <div className={cn('p-2 rounded-lg', content.iconBg)}>{content.icon}</div>
+                        {content.title}
+                    </DialogTitle>
+                    <DialogDescription>{content.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>{content.label}</Label>
+                        {isLoadingOptions ? (
+                            <div className="flex items-center gap-2 p-3 border rounded-md">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-sm text-muted-foreground">Loading options...</span>
+                            </div>
+                        ) : (
+                            <Select value={selectedId} onValueChange={setSelectedId}>
+                                <SelectTrigger><SelectValue placeholder="Select destination..." /></SelectTrigger>
+                                <SelectContent>
+                                    {target.type === 'zone' && warehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id} disabled={w.id === target.currentParentId}>
+                                            <div className="flex items-center gap-2">
+                                                <Warehouse className="h-4 w-4 text-blue-600" />
+                                                {w.name}
+                                                {w.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+
+                                    {target.type === 'rack' && Object.entries(groupedZoneOptions).map(([warehouseName, zones]) => (
+                                        <SelectGroup key={warehouseName}>
+                                            <SelectLabel className="flex items-center gap-2"><Warehouse className="h-3 w-3" />{warehouseName}</SelectLabel>
+                                            {zones.map((z) => (
+                                                <SelectItem key={z.id} value={z.id} disabled={z.id === target.currentParentId}>
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin className="h-4 w-4 text-emerald-600" />
+                                                        {z.name} {z.code && <code className="text-xs">({z.code})</code>}
+                                                        {z.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    ))}
+
+                                    {target.type === 'shelf' && Object.entries(groupedRackOptions).map(([path, racks]) => (
+                                        <SelectGroup key={path}>
+                                            <SelectLabel className="text-xs">{path}</SelectLabel>
+                                            {racks.map((r) => (
+                                                <SelectItem key={r.id} value={r.id} disabled={r.id === target.currentParentId}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Grid3X3 className="h-4 w-4 text-amber-600" />
+                                                        {r.name} {r.code && <code className="text-xs">({r.code})</code>}
+                                                        {r.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleMove} disabled={isSubmitting || !selectedId || selectedId === target.currentParentId}>
+                        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Move
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ============================================================
 // MAIN PAGE COMPONENT
 // ============================================================
 
@@ -893,17 +1125,15 @@ export default function WarehousePage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
+    const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+    const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
+
     // Fetch functions
     const fetchWarehouses = useCallback(async () => {
         setIsLoading(true);
         try {
             const idToken = await user?.getIdToken();
-            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                },
-            });
+            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, { headers: { Authorization: `Bearer ${idToken}` } });
             if (!res.ok) throw new Error('Failed to fetch warehouses');
             const data = await res.json();
             setWarehouses(data.warehouses || []);
@@ -912,21 +1142,15 @@ export default function WarehousePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [businessId, toast]);
+    }, [businessId, toast, user]);
 
     useEffect(() => { fetchWarehouses(); }, [fetchWarehouses]);
 
-    const fetchZones = async (warehouseId: string, force = false) => {
-        // if (zones[warehouseId] && !force) return;
+    const fetchZones = async (warehouseId: string) => {
         setLoadingZones((prev) => new Set(prev).add(warehouseId));
         try {
             const idToken = await user?.getIdToken();
-            const res = await fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                }
-            });
+            const res = await fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`, { headers: { Authorization: `Bearer ${idToken}` } });
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             setZones((prev) => ({ ...prev, [warehouseId]: data.zones || [] }));
@@ -934,17 +1158,11 @@ export default function WarehousePage() {
         finally { setLoadingZones((prev) => { const n = new Set(prev); n.delete(warehouseId); return n; }); }
     };
 
-    const fetchRacks = async (zoneId: string, force = false) => {
-        // if (racks[zoneId] && !force) return;
+    const fetchRacks = async (zoneId: string) => {
         setLoadingRacks((prev) => new Set(prev).add(zoneId));
         try {
             const idToken = await user?.getIdToken();
-            const res = await fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                }
-            });
+            const res = await fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`, { headers: { Authorization: `Bearer ${idToken}` } });
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             setRacks((prev) => ({ ...prev, [zoneId]: data.racks || [] }));
@@ -952,17 +1170,11 @@ export default function WarehousePage() {
         finally { setLoadingRacks((prev) => { const n = new Set(prev); n.delete(zoneId); return n; }); }
     };
 
-    const fetchShelves = async (rackId: string, force = false) => {
-        // if (shelves[rackId] && !force) return;
+    const fetchShelves = async (rackId: string) => {
         setLoadingShelves((prev) => new Set(prev).add(rackId));
         try {
             const idToken = await user?.getIdToken();
-            const res = await fetch(`/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                }
-            });
+            const res = await fetch(`/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`, { headers: { Authorization: `Bearer ${idToken}` } });
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             setShelves((prev) => ({ ...prev, [rackId]: data.shelves || [] }));
@@ -970,17 +1182,11 @@ export default function WarehousePage() {
         finally { setLoadingShelves((prev) => { const n = new Set(prev); n.delete(rackId); return n; }); }
     };
 
-    const fetchPlacements = async (shelfId: string, force = false) => {
-        // if (placements[shelfId] && !force) return;
+    const fetchPlacements = async (shelfId: string) => {
         setLoadingPlacements((prev) => new Set(prev).add(shelfId));
         try {
             const idToken = await user?.getIdToken();
-            const res = await fetch(`/api/business/warehouse/list-placements?businessId=${businessId}&shelfId=${shelfId}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                }
-            });
+            const res = await fetch(`/api/business/warehouse/list-placements?businessId=${businessId}&shelfId=${shelfId}`, { headers: { Authorization: `Bearer ${idToken}` } });
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             setPlacements((prev) => ({ ...prev, [shelfId]: data.placements || [] }));
@@ -989,29 +1195,10 @@ export default function WarehousePage() {
     };
 
     // Toggle functions
-    const toggleWarehouse = (id: string) => {
-        const expanding = !expandedWarehouses.has(id);
-        setExpandedWarehouses((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-        if (expanding) fetchZones(id);
-    };
-
-    const toggleZone = (id: string) => {
-        const expanding = !expandedZones.has(id);
-        setExpandedZones((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-        if (expanding) fetchRacks(id);
-    };
-
-    const toggleRack = (id: string) => {
-        const expanding = !expandedRacks.has(id);
-        setExpandedRacks((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-        if (expanding) fetchShelves(id);
-    };
-
-    const toggleShelf = (id: string) => {
-        const expanding = !expandedShelves.has(id);
-        setExpandedShelves((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-        if (expanding) fetchPlacements(id);
-    };
+    const toggleWarehouse = (id: string) => { const expanding = !expandedWarehouses.has(id); setExpandedWarehouses((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchZones(id); };
+    const toggleZone = (id: string) => { const expanding = !expandedZones.has(id); setExpandedZones((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchRacks(id); };
+    const toggleRack = (id: string) => { const expanding = !expandedRacks.has(id); setExpandedRacks((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchShelves(id); };
+    const toggleShelf = (id: string) => { const expanding = !expandedShelves.has(id); setExpandedShelves((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchPlacements(id); };
 
     // Dialog handlers
     const handleAddWarehouse = () => { setEditWarehouse(null); setWarehouseDialogOpen(true); };
@@ -1021,33 +1208,37 @@ export default function WarehousePage() {
     const handleAddZone = (w: WarehouseData) => { setEditZone(null); setZoneParent({ warehouseId: w.id, warehouseName: w.name }); setZoneDialogOpen(true); };
     const handleEditZone = (z: ZoneData) => { setEditZone(z); setZoneParent({ warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setZoneDialogOpen(true); };
     const handleDeleteZone = (z: ZoneData) => { setDeleteTarget({ type: 'zone', id: z.id, name: z.name, hasChildren: z.stats.totalRacks > 0, childCount: z.stats.totalRacks }); setDeleteDialogOpen(true); };
+    const handleMoveZone = (z: ZoneData) => { setMoveTarget({ type: 'zone', id: z.id, name: z.name, currentParentId: z.warehouseId, currentParentName: z.warehouseName }); setMoveDialogOpen(true); };
 
     const handleAddRack = (z: ZoneData) => { setEditRack(null); setRackParent({ zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setRackDialogOpen(true); };
     const handleEditRack = (r: RackData) => { setEditRack(r); setRackParent({ zoneId: r.zoneId, zoneName: r.zoneName, warehouseId: r.warehouseId, warehouseName: r.warehouseName }); setRackDialogOpen(true); };
     const handleDeleteRack = (r: RackData) => { setDeleteTarget({ type: 'rack', id: r.id, name: r.name, hasChildren: r.stats.totalShelves > 0, childCount: r.stats.totalShelves }); setDeleteDialogOpen(true); };
+    const handleMoveRack = (r: RackData) => { setMoveTarget({ type: 'rack', id: r.id, name: r.name, currentParentId: r.zoneId, currentParentName: r.zoneName }); setMoveDialogOpen(true); };
 
     const handleAddShelf = (r: RackData, z: ZoneData) => { setEditShelf(null); setShelfParent({ rackId: r.id, rackName: r.name, zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setShelfDialogOpen(true); };
     const handleEditShelf = (s: ShelfData) => { setEditShelf(s); setShelfParent({ rackId: s.rackId, rackName: s.rackName, zoneId: s.zoneId, zoneName: s.zoneName, warehouseId: s.warehouseId, warehouseName: s.warehouseName }); setShelfDialogOpen(true); };
     const handleDeleteShelf = (s: ShelfData) => { setDeleteTarget({ type: 'shelf', id: s.id, name: s.name, hasChildren: s.stats.totalProducts > 0, childCount: s.stats.totalProducts }); setDeleteDialogOpen(true); };
+    const handleMoveShelf = (s: ShelfData) => { setMoveTarget({ type: 'shelf', id: s.id, name: s.name, currentParentId: s.rackId, currentParentName: s.rackName }); setMoveDialogOpen(true); };
 
     // Success handlers
     const handleWarehouseSuccess = () => fetchWarehouses();
-    const handleZoneSuccess = () => { if (zoneParent) { fetchZones(zoneParent.warehouseId, true); fetchWarehouses(); } };
-    const handleRackSuccess = () => { if (rackParent) { fetchRacks(rackParent.zoneId, true); fetchZones(rackParent.warehouseId, true); fetchWarehouses(); } };
-    const handleShelfSuccess = () => { if (shelfParent) { fetchShelves(shelfParent.rackId, true); fetchRacks(shelfParent.zoneId, true); fetchZones(shelfParent.warehouseId, true); fetchWarehouses(); } };
+    const handleZoneSuccess = () => { if (zoneParent) { fetchZones(zoneParent.warehouseId); fetchWarehouses(); } };
+    const handleRackSuccess = () => { if (rackParent) { fetchRacks(rackParent.zoneId); fetchZones(rackParent.warehouseId); fetchWarehouses(); } };
+    const handleShelfSuccess = () => { if (shelfParent) { fetchShelves(shelfParent.rackId); fetchRacks(shelfParent.zoneId); fetchZones(shelfParent.warehouseId); fetchWarehouses(); } };
     const handleDeleteSuccess = () => {
         fetchWarehouses();
         if (deleteTarget?.type === 'zone') {
             const z = Object.values(zones).flat().find(x => x.id === deleteTarget.id);
-            if (z) fetchZones(z.warehouseId, true);
+            if (z) fetchZones(z.warehouseId);
         } else if (deleteTarget?.type === 'rack') {
             const r = Object.values(racks).flat().find(x => x.id === deleteTarget.id);
-            if (r) { fetchRacks(r.zoneId, true); const z = Object.values(zones).flat().find(x => x.id === r.zoneId); if (z) fetchZones(z.warehouseId, true); }
+            if (r) { fetchRacks(r.zoneId); const z = Object.values(zones).flat().find(x => x.id === r.zoneId); if (z) fetchZones(z.warehouseId); }
         } else if (deleteTarget?.type === 'shelf') {
             const s = Object.values(shelves).flat().find(x => x.id === deleteTarget.id);
-            if (s) { fetchShelves(s.rackId, true); const r = Object.values(racks).flat().find(x => x.id === s.rackId); if (r) { fetchRacks(r.zoneId, true); const z = Object.values(zones).flat().find(x => x.id === r.zoneId); if (z) fetchZones(z.warehouseId, true); } }
+            if (s) { fetchShelves(s.rackId); const r = Object.values(racks).flat().find(x => x.id === s.rackId); if (r) { fetchRacks(r.zoneId); const z = Object.values(zones).flat().find(x => x.id === r.zoneId); if (z) fetchZones(z.warehouseId); } }
         }
     };
+    const handleMoveSuccess = () => { fetchWarehouses(); setZones({}); setRacks({}); setShelves({}); setPlacements({}); };
 
     // Filter & totals
     const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -1061,10 +1252,7 @@ export default function WarehousePage() {
                     <h1 className="text-2xl font-bold tracking-tight">Warehouse Overview</h1>
                     <p className="text-muted-foreground">Manage your warehouse locations and inventory structure</p>
                 </div>
-                <Button onClick={handleAddWarehouse}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Warehouse
-                </Button>
+                <Button onClick={handleAddWarehouse}><Plus className="h-4 w-4 mr-2" />Add Warehouse</Button>
             </div>
 
             {/* Stats */}
@@ -1079,13 +1267,8 @@ export default function WarehousePage() {
                     <Card key={stat.label}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className={cn('p-2 rounded-lg', stat.bg)}>
-                                    <stat.icon className={cn('h-5 w-5', stat.color)} />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{stat.value}</p>
-                                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                                </div>
+                                <div className={cn('p-2 rounded-lg', stat.bg)}><stat.icon className={cn('h-5 w-5', stat.color)} /></div>
+                                <div><p className="text-2xl font-bold">{stat.value}</p><p className="text-xs text-muted-foreground">{stat.label}</p></div>
                             </div>
                         </CardContent>
                     </Card>
@@ -1097,42 +1280,25 @@ export default function WarehousePage() {
                 <CardHeader className="border-b">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10">
-                                <FolderTree className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <CardTitle>Warehouse Structure</CardTitle>
-                                <CardDescription>Click to expand, use menu for actions</CardDescription>
-                            </div>
+                            <div className="p-2 rounded-lg bg-primary/10"><FolderTree className="h-5 w-5 text-primary" /></div>
+                            <div><CardTitle>Warehouse Structure</CardTitle><CardDescription>Click to expand, use menu for actions</CardDescription></div>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="Search warehouses..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 w-[200px]" />
                             </div>
-                            <Button variant="outline" size="icon" onClick={fetchWarehouses} disabled={isLoading}>
-                                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                            </Button>
+                            <Button variant="outline" size="icon" onClick={fetchWarehouses} disabled={isLoading}><RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} /></Button>
                         </div>
                     </div>
                 </CardHeader>
 
                 <CardContent className="p-0">
                     {isLoading ? (
-                        <div className="p-4 space-y-3">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="flex items-center gap-3 p-3">
-                                    <Skeleton className="h-5 w-5 rounded" />
-                                    <Skeleton className="h-8 w-8 rounded-md" />
-                                    <Skeleton className="h-4 w-48" />
-                                </div>
-                            ))}
-                        </div>
+                        <div className="p-4 space-y-3">{[1, 2, 3].map((i) => (<div key={i} className="flex items-center gap-3 p-3"><Skeleton className="h-5 w-5 rounded" /><Skeleton className="h-8 w-8 rounded-md" /><Skeleton className="h-4 w-48" /></div>))}</div>
                     ) : filteredWarehouses.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 px-4">
-                            <div className="p-4 rounded-full bg-muted mb-4">
-                                <PackageOpen className="h-10 w-10 text-muted-foreground" />
-                            </div>
+                            <div className="p-4 rounded-full bg-muted mb-4"><PackageOpen className="h-10 w-10 text-muted-foreground" /></div>
                             <h3 className="text-lg font-semibold mb-1">No warehouses found</h3>
                             <p className="text-muted-foreground text-center mb-4">{searchQuery ? 'Try a different search term' : 'Create your first warehouse to get started'}</p>
                             {!searchQuery && <Button onClick={handleAddWarehouse}><Plus className="h-4 w-4 mr-2" />Create Warehouse</Button>}
@@ -1140,78 +1306,13 @@ export default function WarehousePage() {
                     ) : (
                         <div className="py-2">
                             {filteredWarehouses.map((warehouse) => (
-                                <TreeNode
-                                    key={warehouse.id}
-                                    level={0}
-                                    icon={Warehouse}
-                                    iconColor="text-blue-600"
-                                    bgColor="bg-blue-500/10"
-                                    label={warehouse.name}
-                                    stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]}
-                                    isExpanded={expandedWarehouses.has(warehouse.id)}
-                                    isLoading={loadingZones.has(warehouse.id)}
-                                    hasChildren={true}
-                                    onToggle={() => toggleWarehouse(warehouse.id)}
-                                    onAdd={() => handleAddZone(warehouse)}
-                                    addLabel="Add Zone"
-                                    onEdit={() => handleEditWarehouse(warehouse)}
-                                    onDelete={() => handleDeleteWarehouse(warehouse)}
-                                >
+                                <TreeNode key={warehouse.id} level={0} icon={Warehouse} iconColor="text-blue-600" bgColor="bg-blue-500/10" label={warehouse.name} stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]} isExpanded={expandedWarehouses.has(warehouse.id)} isLoading={loadingZones.has(warehouse.id)} hasChildren={true} onToggle={() => toggleWarehouse(warehouse.id)} onAdd={() => handleAddZone(warehouse)} addLabel="Add Zone" onEdit={() => handleEditWarehouse(warehouse)} onDelete={() => handleDeleteWarehouse(warehouse)}>
                                     {zones[warehouse.id]?.map((zone) => (
-                                        <TreeNode
-                                            key={zone.id}
-                                            level={1}
-                                            icon={MapPin}
-                                            iconColor="text-emerald-600"
-                                            bgColor="bg-emerald-500/10"
-                                            label={zone.name}
-                                            code={zone.code}
-                                            stats={[{ label: 'racks', value: zone.stats.totalRacks }, { label: 'products', value: zone.stats.totalProducts }]}
-                                            isExpanded={expandedZones.has(zone.id)}
-                                            isLoading={loadingRacks.has(zone.id)}
-                                            hasChildren={true}
-                                            onToggle={() => toggleZone(zone.id)}
-                                            onAdd={() => handleAddRack(zone)}
-                                            addLabel="Add Rack"
-                                            onEdit={() => handleEditZone(zone)}
-                                            onDelete={() => handleDeleteZone(zone)}
-                                        >
+                                        <TreeNode key={zone.id} level={1} icon={MapPin} iconColor="text-emerald-600" bgColor="bg-emerald-500/10" label={zone.name} code={zone.code} stats={[{ label: 'racks', value: zone.stats.totalRacks }, { label: 'products', value: zone.stats.totalProducts }]} isExpanded={expandedZones.has(zone.id)} isLoading={loadingRacks.has(zone.id)} hasChildren={true} onToggle={() => toggleZone(zone.id)} onAdd={() => handleAddRack(zone)} addLabel="Add Rack" onEdit={() => handleEditZone(zone)} onMove={() => handleMoveZone(zone)} onDelete={() => handleDeleteZone(zone)}>
                                             {racks[zone.id]?.map((rack) => (
-                                                <TreeNode
-                                                    key={rack.id}
-                                                    level={2}
-                                                    icon={Grid3X3}
-                                                    iconColor="text-amber-600"
-                                                    bgColor="bg-amber-500/10"
-                                                    label={rack.name}
-                                                    code={rack.code}
-                                                    stats={[{ label: 'shelves', value: rack.stats.totalShelves }, { label: 'products', value: rack.stats.totalProducts }]}
-                                                    isExpanded={expandedRacks.has(rack.id)}
-                                                    isLoading={loadingShelves.has(rack.id)}
-                                                    hasChildren={true}
-                                                    onToggle={() => toggleRack(rack.id)}
-                                                    onAdd={() => handleAddShelf(rack, zone)}
-                                                    addLabel="Add Shelf"
-                                                    onEdit={() => handleEditRack(rack)}
-                                                    onDelete={() => handleDeleteRack(rack)}
-                                                >
+                                                <TreeNode key={rack.id} level={2} icon={Grid3X3} iconColor="text-amber-600" bgColor="bg-amber-500/10" label={rack.name} code={rack.code} stats={[{ label: 'shelves', value: rack.stats.totalShelves }, { label: 'products', value: rack.stats.totalProducts }]} isExpanded={expandedRacks.has(rack.id)} isLoading={loadingShelves.has(rack.id)} hasChildren={true} onToggle={() => toggleRack(rack.id)} onAdd={() => handleAddShelf(rack, zone)} addLabel="Add Shelf" onEdit={() => handleEditRack(rack)} onMove={() => handleMoveRack(rack)} onDelete={() => handleDeleteRack(rack)}>
                                                     {shelves[rack.id]?.map((shelf) => (
-                                                        <TreeNode
-                                                            key={shelf.id}
-                                                            level={3}
-                                                            icon={Layers}
-                                                            iconColor="text-purple-600"
-                                                            bgColor="bg-purple-500/10"
-                                                            label={shelf.name}
-                                                            code={shelf.code}
-                                                            stats={[{ label: 'products', value: shelf.stats.totalProducts }]}
-                                                            isExpanded={expandedShelves.has(shelf.id)}
-                                                            isLoading={loadingPlacements.has(shelf.id)}
-                                                            hasChildren={shelf.stats.totalProducts > 0}
-                                                            onToggle={() => toggleShelf(shelf.id)}
-                                                            onEdit={() => handleEditShelf(shelf)}
-                                                            onDelete={() => handleDeleteShelf(shelf)}
-                                                        >
+                                                        <TreeNode key={shelf.id} level={3} icon={Layers} iconColor="text-purple-600" bgColor="bg-purple-500/10" label={shelf.name} code={shelf.code} stats={[{ label: 'products', value: shelf.stats.totalProducts }]} isExpanded={expandedShelves.has(shelf.id)} isLoading={loadingPlacements.has(shelf.id)} hasChildren={shelf.stats.totalProducts > 0} onToggle={() => toggleShelf(shelf.id)} onEdit={() => handleEditShelf(shelf)} onMove={() => handleMoveShelf(shelf)} onDelete={() => handleDeleteShelf(shelf)}>
                                                             {placements[shelf.id]?.map((p) => <PlacementRow key={p.id} placement={p} level={4} />)}
                                                             {placements[shelf.id]?.length === 0 && <div className="py-3 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: `${4 * 20 + 12}px` }}>No products</div>}
                                                         </TreeNode>
@@ -1236,6 +1337,7 @@ export default function WarehousePage() {
             {rackParent && <RackDialog open={rackDialogOpen} onOpenChange={setRackDialogOpen} onSuccess={handleRackSuccess} businessId={businessId} zoneId={rackParent.zoneId} zoneName={rackParent.zoneName} warehouseId={rackParent.warehouseId} warehouseName={rackParent.warehouseName} editData={editRack} user={user} />}
             {shelfParent && <ShelfDialog open={shelfDialogOpen} onOpenChange={setShelfDialogOpen} onSuccess={handleShelfSuccess} businessId={businessId} rackId={shelfParent.rackId} rackName={shelfParent.rackName} zoneId={shelfParent.zoneId} zoneName={shelfParent.zoneName} warehouseId={shelfParent.warehouseId} warehouseName={shelfParent.warehouseName} editData={editShelf} user={user} />}
             <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onSuccess={handleDeleteSuccess} businessId={businessId} target={deleteTarget} user={user} />
+            <MoveDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen} onSuccess={handleMoveSuccess} businessId={businessId} target={moveTarget} warehouses={warehouses} user={user} />
         </div>
     );
 }

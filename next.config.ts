@@ -310,6 +310,18 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/update-shelf/route',
       },
       {
+        source: '/api/business/warehouse/move-zone',
+        destination: '/api/business/warehouse/move-zone/route',
+      },
+      {
+        source: '/api/business/warehouse/move-rack',
+        destination: '/api/business/warehouse/move-rack/route',
+      },
+      {
+        source: '/api/business/warehouse/move-shelf',
+        destination: '/api/business/warehouse/move-shelf/route',
+      },
+      {
         source: '/api/business/warehouse/delete-warehouse',
         destination: '/api/business/warehouse/delete-warehouse/route',
       },

@@ -1,7 +1,7 @@
 // /business/[businessId]/warehouse/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, use } from 'react';
 import { useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,6 +55,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
+import { User } from 'firebase/auth';
 
 // ============================================================
 // TYPES
@@ -312,6 +313,7 @@ interface CreateWarehouseDialogProps {
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void;
     businessId: string;
+    user: User | null | undefined;
 }
 
 function CreateWarehouseDialog({
@@ -319,6 +321,7 @@ function CreateWarehouseDialog({
     onOpenChange,
     onSuccess,
     businessId,
+    user,
 }: CreateWarehouseDialogProps) {
     const [name, setName] = useState('');
     const [address, setAddress] = useState('');
@@ -331,9 +334,13 @@ function CreateWarehouseDialog({
 
         setIsSubmitting(true);
         try {
+            const idToken = await user?.getIdToken();
             const res = await fetch('/api/business/warehouse/create-warehouse', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({ businessId, name, address }),
             });
 
@@ -421,9 +428,8 @@ function CreateWarehouseDialog({
 // ============================================================
 
 export default function WarehousePage() {
-    const params = useParams();
-    const businessId = params.businessId as string;
     const { toast } = useToast();
+    const { user, businessId } = useBusinessContext();
 
     // State
     const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
@@ -453,7 +459,13 @@ export default function WarehousePage() {
     const fetchWarehouses = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`);
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             const data = await res.json();
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to fetch warehouses');
@@ -480,9 +492,13 @@ export default function WarehousePage() {
 
         setLoadingZones((prev) => new Set(prev).add(warehouseId));
         try {
-            const res = await fetch(
-                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`
-            );
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             if (!res.ok) throw new Error('Failed to fetch zones');
             const data = await res.json();
             setZones((prev) => ({ ...prev, [warehouseId]: data.zones || [] }));
@@ -503,9 +519,13 @@ export default function WarehousePage() {
 
         setLoadingRacks((prev) => new Set(prev).add(zoneId));
         try {
-            const res = await fetch(
-                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`
-            );
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             if (!res.ok) throw new Error('Failed to fetch racks');
             const data = await res.json();
             setRacks((prev) => ({ ...prev, [zoneId]: data.racks || [] }));
@@ -526,9 +546,13 @@ export default function WarehousePage() {
 
         setLoadingShelves((prev) => new Set(prev).add(rackId));
         try {
-            const res = await fetch(
-                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`
-            );
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             if (!res.ok) throw new Error('Failed to fetch shelves');
             const data = await res.json();
             setShelves((prev) => ({ ...prev, [rackId]: data.shelves || [] }));
@@ -549,9 +573,13 @@ export default function WarehousePage() {
 
         setLoadingPlacements((prev) => new Set(prev).add(shelfId));
         try {
-            const res = await fetch(
-                `/api/business/warehouse/list-placements?businessId=${businessId}&shelfId=${shelfId}`
-            );
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-placements?businessId=${businessId}&shelfId=${shelfId}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
             if (!res.ok) throw new Error('Failed to fetch placements');
             const data = await res.json();
             setPlacements((prev) => ({ ...prev, [shelfId]: data.placements || [] }));
@@ -903,6 +931,7 @@ export default function WarehousePage() {
                 onOpenChange={setCreateDialogOpen}
                 onSuccess={fetchWarehouses}
                 businessId={businessId}
+                user={user}
             />
         </div>
     );

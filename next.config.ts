@@ -286,6 +286,14 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/list-placements/route',
       },
       {
+        source: '/api/business/warehouse/list-movements',
+        destination: '/api/business/warehouse/list-movements/route',
+      },
+      {
+        source: '/api/business/warehouse/list-logs',
+        destination: '/api/business/warehouse/list-logs/route',
+      },
+      {
         source: '/api/business/warehouse/update-warehouse',
         destination: '/api/business/warehouse/update-warehouse/route',
       },

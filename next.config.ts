@@ -254,6 +254,18 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/create-warehouse/route',
       },
       {
+        source: '/api/business/warehouse/create-zone',
+        destination: '/api/business/warehouse/create-zone/route',
+      },
+      {
+        source: '/api/business/warehouse/create-rack',
+        destination: '/api/business/warehouse/create-rack/route',
+      },
+      {
+        source: '/api/business/warehouse/create-shelf',
+        destination: '/api/business/warehouse/create-shelf/route',
+      },
+      {
         source: '/api/business/warehouse/list-warehouses',
         destination: '/api/business/warehouse/list-warehouses/route',
       },
@@ -272,6 +284,38 @@ const nextConfig: NextConfig = {
       {
         source: '/api/business/warehouse/list-placements',
         destination: '/api/business/warehouse/list-placements/route',
+      },
+      {
+        source: '/api/business/warehouse/update-warehouse',
+        destination: '/api/business/warehouse/update-warehouse/route',
+      },
+      {
+        source: '/api/business/warehouse/update-zone',
+        destination: '/api/business/warehouse/update-zone/route',
+      },
+      {
+        source: '/api/business/warehouse/update-rack',
+        destination: '/api/business/warehouse/update-rack/route',
+      },
+      {
+        source: '/api/business/warehouse/update-shelf',
+        destination: '/api/business/warehouse/update-shelf/route',
+      },
+      {
+        source: '/api/business/warehouse/delete-warehouse',
+        destination: '/api/business/warehouse/delete-warehouse/route',
+      },
+      {
+        source: '/api/business/warehouse/delete-zone',
+        destination: '/api/business/warehouse/delete-zone/route',
+      },
+      {
+        source: '/api/business/warehouse/delete-rack',
+        destination: '/api/business/warehouse/delete-rack/route',
+      },
+      {
+        source: '/api/business/warehouse/delete-shelf',
+        destination: '/api/business/warehouse/delete-shelf/route',
       },
       {
         source: '/api/public/join-business/[sessionId]',

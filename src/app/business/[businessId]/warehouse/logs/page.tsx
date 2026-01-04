@@ -110,12 +110,18 @@ function formatChanges(changes: Record<string, { from: any; to: any }>): string[
 
 function LogItem({ log }: { log: LogEntry }) {
     const [isOpen, setIsOpen] = useState(false);
-    const entity = entityConfig[log.entityType];
-    const action = actionConfig[log.type] || { icon: History, color: 'text-muted-foreground', label: log.type };
-    const EntityIcon = entity.icon;
-    const ActionIcon = action.icon;
+    const entity = entityConfig[log.entityType] || entityConfig.zone;
+    const action = actionConfig[log.type] ?? { icon: History, color: 'text-muted-foreground', label: log.type || 'Unknown' };
+    const EntityIcon = entity?.icon || MapPin;
+    const ActionIcon = action?.icon || History;
 
     const hasDetails = log.changes || log.fromLocation || log.toLocation || log.quantity !== undefined;
+
+    const entityColor = entity?.color || 'text-muted-foreground';
+    const entityBg = entity?.bg || 'bg-muted';
+    const entityLabel = entity?.label || log.entityType || 'Item';
+    const actionColor = action?.color || 'text-muted-foreground';
+    const actionLabel = action?.label || log.type || 'Action';
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -126,8 +132,8 @@ function LogItem({ log }: { log: LogEntry }) {
                 <CollapsibleTrigger asChild>
                     <button className="w-full p-4 flex items-start gap-4 text-left hover:bg-muted/50 transition-colors">
                         {/* Entity Icon */}
-                        <div className={cn('p-2 rounded-lg shrink-0', entity.bg)}>
-                            <EntityIcon className={cn('h-5 w-5', entity.color)} />
+                        <div className={cn('p-2 rounded-lg shrink-0', entityBg)}>
+                            <EntityIcon className={cn('h-5 w-5', entityColor)} />
                         </div>
 
                         {/* Content */}
@@ -135,11 +141,11 @@ function LogItem({ log }: { log: LogEntry }) {
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium">{log.entityName}</span>
                                 <Badge variant="secondary" className="text-xs">
-                                    {entity.label}
+                                    {entityLabel}
                                 </Badge>
-                                <Badge variant="outline" className={cn('text-xs', action.color)}>
+                                <Badge variant="outline" className={cn('text-xs', actionColor)}>
                                     <ActionIcon className="h-3 w-3 mr-1" />
-                                    {action.label}
+                                    {actionLabel}
                                 </Badge>
                             </div>
 

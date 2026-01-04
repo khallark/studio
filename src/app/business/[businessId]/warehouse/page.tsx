@@ -917,7 +917,7 @@ export default function WarehousePage() {
     useEffect(() => { fetchWarehouses(); }, [fetchWarehouses]);
 
     const fetchZones = async (warehouseId: string, force = false) => {
-        if (zones[warehouseId] && !force) return;
+        // if (zones[warehouseId] && !force) return;
         setLoadingZones((prev) => new Set(prev).add(warehouseId));
         try {
             const idToken = await user?.getIdToken();
@@ -935,7 +935,7 @@ export default function WarehousePage() {
     };
 
     const fetchRacks = async (zoneId: string, force = false) => {
-        if (racks[zoneId] && !force) return;
+        // if (racks[zoneId] && !force) return;
         setLoadingRacks((prev) => new Set(prev).add(zoneId));
         try {
             const idToken = await user?.getIdToken();
@@ -953,7 +953,7 @@ export default function WarehousePage() {
     };
 
     const fetchShelves = async (rackId: string, force = false) => {
-        if (shelves[rackId] && !force) return;
+        // if (shelves[rackId] && !force) return;
         setLoadingShelves((prev) => new Set(prev).add(rackId));
         try {
             const idToken = await user?.getIdToken();
@@ -971,7 +971,7 @@ export default function WarehousePage() {
     };
 
     const fetchPlacements = async (shelfId: string, force = false) => {
-        if (placements[shelfId] && !force) return;
+        // if (placements[shelfId] && !force) return;
         setLoadingPlacements((prev) => new Set(prev).add(shelfId));
         try {
             const idToken = await user?.getIdToken();

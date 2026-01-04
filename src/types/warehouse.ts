@@ -2,8 +2,6 @@
 
 import { Timestamp } from "firebase-admin/firestore";
 
-import { Timestamp } from "firebase-admin/firestore";
-
 // /{businessId}/warehouses/{warehouseId}
 export interface Warehouse {
     id: string;

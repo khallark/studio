@@ -454,7 +454,7 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
         setIsSubmitting(true);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-zone' : '/api/business/warehouse/create-zone';
-            const idToken = user?.getIdToken();
+            const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: {

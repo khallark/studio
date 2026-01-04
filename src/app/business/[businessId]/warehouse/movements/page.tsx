@@ -151,7 +151,7 @@ export default function MovementsPage() {
             if (searchQuery) params.append('productSKU', searchQuery);
             if (loadMore && lastId) params.append('startAfter', lastId);
 
-            const idToken = user?.getIdToken();
+            const idToken = await user?.getIdToken();
             const res = await fetch(`/api/business/warehouse/list-movements?${params}`, {
                 method: 'GET',
                 headers: {

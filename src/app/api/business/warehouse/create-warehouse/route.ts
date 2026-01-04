@@ -1,7 +1,7 @@
 // /api/business/warehouse/create-warehouse/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { db } from '@/lib/firebase-admin';
 import { Warehouse } from '@/types/warehouse';
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create warehouse document
-        const warehouseRef = db.collection(`${businessId}/warehouses`).doc();
+        const warehouseRef = db.collection(`users/${businessId}/warehouses`).doc();
         const now = Timestamp.now();
 
         const warehouseData: Warehouse = {

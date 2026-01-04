@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch racks for the zone
         const racksSnapshot = await db
-            .collection(`${businessId}/racks`)
+            .collection(`users/${businessId}/racks`)
             .where('zoneId', '==', zoneId)
             .where('isDeleted', '==', false)
             .orderBy('position', 'asc')

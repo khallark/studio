@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch shelves for the rack
         const shelvesSnapshot = await db
-            .collection(`${businessId}/shelves`)
+            .collection(`users/${businessId}/shelves`)
             .where('rackId', '==', rackId)
             .where('isDeleted', '==', false)
             .orderBy('position', 'asc')

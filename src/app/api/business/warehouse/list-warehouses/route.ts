@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch warehouses
         const warehousesSnapshot = await db
-            .collection(`${businessId}/warehouses`)
+            .collection(`users/${businessId}/warehouses`)
             .where('isDeleted', '==', false)
             .orderBy('name', 'asc')
             .get();

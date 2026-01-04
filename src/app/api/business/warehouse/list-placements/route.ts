@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch placements for the shelf
         const placementsSnapshot = await db
-            .collection(`${businessId}/placements`)
+            .collection(`users/${businessId}/placements`)
             .where('shelfId', '==', shelfId)
             .orderBy('productSKU', 'asc')
             .get();

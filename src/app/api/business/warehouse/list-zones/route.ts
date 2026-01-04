@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch zones for the warehouse
         const zonesSnapshot = await db
-            .collection(`${businessId}/zones`)
+            .collection(`users/${businessId}/zones`)
             .where('warehouseId', '==', warehouseId)
             .where('isDeleted', '==', false)
             .orderBy('name', 'asc')

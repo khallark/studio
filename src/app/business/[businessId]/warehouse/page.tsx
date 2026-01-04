@@ -454,8 +454,10 @@ export default function WarehousePage() {
         setIsLoading(true);
         try {
             const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`);
-            if (!res.ok) throw new Error('Failed to fetch warehouses');
             const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to fetch warehouses');
+            }
             setWarehouses(data.warehouses || []);
         } catch (error) {
             toast({

@@ -91,9 +91,9 @@ export async function POST(request: NextRequest) {
             updatedBy: userId,
             deletedAt: null,
             stats: {
-                totalZones: totalZones,
-                totalRacks: totalRacks,
-                totalShelves: totalShelves,
+                totalZones: 0,
+                totalRacks: 0,
+                totalShelves: 0,
                 totalProducts: 0,
             },
         };
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
                 warehouseName: trimmedName,
                 deletedAt: null,
                 stats: {
-                    totalRacks: racks,
-                    totalShelves: racks * shelves,
+                    totalRacks: 0,
+                    totalShelves: 0,
                     totalProducts: 0,
                 },
             }
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
                     zoneName: zoneName,
                     deletedAt: null,
                     stats: {
-                        totalShelves: shelves,
+                        totalShelves: 0,
                         totalProducts: 0,
                     },
                 }

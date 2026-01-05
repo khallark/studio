@@ -22,6 +22,7 @@ import {
     FolderTree,
     AlertTriangle,
     MoveRight,
+    Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,15 +60,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-    SelectGroup,
-    SelectLabel,
-} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -169,26 +161,13 @@ interface MoveTarget {
     type: 'zone' | 'rack' | 'shelf';
     id: string;
     name: string;
-    currentParentId: string;
-    currentParentName: string;
-}
-
-interface ZoneOption {
-    id: string;
-    name: string;
-    code: string;
+    // Current location info
     warehouseId: string;
     warehouseName: string;
-}
-
-interface RackOption {
-    id: string;
-    name: string;
-    code: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
+    zoneId?: string;
+    zoneName?: string;
+    rackId?: string;
+    rackName?: string;
 }
 
 // ============================================================
@@ -872,7 +851,7 @@ function DeleteDialog({ open, onOpenChange, onSuccess, businessId, target, user 
 }
 
 // ============================================================
-// MOVE DIALOG
+// MOVE DIALOG - Tree-based selection
 // ============================================================
 
 interface MoveDialogProps {
@@ -881,57 +860,180 @@ interface MoveDialogProps {
     onSuccess: () => void;
     businessId: string;
     target: MoveTarget | null;
-    warehouses: WarehouseData[];
     user: User | null | undefined;
 }
 
-function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, warehouses, user }: MoveDialogProps) {
-    const [selectedId, setSelectedId] = useState('');
+function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }: MoveDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
-    const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
-    const [rackOptions, setRackOptions] = useState<RackOption[]>([]);
+    const [position, setPosition] = useState('');
     const { toast } = useToast();
 
+    // Tree data
+    const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
+    const [zones, setZones] = useState<Record<string, ZoneData[]>>({});
+    const [racks, setRacks] = useState<Record<string, RackData[]>>({});
+
+    // Expanded state
+    const [expandedWarehouses, setExpandedWarehouses] = useState<Set<string>>(new Set());
+    const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+
+    // Loading state
+    const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
+    const [loadingZones, setLoadingZones] = useState<Set<string>>(new Set());
+    const [loadingRacks, setLoadingRacks] = useState<Set<string>>(new Set());
+
+    // Selection - depends on entity type
+    // Zone: select warehouse
+    // Rack: select zone
+    // Shelf: select rack
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
+
+    // Reset state when dialog opens/closes or target changes
     useEffect(() => {
-        if (!open || !target) return;
-        setSelectedId('');
+        if (open && target) {
+            setPosition('');
+            setSelectedWarehouseId(null);
+            setSelectedZoneId(null);
+            setSelectedRackId(null);
+            setExpandedWarehouses(new Set());
+            setExpandedZones(new Set());
+            fetchWarehouses();
+        }
+    }, [open, target]);
 
-        const fetchOptions = async () => {
-            setIsLoadingOptions(true);
-            try {
-                const idToken = await user?.getIdToken();
-                if (target.type === 'rack') {
-                    const res = await fetch(`/api/business/warehouse/list-all-zones?businessId=${businessId}`, {
-                        headers: { Authorization: `Bearer ${idToken}` },
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        setZoneOptions(data.zones || []);
-                    }
-                } else if (target.type === 'shelf') {
-                    const res = await fetch(`/api/business/warehouse/list-all-racks?businessId=${businessId}`, {
-                        headers: { Authorization: `Bearer ${idToken}` },
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        setRackOptions(data.racks || []);
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading options:', error);
-            } finally {
-                setIsLoadingOptions(false);
+    const fetchWarehouses = async () => {
+        setIsLoadingWarehouses(true);
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setWarehouses(data.warehouses || []);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching warehouses:', error);
+        } finally {
+            setIsLoadingWarehouses(false);
+        }
+    };
 
-        if (target.type !== 'zone') fetchOptions();
-    }, [open, target, businessId, user]);
+    const fetchZones = async (warehouseId: string) => {
+        setLoadingZones((prev) => new Set(prev).add(warehouseId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setZones((prev) => ({ ...prev, [warehouseId]: data.zones || [] }));
+            }
+        } catch (error) {
+            console.error('Error fetching zones:', error);
+        } finally {
+            setLoadingZones((prev) => { const n = new Set(prev); n.delete(warehouseId); return n; });
+        }
+    };
 
-    if (!target) return null;
+    const fetchRacks = async (zoneId: string) => {
+        setLoadingRacks((prev) => new Set(prev).add(zoneId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setRacks((prev) => ({ ...prev, [zoneId]: data.racks || [] }));
+            }
+        } catch (error) {
+            console.error('Error fetching racks:', error);
+        } finally {
+            setLoadingRacks((prev) => { const n = new Set(prev); n.delete(zoneId); return n; });
+        }
+    };
+
+    const toggleWarehouse = (warehouseId: string) => {
+        const expanding = !expandedWarehouses.has(warehouseId);
+        setExpandedWarehouses((prev) => {
+            const n = new Set(prev);
+            n.has(warehouseId) ? n.delete(warehouseId) : n.add(warehouseId);
+            return n;
+        });
+        if (expanding && !zones[warehouseId]) {
+            fetchZones(warehouseId);
+        }
+    };
+
+    const toggleZone = (zoneId: string) => {
+        const expanding = !expandedZones.has(zoneId);
+        setExpandedZones((prev) => {
+            const n = new Set(prev);
+            n.has(zoneId) ? n.delete(zoneId) : n.add(zoneId);
+            return n;
+        });
+        if (expanding && !racks[zoneId]) {
+            fetchRacks(zoneId);
+        }
+    };
+
+    // Selection handlers
+    const handleSelectWarehouse = (warehouse: WarehouseData) => {
+        if (target?.type === 'zone') {
+            // For zone move, warehouse is the final selection
+            if (warehouse.id === target.warehouseId) return; // Can't select current
+            setSelectedWarehouseId(warehouse.id);
+            setSelectedZoneId(null);
+            setSelectedRackId(null);
+        }
+    };
+
+    const handleSelectZone = (zone: ZoneData) => {
+        if (target?.type === 'rack') {
+            // For rack move, zone is the final selection
+            if (zone.id === target.zoneId) return; // Can't select current
+            setSelectedWarehouseId(zone.warehouseId);
+            setSelectedZoneId(zone.id);
+            setSelectedRackId(null);
+        }
+    };
+
+    const handleSelectRack = (rack: RackData) => {
+        if (target?.type === 'shelf') {
+            // For shelf move, rack is the final selection
+            if (rack.id === target.rackId) return; // Can't select current
+            setSelectedWarehouseId(rack.warehouseId);
+            setSelectedZoneId(rack.zoneId);
+            setSelectedRackId(rack.id);
+        }
+    };
+
+    // Get selected entity info for display and API call
+    const getSelectedInfo = () => {
+        if (target?.type === 'zone' && selectedWarehouseId) {
+            const warehouse = warehouses.find(w => w.id === selectedWarehouseId);
+            return warehouse ? { type: 'warehouse', name: warehouse.name, data: warehouse } : null;
+        }
+        if (target?.type === 'rack' && selectedZoneId) {
+            const zone = Object.values(zones).flat().find(z => z.id === selectedZoneId);
+            return zone ? { type: 'zone', name: `${zone.warehouseName} > ${zone.name}`, data: zone } : null;
+        }
+        if (target?.type === 'shelf' && selectedRackId) {
+            const rack = Object.values(racks).flat().find(r => r.id === selectedRackId);
+            return rack ? { type: 'rack', name: `${rack.warehouseName} > ${rack.zoneName} > ${rack.name}`, data: rack } : null;
+        }
+        return null;
+    };
+
+    const selectedInfo = getSelectedInfo();
+    const canSubmit = !!selectedInfo;
 
     const handleMove = async () => {
-        if (!selectedId) return;
+        if (!target || !selectedInfo) return;
 
         setIsSubmitting(true);
         try {
@@ -940,17 +1042,40 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, warehou
             let body: any = { businessId };
 
             if (target.type === 'zone') {
-                const selectedWarehouse = warehouses.find(w => w.id === selectedId);
+                const warehouse = selectedInfo.data as WarehouseData;
                 endpoint = '/api/business/warehouse/move-zone';
-                body = { ...body, zoneId: target.id, targetWarehouseId: selectedId, targetWarehouseName: selectedWarehouse?.name || '' };
+                body = {
+                    ...body,
+                    zoneId: target.id,
+                    targetWarehouseId: warehouse.id,
+                    targetWarehouseName: warehouse.name,
+                };
             } else if (target.type === 'rack') {
-                const selectedZone = zoneOptions.find(z => z.id === selectedId);
+                const zone = selectedInfo.data as ZoneData;
                 endpoint = '/api/business/warehouse/move-rack';
-                body = { ...body, rackId: target.id, targetZoneId: selectedId, targetZoneName: selectedZone?.name || '', targetWarehouseId: selectedZone?.warehouseId || '', targetWarehouseName: selectedZone?.warehouseName || '' };
+                body = {
+                    ...body,
+                    rackId: target.id,
+                    targetZoneId: zone.id,
+                    targetZoneName: zone.name,
+                    targetWarehouseId: zone.warehouseId,
+                    targetWarehouseName: zone.warehouseName,
+                    targetPosition: position ? parseInt(position) : undefined,
+                };
             } else if (target.type === 'shelf') {
-                const selectedRack = rackOptions.find(r => r.id === selectedId);
+                const rack = selectedInfo.data as RackData;
                 endpoint = '/api/business/warehouse/move-shelf';
-                body = { ...body, shelfId: target.id, targetRackId: selectedId, targetRackName: selectedRack?.name || '', targetZoneId: selectedRack?.zoneId || '', targetZoneName: selectedRack?.zoneName || '', targetWarehouseId: selectedRack?.warehouseId || '', targetWarehouseName: selectedRack?.warehouseName || '' };
+                body = {
+                    ...body,
+                    shelfId: target.id,
+                    targetRackId: rack.id,
+                    targetRackName: rack.name,
+                    targetZoneId: rack.zoneId,
+                    targetZoneName: rack.zoneName,
+                    targetWarehouseId: rack.warehouseId,
+                    targetWarehouseName: rack.warehouseName,
+                    targetPosition: position ? parseInt(position) : undefined,
+                };
             }
 
             const res = await fetch(endpoint, {
@@ -974,98 +1099,245 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, warehou
         }
     };
 
-    const getDialogContent = () => {
-        if (target.type === 'zone') return { title: 'Move Zone', description: `Move "${target.name}" to a different warehouse`, label: 'Select Warehouse', icon: <MapPin className="h-5 w-5 text-emerald-600" />, iconBg: 'bg-emerald-500/10' };
-        if (target.type === 'rack') return { title: 'Move Rack', description: `Move "${target.name}" to a different zone`, label: 'Select Zone', icon: <Grid3X3 className="h-5 w-5 text-amber-600" />, iconBg: 'bg-amber-500/10' };
-        return { title: 'Move Shelf', description: `Move "${target.name}" to a different rack`, label: 'Select Rack', icon: <Layers className="h-5 w-5 text-purple-600" />, iconBg: 'bg-purple-500/10' };
+    if (!target) return null;
+
+    const getDialogInfo = () => {
+        if (target.type === 'zone') return { title: 'Move Zone', description: `Select destination warehouse for "${target.name}"`, selectLabel: 'Select a warehouse', icon: <MapPin className="h-5 w-5 text-emerald-600" />, iconBg: 'bg-emerald-500/10' };
+        if (target.type === 'rack') return { title: 'Move Rack', description: `Select destination zone for "${target.name}"`, selectLabel: 'Select a zone', icon: <Grid3X3 className="h-5 w-5 text-amber-600" />, iconBg: 'bg-amber-500/10' };
+        return { title: 'Move Shelf', description: `Select destination rack for "${target.name}"`, selectLabel: 'Select a rack', icon: <Layers className="h-5 w-5 text-purple-600" />, iconBg: 'bg-purple-500/10' };
     };
 
-    const content = getDialogContent();
+    const dialogInfo = getDialogInfo();
 
-    const groupedZoneOptions = zoneOptions.reduce((acc, zone) => {
-        if (!acc[zone.warehouseName]) acc[zone.warehouseName] = [];
-        acc[zone.warehouseName].push(zone);
-        return acc;
-    }, {} as Record<string, ZoneOption[]>);
-
-    const groupedRackOptions = rackOptions.reduce((acc, rack) => {
-        const key = `${rack.warehouseName} > ${rack.zoneName}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(rack);
-        return acc;
-    }, {} as Record<string, RackOption[]>);
+    // Determine what depth to show based on entity type
+    const showZones = target.type === 'rack' || target.type === 'shelf';
+    const showRacks = target.type === 'shelf';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <div className={cn('p-2 rounded-lg', content.iconBg)}>{content.icon}</div>
-                        {content.title}
+                        <div className={cn('p-2 rounded-lg', dialogInfo.iconBg)}>{dialogInfo.icon}</div>
+                        {dialogInfo.title}
                     </DialogTitle>
-                    <DialogDescription>{content.description}</DialogDescription>
+                    <DialogDescription>{dialogInfo.description}</DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label>{content.label}</Label>
-                        {isLoadingOptions ? (
-                            <div className="flex items-center gap-2 p-3 border rounded-md">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span className="text-sm text-muted-foreground">Loading options...</span>
+                <div className="flex-1 overflow-hidden flex flex-col gap-4 py-2">
+                    {/* Current location */}
+                    <div className="text-sm text-muted-foreground">
+                        <span className="font-medium">Current location: </span>
+                        {target.type === 'zone' && target.warehouseName}
+                        {target.type === 'rack' && `${target.warehouseName} > ${target.zoneName}`}
+                        {target.type === 'shelf' && `${target.warehouseName} > ${target.zoneName} > ${target.rackName}`}
+                    </div>
+
+                    {/* Tree selection */}
+                    <div className="flex-1 border rounded-lg overflow-auto max-h-[300px]">
+                        {isLoadingWarehouses ? (
+                            <div className="p-4 space-y-2">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <Skeleton className="h-4 w-4" />
+                                        <Skeleton className="h-6 w-6 rounded" />
+                                        <Skeleton className="h-4 w-32" />
+                                    </div>
+                                ))}
                             </div>
                         ) : (
-                            <Select value={selectedId} onValueChange={setSelectedId}>
-                                <SelectTrigger><SelectValue placeholder="Select destination..." /></SelectTrigger>
-                                <SelectContent>
-                                    {target.type === 'zone' && warehouses.map((w) => (
-                                        <SelectItem key={w.id} value={w.id} disabled={w.id === target.currentParentId}>
-                                            <div className="flex items-center gap-2">
-                                                <Warehouse className="h-4 w-4 text-blue-600" />
-                                                {w.name}
-                                                {w.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
+                            <div className="py-1">
+                                {warehouses.map((warehouse) => {
+                                    const isCurrentWarehouse = warehouse.id === target.warehouseId;
+                                    const isSelected = target.type === 'zone' && selectedWarehouseId === warehouse.id;
+                                    const isExpandable = showZones && warehouse.stats.totalZones > 0;
+
+                                    return (
+                                        <div key={warehouse.id}>
+                                            {/* Warehouse row */}
+                                            <div
+                                                className={cn(
+                                                    'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
+                                                    target.type === 'zone' && !isCurrentWarehouse && 'hover:bg-muted/60',
+                                                    isSelected && 'bg-primary/10',
+                                                    isCurrentWarehouse && target.type === 'zone' && 'opacity-50 cursor-not-allowed'
+                                                )}
+                                                onClick={() => {
+                                                    if (isExpandable) toggleWarehouse(warehouse.id);
+                                                    handleSelectWarehouse(warehouse);
+                                                }}
+                                            >
+                                                <div className="w-5 h-5 flex items-center justify-center">
+                                                    {loadingZones.has(warehouse.id) ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                    ) : isExpandable ? (
+                                                        <motion.div animate={{ rotate: expandedWarehouses.has(warehouse.id) ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                        </motion.div>
+                                                    ) : (
+                                                        <div className="w-4 h-4" />
+                                                    )}
+                                                </div>
+                                                <div className="p-1.5 rounded-md bg-blue-500/10">
+                                                    <Warehouse className="h-4 w-4 text-blue-600" />
+                                                </div>
+                                                <span className="flex-1 text-sm font-medium truncate">{warehouse.name}</span>
+                                                {isCurrentWarehouse && target.type === 'zone' && (
+                                                    <Badge variant="outline" className="text-xs">current</Badge>
+                                                )}
+                                                {isSelected && <Check className="h-4 w-4 text-primary" />}
                                             </div>
-                                        </SelectItem>
-                                    ))}
 
-                                    {target.type === 'rack' && Object.entries(groupedZoneOptions).map(([warehouseName, zones]) => (
-                                        <SelectGroup key={warehouseName}>
-                                            <SelectLabel className="flex items-center gap-2"><Warehouse className="h-3 w-3" />{warehouseName}</SelectLabel>
-                                            {zones.map((z) => (
-                                                <SelectItem key={z.id} value={z.id} disabled={z.id === target.currentParentId}>
-                                                    <div className="flex items-center gap-2">
-                                                        <MapPin className="h-4 w-4 text-emerald-600" />
-                                                        {z.name} {z.code && <code className="text-xs">({z.code})</code>}
-                                                        {z.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    ))}
+                                            {/* Zones */}
+                                            <AnimatePresence>
+                                                {showZones && expandedWarehouses.has(warehouse.id) && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        transition={{ duration: 0.2 }}
+                                                    >
+                                                        {zones[warehouse.id]?.map((zone) => {
+                                                            const isCurrentZone = zone.id === target.zoneId;
+                                                            const isZoneSelected = target.type === 'rack' && selectedZoneId === zone.id;
+                                                            const isZoneExpandable = showRacks && zone.stats.totalRacks > 0;
 
-                                    {target.type === 'shelf' && Object.entries(groupedRackOptions).map(([path, racks]) => (
-                                        <SelectGroup key={path}>
-                                            <SelectLabel className="text-xs">{path}</SelectLabel>
-                                            {racks.map((r) => (
-                                                <SelectItem key={r.id} value={r.id} disabled={r.id === target.currentParentId}>
-                                                    <div className="flex items-center gap-2">
-                                                        <Grid3X3 className="h-4 w-4 text-amber-600" />
-                                                        {r.name} {r.code && <code className="text-xs">({r.code})</code>}
-                                                        {r.id === target.currentParentId && <span className="text-xs text-muted-foreground">(current)</span>}
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                                            return (
+                                                                <div key={zone.id}>
+                                                                    {/* Zone row */}
+                                                                    <div
+                                                                        className={cn(
+                                                                            'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
+                                                                            target.type === 'rack' && !isCurrentZone && 'hover:bg-muted/60',
+                                                                            isZoneSelected && 'bg-primary/10',
+                                                                            isCurrentZone && target.type === 'rack' && 'opacity-50 cursor-not-allowed'
+                                                                        )}
+                                                                        style={{ paddingLeft: '32px' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (isZoneExpandable) toggleZone(zone.id);
+                                                                            handleSelectZone(zone);
+                                                                        }}
+                                                                    >
+                                                                        <div className="w-5 h-5 flex items-center justify-center">
+                                                                            {loadingRacks.has(zone.id) ? (
+                                                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                            ) : isZoneExpandable ? (
+                                                                                <motion.div animate={{ rotate: expandedZones.has(zone.id) ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                                                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                                </motion.div>
+                                                                            ) : (
+                                                                                <div className="w-4 h-4" />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="p-1.5 rounded-md bg-emerald-500/10">
+                                                                            <MapPin className="h-4 w-4 text-emerald-600" />
+                                                                        </div>
+                                                                        <span className="flex-1 text-sm font-medium truncate">{zone.name}</span>
+                                                                        {zone.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{zone.code}</code>}
+                                                                        {isCurrentZone && target.type === 'rack' && (
+                                                                            <Badge variant="outline" className="text-xs">current</Badge>
+                                                                        )}
+                                                                        {isZoneSelected && <Check className="h-4 w-4 text-primary" />}
+                                                                    </div>
+
+                                                                    {/* Racks */}
+                                                                    <AnimatePresence>
+                                                                        {showRacks && expandedZones.has(zone.id) && (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, height: 0 }}
+                                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                                exit={{ opacity: 0, height: 0 }}
+                                                                                transition={{ duration: 0.2 }}
+                                                                            >
+                                                                                {racks[zone.id]?.map((rack) => {
+                                                                                    const isCurrentRack = rack.id === target.rackId;
+                                                                                    const isRackSelected = target.type === 'shelf' && selectedRackId === rack.id;
+
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={rack.id}
+                                                                                            className={cn(
+                                                                                                'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
+                                                                                                !isCurrentRack && 'hover:bg-muted/60',
+                                                                                                isRackSelected && 'bg-primary/10',
+                                                                                                isCurrentRack && 'opacity-50 cursor-not-allowed'
+                                                                                            )}
+                                                                                            style={{ paddingLeft: '56px' }}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleSelectRack(rack);
+                                                                                            }}
+                                                                                        >
+                                                                                            <div className="w-5 h-5" />
+                                                                                            <div className="p-1.5 rounded-md bg-amber-500/10">
+                                                                                                <Grid3X3 className="h-4 w-4 text-amber-600" />
+                                                                                            </div>
+                                                                                            <span className="flex-1 text-sm font-medium truncate">{rack.name}</span>
+                                                                                            {rack.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{rack.code}</code>}
+                                                                                            {isCurrentRack && (
+                                                                                                <Badge variant="outline" className="text-xs">current</Badge>
+                                                                                            )}
+                                                                                            {isRackSelected && <Check className="h-4 w-4 text-primary" />}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                                {racks[zone.id]?.length === 0 && (
+                                                                                    <div className="py-2 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: '56px' }}>
+                                                                                        No racks
+                                                                                    </div>
+                                                                                )}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {zones[warehouse.id]?.length === 0 && (
+                                                            <div className="py-2 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: '32px' }}>
+                                                                No zones
+                                                            </div>
+                                                        )}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
+
+                    {/* Selected destination */}
+                    {selectedInfo && (
+                        <div className="text-sm">
+                            <span className="font-medium text-primary">Selected: </span>
+                            {selectedInfo.name}
+                        </div>
+                    )}
+
+                    {/* Position input (for rack and shelf moves) */}
+                    {(target.type === 'rack' || target.type === 'shelf') && (
+                        <div className="space-y-2">
+                            <Label htmlFor="move-position">Position (optional)</Label>
+                            <Input
+                                id="move-position"
+                                type="number"
+                                placeholder="Leave empty to append at end"
+                                value={position}
+                                onChange={(e) => setPosition(e.target.value)}
+                                className="w-full"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Specify a position to insert at, or leave empty to place at the end.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleMove} disabled={isSubmitting || !selectedId || selectedId === target.currentParentId}>
+                    <Button onClick={handleMove} disabled={isSubmitting || !canSubmit}>
                         {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Move
                     </Button>
@@ -1208,17 +1480,50 @@ export default function WarehousePage() {
     const handleAddZone = (w: WarehouseData) => { setEditZone(null); setZoneParent({ warehouseId: w.id, warehouseName: w.name }); setZoneDialogOpen(true); };
     const handleEditZone = (z: ZoneData) => { setEditZone(z); setZoneParent({ warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setZoneDialogOpen(true); };
     const handleDeleteZone = (z: ZoneData) => { setDeleteTarget({ type: 'zone', id: z.id, name: z.name, hasChildren: z.stats.totalRacks > 0, childCount: z.stats.totalRacks }); setDeleteDialogOpen(true); };
-    const handleMoveZone = (z: ZoneData) => { setMoveTarget({ type: 'zone', id: z.id, name: z.name, currentParentId: z.warehouseId, currentParentName: z.warehouseName }); setMoveDialogOpen(true); };
+    const handleMoveZone = (z: ZoneData) => {
+        setMoveTarget({
+            type: 'zone',
+            id: z.id,
+            name: z.name,
+            warehouseId: z.warehouseId,
+            warehouseName: z.warehouseName,
+        });
+        setMoveDialogOpen(true);
+    };
 
     const handleAddRack = (z: ZoneData) => { setEditRack(null); setRackParent({ zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setRackDialogOpen(true); };
     const handleEditRack = (r: RackData) => { setEditRack(r); setRackParent({ zoneId: r.zoneId, zoneName: r.zoneName, warehouseId: r.warehouseId, warehouseName: r.warehouseName }); setRackDialogOpen(true); };
     const handleDeleteRack = (r: RackData) => { setDeleteTarget({ type: 'rack', id: r.id, name: r.name, hasChildren: r.stats.totalShelves > 0, childCount: r.stats.totalShelves }); setDeleteDialogOpen(true); };
-    const handleMoveRack = (r: RackData) => { setMoveTarget({ type: 'rack', id: r.id, name: r.name, currentParentId: r.zoneId, currentParentName: r.zoneName }); setMoveDialogOpen(true); };
+    const handleMoveRack = (r: RackData) => {
+        setMoveTarget({
+            type: 'rack',
+            id: r.id,
+            name: r.name,
+            warehouseId: r.warehouseId,
+            warehouseName: r.warehouseName,
+            zoneId: r.zoneId,
+            zoneName: r.zoneName,
+        });
+        setMoveDialogOpen(true);
+    };
 
     const handleAddShelf = (r: RackData, z: ZoneData) => { setEditShelf(null); setShelfParent({ rackId: r.id, rackName: r.name, zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setShelfDialogOpen(true); };
     const handleEditShelf = (s: ShelfData) => { setEditShelf(s); setShelfParent({ rackId: s.rackId, rackName: s.rackName, zoneId: s.zoneId, zoneName: s.zoneName, warehouseId: s.warehouseId, warehouseName: s.warehouseName }); setShelfDialogOpen(true); };
     const handleDeleteShelf = (s: ShelfData) => { setDeleteTarget({ type: 'shelf', id: s.id, name: s.name, hasChildren: s.stats.totalProducts > 0, childCount: s.stats.totalProducts }); setDeleteDialogOpen(true); };
-    const handleMoveShelf = (s: ShelfData) => { setMoveTarget({ type: 'shelf', id: s.id, name: s.name, currentParentId: s.rackId, currentParentName: s.rackName }); setMoveDialogOpen(true); };
+    const handleMoveShelf = (s: ShelfData) => {
+        setMoveTarget({
+            type: 'shelf',
+            id: s.id,
+            name: s.name,
+            warehouseId: s.warehouseId,
+            warehouseName: s.warehouseName,
+            zoneId: s.zoneId,
+            zoneName: s.zoneName,
+            rackId: s.rackId,
+            rackName: s.rackName,
+        });
+        setMoveDialogOpen(true);
+    };
 
     // Success handlers
     const handleWarehouseSuccess = () => fetchWarehouses();
@@ -1337,7 +1642,7 @@ export default function WarehousePage() {
             {rackParent && <RackDialog open={rackDialogOpen} onOpenChange={setRackDialogOpen} onSuccess={handleRackSuccess} businessId={businessId} zoneId={rackParent.zoneId} zoneName={rackParent.zoneName} warehouseId={rackParent.warehouseId} warehouseName={rackParent.warehouseName} editData={editRack} user={user} />}
             {shelfParent && <ShelfDialog open={shelfDialogOpen} onOpenChange={setShelfDialogOpen} onSuccess={handleShelfSuccess} businessId={businessId} rackId={shelfParent.rackId} rackName={shelfParent.rackName} zoneId={shelfParent.zoneId} zoneName={shelfParent.zoneName} warehouseId={shelfParent.warehouseId} warehouseName={shelfParent.warehouseName} editData={editShelf} user={user} />}
             <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onSuccess={handleDeleteSuccess} businessId={businessId} target={deleteTarget} user={user} />
-            <MoveDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen} onSuccess={handleMoveSuccess} businessId={businessId} target={moveTarget} warehouses={warehouses} user={user} />
+            <MoveDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen} onSuccess={handleMoveSuccess} businessId={businessId} target={moveTarget} user={user} />
         </div>
     );
 }

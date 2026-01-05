@@ -52,6 +52,10 @@ function calculatePhysicalStock(inv: InventoryData): number {
     return inv.openingStock + inv.inwardAddition - inv.deduction + inv.autoAddition - inv.autoDeduction;
 }
 
+export function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // ============================================================
 // MAIN HANDLER
 // ============================================================
@@ -302,7 +306,7 @@ export async function POST(req: NextRequest) {
             const newQuantity = (placementInfo.currentQuantity || 0) - amount;
 
             // Update placement with reduced quantity
-            batch.update(placementRef, {
+            placementRef.update({
                 quantity: newQuantity,
                 updatedAt: now,
                 updatedBy: userId,
@@ -310,6 +314,7 @@ export async function POST(req: NextRequest) {
             });
 
             if (newQuantity <= 0) {
+                await sleep(100);
                 // Delete placement if quantity becomes 0 or less
                 batch.delete(placementRef);
             }

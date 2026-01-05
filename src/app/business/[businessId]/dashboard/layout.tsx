@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Zap,
   Warehouse,
+  Logs,
+  ListCollapse,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -661,6 +663,34 @@ export default function BusinessLayout({
                     icon={Warehouse}
                     label="Inventory"
                     isActive={pathname === `/business/${businessId}/inventory`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
+
+              {/* Warehouse Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={Warehouse}
+                  label="Warehouse"
+                  isActive={pathname.startsWith(`/business/${businessId}/warehouse`)}
+                >
+                  <NavItem
+                    href={`/business/${businessId}/warehouse`}
+                    icon={ListCollapse}
+                    label="Warehouses"
+                    isActive={pathname === `/business/${businessId}/warehouse`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/movements`}
+                    icon={MoveRight}
+                    label="Movements"
+                    isActive={pathname === `/business/${businessId}/warehouse/movements`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/logs`}
+                    icon={Logs}
+                    label="Activity Logs"
+                    isActive={pathname === `/business/${businessId}/warehouse/logs`}
                   />
                 </NavSection>
               </SidebarMenuItem>

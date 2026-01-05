@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
-        if(!userId) {
+        if (!userId) {
             return NextResponse.json({ error: 'User not logged in' }, { status: 401 });
         }
 
@@ -303,6 +303,9 @@ export async function POST(req: NextRequest) {
 
             if (newQuantity <= 0) {
                 // Delete placement if quantity becomes 0 or less
+                batch.update(placementRef, {
+                    lastMovementReason: 'manual_deduction'
+                })
                 batch.delete(placementRef);
             } else {
                 // Update placement with reduced quantity

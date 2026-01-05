@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
             zoneName: zoneName || '',
             warehouseId,
             warehouseName: warehouseName || '',
-            path,
             coordinates: coordinates || null,
             isDeleted: false,
             createdBy: userId,

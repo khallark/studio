@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
+import { Movement, Placement, PlacementLog } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -15,6 +16,21 @@ interface InventoryData {
     autoAddition: number;
     autoDeduction: number;
     blockedStock: number;
+}
+
+interface PlacementInfo {
+    // For inward - shelf location to place product
+    shelfId: string;
+    shelfName: string;
+    rackId: string;
+    rackName: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    // For deduction - existing placement to deduct from
+    placementId?: string;
+    currentQuantity?: number;
 }
 
 // ============================================================
@@ -42,7 +58,7 @@ function calculatePhysicalStock(inv: InventoryData): number {
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, sku, type, amount } = await req.json();
+        const { businessId, sku, productName, type, amount, placement } = await req.json();
 
         // ============================================================
         // VALIDATION
@@ -76,6 +92,30 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Validate placement info
+        if (!placement || !placement.shelfId) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'placement.shelfId is required' },
+                { status: 400 }
+            );
+        }
+
+        // For deduction, validate placement has enough quantity
+        if (type === 'deduction') {
+            if (!placement.placementId) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: 'placement.placementId is required for deduction' },
+                    { status: 400 }
+                );
+            }
+            if (typeof placement.currentQuantity !== 'number' || amount > placement.currentQuantity) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Cannot deduct ${amount} units. Only ${placement.currentQuantity || 0} available at this location.` },
+                    { status: 400 }
+                );
+            }
+        }
+
         // ============================================================
         // AUTHORIZATION
         // ============================================================
@@ -86,6 +126,10 @@ export async function POST(req: NextRequest) {
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
+        }
+
+        if(!userId) {
+            return NextResponse.json({ error: 'User not logged in' }, { status: 401 });
         }
 
         // ============================================================
@@ -106,11 +150,10 @@ export async function POST(req: NextRequest) {
         const currentInventory = getInventoryValues(productData?.inventory);
 
         // ============================================================
-        // VALIDATE DEDUCTION
+        // VALIDATE DEDUCTION (inventory level)
         // ============================================================
 
         if (type === 'deduction') {
-            // Calculate what the physical stock would be after deduction
             const newDeduction = currentInventory.deduction + amount;
             const previewInventory = { ...currentInventory, deduction: newDeduction };
             const previewPhysicalStock = calculatePhysicalStock(previewInventory);
@@ -128,14 +171,13 @@ export async function POST(req: NextRequest) {
         }
 
         // ============================================================
-        // PREPARE UPDATE
+        // PREPARE INVENTORY UPDATE
         // ============================================================
 
         const fieldToUpdate = type === 'inward' ? 'inventory.inwardAddition' : 'inventory.deduction';
         const oldValue = type === 'inward' ? currentInventory.inwardAddition : currentInventory.deduction;
         const newValue = oldValue + amount;
 
-        // Calculate new stock values for response
         const updatedInventory = { ...currentInventory };
         if (type === 'inward') {
             updatedInventory.inwardAddition = newValue;
@@ -146,11 +188,27 @@ export async function POST(req: NextRequest) {
         const newAvailableStock = newPhysicalStock - updatedInventory.blockedStock;
 
         // ============================================================
+        // PREPARE PLACEMENT UPDATE
+        // ============================================================
+
+        const now = Timestamp.now();
+        const placementInfo = placement as PlacementInfo;
+
+        // For inward: placementId is `${productId}_${shelfId}`
+        // For deduction: placementId is provided
+        const placementId = type === 'inward'
+            ? `${sku}_${placementInfo.shelfId}`
+            : placementInfo.placementId!;
+
+        const placementRef = db.doc(`users/${businessId}/placements/${placementId}`);
+
+        // ============================================================
         // CREATE AUDIT LOG
         // ============================================================
 
         const userData = userDoc?.data();
         const userEmail = userData?.email || userData?.primaryContact?.email || null;
+        const userName = userData?.name || userData?.primaryContact?.name || userEmail || 'Unknown';
 
         const logEntry = {
             action: 'inventory_adjusted',
@@ -166,7 +224,18 @@ export async function POST(req: NextRequest) {
             adjustmentAmount: amount,
             performedBy: userId || 'unknown',
             performedByEmail: userEmail,
-            performedAt: Timestamp.now(),
+            performedAt: now,
+            placement: {
+                placementId,
+                shelfId: placementInfo.shelfId,
+                shelfName: placementInfo.shelfName,
+                rackId: placementInfo.rackId,
+                rackName: placementInfo.rackName,
+                zoneId: placementInfo.zoneId,
+                zoneName: placementInfo.zoneName,
+                warehouseId: placementInfo.warehouseId,
+                warehouseName: placementInfo.warehouseName,
+            },
             metadata: {
                 userAgent: req.headers.get('user-agent') || undefined,
                 previousPhysicalStock: calculatePhysicalStock(currentInventory),
@@ -177,19 +246,73 @@ export async function POST(req: NextRequest) {
         };
 
         // ============================================================
-        // BATCH WRITE: Update inventory + Create log
+        // BATCH WRITE
         // ============================================================
 
         const batch = db.batch();
 
-        // Update the inventory field using increment for atomic operation
+        // 1. Update the inventory field
         batch.update(productRef!, {
             [fieldToUpdate]: FieldValue.increment(amount),
-            updatedAt: Timestamp.now(),
+            updatedAt: now,
             updatedBy: userId,
         });
 
-        // Create the log entry
+        // 2. Create/Update/Delete placement
+        if (type === 'inward') {
+            // Check if placement already exists
+            const existingPlacement = await placementRef.get();
+
+            if (existingPlacement.exists) {
+                // Update existing placement - increment quantity
+                batch.update(placementRef, {
+                    quantity: FieldValue.increment(amount),
+                    updatedAt: now,
+                    updatedBy: userId,
+                    lastMovementReason: 'inward_addition',
+                });
+            } else {
+                const newPlacementData: Placement = {
+                    id: placementId,
+                    productId: sku,
+                    productSKU: sku,
+                    quantity: amount,
+                    shelfId: placementInfo.shelfId,
+                    shelfName: placementInfo.shelfName,
+                    rackId: placementInfo.rackId,
+                    rackName: placementInfo.rackName,
+                    zoneId: placementInfo.zoneId,
+                    zoneName: placementInfo.zoneName,
+                    warehouseId: placementInfo.warehouseId,
+                    warehouseName: placementInfo.warehouseName,
+                    createdAt: now,
+                    updatedAt: now,
+                    createdBy: userId,
+                    updatedBy: userId,
+                    lastMovementReason: 'inward_addition',
+                }
+                // Create new placement
+                batch.set(placementRef, newPlacementData);
+            }
+        } else {
+            // Deduction - update or delete placement
+            const newQuantity = (placementInfo.currentQuantity || 0) - amount;
+
+            if (newQuantity <= 0) {
+                // Delete placement if quantity becomes 0 or less
+                batch.delete(placementRef);
+            } else {
+                // Update placement with reduced quantity
+                batch.update(placementRef, {
+                    quantity: newQuantity,
+                    updatedAt: now,
+                    updatedBy: userId,
+                    lastMovementReason: 'manual_deduction',
+                });
+            }
+        }
+
+        // 3. Create product log entry
         const logRef = productRef!.collection('logs').doc();
         batch.set(logRef, logEntry);
 
@@ -208,6 +331,10 @@ export async function POST(req: NextRequest) {
                     amount,
                     sku,
                     productName: productData?.name,
+                },
+                placement: {
+                    placementId,
+                    location: `${placementInfo.warehouseName} > ${placementInfo.zoneName} > ${placementInfo.rackName} > ${placementInfo.shelfName}`,
                 },
                 inventory: {
                     previous: {

@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
                 zoneName: data.zoneName || '',
                 warehouseId: data.warehouseId,
                 warehouseName: data.warehouseName || '',
-                locationPath: data.locationPath || '',
                 coordinates: data.coordinates || null,
                 locationCode: data.locationCode || null,
                 createdAt: data.createdAt?.toDate?.()?.toISOString() || null,

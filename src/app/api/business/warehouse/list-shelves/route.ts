@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
                 warehouseId: data.warehouseId,
                 warehouseName: data.warehouseName || '',
                 position: data.position || 0,
-                path: data.path || '',
                 coordinates: data.coordinates || null,
                 stats: {
                     totalProducts: data.stats?.totalProducts || 0,

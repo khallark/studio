@@ -1,7 +1,7 @@
 // /business/[businessId]/inventory/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useBusinessContext } from '../layout';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, Timestamp } from 'firebase/firestore';
@@ -67,6 +67,9 @@ import {
     ShieldCheck,
     PackageCheck,
     Info,
+    MapPin,
+    Grid3X3,
+    Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -102,6 +105,118 @@ interface InventoryProduct extends Product {
 }
 
 type AdjustmentType = 'inward' | 'deduction';
+
+// Warehouse types for tree selection
+interface WarehouseData {
+    id: string;
+    name: string;
+    stats: { totalZones: number };
+}
+
+interface ZoneData {
+    id: string;
+    name: string;
+    code: string;
+    warehouseId: string;
+    warehouseName: string;
+    stats: { totalRacks: number };
+}
+
+interface RackData {
+    id: string;
+    name: string;
+    code: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    stats: { totalShelves: number };
+}
+
+interface ShelfData {
+    id: string;
+    name: string;
+    code: string;
+    rackId: string;
+    rackName: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    path: string;
+}
+
+interface PlacementData {
+    id: string;
+    productId: string;
+    productSKU: string;
+    quantity: number;
+    shelfId: string;
+    shelfName: string;
+    rackId: string;
+    rackName: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    locationPath: string;
+}
+
+// Warehouse types for tree selection
+interface WarehouseData {
+    id: string;
+    name: string;
+    stats: { totalZones: number };
+}
+
+interface ZoneData {
+    id: string;
+    name: string;
+    code: string;
+    warehouseId: string;
+    warehouseName: string;
+    stats: { totalRacks: number };
+}
+
+interface RackData {
+    id: string;
+    name: string;
+    code: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    stats: { totalShelves: number };
+}
+
+interface ShelfData {
+    id: string;
+    name: string;
+    code: string;
+    rackId: string;
+    rackName: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    path: string;
+}
+
+interface PlacementData {
+    id: string;
+    productId: string;
+    productSKU: string;
+    quantity: number;
+    shelfId: string;
+    shelfName: string;
+    rackId: string;
+    rackName: string;
+    zoneId: string;
+    zoneName: string;
+    warehouseId: string;
+    warehouseName: string;
+    locationPath: string;
+}
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -178,12 +293,178 @@ function AdjustmentDialog({
     const [value, setValue] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Reset value when dialog opens/closes
+    // Warehouse tree state (for inward)
+    const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
+    const [zones, setZones] = useState<Record<string, ZoneData[]>>({});
+    const [racks, setRacks] = useState<Record<string, RackData[]>>({});
+    const [shelves, setShelves] = useState<Record<string, ShelfData[]>>({});
+
+    const [expandedWarehouses, setExpandedWarehouses] = useState<Set<string>>(new Set());
+    const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+    const [expandedRacks, setExpandedRacks] = useState<Set<string>>(new Set());
+
+    const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
+    const [loadingZones, setLoadingZones] = useState<Set<string>>(new Set());
+    const [loadingRacks, setLoadingRacks] = useState<Set<string>>(new Set());
+    const [loadingShelves, setLoadingShelves] = useState<Set<string>>(new Set());
+
+    const [selectedShelf, setSelectedShelf] = useState<ShelfData | null>(null);
+
+    // Placements state (for deduction)
+    const [placements, setPlacements] = useState<PlacementData[]>([]);
+    const [isLoadingPlacements, setIsLoadingPlacements] = useState(false);
+    const [selectedPlacement, setSelectedPlacement] = useState<PlacementData | null>(null);
+
+    // Reset state when dialog opens/closes
     useEffect(() => {
-        if (open) {
+        if (open && product) {
             setValue('');
+            setSelectedShelf(null);
+            setSelectedPlacement(null);
+            setExpandedWarehouses(new Set());
+            setExpandedZones(new Set());
+            setExpandedRacks(new Set());
+            setZones({});
+            setRacks({});
+            setShelves({});
+
+            if (type === 'inward') {
+                fetchWarehouses();
+            } else {
+                fetchPlacements();
+            }
         }
-    }, [open]);
+    }, [open, product, type]);
+
+    // Fetch warehouses for inward
+    const fetchWarehouses = async () => {
+        setIsLoadingWarehouses(true);
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setWarehouses(data.warehouses || []);
+            }
+        } catch (error) {
+            console.error('Error fetching warehouses:', error);
+        } finally {
+            setIsLoadingWarehouses(false);
+        }
+    };
+
+    const fetchZones = async (warehouseId: string) => {
+        setLoadingZones((prev) => new Set(prev).add(warehouseId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setZones((prev) => ({ ...prev, [warehouseId]: data.zones || [] }));
+            }
+        } catch (error) {
+            console.error('Error fetching zones:', error);
+        } finally {
+            setLoadingZones((prev) => { const n = new Set(prev); n.delete(warehouseId); return n; });
+        }
+    };
+
+    const fetchRacks = async (zoneId: string) => {
+        setLoadingRacks((prev) => new Set(prev).add(zoneId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setRacks((prev) => ({ ...prev, [zoneId]: data.racks || [] }));
+            }
+        } catch (error) {
+            console.error('Error fetching racks:', error);
+        } finally {
+            setLoadingRacks((prev) => { const n = new Set(prev); n.delete(zoneId); return n; });
+        }
+    };
+
+    const fetchShelves = async (rackId: string) => {
+        setLoadingShelves((prev) => new Set(prev).add(rackId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setShelves((prev) => ({ ...prev, [rackId]: data.shelves || [] }));
+            }
+        } catch (error) {
+            console.error('Error fetching shelves:', error);
+        } finally {
+            setLoadingShelves((prev) => { const n = new Set(prev); n.delete(rackId); return n; });
+        }
+    };
+
+    // Fetch placements for this product (for deduction)
+    const fetchPlacements = async () => {
+        if (!product) return;
+        setIsLoadingPlacements(true);
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-product-placements?businessId=${businessId}&productId=${product.id}`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setPlacements(data.placements || []);
+            }
+        } catch (error) {
+            console.error('Error fetching placements:', error);
+        } finally {
+            setIsLoadingPlacements(false);
+        }
+    };
+
+    // Toggle functions
+    const toggleWarehouse = (warehouseId: string) => {
+        const expanding = !expandedWarehouses.has(warehouseId);
+        setExpandedWarehouses((prev) => {
+            const n = new Set(prev);
+            n.has(warehouseId) ? n.delete(warehouseId) : n.add(warehouseId);
+            return n;
+        });
+        if (expanding && !zones[warehouseId]) {
+            fetchZones(warehouseId);
+        }
+    };
+
+    const toggleZone = (zoneId: string) => {
+        const expanding = !expandedZones.has(zoneId);
+        setExpandedZones((prev) => {
+            const n = new Set(prev);
+            n.has(zoneId) ? n.delete(zoneId) : n.add(zoneId);
+            return n;
+        });
+        if (expanding && !racks[zoneId]) {
+            fetchRacks(zoneId);
+        }
+    };
+
+    const toggleRack = (rackId: string) => {
+        const expanding = !expandedRacks.has(rackId);
+        setExpandedRacks((prev) => {
+            const n = new Set(prev);
+            n.has(rackId) ? n.delete(rackId) : n.add(rackId);
+            return n;
+        });
+        if (expanding && !shelves[rackId]) {
+            fetchShelves(rackId);
+        }
+    };
 
     if (!product) return null;
 
@@ -209,42 +490,63 @@ function AdjustmentDialog({
 
     // Validation for deduction
     const isDeductionInvalid = type === 'deduction' && previewPhysicalStock < 0;
+    const isPlacementDeductionInvalid = type === 'deduction' && selectedPlacement && addAmount > selectedPlacement.quantity;
+
+    // Check if can submit
+    const canSubmit = addAmount > 0 &&
+        !isDeductionInvalid &&
+        !isPlacementDeductionInvalid &&
+        (type === 'inward' ? selectedShelf !== null : selectedPlacement !== null);
 
     const handleSubmit = async () => {
-        if (!value || addAmount <= 0) {
-            toast({
-                title: 'Invalid Value',
-                description: 'Please enter a positive number',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        if (isDeductionInvalid) {
-            toast({
-                title: 'Cannot Deduct',
-                description: 'Deduction would result in negative physical stock',
-                variant: 'destructive',
-            });
-            return;
-        }
+        if (!canSubmit) return;
 
         setIsSubmitting(true);
 
         try {
             const idToken = await user?.getIdToken();
+
+            const body: any = {
+                businessId,
+                sku: product.sku,
+                productName: product.name,
+                type,
+                amount: addAmount,
+            };
+
+            if (type === 'inward' && selectedShelf) {
+                body.placement = {
+                    shelfId: selectedShelf.id,
+                    shelfName: selectedShelf.name,
+                    rackId: selectedShelf.rackId,
+                    rackName: selectedShelf.rackName,
+                    zoneId: selectedShelf.zoneId,
+                    zoneName: selectedShelf.zoneName,
+                    warehouseId: selectedShelf.warehouseId,
+                    warehouseName: selectedShelf.warehouseName,
+                };
+            } else if (type === 'deduction' && selectedPlacement) {
+                body.placement = {
+                    placementId: selectedPlacement.id,
+                    shelfId: selectedPlacement.shelfId,
+                    shelfName: selectedPlacement.shelfName,
+                    rackId: selectedPlacement.rackId,
+                    rackName: selectedPlacement.rackName,
+                    zoneId: selectedPlacement.zoneId,
+                    zoneName: selectedPlacement.zoneName,
+                    warehouseId: selectedPlacement.warehouseId,
+                    warehouseName: selectedPlacement.warehouseName,
+                    currentQuantity: selectedPlacement.quantity,
+                };
+            }
+
             const response = await fetch('/api/business/inventory/adjust', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${idToken}`,
                 },
-                body: JSON.stringify({
-                    businessId,
-                    sku: product.sku,
-                    type,
-                    amount: addAmount,
-                }),
+                body: JSON.stringify(body),
             });
 
             const result = await response.json();
@@ -270,9 +572,22 @@ function AdjustmentDialog({
         }
     };
 
+    // Get selection path text
+    const getSelectionText = () => {
+        if (type === 'inward' && selectedShelf) {
+            return `${selectedShelf.warehouseName} > ${selectedShelf.zoneName} > ${selectedShelf.rackName} > ${selectedShelf.name}`;
+        }
+        if (type === 'deduction' && selectedPlacement) {
+            return selectedPlacement.locationPath;
+        }
+        return null;
+    };
+
+    const selectionText = getSelectionText();
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[480px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
                         <div className={cn(
@@ -298,24 +613,14 @@ function AdjustmentDialog({
                     </div>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
+                <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
                     {/* Current State */}
                     <div className="rounded-lg border bg-muted/30 p-4">
                         <p className="text-sm font-medium text-muted-foreground mb-3">Current Inventory</p>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">
-                                    {type === 'inward' ? 'Inward Addition' : 'Deduction'}:
-                                </span>
-                                <span className="font-medium">{currentValue}</span>
-                            </div>
-                            <div className="flex justify-between">
                                 <span className="text-muted-foreground">Physical Stock:</span>
                                 <span className="font-medium">{product.physicalStock}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Blocked Stock:</span>
-                                <span className="font-medium">{product.inventory?.blockedStock ?? 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Available Stock:</span>
@@ -324,7 +629,7 @@ function AdjustmentDialog({
                         </div>
                     </div>
 
-                    {/* Input */}
+                    {/* Quantity Input */}
                     <div className="space-y-2">
                         <Label htmlFor="amount" className="text-sm font-medium">
                             {type === 'inward' ? 'Quantity to Add' : 'Quantity to Deduct'}
@@ -345,9 +650,8 @@ function AdjustmentDialog({
                                 placeholder="Enter quantity..."
                                 className={cn(
                                     'pl-10 text-lg font-medium',
-                                    isDeductionInvalid && 'border-destructive focus-visible:ring-destructive'
+                                    (isDeductionInvalid || isPlacementDeductionInvalid) && 'border-destructive focus-visible:ring-destructive'
                                 )}
-                                autoFocus
                             />
                         </div>
                         {isDeductionInvalid && (
@@ -356,22 +660,273 @@ function AdjustmentDialog({
                                 Cannot deduct more than available physical stock
                             </p>
                         )}
+                        {isPlacementDeductionInvalid && (
+                            <p className="text-xs text-destructive flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Cannot deduct more than {selectedPlacement?.quantity} units from this location
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Location Selection */}
+                    <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
+                        <Label className="text-sm font-medium">
+                            {type === 'inward' ? 'Select Placement Location' : 'Select Stock Location'}
+                        </Label>
+
+                        {type === 'inward' ? (
+                            // Tree view for inward
+                            <div className="flex-1 border rounded-lg overflow-auto max-h-[250px]">
+                                {isLoadingWarehouses ? (
+                                    <div className="p-4 space-y-2">
+                                        {[1, 2, 3].map((i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <Skeleton className="h-4 w-4" />
+                                                <Skeleton className="h-6 w-6 rounded" />
+                                                <Skeleton className="h-4 w-32" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : warehouses.length === 0 ? (
+                                    <div className="p-8 text-center text-muted-foreground">
+                                        <Warehouse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">No warehouses found</p>
+                                        <p className="text-xs">Create a warehouse first to place products</p>
+                                    </div>
+                                ) : (
+                                    <div className="py-1">
+                                        {warehouses.map((warehouse) => (
+                                            <div key={warehouse.id}>
+                                                {/* Warehouse row */}
+                                                <div
+                                                    className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-muted/60 transition-colors"
+                                                    onClick={() => toggleWarehouse(warehouse.id)}
+                                                >
+                                                    <div className="w-5 h-5 flex items-center justify-center">
+                                                        {loadingZones.has(warehouse.id) ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                        ) : warehouse.stats.totalZones > 0 ? (
+                                                            <motion.div animate={{ rotate: expandedWarehouses.has(warehouse.id) ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                            </motion.div>
+                                                        ) : (
+                                                            <div className="w-4 h-4" />
+                                                        )}
+                                                    </div>
+                                                    <div className="p-1.5 rounded-md bg-blue-500/10">
+                                                        <Warehouse className="h-4 w-4 text-blue-600" />
+                                                    </div>
+                                                    <span className="flex-1 text-sm font-medium truncate">{warehouse.name}</span>
+                                                </div>
+
+                                                {/* Zones */}
+                                                <AnimatePresence>
+                                                    {expandedWarehouses.has(warehouse.id) && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            transition={{ duration: 0.2 }}
+                                                        >
+                                                            {zones[warehouse.id]?.map((zone) => (
+                                                                <div key={zone.id}>
+                                                                    <div
+                                                                        className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-muted/60 transition-colors"
+                                                                        style={{ paddingLeft: '32px' }}
+                                                                        onClick={() => toggleZone(zone.id)}
+                                                                    >
+                                                                        <div className="w-5 h-5 flex items-center justify-center">
+                                                                            {loadingRacks.has(zone.id) ? (
+                                                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                            ) : zone.stats.totalRacks > 0 ? (
+                                                                                <motion.div animate={{ rotate: expandedZones.has(zone.id) ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                                                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                                </motion.div>
+                                                                            ) : (
+                                                                                <div className="w-4 h-4" />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="p-1.5 rounded-md bg-emerald-500/10">
+                                                                            <MapPin className="h-4 w-4 text-emerald-600" />
+                                                                        </div>
+                                                                        <span className="flex-1 text-sm font-medium truncate">{zone.name}</span>
+                                                                        {zone.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{zone.code}</code>}
+                                                                    </div>
+
+                                                                    {/* Racks */}
+                                                                    <AnimatePresence>
+                                                                        {expandedZones.has(zone.id) && (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, height: 0 }}
+                                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                                exit={{ opacity: 0, height: 0 }}
+                                                                                transition={{ duration: 0.2 }}
+                                                                            >
+                                                                                {racks[zone.id]?.map((rack) => (
+                                                                                    <div key={rack.id}>
+                                                                                        <div
+                                                                                            className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-muted/60 transition-colors"
+                                                                                            style={{ paddingLeft: '56px' }}
+                                                                                            onClick={() => toggleRack(rack.id)}
+                                                                                        >
+                                                                                            <div className="w-5 h-5 flex items-center justify-center">
+                                                                                                {loadingShelves.has(rack.id) ? (
+                                                                                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                                                ) : rack.stats.totalShelves > 0 ? (
+                                                                                                    <motion.div animate={{ rotate: expandedRacks.has(rack.id) ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                                                                                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                                                    </motion.div>
+                                                                                                ) : (
+                                                                                                    <div className="w-4 h-4" />
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div className="p-1.5 rounded-md bg-amber-500/10">
+                                                                                                <Grid3X3 className="h-4 w-4 text-amber-600" />
+                                                                                            </div>
+                                                                                            <span className="flex-1 text-sm font-medium truncate">{rack.name}</span>
+                                                                                            {rack.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{rack.code}</code>}
+                                                                                        </div>
+
+                                                                                        {/* Shelves */}
+                                                                                        <AnimatePresence>
+                                                                                            {expandedRacks.has(rack.id) && (
+                                                                                                <motion.div
+                                                                                                    initial={{ opacity: 0, height: 0 }}
+                                                                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                                                                    exit={{ opacity: 0, height: 0 }}
+                                                                                                    transition={{ duration: 0.2 }}
+                                                                                                >
+                                                                                                    {shelves[rack.id]?.map((shelf) => {
+                                                                                                        const isSelected = selectedShelf?.id === shelf.id;
+                                                                                                        return (
+                                                                                                            <div
+                                                                                                                key={shelf.id}
+                                                                                                                className={cn(
+                                                                                                                    'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
+                                                                                                                    isSelected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-muted/60'
+                                                                                                                )}
+                                                                                                                style={{ paddingLeft: '80px' }}
+                                                                                                                onClick={() => setSelectedShelf(shelf)}
+                                                                                                            >
+                                                                                                                <div className="w-5 h-5" />
+                                                                                                                <div className="p-1.5 rounded-md bg-purple-500/10">
+                                                                                                                    <Layers className="h-4 w-4 text-purple-600" />
+                                                                                                                </div>
+                                                                                                                <span className="flex-1 text-sm font-medium truncate">{shelf.name}</span>
+                                                                                                                {shelf.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{shelf.code}</code>}
+                                                                                                                {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                                                                                                            </div>
+                                                                                                        );
+                                                                                                    })}
+                                                                                                    {shelves[rack.id]?.length === 0 && (
+                                                                                                        <div className="py-2 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: '80px' }}>
+                                                                                                            No shelves
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </motion.div>
+                                                                                            )}
+                                                                                        </AnimatePresence>
+                                                                                    </div>
+                                                                                ))}
+                                                                                {racks[zone.id]?.length === 0 && (
+                                                                                    <div className="py-2 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: '56px' }}>
+                                                                                        No racks
+                                                                                    </div>
+                                                                                )}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                            ))}
+                                                            {zones[warehouse.id]?.length === 0 && (
+                                                                <div className="py-2 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: '32px' }}>
+                                                                    No zones
+                                                                </div>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            // Placements list for deduction
+                            <div className="flex-1 border rounded-lg overflow-auto max-h-[250px]">
+                                {isLoadingPlacements ? (
+                                    <div className="p-4 space-y-2">
+                                        {[1, 2, 3].map((i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <Skeleton className="h-6 w-6 rounded" />
+                                                <Skeleton className="h-4 w-48" />
+                                                <Skeleton className="h-4 w-16" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : placements.length === 0 ? (
+                                    <div className="p-8 text-center text-muted-foreground">
+                                        <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">No placements found</p>
+                                        <p className="text-xs">This product is not placed in any warehouse location</p>
+                                    </div>
+                                ) : (
+                                    <div className="py-1">
+                                        {placements.map((placement) => {
+                                            const isSelected = selectedPlacement?.id === placement.id;
+                                            return (
+                                                <div
+                                                    key={placement.id}
+                                                    className={cn(
+                                                        'flex items-center gap-3 py-3 px-4 cursor-pointer transition-colors',
+                                                        isSelected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-muted/60'
+                                                    )}
+                                                    onClick={() => setSelectedPlacement(placement)}
+                                                >
+                                                    <div className="p-2 rounded-lg bg-purple-500/10">
+                                                        <Layers className="h-4 w-4 text-purple-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate">{placement.locationPath}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {placement.warehouseName}
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant="outline" className="font-mono">
+                                                        Qty: {placement.quantity}
+                                                    </Badge>
+                                                    {isSelected && <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Selected location display */}
+                        {selectionText && (
+                            <div className="text-sm p-2 bg-primary/5 rounded-md border border-primary/20">
+                                <span className="font-medium text-primary">Selected: </span>
+                                {selectionText}
+                            </div>
+                        )}
                     </div>
 
                     {/* Preview */}
-                    {addAmount > 0 && (
+                    {addAmount > 0 && (type === 'inward' ? selectedShelf : selectedPlacement) && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className={cn(
                                 'rounded-lg border p-4',
-                                isDeductionInvalid
+                                (isDeductionInvalid || isPlacementDeductionInvalid)
                                     ? 'bg-destructive/5 border-destructive/20'
                                     : 'bg-emerald-500/5 border-emerald-500/20'
                             )}
                         >
                             <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                                {isDeductionInvalid ? (
+                                {(isDeductionInvalid || isPlacementDeductionInvalid) ? (
                                     <AlertCircle className="h-4 w-4 text-destructive" />
                                 ) : (
                                     <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -380,33 +935,12 @@ function AdjustmentDialog({
                             </p>
                             <div className="space-y-2 text-sm">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground w-28">
-                                        {type === 'inward' ? 'Inward Addition' : 'Deduction'}:
-                                    </span>
-                                    <span className="font-medium">{currentValue}</span>
-                                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                    <span className={cn(
-                                        'font-bold',
-                                        type === 'inward' ? 'text-emerald-600' : 'text-rose-600'
-                                    )}>
-                                        {newValue}
-                                    </span>
-                                    <Badge variant="outline" className={cn(
-                                        'text-xs',
-                                        type === 'inward'
-                                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-                                            : 'bg-rose-500/10 text-rose-700 border-rose-500/20'
-                                    )}>
-                                        {type === 'inward' ? '+' : '+'}{addAmount}
-                                    </Badge>
-                                </div>
-                                <div className="flex items-center gap-2">
                                     <span className="text-muted-foreground w-28">Physical Stock:</span>
                                     <span className="font-medium">{product.physicalStock}</span>
                                     <ArrowRight className="h-3 w-3 text-muted-foreground" />
                                     <span className={cn(
                                         'font-bold',
-                                        isDeductionInvalid ? 'text-destructive' : 'text-foreground'
+                                        (isDeductionInvalid || isPlacementDeductionInvalid) ? 'text-destructive' : 'text-foreground'
                                     )}>
                                         {previewPhysicalStock}
                                     </span>
@@ -422,6 +956,19 @@ function AdjustmentDialog({
                                         {previewAvailableStock}
                                     </span>
                                 </div>
+                                {type === 'deduction' && selectedPlacement && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground w-28">Location Qty:</span>
+                                        <span className="font-medium">{selectedPlacement.quantity}</span>
+                                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                        <span className={cn(
+                                            'font-bold',
+                                            isPlacementDeductionInvalid ? 'text-destructive' : 'text-foreground'
+                                        )}>
+                                            {selectedPlacement.quantity - addAmount}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     )}
@@ -438,7 +985,7 @@ function AdjustmentDialog({
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !value || addAmount <= 0 || isDeductionInvalid}
+                        disabled={isSubmitting || !canSubmit}
                         className={cn(
                             'gap-2',
                             type === 'inward'
@@ -630,16 +1177,6 @@ export default function InventoryPage() {
     };
 
     const handleOpenAdjustment = (product: InventoryProduct, type: AdjustmentType) => {
-        // For deduction, check if physical stock > 0
-        if (type === 'deduction' && product.physicalStock <= 0) {
-            toast({
-                title: 'Cannot Deduct',
-                description: 'Physical stock must be greater than 0 to deduct',
-                variant: 'destructive',
-            });
-            return;
-        }
-
         setSelectedProduct(product);
         setAdjustmentType(type);
         setAdjustmentDialogOpen(true);
@@ -1129,14 +1666,8 @@ export default function InventoryPage() {
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                className={cn(
-                                                                    'h-8 gap-1',
-                                                                    product.physicalStock > 0
-                                                                        ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-500/10'
-                                                                        : 'text-muted-foreground cursor-not-allowed'
-                                                                )}
+                                                                className="h-8 gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
                                                                 onClick={() => handleOpenAdjustment(product, 'deduction')}
-                                                                disabled={product.physicalStock <= 0}
                                                             >
                                                                 <Minus className="h-3 w-3" />
                                                                 {inv.deduction}

@@ -50,7 +50,7 @@ export interface Zone {
 
 // /{businessId}/zones/{zoneId}/logs/{logsId}
 export interface ZoneLog {
-    type: 'created' | 'updated' | 'deleted' | 'restored';
+    type: "created" | "updated" | "deleted" | "restored";
     changes?: {
         [field: string]: { from: any; to: any };
     };
@@ -86,7 +86,7 @@ export interface Rack {
 
 // /{businessId}/racks/{rackId}/logs/{logId}
 export interface RackLog {
-    type: 'created' | 'updated' | 'deleted' | 'restored' | 'moved';
+    type: "created" | "updated" | "deleted" | "restored" | "moved";
     changes?: {
         [field: string]: { from: any; to: any };
     };
@@ -119,8 +119,6 @@ export interface Shelf {
     rackName: string;
     position: number;
 
-    path: string;
-
     stats: {
         totalProducts: number;
         currentOccupancy: number;
@@ -135,7 +133,7 @@ export interface Shelf {
 
 // /{businessId}/shelves/{shelfId}/logs/{logId}
 export interface ShelfLog {
-    type: 'created' | 'updated' | 'deleted' | 'restored' | 'moved';
+    type: "created" | "updated" | "deleted" | "restored" | "moved";
     changes?: {
         [field: string]: { from: any; to: any };
     };
@@ -176,15 +174,13 @@ export interface Placement {
     shelfId: string;
     shelfName: string;
 
-    locationPath: string;
-
     lastMovementReason?: string;
     lastMovementReference?: string;
 }
 
 // /{businessId}/placements/{placementId}/logs/{logId}
 export interface PlacementLog {
-    type: 'added' | 'removed' | 'quantity_adjusted';
+    type: "added" | "removed" | "quantity_adjusted";
     quantity: number;
     quantityBefore?: number;
     quantityAfter?: number;
@@ -201,7 +197,7 @@ export interface Movement {
     productId: string;
     productSKU: string;
 
-    type: 'transfer' | 'inbound' | 'outbound' | 'adjustment';
+    type: "transfer" | "inbound" | "outbound" | "adjustment";
 
     from: {
         shelfId: string | null;
@@ -212,7 +208,6 @@ export interface Movement {
         zoneName: string | null;
         warehouseId: string | null;
         warehouseName: string | null;
-        path: string | null;
     };
 
     to: {
@@ -224,7 +219,6 @@ export interface Movement {
         zoneName: string | null;
         warehouseId: string | null;
         warehouseName: string | null;
-        path: string | null;
     };
 
     quantity: number;

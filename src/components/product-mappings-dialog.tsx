@@ -49,6 +49,7 @@ import {
     ArrowRight,
     Layers,
     Upload,
+    Download,
 } from 'lucide-react';
 import { BulkMappingDialog } from '@/components/bulk-mapping-dialog';
 
@@ -83,7 +84,7 @@ interface ProductMappingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     businessId: string;
-    user: User | null | undefined ;
+    user: User | null | undefined;
 }
 
 type MappingFilter = 'all' | 'mapped' | 'unmapped';
@@ -431,6 +432,9 @@ export function ProductMappingsDialog({
     // Bulk mapping dialog state
     const [bulkMappingOpen, setBulkMappingOpen] = useState(false);
 
+    // Export state
+    const [isExporting, setIsExporting] = useState(false);
+
     // Fetch stores and variants
     useEffect(() => {
         if (!open || !user || !businessId) return;
@@ -482,6 +486,72 @@ export function ProductMappingsDialog({
         setRefreshKey((k) => k + 1);
     };
 
+    // Export to Excel handler
+    const handleExportToExcel = async () => {
+        if (!user || !businessId) {
+            toast({
+                title: 'Authentication Error',
+                description: 'You must be logged in to export.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsExporting(true);
+
+        try {
+            const idToken = await user.getIdToken();
+
+            const response = await fetch('/api/shopify/products/export-store-variants', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    storeFilter: selectedStore === 'all' ? null : selectedStore,
+                    mappingFilter: mappingFilter === 'all' ? null : mappingFilter,
+                    searchQuery: debouncedSearch || null,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to export');
+            }
+
+            // Get the blob from response
+            const blob = await response.blob();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `store-variants-${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            toast({
+                title: 'Export Successful',
+                description: `Exported ${variants.length} store variants to Excel.`,
+            });
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            toast({
+                title: 'Export Failed',
+                description: error instanceof Error ? error.message : 'Failed to export store variants.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     // Pagination
     const totalPages = Math.ceil(variants.length / rowsPerPage);
     const paginatedVariants = variants.slice(
@@ -513,25 +583,48 @@ export function ProductMappingsDialog({
 
                 {/* Stats Bar */}
                 <div className="px-6 py-3 border-b bg-muted/30">
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-blue-500" />
-                            <span className="text-sm text-muted-foreground">
-                                Total Variants: <span className="font-semibold text-foreground">{variants.length}</span>
-                            </span>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                <span className="text-sm text-muted-foreground">
+                                    Total Variants: <span className="font-semibold text-foreground">{variants.length}</span>
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                <span className="text-sm text-muted-foreground">
+                                    Mapped: <span className="font-semibold text-emerald-600">{mappedCount}</span>
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                <span className="text-sm text-muted-foreground">
+                                    Unmapped: <span className="font-semibold text-amber-600">{unmappedCount}</span>
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                            <span className="text-sm text-muted-foreground">
-                                Mapped: <span className="font-semibold text-emerald-600">{mappedCount}</span>
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-amber-500" />
-                            <span className="text-sm text-muted-foreground">
-                                Unmapped: <span className="font-semibold text-amber-600">{unmappedCount}</span>
-                            </span>
-                        </div>
+
+                        {/* Export Button */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExportToExcel}
+                            disabled={isExporting || loading || variants.length === 0}
+                            className="gap-2"
+                        >
+                            {isExporting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Exporting...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4" />
+                                    Export to Excel
+                                </>
+                            )}
+                        </Button>
                     </div>
                 </div>
 

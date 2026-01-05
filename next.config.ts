@@ -254,6 +254,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/create-warehouse/route',
       },
       {
+        source: '/api/business/warehouse/create-instant-warehouse',
+        destination: '/api/business/warehouse/create-instant-warehouse',
+      },
+      {
         source: '/api/business/warehouse/create-zone',
         destination: '/api/business/warehouse/create-zone/route',
       },

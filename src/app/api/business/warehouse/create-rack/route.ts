@@ -35,6 +35,47 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Rack name is required' }, { status: 400 });
         }
 
+        // Get existing racks in the zone to determine position
+        const existingRacksSnap = await db
+            .collection(`users/${businessId}/racks`)
+            .where('zoneId', '==', zoneId)
+            .where('isDeleted', '==', false)
+            .get();
+
+        const existingRacks = existingRacksSnap.docs.map(doc => ({
+            id: doc.id,
+            position: doc.data().position as number,
+        }));
+
+        // Determine final position
+        let finalPosition: number;
+
+        if (position && position > 0) {
+            // User specified a position - use it and shift others if needed
+            finalPosition = position;
+
+            // Find racks that need to be shifted (position >= new position)
+            const racksToShift = existingRacks.filter(r => r.position >= finalPosition);
+
+            if (racksToShift.length > 0) {
+                // Shift existing racks up by 1
+                const batch = db.batch();
+                for (const rack of racksToShift) {
+                    const rackRef = db.doc(`users/${businessId}/racks/${rack.id}`);
+                    batch.update(rackRef, {
+                        position: rack.position + 1,
+                        updatedAt: Timestamp.now(),
+                        updatedBy: userId,
+                    });
+                }
+                await batch.commit();
+            }
+        } else {
+            // No position specified - append at the end
+            const maxPosition = existingRacks.reduce((max, r) => Math.max(max, r.position), 0);
+            finalPosition = maxPosition + 1;
+        }
+
         const rackRef = db.collection(`users/${businessId}/racks`).doc();
         const now = Timestamp.now();
 
@@ -42,7 +83,7 @@ export async function POST(request: NextRequest) {
             id: rackRef.id,
             name: name.trim(),
             code: code?.trim() || '',
-            position: position || 0,
+            position: finalPosition,
             zoneId,
             zoneName: zoneName || '',
             warehouseId,
@@ -60,7 +101,7 @@ export async function POST(request: NextRequest) {
 
         await rackRef.set(rackData);
 
-        return NextResponse.json({ success: true, rack: { id: rackRef.id, name: name.trim() } });
+        return NextResponse.json({ success: true, rack: { id: rackRef.id, name: name.trim(), position: finalPosition } });
     } catch (error) {
         console.error('Error creating rack:', error);
         return NextResponse.json({ error: 'Failed to create rack' }, { status: 500 });

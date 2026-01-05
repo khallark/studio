@@ -1348,6 +1348,249 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
 }
 
 // ============================================================
+// INSTANT WAREHOUSE DIALOG
+// ============================================================
+
+interface InstantWarehouseDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSuccess: () => void;
+    businessId: string;
+    user: User | null | undefined;
+}
+
+function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, user }: InstantWarehouseDialogProps) {
+    const [name, setName] = useState('');
+    const [address, setAddress] = useState('');
+    const [zoneCount, setZoneCount] = useState('3');
+    const [racksPerZone, setRacksPerZone] = useState('4');
+    const [shelvesPerRack, setShelvesPerRack] = useState('5');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [progress, setProgress] = useState<string | null>(null);
+    const { toast } = useToast();
+
+    // Calculate totals
+    const zones = parseInt(zoneCount) || 0;
+    const racks = parseInt(racksPerZone) || 0;
+    const shelves = parseInt(shelvesPerRack) || 0;
+
+    const totalZones = zones;
+    const totalRacks = zones * racks;
+    const totalShelves = zones * racks * shelves;
+    const totalEntities = 1 + totalZones + totalRacks + totalShelves;
+
+    const isValid = name.trim() && zones >= 1 && zones <= 50 && racks >= 1 && racks <= 50 && shelves >= 1 && shelves <= 20 && totalEntities <= 5000;
+
+    useEffect(() => {
+        if (open) {
+            setName('');
+            setAddress('');
+            setZoneCount('3');
+            setRacksPerZone('4');
+            setShelvesPerRack('5');
+            setProgress(null);
+        }
+    }, [open]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!isValid) return;
+
+        setIsSubmitting(true);
+        setProgress('Creating warehouse structure...');
+
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch('/api/business/warehouse/create-instant-warehouse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({
+                    businessId,
+                    warehouseName: name,
+                    address,
+                    zoneCount: zones,
+                    racksPerZone: racks,
+                    shelvesPerRack: shelves,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to create warehouse');
+            }
+
+            const data = await res.json();
+
+            toast({
+                title: 'Warehouse created!',
+                description: `Created ${data.structure.zones} zones, ${data.structure.racks} racks, and ${data.structure.shelves} shelves.`,
+            });
+            onOpenChange(false);
+            onSuccess();
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message || 'Failed to create warehouse.', variant: 'destructive' });
+        } finally {
+            setIsSubmitting(false);
+            setProgress(null);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+                            <Warehouse className="h-5 w-5 text-blue-600" />
+                        </div>
+                        Quick Warehouse Setup
+                    </DialogTitle>
+                    <DialogDescription>
+                        Instantly create a warehouse with a complete zone, rack, and shelf structure.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Warehouse Name */}
+                    <div className="space-y-2">
+                        <Label htmlFor="instant-name">Warehouse Name</Label>
+                        <Input
+                            id="instant-name"
+                            placeholder="e.g., Main Warehouse"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    {/* Address */}
+                    <div className="space-y-2">
+                        <Label htmlFor="instant-address">Address (Optional)</Label>
+                        <Input
+                            id="instant-address"
+                            placeholder="Enter warehouse address..."
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Structure Configuration */}
+                    <div className="space-y-3">
+                        <Label className="text-sm font-medium">Structure Configuration</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="zone-count" className="text-xs text-muted-foreground">Zones</Label>
+                                <Input
+                                    id="zone-count"
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    value={zoneCount}
+                                    onChange={(e) => setZoneCount(e.target.value)}
+                                    className="text-center font-medium"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="racks-per-zone" className="text-xs text-muted-foreground">Racks/Zone</Label>
+                                <Input
+                                    id="racks-per-zone"
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    value={racksPerZone}
+                                    onChange={(e) => setRacksPerZone(e.target.value)}
+                                    className="text-center font-medium"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="shelves-per-rack" className="text-xs text-muted-foreground">Shelves/Rack</Label>
+                                <Input
+                                    id="shelves-per-rack"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={shelvesPerRack}
+                                    onChange={(e) => setShelvesPerRack(e.target.value)}
+                                    className="text-center font-medium"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                        <p className="text-sm font-medium">Structure Preview</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1 rounded bg-emerald-500/10">
+                                    <MapPin className="h-3 w-3 text-emerald-600" />
+                                </div>
+                                <span className="text-muted-foreground">Zones:</span>
+                                <span className="font-medium">{totalZones}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="p-1 rounded bg-amber-500/10">
+                                    <Grid3X3 className="h-3 w-3 text-amber-600" />
+                                </div>
+                                <span className="text-muted-foreground">Racks:</span>
+                                <span className="font-medium">{totalRacks}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="p-1 rounded bg-purple-500/10">
+                                    <Layers className="h-3 w-3 text-purple-600" />
+                                </div>
+                                <span className="text-muted-foreground">Shelves:</span>
+                                <span className="font-medium">{totalShelves}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="p-1 rounded bg-blue-500/10">
+                                    <Package className="h-3 w-3 text-blue-600" />
+                                </div>
+                                <span className="text-muted-foreground">Total:</span>
+                                <span className="font-medium">{totalEntities} entities</span>
+                            </div>
+                        </div>
+
+                        {totalEntities > 5000 && (
+                            <p className="text-xs text-destructive flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Maximum 5000 entities allowed. Reduce the structure size.
+                            </p>
+                        )}
+
+                        {/* Sample naming preview */}
+                        <div className="pt-2 border-t">
+                            <p className="text-xs text-muted-foreground mb-1">Naming format:</p>
+                            <code className="text-xs bg-muted px-2 py-1 rounded block">
+                                Zone-1 → Rack-1 → Shelf-1 (Z01-R01-S01)
+                            </code>
+                        </div>
+                    </div>
+
+                    {/* Progress */}
+                    {progress && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {progress}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting || !isValid}>
+                            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Create Warehouse
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ============================================================
 // MAIN PAGE COMPONENT
 // ============================================================
 
@@ -1399,6 +1642,8 @@ export default function WarehousePage() {
 
     const [moveDialogOpen, setMoveDialogOpen] = useState(false);
     const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
+
+    const [instantWarehouseDialogOpen, setInstantWarehouseDialogOpen] = useState(false);
 
     // Fetch functions
     const fetchWarehouses = useCallback(async () => {
@@ -1557,7 +1802,16 @@ export default function WarehousePage() {
                     <h1 className="text-2xl font-bold tracking-tight">Warehouse Overview</h1>
                     <p className="text-muted-foreground">Manage your warehouse locations and inventory structure</p>
                 </div>
-                <Button onClick={handleAddWarehouse}><Plus className="h-4 w-4 mr-2" />Add Warehouse</Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setInstantWarehouseDialogOpen(true)}>
+                        <FolderTree className="h-4 w-4 mr-2" />
+                        Quick Setup
+                    </Button>
+                    <Button onClick={handleAddWarehouse}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Warehouse
+                    </Button>
+                </div>
             </div>
 
             {/* Stats */}
@@ -1643,6 +1897,7 @@ export default function WarehousePage() {
             {shelfParent && <ShelfDialog open={shelfDialogOpen} onOpenChange={setShelfDialogOpen} onSuccess={handleShelfSuccess} businessId={businessId} rackId={shelfParent.rackId} rackName={shelfParent.rackName} zoneId={shelfParent.zoneId} zoneName={shelfParent.zoneName} warehouseId={shelfParent.warehouseId} warehouseName={shelfParent.warehouseName} editData={editShelf} user={user} />}
             <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onSuccess={handleDeleteSuccess} businessId={businessId} target={deleteTarget} user={user} />
             <MoveDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen} onSuccess={handleMoveSuccess} businessId={businessId} target={moveTarget} user={user} />
+            <InstantWarehouseDialog open={instantWarehouseDialogOpen} onOpenChange={setInstantWarehouseDialogOpen} onSuccess={handleWarehouseSuccess} businessId={businessId} user={user} />
         </div>
     );
 }

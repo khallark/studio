@@ -11,7 +11,7 @@ export interface Warehouse {
     operationalHours: number;
     defaultGSTstate: string;
     isDeleted: boolean;
-    deletedAt?: Timestamp;
+    deletedAt: Timestamp | null;
     createdBy: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -30,9 +30,9 @@ export interface Zone {
     id: string;
     name: string;
     code: string;
-    description?: string;
+    description: string | null;
     isDeleted: boolean;
-    deletedAt?: Timestamp;
+    deletedAt: Timestamp | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
     createdBy: string;
@@ -51,10 +51,10 @@ export interface Zone {
 // /{businessId}/zones/{zoneId}/logs/{logsId}
 export interface ZoneLog {
     type: "created" | "updated" | "deleted" | "restored";
-    changes?: {
+    changes: {
         [field: string]: { from: any; to: any };
-    };
-    note?: string;
+    } | null;
+    note: string | null;
     timestamp: Timestamp;
     userId: string;
 }
@@ -65,7 +65,7 @@ export interface Rack {
     name: string;
     code: string;
     isDeleted: boolean;
-    deletedAt?: Timestamp;
+    deletedAt: Timestamp | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
     createdBy: string;
@@ -87,11 +87,11 @@ export interface Rack {
 // /{businessId}/racks/{rackId}/logs/{logId}
 export interface RackLog {
     type: "created" | "updated" | "deleted" | "restored" | "moved";
-    changes?: {
+    changes: {
         [field: string]: { from: any; to: any };
-    };
-    fromZone?: { id: string; name: string };
-    toZone?: { id: string; name: string };
+    } | null;
+    fromZone: { id: string; name: string } | null;
+    toZone: { id: string; name: string } | null;
     timestamp: Timestamp;
     userId: string;
 }
@@ -101,9 +101,9 @@ export interface Shelf {
     id: string;
     name: string;
     code: string;
-    capacity?: number;
+    capacity: number | null;
     isDeleted: boolean;
-    deletedAt?: Timestamp;
+    deletedAt: Timestamp | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
     createdBy: string;
@@ -124,21 +124,21 @@ export interface Shelf {
         currentOccupancy: number;
     };
 
-    coordinates?: {
+    coordinates: {
         aisle: string;
         bay: number;
         level: number;
-    };
+    } | null;
 }
 
 // /{businessId}/shelves/{shelfId}/logs/{logId}
 export interface ShelfLog {
     type: "created" | "updated" | "deleted" | "restored" | "moved";
-    changes?: {
+    changes: {
         [field: string]: { from: any; to: any };
-    };
-    fromRack?: { id: string; name: string; zoneId: string };
-    toRack?: { id: string; name: string; zoneId: string };
+    } | null;
+    fromRack: { id: string; name: string; zoneId: string } | null;
+    toRack: { id: string; name: string; zoneId: string } | null;
     timestamp: Timestamp;
     userId: string;
 }
@@ -152,12 +152,12 @@ export interface Placement {
     updatedAt: Timestamp;
     createdBy: string;
     updatedBy: string;
-    coordinates?: {
+    coordinates: {
         aisle: string;
         bay: number;
         level: number;
-    };
-    locationCode?: string;
+    } | null;
+    locationCode: string | null;
 
     productId: string;
     productSKU: string;
@@ -174,18 +174,18 @@ export interface Placement {
     shelfId: string;
     shelfName: string;
 
-    lastMovementReason?: string;
-    lastMovementReference?: string;
+    lastMovementReason: string | null;
+    lastMovementReference: string | null;
 }
 
 // /{businessId}/placements/{placementId}/logs/{logId}
 export interface PlacementLog {
     type: "added" | "removed" | "quantity_adjusted";
     quantity: number;
-    quantityBefore?: number;
-    quantityAfter?: number;
-    relatedMovementId?: string;
-    note?: string;
+    quantityBefore: number | null;
+    quantityAfter: number | null;
+    relatedMovementId: string | null;
+    note: string | null;
     timestamp: Timestamp;
     userId: string;
 }
@@ -222,8 +222,8 @@ export interface Movement {
     };
 
     quantity: number;
-    reason?: string;
-    reference?: string;
+    reason: string | null;
+    reference: string | null;
 
     timestamp: Timestamp;
     userId: string;

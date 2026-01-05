@@ -290,6 +290,9 @@ export async function POST(req: NextRequest) {
                     createdBy: userId,
                     updatedBy: userId,
                     lastMovementReason: 'inward_addition',
+                    coordinates: null,
+                    locationCode: null,
+                    lastMovementReference: null,
                 }
                 // Create new placement
                 batch.set(placementRef, newPlacementData);

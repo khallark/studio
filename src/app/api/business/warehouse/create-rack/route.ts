@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
             createdAt: now,
             updatedAt: now,
             updatedBy: userId,
+            deletedAt: null,
             stats: {
                 totalShelves: 0,
                 totalProducts: 0,

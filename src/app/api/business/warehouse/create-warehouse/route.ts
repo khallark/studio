@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
             storageCapacity: storageCapacity || 0,
             operationalHours: operationalHours || 0,
             defaultGSTstate: defaultGSTstate || '',
+            deletedAt: null,
             isDeleted: false,
             createdBy: userId,
             createdAt: now,

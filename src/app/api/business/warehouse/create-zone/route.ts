@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
             description: description?.trim() || '',
             warehouseId,
             warehouseName: warehouseName || '',
+            deletedAt: null,
             isDeleted: false,
             createdBy: userId,
             createdAt: now,

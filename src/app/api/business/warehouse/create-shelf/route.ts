@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
             warehouseId,
             warehouseName: warehouseName || '',
             coordinates: coordinates || null,
+            deletedAt: null,
             isDeleted: false,
             createdBy: userId,
             createdAt: now,

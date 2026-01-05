@@ -301,20 +301,17 @@ export async function POST(req: NextRequest) {
             // Deduction - update or delete placement
             const newQuantity = (placementInfo.currentQuantity || 0) - amount;
 
+            // Update placement with reduced quantity
+            batch.update(placementRef, {
+                quantity: newQuantity,
+                updatedAt: now,
+                updatedBy: userId,
+                lastMovementReason: 'manual_deduction',
+            });
+
             if (newQuantity <= 0) {
                 // Delete placement if quantity becomes 0 or less
-                batch.update(placementRef, {
-                    lastMovementReason: 'manual_deduction'
-                })
                 batch.delete(placementRef);
-            } else {
-                // Update placement with reduced quantity
-                batch.update(placementRef, {
-                    quantity: newQuantity,
-                    updatedAt: now,
-                    updatedBy: userId,
-                    lastMovementReason: 'manual_deduction',
-                });
             }
         }
 

@@ -9,7 +9,7 @@ import { Rack, Shelf, Warehouse, Zone } from '@/types/warehouse';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, warehouseName, address, zoneCount, racksPerZone, shelvesPerRack } = body;
+        const { businessId, warehouseName, warehouseCode, address, zoneCount, racksPerZone, shelvesPerRack } = body;
 
         // Validation
         if (!businessId) {
@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Warehouse name is required' }, { status: 400 });
         }
 
+        if (!warehouseCode || !warehouseCode.trim()) {
+            return NextResponse.json({ error: 'Warehouse code is required' }, { status: 400 });
+        }
+
         const zones = parseInt(zoneCount) || 0;
         const racks = parseInt(racksPerZone) || 0;
         const shelves = parseInt(shelvesPerRack) || 0;
@@ -46,6 +50,20 @@ export async function POST(request: NextRequest) {
 
         if (shelves < 1 || shelves > 20) {
             return NextResponse.json({ error: 'Shelves per rack must be between 1 and 20' }, { status: 400 });
+        }
+
+        // Normalize codes
+        const normalizedWarehouseCode = warehouseCode.trim().toUpperCase();
+        const trimmedName = warehouseName.trim();
+
+        // Check if warehouse code already exists
+        const warehouseRef = db.collection(`users/${businessId}/warehouses`).doc(normalizedWarehouseCode);
+        const existingWarehouse = await warehouseRef.get();
+        if (existingWarehouse.exists) {
+            return NextResponse.json(
+                { error: `Warehouse with code "${normalizedWarehouseCode}" already exists` },
+                { status: 409 }
+            );
         }
 
         // Calculate totals
@@ -64,10 +82,38 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
+        // Generate all codes upfront and check for conflicts
+        const allCodes: { type: string; code: string; collection: string }[] = [];
+
+        for (let z = 1; z <= zones; z++) {
+            const zoneCode = `${normalizedWarehouseCode}-Z${z.toString().padStart(2, '0')}`;
+            allCodes.push({ type: 'zone', code: zoneCode, collection: 'zones' });
+
+            for (let r = 1; r <= racks; r++) {
+                const rackCode = `${zoneCode}-R${r.toString().padStart(2, '0')}`;
+                allCodes.push({ type: 'rack', code: rackCode, collection: 'racks' });
+
+                for (let s = 1; s <= shelves; s++) {
+                    const shelfCode = `${rackCode}-S${s.toString().padStart(2, '0')}`;
+                    allCodes.push({ type: 'shelf', code: shelfCode, collection: 'shelves' });
+                }
+            }
+        }
+
+        // Batch check for existing codes (check a sample if too many)
+        // For full validation, we check zones and racks (shelves are derived, less likely to conflict)
+        const zoneCodes = allCodes.filter(c => c.type === 'zone').map(c => c.code);
+        for (const zCode of zoneCodes) {
+            const zoneDoc = await db.collection(`users/${businessId}/zones`).doc(zCode).get();
+            if (zoneDoc.exists) {
+                return NextResponse.json(
+                    { error: `Zone with code "${zCode}" already exists` },
+                    { status: 409 }
+                );
+            }
+        }
+
         const now = Timestamp.now();
-        const warehouseRef = db.collection(`users/${businessId}/warehouses`).doc();
-        const warehouseId = warehouseRef.id;
-        const trimmedName = warehouseName.trim();
 
         // Prepare all documents
         interface DocToCreate {
@@ -77,8 +123,10 @@ export async function POST(request: NextRequest) {
 
         const allDocs: DocToCreate[] = [];
 
+        // 1. Create warehouse document
         const warehouseData: Warehouse = {
-            id: warehouseId,
+            id: normalizedWarehouseCode,
+            code: normalizedWarehouseCode,
             name: trimmedName,
             address: address?.trim() || '',
             storageCapacity: 0,
@@ -98,7 +146,6 @@ export async function POST(request: NextRequest) {
             },
         };
 
-        // 1. Create warehouse document
         allDocs.push({
             ref: warehouseRef,
             data: warehouseData,
@@ -106,13 +153,12 @@ export async function POST(request: NextRequest) {
 
         // 2. Create zones, racks, and shelves
         for (let z = 1; z <= zones; z++) {
-            const zoneRef = db.collection(`users/${businessId}/zones`).doc();
-            const zoneId = zoneRef.id;
-            const zoneName = `Zone-${z}`;
-            const zoneCode = `Z${z.toString().padStart(2, '0')}`;
+            const zoneCode = `${normalizedWarehouseCode}-Z${z.toString().padStart(2, '0')}`;
+            const zoneName = `Zone ${z}`;
+            const zoneRef = db.collection(`users/${businessId}/zones`).doc(zoneCode);
 
             const zoneData: Zone = {
-                id: zoneId,
+                id: zoneCode,
                 name: zoneName,
                 code: zoneCode,
                 description: '',
@@ -121,7 +167,7 @@ export async function POST(request: NextRequest) {
                 updatedAt: now,
                 createdBy: userId,
                 updatedBy: userId,
-                warehouseId: warehouseId,
+                warehouseId: normalizedWarehouseCode,
                 warehouseName: trimmedName,
                 deletedAt: null,
                 stats: {
@@ -129,7 +175,7 @@ export async function POST(request: NextRequest) {
                     totalShelves: 0,
                     totalProducts: 0,
                 },
-            }
+            };
 
             allDocs.push({
                 ref: zoneRef,
@@ -137,13 +183,12 @@ export async function POST(request: NextRequest) {
             });
 
             for (let r = 1; r <= racks; r++) {
-                const rackRef = db.collection(`users/${businessId}/racks`).doc();
-                const rackId = rackRef.id;
-                const rackName = `Rack-${r}`;
                 const rackCode = `${zoneCode}-R${r.toString().padStart(2, '0')}`;
+                const rackName = `Rack ${r}`;
+                const rackRef = db.collection(`users/${businessId}/racks`).doc(rackCode);
 
                 const rackData: Rack = {
-                    id: rackId,
+                    id: rackCode,
                     name: rackName,
                     code: rackCode,
                     position: r,
@@ -152,16 +197,16 @@ export async function POST(request: NextRequest) {
                     updatedAt: now,
                     createdBy: userId,
                     updatedBy: userId,
-                    warehouseId: warehouseId,
+                    warehouseId: normalizedWarehouseCode,
                     warehouseName: trimmedName,
-                    zoneId: zoneId,
+                    zoneId: zoneCode,
                     zoneName: zoneName,
                     deletedAt: null,
                     stats: {
                         totalShelves: 0,
                         totalProducts: 0,
                     },
-                }
+                };
 
                 allDocs.push({
                     ref: rackRef,
@@ -169,13 +214,12 @@ export async function POST(request: NextRequest) {
                 });
 
                 for (let s = 1; s <= shelves; s++) {
-                    const shelfRef = db.collection(`users/${businessId}/shelves`).doc();
-                    const shelfId = shelfRef.id;
-                    const shelfName = `Shelf-${s}`;
                     const shelfCode = `${rackCode}-S${s.toString().padStart(2, '0')}`;
+                    const shelfName = `Shelf ${s}`;
+                    const shelfRef = db.collection(`users/${businessId}/shelves`).doc(shelfCode);
 
                     const shelfData: Shelf = {
-                        id: shelfId,
+                        id: shelfCode,
                         name: shelfName,
                         code: shelfCode,
                         position: s,
@@ -185,11 +229,11 @@ export async function POST(request: NextRequest) {
                         updatedAt: now,
                         createdBy: userId,
                         updatedBy: userId,
-                        warehouseId: warehouseId,
+                        warehouseId: normalizedWarehouseCode,
                         warehouseName: trimmedName,
-                        zoneId: zoneId,
+                        zoneId: zoneCode,
                         zoneName: zoneName,
-                        rackId: rackId,
+                        rackId: rackCode,
                         rackName: rackName,
                         deletedAt: null,
                         coordinates: null,
@@ -197,7 +241,7 @@ export async function POST(request: NextRequest) {
                             totalProducts: 0,
                             currentOccupancy: 0,
                         },
-                    }
+                    };
 
                     allDocs.push({
                         ref: shelfRef,
@@ -233,7 +277,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             warehouse: {
-                id: warehouseId,
+                id: normalizedWarehouseCode,
+                code: normalizedWarehouseCode,
                 name: trimmedName,
             },
             structure: {

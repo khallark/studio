@@ -85,42 +85,6 @@ function normalizeColumnNames(row: any): MappingRow {
     return normalized;
 }
 
-function validateRow(row: MappingRow, rowIndex: number): { valid: boolean; error?: string } {
-
-    const warehouseCode = row['Warehouse Code']?.toString().trim();
-    const zoneCode = row['Zone Code']?.toString().trim();
-    const rackCode = row['Rack Code']?.toString().trim();
-    const shelfCode = row['Shelf Code']?.toString().trim();
-    const businessProductSKU = row['Business Product SKU']?.toString().trim();
-    const businessProductQuantity = row['Business Product Quantity']?.toString().trim();
-
-    if (!warehouseCode) {
-        return { valid: false, error: `Row ${rowIndex}: Warehouse Code is required` };
-    }
-
-    if (!zoneCode) {
-        return { valid: false, error: `Row ${rowIndex}: Zone Code is required` };
-    }
-
-    if (!rackCode) {
-        return { valid: false, error: `Row ${rowIndex}: Rack Code is required` };
-    }
-
-    if (!shelfCode) {
-        return { valid: false, error: `Row ${rowIndex}: Shelf Code is required` };
-    }
-
-    if (!businessProductSKU) {
-        return { valid: false, error: `Row ${rowIndex}: Business Product SKU is required` };
-    }
-
-    if (!businessProductQuantity) {
-        return { valid: false, error: `Row ${rowIndex}: Business Product Quantity is required` };
-    }
-
-    return { valid: true };
-}
-
 async function parseExcelFile(buffer: ArrayBuffer): Promise<MappingRow[]> {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
@@ -198,7 +162,6 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
         { header: 'Business Product Quantity', key: 'Business Product Quantity', width: 20 },
         { header: 'Status', key: 'Status', width: 12 },
         { header: 'Message', key: 'Message', width: 50 },
-        { header: 'Message', key: 'Message', width: 50 },
     ];
 
     worksheet.getRow(1).font = { bold: true };
@@ -239,6 +202,152 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
 }
+
+async function processRow(
+    row: MappingRow,
+    rowIndex: number,
+    businessId: string,
+    businessDoc: any,
+    userId: string,
+    userEmail: string | null,
+    req: NextRequest
+): Promise<{
+    result: ProcessedRow;
+    applyWrites?: (batch: FirebaseFirestore.WriteBatch) => number;
+}> {
+    const warehouseCode = row['Warehouse Code']?.toString().trim().toUpperCase();
+    const zoneCode = row['Zone Code']?.toString().trim().toUpperCase();
+    const rackCode = row['Rack Code']?.toString().trim().toUpperCase();
+    const shelfCode = row['Shelf Code']?.toString().trim().toUpperCase();
+    const businessProductSKU = row['Business Product SKU']?.toString().trim().toUpperCase();
+    const businessProductQuantity = Number(row['Business Product Quantity']);
+
+    if (!warehouseCode || !zoneCode || !rackCode || !shelfCode || !businessProductSKU) {
+        return {
+            result: { ...row, Status: 'Error', Message: `Row ${rowIndex}: Missing required fields` }
+        };
+    }
+
+    if (isNaN(businessProductQuantity) || businessProductQuantity <= 0) {
+        return {
+            result: { ...row, Status: 'Error', Message: `Invalid Business Product Quantity` }
+        };
+    }
+
+    const placementId = `${businessProductSKU}_${shelfCode}`;
+
+    const [
+        warehouseDoc,
+        zoneDoc,
+        rackDoc,
+        shelfDoc,
+        businessProductDoc,
+        placementDoc,
+    ] = await Promise.all([
+        db.collection('users').doc(businessId).collection('warehouses').doc(warehouseCode).get(),
+        db.collection('users').doc(businessId).collection('zones').doc(zoneCode).get(),
+        db.collection('users').doc(businessId).collection('racks').doc(rackCode).get(),
+        db.collection('users').doc(businessId).collection('shelves').doc(shelfCode).get(),
+        db.collection('users').doc(businessId).collection('products').doc(businessProductSKU).get(),
+        db.collection('users').doc(businessId).collection('placements').doc(placementId).get(),
+    ]);
+
+    if (!warehouseDoc.exists || !zoneDoc.exists || !rackDoc.exists || !shelfDoc.exists) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Invalid warehouse hierarchy`
+            }
+        };
+    }
+
+    if (!businessProductDoc.exists) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Business Product "${businessProductSKU}" does not exist`
+            }
+        };
+    }
+
+    const warehouseData = warehouseDoc.data() as Warehouse;
+    const zoneData = zoneDoc.data() as Zone;
+    const rackData = rackDoc.data() as Rack;
+    const shelfData = shelfDoc.data() as Shelf;
+
+    if (
+        shelfData.rackId !== rackData.code ||
+        shelfData.zoneId !== zoneData.code ||
+        shelfData.warehouseId !== warehouseData.code
+    ) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Shelf path mismatch`
+            }
+        };
+    }
+
+    const now = Timestamp.now();
+
+    return {
+        result: {
+            ...row,
+            Status: 'Success',
+            Message: `Placement "${placementId}" processed successfully`
+        },
+
+        applyWrites: (batch) => {
+            if (placementDoc.exists) {
+                batch.update(placementDoc.ref, {
+                    quantity: FieldValue.increment(businessProductQuantity),
+                    updatedAt: now,
+                    updatedBy: userId,
+                    lastMovementReason: 'inward_addition',
+                });
+            } else {
+                batch.set(placementDoc.ref, {
+                    id: placementId,
+                    productId: businessProductSKU,
+                    productSKU: businessProductSKU,
+                    quantity: businessProductQuantity,
+                    shelfId: shelfData.code,
+                    shelfName: shelfData.name,
+                    rackId: rackData.code,
+                    rackName: rackData.name,
+                    zoneId: zoneData.code,
+                    zoneName: zoneData.name,
+                    warehouseId: warehouseData.code,
+                    warehouseName: warehouseData.name,
+                    createdAt: now,
+                    updatedAt: now,
+                    createdBy: userId,
+                    updatedBy: userId,
+                    lastMovementReason: 'inward_addition',
+                    coordinates: null,
+                    locationCode: null,
+                    lastMovementReference: null,
+                });
+            }
+
+            const logRef = businessProductDoc.ref.collection('logs').doc();
+            batch.set(logRef, {
+                action: 'inventory_adjusted',
+                adjustmentType: 'inward',
+                adjustmentAmount: businessProductQuantity,
+                performedBy: userId,
+                performedByEmail: userEmail,
+                performedAt: now,
+            });
+
+            return 2; // number of writes added
+        }
+    };
+}
+
 
 // ============================================================
 // MAIN HANDLER
@@ -337,204 +446,44 @@ export async function POST(req: NextRequest) {
         const userData = userDoc?.data();
         const userEmail = userData?.email || userData?.primaryContact?.email || null;
 
-        for (let i = 0; i < data.length; i++) {
-            const row = data[i];
-            const rowIndex = i + 2;
+        const CONCURRENCY = 10;
 
-            // Skip empty rows
-            const warehouseCode = row['Warehouse Code']?.toString().trim().toUpperCase();
-            const zoneCode = row['Zone Code']?.toString().trim().toUpperCase();
-            const rackCode = row['Rack Code']?.toString().trim().toUpperCase();
-            const shelfCode = row['Shelf Code']?.toString().trim().toUpperCase();
-            const businessProductSKU = row['Business Product SKU']?.toString().trim().toUpperCase();
-            const businessProductQuantity = row['Business Product Quantity']?.toString().trim().toUpperCase();
+        for (let i = 0; i < data.length; i += CONCURRENCY) {
+            const chunk = data.slice(i, i + CONCURRENCY);
 
-            if (!warehouseCode && !zoneCode && !rackCode && !shelfCode && !businessProductSKU && !businessProductQuantity) {
-                continue;
-            }
+            const processed = await Promise.all(
+                chunk.map((row, idx) =>
+                    processRow(
+                        row,
+                        i + idx + 2,
+                        businessId,
+                        businessDoc,
+                        userId,
+                        userEmail,
+                        req
+                    )
+                )
+            );
 
-            // Validate row
-            const validation = validateRow(row, rowIndex);
-            if (!validation.valid) {
-                results.push({
-                    ...row,
-                    Status: 'Error',
-                    Message: validation.error || 'Validation failed',
-                });
-                errorCount++;
-                continue;
-            }
+            for (const item of processed) {
+                results.push(item.result);
 
-            /*
-                ===== ROW DATA VALIDATION =====
+                if (item.result.Status === 'Success') successCount++;
+                if (item.result.Status === 'Error') errorCount++;
+                if (item.result.Status === 'Skipped') skippedCount++;
 
-                1. Check if the shelf exists, i.e.:
-                - All the given entities (warehouse, zone, rack, shelf) must exists.
-                - The shelf path exists (can be checked from the shelf doc).
+                if (item.applyWrites) {
+                    batchCount += item.applyWrites(batch);
+                }
 
-                2. Check if Business Product exists. 
-            */
-            const placementId = `${businessProductSKU}_${shelfCode}`;
-
-            const [warehouseDoc, zoneDoc, rackDoc, shelfDoc, businessProductDoc, placementDoc] = await Promise.all([
-                await db.collection('users').doc(businessId).collection('warehouses').doc(warehouseCode || '').get(),
-                await db.collection('users').doc(businessId).collection('zones').doc(warehouseCode || '').get(),
-                await db.collection('users').doc(businessId).collection('racks').doc(warehouseCode || '').get(),
-                await db.collection('users').doc(businessId).collection('shelves').doc(warehouseCode || '').get(),
-                await db.collection('users').doc(businessId).collection('products').doc(businessProductSKU || '').get(),
-                await db.collection('users').doc(businessId).collection('placements').doc(placementId).get(),
-            ])
-
-            if (!warehouseDoc.exists) {
-                results.push({
-                    ...row,
-                    Status: 'Skipped',
-                    Message: `Warehouse entity "${warehouseCode}" does not exist`,
-                });
-                skippedCount++;
-                continue;
-            }
-
-            if (!zoneDoc.exists) {
-                results.push({
-                    ...row,
-                    Status: 'Skipped',
-                    Message: `Zone entity "${zoneCode}" does not exist`,
-                });
-                skippedCount++;
-                continue;
-            }
-
-            if (!rackDoc.exists) {
-                results.push({
-                    ...row,
-                    Status: 'Skipped',
-                    Message: `Rack entity "${rackCode}" does not exist`,
-                });
-                skippedCount++;
-                continue;
-            }
-
-            if (!shelfDoc.exists) {
-                results.push({
-                    ...row,
-                    Status: 'Skipped',
-                    Message: `Shelf entity "${shelfCode}" does not exist`,
-                });
-                skippedCount++;
-                continue;
-            }
-
-            if (!businessProductDoc.exists) {
-                results.push({
-                    ...row,
-                    Status: 'Skipped',
-                    Message: `Business Product "${businessProductSKU}" does not exist`,
-                });
-                skippedCount++;
-                continue;
-            }
-
-            const warehouseData = warehouseDoc.data() as Warehouse;
-            const zoneData = zoneDoc.data() as Zone;
-            const rackData = rackDoc.data() as Rack;
-            const shelfData = warehouseDoc.data() as Shelf;
-            const now = Timestamp.now();
-
-            // Create the placement
-            const newPlacementData: Placement = {
-                id: placementId,
-                productId: String(businessProductSKU),
-                productSKU: String(businessProductSKU),
-                quantity: Number(businessProductQuantity),
-                shelfId: shelfData.code,
-                shelfName: shelfData.name,
-                rackId: rackData.code,
-                rackName: rackData.name,
-                zoneId: zoneData.code,
-                zoneName: zoneData.name,
-                warehouseId: warehouseData.code,
-                warehouseName: warehouseData.name,
-                createdAt: now,
-                updatedAt: now,
-                createdBy: userId,
-                updatedBy: userId,
-                lastMovementReason: 'inward_addition',
-                coordinates: null,
-                locationCode: null,
-                lastMovementReference: null,
-            }
-
-            if (placementDoc.exists) {
-                // Update existing placement - increment quantity
-                batch.update(placementDoc.ref, {
-                    quantity: FieldValue.increment(Number(businessProductQuantity) || 0),
-                    updatedAt: now,
-                    updatedBy: userId,
-                    lastMovementReason: 'inward_addition',
-                });
-            } else {
-                batch.set(placementDoc.ref, newPlacementData);
-            }
-            batchCount++;
-
-            // Create the product log
-            const businessProductData = businessDoc?.data();
-            const oldValue = Number(businessProductData?.inventory?.inwardAddition) || 0;
-            const newValue = oldValue + (Number(businessProductQuantity) || 0);
-            const logEntry = {
-                action: 'inventory_adjusted',
-                changes: [
-                    {
-                        field: 'inventory.inwardAddition',
-                        fieldLabel: 'Inward Addition',
-                        oldValue: oldValue,
-                        newValue: newValue,
-                    },
-                ],
-                adjustmentType: 'inward',
-                adjustmentAmount: Number(businessProductQuantity) || 0,
-                performedBy: userId || 'unknown',
-                performedByEmail: userEmail,
-                performedAt: now,
-                placement: {
-                    placementId,
-                    shelfId: newPlacementData.shelfId,
-                    shelfName: newPlacementData.shelfName,
-                    rackId: newPlacementData.rackId,
-                    rackName: newPlacementData.rackName,
-                    zoneId: newPlacementData.zoneId,
-                    zoneName: newPlacementData.zoneName,
-                    warehouseId: newPlacementData.warehouseId,
-                    warehouseName: newPlacementData.warehouseName,
-                },
-                metadata: {
-                    userAgent: req.headers.get('user-agent') || undefined,
-                    previousPhysicalStock: null,
-                    newPhysicalStock: null,
-                    previousAvailableStock: null,
-                    newAvailableStock: null,
-                },
-            };
-
-            const logRef = businessProductDoc.ref.collection('logs').doc();
-            batch.set(logRef, logEntry);
-            batchCount++;
-
-            results.push({
-                ...row,
-                Status: 'Success',
-                Message: `Created placement "${placementId}" for business product ${businessProductSKU} in shelf "${shelfCode}", rack "${rackCode}, zone "${zoneCode}", warehouse "${warehouseCode}".`,
-            });
-            successCount++;
-
-            // Commit batch if approaching limit
-            if (batchCount >= MAX_BATCH_SIZE) {
-                await batch.commit();
-                batch = db.batch();
-                batchCount = 0;
+                if (batchCount >= MAX_BATCH_SIZE) {
+                    await batch.commit();
+                    batch = db.batch();
+                    batchCount = 0;
+                }
             }
         }
+
 
         // Commit remaining operations
         if (batchCount > 0) {

@@ -178,6 +178,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/products/create-mapping/route',
       },
       {
+        source: '/api/shopify/products/bulk-mapping',
+        destination: '/api/shopify/products/bulk-mapping/route',
+      },
+      {
         source: '/api/shopify/products/remove-mapping',
         destination: '/api/shopify/products/remove-mapping/route',
       },
@@ -256,6 +260,10 @@ const nextConfig: NextConfig = {
       {
         source: '/api/business/inventory/adjust',
         destination: '/api/business/inventory/adjust/route',
+      },
+      {
+        source: '/api/business/inventory/bulk-inward',
+        destination: '/api/business/inventory/bulk-inward/route',
       },
       {
         source: '/api/business/warehouse/create-warehouse',

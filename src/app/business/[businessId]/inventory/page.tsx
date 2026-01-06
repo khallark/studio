@@ -74,6 +74,7 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { BulkInwardDialog } from '@/components/bulk-inward-dialog';
 
 // ============================================================
 // TYPES
@@ -1029,6 +1030,9 @@ export default function InventoryPage() {
     const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
     const [adjustmentType, setAdjustmentType] = useState<AdjustmentType>('inward');
 
+    // Bulk mapping dialog state
+    const [bulkInwardOpen, setBulkInwardOpen] = useState(false);
+
     // ============================================================
     // EFFECTS
     // ============================================================
@@ -1229,6 +1233,17 @@ export default function InventoryPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                        variant="outline"
+                        asChild
+                        onClick={() => setBulkInwardOpen(true)}
+                        className="gap-2"
+                    >
+                        <Link href={`/business/${businessId}/products`}>
+                            <Package className="h-4 w-4" />
+                            Bulk Inward
+                        </Link>
+                    </Button>
                     <Button
                         variant="outline"
                         asChild
@@ -1783,6 +1798,15 @@ export default function InventoryPage() {
                 type={adjustmentType}
                 user={user}
                 businessId={businessId}
+            />
+
+            {/* Bulk Mapping Dialog */}
+            <BulkInwardDialog
+                open={bulkInwardOpen}
+                onOpenChange={setBulkInwardOpen}
+                businessId={businessId}
+                user={user}
+                onMappingComplete={() => {}}
             />
         </div>
     );

@@ -1239,10 +1239,8 @@ export default function InventoryPage() {
                         onClick={() => setBulkInwardOpen(true)}
                         className="gap-2"
                     >
-                        <Link href={`/business/${businessId}/products`}>
-                            <Package className="h-4 w-4" />
-                            Bulk Inward
-                        </Link>
+                        <Package className="h-4 w-4" />
+                        Bulk Inward
                     </Button>
                     <Button
                         variant="outline"
@@ -1806,7 +1804,7 @@ export default function InventoryPage() {
                 onOpenChange={setBulkInwardOpen}
                 businessId={businessId}
                 user={user}
-                onMappingComplete={() => {}}
+                onMappingComplete={() => { }}
             />
         </div>
     );

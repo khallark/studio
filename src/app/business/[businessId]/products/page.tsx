@@ -58,6 +58,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from 'use-debounce';
 import {
@@ -84,6 +85,9 @@ import {
     Sparkles,
     History,
     Link2,
+    Link2Off,
+    Unlink,
+    AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -200,12 +204,19 @@ export default function ProductsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
+    // Selection state
+    const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Remove Mappings Dialog state
+    const [isRemoveMappingsDialogOpen, setIsRemoveMappingsDialogOpen] = useState(false);
+    const [isRemovingMappings, setIsRemovingMappings] = useState(false);
 
     // Activity Log state
     const [activityLogOpen, setActivityLogOpen] = useState(false);
@@ -264,6 +275,11 @@ export default function ProductsPage() {
     useEffect(() => {
         setCurrentPage(1);
     }, [debouncedSearch, categoryFilter, sortField, sortDirection]);
+
+    // Clear selection when products change
+    useEffect(() => {
+        setSelectedProducts(new Set());
+    }, [products]);
 
     // ============================================================
     // COMPUTED VALUES
@@ -330,6 +346,35 @@ export default function ProductsPage() {
         return products.filter((p) => p.mappedVariants && p.mappedVariants.length > 0).length;
     }, [products]);
 
+    // Count total mappings in selected products
+    const selectedMappingsCount = useMemo(() => {
+        let count = 0;
+        selectedProducts.forEach((sku) => {
+            const product = products.find((p) => p.sku === sku);
+            if (product?.mappedVariants) {
+                count += product.mappedVariants.length;
+            }
+        });
+        return count;
+    }, [selectedProducts, products]);
+
+    // Count total mappings across all products
+    const totalMappingsCount = useMemo(() => {
+        return products.reduce((sum, p) => sum + (p.mappedVariants?.length || 0), 0);
+    }, [products]);
+
+    // Check if all visible products are selected
+    const allVisibleSelected = useMemo(() => {
+        if (paginatedProducts.length === 0) return false;
+        return paginatedProducts.every((p) => selectedProducts.has(p.sku));
+    }, [paginatedProducts, selectedProducts]);
+
+    // Check if some visible products are selected
+    const someVisibleSelected = useMemo(() => {
+        if (paginatedProducts.length === 0) return false;
+        return paginatedProducts.some((p) => selectedProducts.has(p.sku)) && !allVisibleSelected;
+    }, [paginatedProducts, selectedProducts, allVisibleSelected]);
+
     // ============================================================
     // HANDLERS
     // ============================================================
@@ -341,6 +386,32 @@ export default function ProductsPage() {
             setSortField(field);
             setSortDirection('asc');
         }
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            const newSelected = new Set(selectedProducts);
+            paginatedProducts.forEach((p) => newSelected.add(p.sku));
+            setSelectedProducts(newSelected);
+        } else {
+            const newSelected = new Set(selectedProducts);
+            paginatedProducts.forEach((p) => newSelected.delete(p.sku));
+            setSelectedProducts(newSelected);
+        }
+    };
+
+    const handleSelectProduct = (sku: string, checked: boolean) => {
+        const newSelected = new Set(selectedProducts);
+        if (checked) {
+            newSelected.add(sku);
+        } else {
+            newSelected.delete(sku);
+        }
+        setSelectedProducts(newSelected);
+    };
+
+    const handleClearSelection = () => {
+        setSelectedProducts(new Set());
     };
 
     const handleOpenDialog = (product?: Product) => {
@@ -525,6 +596,50 @@ export default function ProductsPage() {
         }
     };
 
+    const handleRemoveMappings = async (removeAll: boolean) => {
+        if (!user || !businessId) return;
+
+        setIsRemovingMappings(true);
+
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/business/products/bulk-remove-all-mappings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    ...(removeAll
+                        ? { removeAll: true }
+                        : { skus: Array.from(selectedProducts) }
+                    ),
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to remove mappings');
+
+            toast({
+                title: 'Mappings Removed',
+                description: result.message,
+            });
+
+            setSelectedProducts(new Set());
+            setIsRemoveMappingsDialogOpen(false);
+        } catch (error) {
+            console.error('Error removing mappings:', error);
+            toast({
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to remove mappings.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsRemovingMappings(false);
+        }
+    };
+
     const formatDate = (timestamp?: Timestamp) => {
         if (!timestamp) return '—';
         return timestamp.toDate().toLocaleDateString('en-IN', {
@@ -615,6 +730,52 @@ export default function ProductsPage() {
                     </Button>
                 </div>
             </motion.div>
+
+            {/* Selection Action Bar */}
+            <AnimatePresence>
+                {selectedProducts.size > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="border-b bg-primary/5"
+                    >
+                        <div className="flex items-center justify-between px-4 md:px-6 py-3">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                                    {selectedProducts.size} selected
+                                </Badge>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleClearSelection}
+                                    className="h-7 text-xs"
+                                >
+                                    Clear selection
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {/* Remove Mappings Button */}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsRemoveMappingsDialogOpen(true)}
+                                    className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive/50"
+                                >
+                                    <Unlink className="h-4 w-4" />
+                                    Remove Mappings
+                                    {selectedMappingsCount > 0 && (
+                                        <Badge variant="secondary" className="ml-1 bg-destructive/10 text-destructive">
+                                            {selectedMappingsCount}
+                                        </Badge>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Stats Cards */}
             <motion.div
@@ -762,6 +923,7 @@ export default function ProductsPage() {
                             <div className="p-6 space-y-4">
                                 {[...Array(5)].map((_, i) => (
                                     <div key={i} className="flex items-center gap-4">
+                                        <Skeleton className="h-5 w-5 rounded" />
                                         <Skeleton className="h-10 w-10 rounded-lg" />
                                         <div className="flex-1 space-y-2">
                                             <Skeleton className="h-4 w-1/3" />
@@ -815,7 +977,19 @@ export default function ProductsPage() {
                             <Table>
                                 <TableHeader className="bg-muted/50 sticky top-0">
                                     <TableRow className="hover:bg-transparent">
-                                        <TableHead className="w-[300px]">
+                                        <TableHead className="w-[50px]">
+                                            <Checkbox
+                                                checked={allVisibleSelected}
+                                                ref={(el) => {
+                                                    if (el) {
+                                                        (el as any).indeterminate = someVisibleSelected;
+                                                    }
+                                                }}
+                                                onCheckedChange={handleSelectAll}
+                                                aria-label="Select all"
+                                            />
+                                        </TableHead>
+                                        <TableHead className="w-[280px]">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -886,8 +1060,20 @@ export default function ProductsPage() {
                                                 animate="visible"
                                                 exit="exit"
                                                 layout
-                                                className="group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                                                className={cn(
+                                                    "group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+                                                    selectedProducts.has(product.sku) && "bg-primary/5"
+                                                )}
                                             >
+                                                <TableCell className="py-3">
+                                                    <Checkbox
+                                                        checked={selectedProducts.has(product.sku)}
+                                                        onCheckedChange={(checked) =>
+                                                            handleSelectProduct(product.sku, checked as boolean)
+                                                        }
+                                                        aria-label={`Select ${product.name}`}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="py-3">
                                                     <div className="flex items-center gap-3">
                                                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 ring-1 ring-primary/10 group-hover:ring-primary/20 transition-all">
@@ -1260,6 +1446,109 @@ export default function ProductsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Remove Mappings Confirmation Dialog */}
+            <Dialog open={isRemoveMappingsDialogOpen} onOpenChange={setIsRemoveMappingsDialogOpen}>
+                <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-destructive/10 ring-1 ring-destructive/20">
+                                <Unlink className="h-5 w-5 text-destructive" />
+                            </div>
+                            <div>
+                                <DialogTitle>Remove Product Mappings</DialogTitle>
+                                <DialogDescription>
+                                    Choose which mappings to remove
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                        <div className="rounded-lg border bg-amber-500/5 border-amber-500/20 p-4">
+                            <div className="flex gap-3">
+                                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                        This action will unlink store variants
+                                    </p>
+                                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                                        All variant mappings will be removed from the selected business products.
+                                        The store products will no longer be linked.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                                <div>
+                                    <p className="text-sm font-medium">Selected products</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {selectedProducts.size} product(s) with {selectedMappingsCount} mapping(s)
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRemoveMappings(false)}
+                                    disabled={isRemovingMappings || selectedMappingsCount === 0}
+                                    className="gap-2"
+                                >
+                                    {isRemovingMappings ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Unlink className="h-4 w-4" />
+                                    )}
+                                    Remove
+                                </Button>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-background px-2 text-muted-foreground">or</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                                <div>
+                                    <p className="text-sm font-medium">All products</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {mappedProductsCount} product(s) with {totalMappingsCount} mapping(s)
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleRemoveMappings(true)}
+                                    disabled={isRemovingMappings || totalMappingsCount === 0}
+                                    className="gap-2"
+                                >
+                                    {isRemovingMappings ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Unlink className="h-4 w-4" />
+                                    )}
+                                    Remove All
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsRemoveMappingsDialogOpen(false)}
+                            disabled={isRemovingMappings}
+                        >
+                            Cancel
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Activity Log Sheet */}
             {activityLogProduct && (

@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase-admin';
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, zoneId, name, code, description } = body;
+        const { businessId, zoneId, name, description } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -35,9 +35,15 @@ export async function PUT(request: NextRequest) {
         }
 
         const zoneRef = db.doc(`users/${businessId}/zones/${zoneId}`);
+        const zoneDoc = await zoneRef.get();
+
+        if (!zoneDoc.exists) {
+            return NextResponse.json({ error: 'Zone not found' }, { status: 404 });
+        }
+
+        // Note: code is not updated as it serves as the document ID
         await zoneRef.update({
             name: name.trim(),
-            code: code?.trim() || '',
             description: description?.trim() || '',
             updatedAt: Timestamp.now(),
             updatedBy: userId,

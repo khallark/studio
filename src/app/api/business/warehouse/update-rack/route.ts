@@ -8,7 +8,7 @@ import { authUserForBusiness } from '@/lib/authoriseUser';
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, rackId, name, code, position } = body;
+        const { businessId, rackId, name, position } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -93,9 +93,9 @@ export async function PUT(request: NextRequest) {
         }
 
         // Update the rack itself
+        // Note: code is not updated as it serves as the document ID
         batch.update(rackRef, {
             name: name.trim(),
-            code: code?.trim() || '',
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,

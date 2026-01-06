@@ -8,7 +8,7 @@ import { authUserForBusiness } from '@/lib/authoriseUser';
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, shelfId, name, code, position, capacity, coordinates } = body;
+        const { businessId, shelfId, name, position, capacity, coordinates } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -93,9 +93,9 @@ export async function PUT(request: NextRequest) {
         }
 
         // Update the shelf itself
+        // Note: code is not updated as it serves as the document ID
         const updateData: Record<string, any> = {
             name: name.trim(),
-            code: code?.trim() || '',
             position: newPosition,
             capacity: capacity || null,
             updatedAt: Timestamp.now(),

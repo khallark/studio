@@ -38,6 +38,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Shelf name is required' }, { status: 400 });
         }
 
+        if (!code || !code.trim()) {
+            return NextResponse.json({ error: 'Shelf code is required' }, { status: 400 });
+        }
+
+        // Normalize code (uppercase, trimmed)
+        const normalizedCode = code.trim().toUpperCase();
+
+        // Use code as document ID
+        const shelfRef = db.collection(`users/${businessId}/shelves`).doc(normalizedCode);
+
+        // Check if shelf with this code already exists
+        const existingShelf = await shelfRef.get();
+        if (existingShelf.exists) {
+            return NextResponse.json(
+                { error: `Shelf with code "${normalizedCode}" already exists` },
+                { status: 409 }
+            );
+        }
+
         // Get existing shelves in the rack to determine position
         const existingShelvesSnap = await db
             .collection(`users/${businessId}/shelves`)
@@ -54,18 +73,15 @@ export async function POST(request: NextRequest) {
         let finalPosition: number;
 
         if (position && position > 0) {
-            // User specified a position - use it and shift others if needed
             finalPosition = position;
 
-            // Find shelves that need to be shifted (position >= new position)
             const shelvesToShift = existingShelves.filter(s => s.position >= finalPosition);
 
             if (shelvesToShift.length > 0) {
-                // Shift existing shelves up by 1
                 const batch = db.batch();
                 for (const shelf of shelvesToShift) {
-                    const shelfRef = db.doc(`users/${businessId}/shelves/${shelf.id}`);
-                    batch.update(shelfRef, {
+                    const shelfRefToShift = db.doc(`users/${businessId}/shelves/${shelf.id}`);
+                    batch.update(shelfRefToShift, {
                         position: shelf.position + 1,
                         updatedAt: Timestamp.now(),
                         updatedBy: userId,
@@ -74,21 +90,16 @@ export async function POST(request: NextRequest) {
                 await batch.commit();
             }
         } else {
-            // No position specified - append at the end
             const maxPosition = existingShelves.reduce((max, s) => Math.max(max, s.position), 0);
             finalPosition = maxPosition + 1;
         }
 
-        const shelfRef = db.collection(`users/${businessId}/shelves`).doc();
         const now = Timestamp.now();
 
-        // Path will be computed by cloud function, but we can set initial value
-        const path = `${zoneName || ''} > ${rackName || ''} > ${name.trim()}`;
-
         const shelfData: Shelf = {
-            id: shelfRef.id,
+            id: normalizedCode,
             name: name.trim(),
-            code: code?.trim() || '',
+            code: normalizedCode,
             position: finalPosition,
             capacity: capacity || null,
             rackId,
@@ -112,7 +123,10 @@ export async function POST(request: NextRequest) {
 
         await shelfRef.set(shelfData);
 
-        return NextResponse.json({ success: true, shelf: { id: shelfRef.id, name: name.trim(), position: finalPosition } });
+        return NextResponse.json({
+            success: true,
+            shelf: { id: normalizedCode, code: normalizedCode, name: name.trim(), position: finalPosition },
+        });
     } catch (error) {
         console.error('Error creating shelf:', error);
         return NextResponse.json({ error: 'Failed to create shelf' }, { status: 500 });

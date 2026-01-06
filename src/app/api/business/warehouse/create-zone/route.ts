@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
         }
-        
+
         const result = await authUserForBusiness({ businessId, req: request });
 
         if (!result.authorised) {
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
         }
 
         const { userId } = result;
-        
-        if(!userId) {
+
+        if (!userId) {
             return NextResponse.json({ error: 'User not logged in' }, { status: 401 });
         }
 
@@ -35,13 +35,31 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Zone name is required' }, { status: 400 });
         }
 
-        const zoneRef = db.collection(`users/${businessId}/zones`).doc();
+        if (!code || !code.trim()) {
+            return NextResponse.json({ error: 'Zone code is required' }, { status: 400 });
+        }
+
+        // Normalize code (uppercase, trimmed)
+        const normalizedCode = code.trim().toUpperCase();
+
+        // Use code as document ID
+        const zoneRef = db.collection(`users/${businessId}/zones`).doc(normalizedCode);
+
+        // Check if zone with this code already exists
+        const existingZone = await zoneRef.get();
+        if (existingZone.exists) {
+            return NextResponse.json(
+                { error: `Zone with code "${normalizedCode}" already exists` },
+                { status: 409 }
+            );
+        }
+
         const now = Timestamp.now();
 
         const zoneData: Zone = {
-            id: zoneRef.id,
+            id: normalizedCode, // Same as doc ID
             name: name.trim(),
-            code: code?.trim() || '',
+            code: normalizedCode,
             description: description?.trim() || '',
             warehouseId,
             warehouseName: warehouseName || '',
@@ -60,7 +78,10 @@ export async function POST(request: NextRequest) {
 
         await zoneRef.set(zoneData);
 
-        return NextResponse.json({ success: true, zone: { id: zoneRef.id, name: name.trim() } });
+        return NextResponse.json({
+            success: true,
+            zone: { id: normalizedCode, code: normalizedCode, name: name.trim() },
+        });
     } catch (error) {
         console.error('Error creating zone:', error);
         return NextResponse.json({ error: 'Failed to create zone' }, { status: 500 });

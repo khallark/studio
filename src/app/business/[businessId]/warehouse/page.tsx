@@ -79,6 +79,7 @@ interface WarehouseStats {
 
 interface WarehouseData {
     id: string;
+    code: string;
     name: string;
     address: string;
     stats: WarehouseStats;
@@ -161,7 +162,6 @@ interface MoveTarget {
     type: 'zone' | 'rack' | 'shelf';
     id: string;
     name: string;
-    // Current location info
     warehouseId: string;
     warehouseName: string;
     zoneId?: string;
@@ -355,41 +355,62 @@ interface WarehouseDialogProps {
 
 function WarehouseDialog({ open, onOpenChange, onSuccess, businessId, editData, user }: WarehouseDialogProps) {
     const [name, setName] = useState('');
+    const [code, setCode] = useState('');
     const [address, setAddress] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
     const isEdit = !!editData;
 
     useEffect(() => {
         if (editData) {
             setName(editData.name);
+            setCode(editData.code || '');
             setAddress(editData.address || '');
         } else {
             setName('');
+            setCode('');
             setAddress('');
         }
+        setError(null);
     }, [editData, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!isEdit && !code.trim()) {
+            setError('Warehouse code is required');
+            return;
+        }
 
         setIsSubmitting(true);
+        setError(null);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-warehouse' : '/api/business/warehouse/create-warehouse';
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, warehouseId: editData?.id, name, address }),
+                body: JSON.stringify({
+                    businessId,
+                    warehouseId: editData?.id,
+                    name,
+                    code: isEdit ? undefined : code.trim().toUpperCase(),
+                    address,
+                }),
             });
-            if (!res.ok) throw new Error('Failed to save warehouse');
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to save warehouse');
+            }
 
             toast({ title: isEdit ? 'Warehouse updated' : 'Warehouse created', description: `${name} has been ${isEdit ? 'updated' : 'created'} successfully.` });
             onOpenChange(false);
             onSuccess();
-        } catch (error) {
-            toast({ title: 'Error', description: `Failed to ${isEdit ? 'update' : 'create'} warehouse.`, variant: 'destructive' });
+        } catch (err: any) {
+            setError(err.message);
+            toast({ title: 'Error', description: err.message || `Failed to ${isEdit ? 'update' : 'create'} warehouse.`, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -410,17 +431,53 @@ function WarehouseDialog({ open, onOpenChange, onSuccess, businessId, editData, 
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="warehouse-name">Warehouse Name</Label>
-                        <Input id="warehouse-name" placeholder="e.g., Main Warehouse" value={name} onChange={(e) => setName(e.target.value)} required />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="warehouse-name">
+                                Warehouse Name <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="warehouse-name"
+                                placeholder="e.g., Main Warehouse"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="warehouse-code">
+                                Code <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="warehouse-code"
+                                placeholder="e.g., WH01"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                disabled={isEdit}
+                                className={cn(isEdit && 'bg-muted cursor-not-allowed')}
+                                required={!isEdit}
+                            />
+                            {isEdit && (
+                                <p className="text-xs text-muted-foreground">Code cannot be changed</p>
+                            )}
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="warehouse-address">Address</Label>
-                        <Textarea id="warehouse-address" placeholder="Enter warehouse address..." value={address} onChange={(e) => setAddress(e.target.value)} rows={3} />
+                        <Textarea
+                            id="warehouse-address"
+                            placeholder="Enter warehouse address..."
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            rows={3}
+                        />
                     </div>
+                    {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                    )}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                        <Button type="submit" disabled={isSubmitting || !name.trim() || (!isEdit && !code.trim())}>
                             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {isEdit ? 'Save Changes' : 'Create Warehouse'}
                         </Button>
@@ -451,6 +508,7 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
     const [code, setCode] = useState('');
     const [description, setDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
     const isEdit = !!editData;
 
@@ -464,28 +522,47 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
             setCode('');
             setDescription('');
         }
+        setError(null);
     }, [editData, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!isEdit && !code.trim()) {
+            setError('Zone code is required');
+            return;
+        }
 
         setIsSubmitting(true);
+        setError(null);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-zone' : '/api/business/warehouse/create-zone';
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, zoneId: editData?.id, warehouseId, warehouseName, name, code, description }),
+                body: JSON.stringify({
+                    businessId,
+                    zoneId: editData?.id,
+                    warehouseId,
+                    warehouseName,
+                    name,
+                    code: isEdit ? undefined : code.trim().toUpperCase(),
+                    description,
+                }),
             });
-            if (!res.ok) throw new Error('Failed to save zone');
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to save zone');
+            }
 
             toast({ title: isEdit ? 'Zone updated' : 'Zone created', description: `${name} has been ${isEdit ? 'updated' : 'created'} successfully.` });
             onOpenChange(false);
             onSuccess();
-        } catch (error) {
-            toast({ title: 'Error', description: `Failed to ${isEdit ? 'update' : 'create'} zone.`, variant: 'destructive' });
+        } catch (err: any) {
+            setError(err.message);
+            toast({ title: 'Error', description: err.message || `Failed to ${isEdit ? 'update' : 'create'} zone.`, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -506,21 +583,53 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="zone-name">Zone Name</Label>
-                        <Input id="zone-name" placeholder="e.g., Zone A" value={name} onChange={(e) => setName(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="zone-code">Code</Label>
-                        <Input id="zone-code" placeholder="e.g., Z-001" value={code} onChange={(e) => setCode(e.target.value)} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="zone-name">
+                                Zone Name <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="zone-name"
+                                placeholder="e.g., Zone A"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="zone-code">
+                                Code <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="zone-code"
+                                placeholder="e.g., WH01-Z01"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                disabled={isEdit}
+                                className={cn(isEdit && 'bg-muted cursor-not-allowed')}
+                                required={!isEdit}
+                            />
+                            {isEdit && (
+                                <p className="text-xs text-muted-foreground">Code cannot be changed</p>
+                            )}
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="zone-description">Description (Optional)</Label>
-                        <Textarea id="zone-description" placeholder="Zone description..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+                        <Textarea
+                            id="zone-description"
+                            placeholder="Zone description..."
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            rows={2}
+                        />
                     </div>
+                    {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                    )}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                        <Button type="submit" disabled={isSubmitting || !name.trim() || (!isEdit && !code.trim())}>
                             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {isEdit ? 'Save Changes' : 'Create Zone'}
                         </Button>
@@ -553,6 +662,7 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
     const [code, setCode] = useState('');
     const [position, setPosition] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
     const isEdit = !!editData;
 
@@ -566,28 +676,49 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
             setCode('');
             setPosition('');
         }
+        setError(null);
     }, [editData, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!isEdit && !code.trim()) {
+            setError('Rack code is required');
+            return;
+        }
 
         setIsSubmitting(true);
+        setError(null);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-rack' : '/api/business/warehouse/create-rack';
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, rackId: editData?.id, zoneId, zoneName, warehouseId, warehouseName, name, code, position: position ? parseInt(position) : 0 }),
+                body: JSON.stringify({
+                    businessId,
+                    rackId: editData?.id,
+                    zoneId,
+                    zoneName,
+                    warehouseId,
+                    warehouseName,
+                    name,
+                    code: isEdit ? undefined : code.trim().toUpperCase(),
+                    position: position ? parseInt(position) : 0,
+                }),
             });
-            if (!res.ok) throw new Error('Failed to save rack');
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to save rack');
+            }
 
             toast({ title: isEdit ? 'Rack updated' : 'Rack created', description: `${name} has been ${isEdit ? 'updated' : 'created'} successfully.` });
             onOpenChange(false);
             onSuccess();
-        } catch (error) {
-            toast({ title: 'Error', description: `Failed to ${isEdit ? 'update' : 'create'} rack.`, variant: 'destructive' });
+        } catch (err: any) {
+            setError(err.message);
+            toast({ title: 'Error', description: err.message || `Failed to ${isEdit ? 'update' : 'create'} rack.`, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -609,22 +740,52 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="rack-name">Rack Name</Label>
-                        <Input id="rack-name" placeholder="e.g., Rack 1" value={name} onChange={(e) => setName(e.target.value)} required />
+                        <Label htmlFor="rack-name">
+                            Rack Name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="rack-name"
+                            placeholder="e.g., Rack 1"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                        />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="rack-code">Code</Label>
-                            <Input id="rack-code" placeholder="e.g., R-001" value={code} onChange={(e) => setCode(e.target.value)} />
+                            <Label htmlFor="rack-code">
+                                Code <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="rack-code"
+                                placeholder="e.g., WH01-Z01-R01"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                disabled={isEdit}
+                                className={cn(isEdit && 'bg-muted cursor-not-allowed')}
+                                required={!isEdit}
+                            />
+                            {isEdit && (
+                                <p className="text-xs text-muted-foreground">Code cannot be changed</p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="rack-position">Position</Label>
-                            <Input id="rack-position" type="number" placeholder="e.g., 1" value={position} onChange={(e) => setPosition(e.target.value)} />
+                            <Input
+                                id="rack-position"
+                                type="number"
+                                placeholder="e.g., 1"
+                                value={position}
+                                onChange={(e) => setPosition(e.target.value)}
+                            />
                         </div>
                     </div>
+                    {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                    )}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                        <Button type="submit" disabled={isSubmitting || !name.trim() || (!isEdit && !code.trim())}>
                             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {isEdit ? 'Save Changes' : 'Create Rack'}
                         </Button>
@@ -663,6 +824,7 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
     const [bay, setBay] = useState('');
     const [level, setLevel] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
     const isEdit = !!editData;
 
@@ -684,13 +846,19 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
             setBay('');
             setLevel('');
         }
+        setError(null);
     }, [editData, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!isEdit && !code.trim()) {
+            setError('Shelf code is required');
+            return;
+        }
 
         setIsSubmitting(true);
+        setError(null);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-shelf' : '/api/business/warehouse/create-shelf';
             const coordinates = aisle || bay || level ? { aisle: aisle || '', bay: bay ? parseInt(bay) : 0, level: level ? parseInt(level) : 0 } : null;
@@ -699,17 +867,33 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({
-                    businessId, shelfId: editData?.id, rackId, rackName, zoneId, zoneName, warehouseId, warehouseName,
-                    name, code, position: position ? parseInt(position) : 0, capacity: capacity ? parseInt(capacity) : null, coordinates,
+                    businessId,
+                    shelfId: editData?.id,
+                    rackId,
+                    rackName,
+                    zoneId,
+                    zoneName,
+                    warehouseId,
+                    warehouseName,
+                    name,
+                    code: isEdit ? undefined : code.trim().toUpperCase(),
+                    position: position ? parseInt(position) : 0,
+                    capacity: capacity ? parseInt(capacity) : null,
+                    coordinates,
                 }),
             });
-            if (!res.ok) throw new Error('Failed to save shelf');
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to save shelf');
+            }
 
             toast({ title: isEdit ? 'Shelf updated' : 'Shelf created', description: `${name} has been ${isEdit ? 'updated' : 'created'} successfully.` });
             onOpenChange(false);
             onSuccess();
-        } catch (error) {
-            toast({ title: 'Error', description: `Failed to ${isEdit ? 'update' : 'create'} shelf.`, variant: 'destructive' });
+        } catch (err: any) {
+            setError(err.message);
+            toast({ title: 'Error', description: err.message || `Failed to ${isEdit ? 'update' : 'create'} shelf.`, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -730,22 +914,57 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="shelf-name">Shelf Name</Label>
-                        <Input id="shelf-name" placeholder="e.g., Shelf 1" value={name} onChange={(e) => setName(e.target.value)} required />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="shelf-code">Code</Label>
-                            <Input id="shelf-code" placeholder="S-001" value={code} onChange={(e) => setCode(e.target.value)} />
+                            <Label htmlFor="shelf-name">
+                                Shelf Name <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="shelf-name"
+                                placeholder="e.g., Shelf 1"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                            />
                         </div>
                         <div className="space-y-2">
+                            <Label htmlFor="shelf-code">
+                                Code <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="shelf-code"
+                                placeholder="e.g., WH01-Z01-R01-S01"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                disabled={isEdit}
+                                className={cn(isEdit && 'bg-muted cursor-not-allowed')}
+                                required={!isEdit}
+                            />
+                            {isEdit && (
+                                <p className="text-xs text-muted-foreground">Code cannot be changed</p>
+                            )}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <Label htmlFor="shelf-position">Position</Label>
-                            <Input id="shelf-position" type="number" placeholder="1" value={position} onChange={(e) => setPosition(e.target.value)} />
+                            <Input
+                                id="shelf-position"
+                                type="number"
+                                placeholder="1"
+                                value={position}
+                                onChange={(e) => setPosition(e.target.value)}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="shelf-capacity">Capacity</Label>
-                            <Input id="shelf-capacity" type="number" placeholder="100" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+                            <Input
+                                id="shelf-capacity"
+                                type="number"
+                                placeholder="100"
+                                value={capacity}
+                                onChange={(e) => setCapacity(e.target.value)}
+                            />
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -756,9 +975,12 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
                             <Input type="number" placeholder="Level (1)" value={level} onChange={(e) => setLevel(e.target.value)} />
                         </div>
                     </div>
+                    {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                    )}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                        <Button type="submit" disabled={isSubmitting || !name.trim() || (!isEdit && !code.trim())}>
                             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {isEdit ? 'Save Changes' : 'Create Shelf'}
                         </Button>
@@ -882,15 +1104,11 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
     const [loadingZones, setLoadingZones] = useState<Set<string>>(new Set());
     const [loadingRacks, setLoadingRacks] = useState<Set<string>>(new Set());
 
-    // Selection - depends on entity type
-    // Zone: select warehouse
-    // Rack: select zone
-    // Shelf: select rack
+    // Selection
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
 
-    // Reset state when dialog opens/closes or target changes
     useEffect(() => {
         if (open && target) {
             setPosition('');
@@ -981,11 +1199,9 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
         }
     };
 
-    // Selection handlers
     const handleSelectWarehouse = (warehouse: WarehouseData) => {
         if (target?.type === 'zone') {
-            // For zone move, warehouse is the final selection
-            if (warehouse.id === target.warehouseId) return; // Can't select current
+            if (warehouse.id === target.warehouseId) return;
             setSelectedWarehouseId(warehouse.id);
             setSelectedZoneId(null);
             setSelectedRackId(null);
@@ -994,8 +1210,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
 
     const handleSelectZone = (zone: ZoneData) => {
         if (target?.type === 'rack') {
-            // For rack move, zone is the final selection
-            if (zone.id === target.zoneId) return; // Can't select current
+            if (zone.id === target.zoneId) return;
             setSelectedWarehouseId(zone.warehouseId);
             setSelectedZoneId(zone.id);
             setSelectedRackId(null);
@@ -1004,15 +1219,13 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
 
     const handleSelectRack = (rack: RackData) => {
         if (target?.type === 'shelf') {
-            // For shelf move, rack is the final selection
-            if (rack.id === target.rackId) return; // Can't select current
+            if (rack.id === target.rackId) return;
             setSelectedWarehouseId(rack.warehouseId);
             setSelectedZoneId(rack.zoneId);
             setSelectedRackId(rack.id);
         }
     };
 
-    // Get selected entity info for display and API call
     const getSelectedInfo = () => {
         if (target?.type === 'zone' && selectedWarehouseId) {
             const warehouse = warehouses.find(w => w.id === selectedWarehouseId);
@@ -1108,8 +1321,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
     };
 
     const dialogInfo = getDialogInfo();
-
-    // Determine what depth to show based on entity type
     const showZones = target.type === 'rack' || target.type === 'shelf';
     const showRacks = target.type === 'shelf';
 
@@ -1125,7 +1336,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                 </DialogHeader>
 
                 <div className="flex-1 overflow-hidden flex flex-col gap-4 py-2">
-                    {/* Current location */}
                     <div className="text-sm text-muted-foreground">
                         <span className="font-medium">Current location: </span>
                         {target.type === 'zone' && target.warehouseName}
@@ -1133,7 +1343,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                         {target.type === 'shelf' && `${target.warehouseName} > ${target.zoneName} > ${target.rackName}`}
                     </div>
 
-                    {/* Tree selection */}
                     <div className="flex-1 border rounded-lg overflow-auto max-h-[300px]">
                         {isLoadingWarehouses ? (
                             <div className="p-4 space-y-2">
@@ -1154,7 +1363,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
 
                                     return (
                                         <div key={warehouse.id}>
-                                            {/* Warehouse row */}
                                             <div
                                                 className={cn(
                                                     'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
@@ -1182,13 +1390,13 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                                                     <Warehouse className="h-4 w-4 text-blue-600" />
                                                 </div>
                                                 <span className="flex-1 text-sm font-medium truncate">{warehouse.name}</span>
+                                                {warehouse.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{warehouse.code}</code>}
                                                 {isCurrentWarehouse && target.type === 'zone' && (
                                                     <Badge variant="outline" className="text-xs">current</Badge>
                                                 )}
                                                 {isSelected && <Check className="h-4 w-4 text-primary" />}
                                             </div>
 
-                                            {/* Zones */}
                                             <AnimatePresence>
                                                 {showZones && expandedWarehouses.has(warehouse.id) && (
                                                     <motion.div
@@ -1204,7 +1412,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
 
                                                             return (
                                                                 <div key={zone.id}>
-                                                                    {/* Zone row */}
                                                                     <div
                                                                         className={cn(
                                                                             'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
@@ -1241,7 +1448,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                                                                         {isZoneSelected && <Check className="h-4 w-4 text-primary" />}
                                                                     </div>
 
-                                                                    {/* Racks */}
                                                                     <AnimatePresence>
                                                                         {showRacks && expandedZones.has(zone.id) && (
                                                                             <motion.div
@@ -1308,7 +1514,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                         )}
                     </div>
 
-                    {/* Selected destination */}
                     {selectedInfo && (
                         <div className="text-sm">
                             <span className="font-medium text-primary">Selected: </span>
@@ -1316,7 +1521,6 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                         </div>
                     )}
 
-                    {/* Position input (for rack and shelf moves) */}
                     {(target.type === 'rack' || target.type === 'shelf') && (
                         <div className="space-y-2">
                             <Label htmlFor="move-position">Position (optional)</Label>
@@ -1361,15 +1565,16 @@ interface InstantWarehouseDialogProps {
 
 function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, user }: InstantWarehouseDialogProps) {
     const [name, setName] = useState('');
+    const [code, setCode] = useState('');
     const [address, setAddress] = useState('');
     const [zoneCount, setZoneCount] = useState('3');
     const [racksPerZone, setRacksPerZone] = useState('4');
     const [shelvesPerRack, setShelvesPerRack] = useState('5');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [progress, setProgress] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
 
-    // Calculate totals
     const zones = parseInt(zoneCount) || 0;
     const racks = parseInt(racksPerZone) || 0;
     const shelves = parseInt(shelvesPerRack) || 0;
@@ -1379,16 +1584,18 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
     const totalShelves = zones * racks * shelves;
     const totalEntities = 1 + totalZones + totalRacks + totalShelves;
 
-    const isValid = name.trim() && zones >= 1 && zones <= 50 && racks >= 1 && racks <= 50 && shelves >= 1 && shelves <= 20 && totalEntities <= 5000;
+    const isValid = name.trim() && code.trim() && zones >= 1 && zones <= 50 && racks >= 1 && racks <= 50 && shelves >= 1 && shelves <= 20 && totalEntities <= 5000;
 
     useEffect(() => {
         if (open) {
             setName('');
+            setCode('');
             setAddress('');
             setZoneCount('3');
             setRacksPerZone('4');
             setShelvesPerRack('5');
             setProgress(null);
+            setError(null);
         }
     }, [open]);
 
@@ -1398,6 +1605,7 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
 
         setIsSubmitting(true);
         setProgress('Creating warehouse structure...');
+        setError(null);
 
         try {
             const idToken = await user?.getIdToken();
@@ -1407,6 +1615,7 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                 body: JSON.stringify({
                     businessId,
                     warehouseName: name,
+                    warehouseCode: code.trim().toUpperCase(),
                     address,
                     zoneCount: zones,
                     racksPerZone: racks,
@@ -1414,12 +1623,10 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                 }),
             });
 
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
                 throw new Error(data.error || 'Failed to create warehouse');
             }
-
-            const data = await res.json();
 
             toast({
                 title: 'Warehouse created!',
@@ -1427,13 +1634,17 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
             });
             onOpenChange(false);
             onSuccess();
-        } catch (error: any) {
-            toast({ title: 'Error', description: error.message || 'Failed to create warehouse.', variant: 'destructive' });
+        } catch (err: any) {
+            setError(err.message);
+            toast({ title: 'Error', description: err.message || 'Failed to create warehouse.', variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
             setProgress(null);
         }
     };
+
+    // Preview code format
+    const previewCode = code.trim().toUpperCase() || 'WH01';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1451,19 +1662,33 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Warehouse Name */}
-                    <div className="space-y-2">
-                        <Label htmlFor="instant-name">Warehouse Name</Label>
-                        <Input
-                            id="instant-name"
-                            placeholder="e.g., Main Warehouse"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="instant-name">
+                                Warehouse Name <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="instant-name"
+                                placeholder="e.g., Main Warehouse"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="instant-code">
+                                Code <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="instant-code"
+                                placeholder="e.g., WH01"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                required
+                            />
+                        </div>
                     </div>
 
-                    {/* Address */}
                     <div className="space-y-2">
                         <Label htmlFor="instant-address">Address (Optional)</Label>
                         <Input
@@ -1474,7 +1699,6 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                         />
                     </div>
 
-                    {/* Structure Configuration */}
                     <div className="space-y-3">
                         <Label className="text-sm font-medium">Structure Configuration</Label>
                         <div className="grid grid-cols-3 gap-3">
@@ -1517,7 +1741,6 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                         </div>
                     </div>
 
-                    {/* Preview */}
                     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                         <p className="text-sm font-medium">Structure Preview</p>
                         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1558,16 +1781,18 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                             </p>
                         )}
 
-                        {/* Sample naming preview */}
                         <div className="pt-2 border-t">
                             <p className="text-xs text-muted-foreground mb-1">Naming format:</p>
                             <code className="text-xs bg-muted px-2 py-1 rounded block">
-                                Zone-1 → Rack-1 → Shelf-1 (Z01-R01-S01)
+                                Zone 1 → Rack 1 → Shelf 1 ({previewCode}-Z01-R01-S01)
                             </code>
                         </div>
                     </div>
 
-                    {/* Progress */}
+                    {error && (
+                        <p className="text-sm text-destructive">{error}</p>
+                    )}
+
                     {progress && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -1791,7 +2016,10 @@ export default function WarehousePage() {
     const handleMoveSuccess = () => { fetchWarehouses(); setZones({}); setRacks({}); setShelves({}); setPlacements({}); };
 
     // Filter & totals
-    const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredWarehouses = warehouses.filter((w) =>
+        w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.code?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
     const totals = warehouses.reduce((acc, w) => ({ warehouses: acc.warehouses + 1, zones: acc.zones + w.stats.totalZones, racks: acc.racks + w.stats.totalRacks, shelves: acc.shelves + w.stats.totalShelves, products: acc.products + w.stats.totalProducts }), { warehouses: 0, zones: 0, racks: 0, shelves: 0, products: 0 });
 
     return (
@@ -1845,7 +2073,7 @@ export default function WarehousePage() {
                         <div className="flex items-center gap-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search warehouses..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 w-[200px]" />
+                                <Input placeholder="Search by name or code..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 w-[200px]" />
                             </div>
                             <Button variant="outline" size="icon" onClick={fetchWarehouses} disabled={isLoading}><RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} /></Button>
                         </div>
@@ -1865,7 +2093,7 @@ export default function WarehousePage() {
                     ) : (
                         <div className="py-2">
                             {filteredWarehouses.map((warehouse) => (
-                                <TreeNode key={warehouse.id} level={0} icon={Warehouse} iconColor="text-blue-600" bgColor="bg-blue-500/10" label={warehouse.name} stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]} isExpanded={expandedWarehouses.has(warehouse.id)} isLoading={loadingZones.has(warehouse.id)} hasChildren={true} onToggle={() => toggleWarehouse(warehouse.id)} onAdd={() => handleAddZone(warehouse)} addLabel="Add Zone" onEdit={() => handleEditWarehouse(warehouse)} onDelete={() => handleDeleteWarehouse(warehouse)}>
+                                <TreeNode key={warehouse.id} level={0} icon={Warehouse} iconColor="text-blue-600" bgColor="bg-blue-500/10" label={warehouse.name} code={warehouse.code} stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]} isExpanded={expandedWarehouses.has(warehouse.id)} isLoading={loadingZones.has(warehouse.id)} hasChildren={true} onToggle={() => toggleWarehouse(warehouse.id)} onAdd={() => handleAddZone(warehouse)} addLabel="Add Zone" onEdit={() => handleEditWarehouse(warehouse)} onDelete={() => handleDeleteWarehouse(warehouse)}>
                                     {zones[warehouse.id]?.map((zone) => (
                                         <TreeNode key={zone.id} level={1} icon={MapPin} iconColor="text-emerald-600" bgColor="bg-emerald-500/10" label={zone.name} code={zone.code} stats={[{ label: 'racks', value: zone.stats.totalRacks }, { label: 'products', value: zone.stats.totalProducts }]} isExpanded={expandedZones.has(zone.id)} isLoading={loadingRacks.has(zone.id)} hasChildren={true} onToggle={() => toggleZone(zone.id)} onAdd={() => handleAddRack(zone)} addLabel="Add Rack" onEdit={() => handleEditZone(zone)} onMove={() => handleMoveZone(zone)} onDelete={() => handleDeleteZone(zone)}>
                                             {racks[zone.id]?.map((rack) => (

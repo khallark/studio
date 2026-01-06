@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
     try {
         // Parse request body
         const body = await request.json();
-        const { businessId, name, address, storageCapacity, operationalHours, defaultGSTstate } = body;
+        const { businessId, name, code, address, storageCapacity, operationalHours, defaultGSTstate } = body;
 
-        // Verify authentication;
+        // Verify authentication
         if (!businessId) {
             return NextResponse.json(
                 { error: 'Business ID is required' },
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
         const { userId } = result;
 
-        if(!userId) {
+        if (!userId) {
             return NextResponse.json(
                 { error: 'User not logged in' },
                 { status: 401 }
@@ -46,12 +46,33 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create warehouse document
-        const warehouseRef = db.collection(`users/${businessId}/warehouses`).doc();
+        if (!code || !code.trim()) {
+            return NextResponse.json(
+                { error: 'Warehouse code is required' },
+                { status: 400 }
+            );
+        }
+
+        // Normalize code (uppercase, trimmed)
+        const normalizedCode = code.trim().toUpperCase();
+
+        // Use code as document ID
+        const warehouseRef = db.collection(`users/${businessId}/warehouses`).doc(normalizedCode);
+
+        // Check if warehouse with this code already exists
+        const existingWarehouse = await warehouseRef.get();
+        if (existingWarehouse.exists) {
+            return NextResponse.json(
+                { error: `Warehouse with code "${normalizedCode}" already exists` },
+                { status: 409 }
+            );
+        }
+
         const now = Timestamp.now();
 
         const warehouseData: Warehouse = {
-            id: warehouseRef.id,
+            id: normalizedCode,
+            code: normalizedCode,
             name: name.trim(),
             address: address?.trim() || '',
             storageCapacity: storageCapacity || 0,
@@ -76,7 +97,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             warehouse: {
-                id: warehouseRef.id,
+                id: normalizedCode,
+                code: normalizedCode,
                 name: name.trim(),
                 address: address?.trim() || '',
             },

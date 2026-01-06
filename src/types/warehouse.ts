@@ -6,6 +6,7 @@ import { Timestamp } from "firebase-admin/firestore";
 export interface Warehouse {
     id: string;
     name: string;
+    code: string;
     address: string;
     storageCapacity: number;
     operationalHours: number;

@@ -149,8 +149,8 @@ function getDateRangeFromPreset(preset: DateRangePreset): { start: Date; end: Da
             };
         case 'yesterday':
             return {
-                start: startOfDay(subDays(now, 6)),
-                end: endOfDay(subDays(now, 6)),
+                start: startOfDay(subDays(now, 1)),
+                end: endOfDay(subDays(now, 1)),
             };
         case 'last7days':
             return {

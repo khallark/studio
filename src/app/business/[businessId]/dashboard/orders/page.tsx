@@ -1847,8 +1847,7 @@ export default function BusinessOrdersPage() {
                                                         {(
                                                             viewingOrder.raw.shipping_address?.address2 ||
                                                             viewingOrder.raw.billing_address?.address2 ||
-                                                            viewingOrder.raw.default_address?.address2 ||
-                                                            "N/A"
+                                                            viewingOrder.raw.default_address?.address2
                                                         ) && (
                                                                 <p>
                                                                     {
@@ -1880,8 +1879,7 @@ export default function BusinessOrdersPage() {
                                                         {(
                                                             viewingOrder.raw.shipping_address?.phone ||
                                                             viewingOrder.raw.billing_address?.phone ||
-                                                            viewingOrder.raw.default_address?.phone ||
-                                                            "N/A"
+                                                            viewingOrder.raw.default_address?.phone
                                                         ) && (
                                                                 <p>
                                                                     Phone: {

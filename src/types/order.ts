@@ -104,6 +104,18 @@ export interface Order {
       province: string;
       country: string;
     };
+    default_address?: {
+      name?: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      address1: string;
+      address2: string;
+      city: string;
+      zip: string;
+      province: string;
+      country: string;
+    }
     total_discounts?: number;
     total_outstanding?: string;
   };

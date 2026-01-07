@@ -1825,23 +1825,73 @@ export default function BusinessOrdersPage() {
                                             <h4 className="text-sm font-semibold mb-2">Customer</h4>
                                             <div className="text-sm space-y-1">
                                                 <p className="font-medium">
-                                                    {viewingOrder.raw.shipping_address?.name ||
+                                                    {
+                                                        viewingOrder.raw.shipping_address?.name ||
+                                                        viewingOrder.raw.billing_address?.name ||
+                                                        viewingOrder.raw.default_address?.name ||
                                                         `${viewingOrder.raw.customer?.first_name || ''} ${viewingOrder.raw.customer?.last_name || ''}`.trim() ||
-                                                        'Unknown'}
+                                                        'Unknown'
+                                                    }
                                                 </p>
                                                 <p className="text-muted-foreground">{viewingOrder.email}</p>
                                                 {viewingOrder.raw.shipping_address && (
                                                     <div className="text-muted-foreground mt-2">
-                                                        <p>{viewingOrder.raw.shipping_address.address1}</p>
-                                                        {viewingOrder.raw.shipping_address.address2 && (
-                                                            <p>{viewingOrder.raw.shipping_address.address2}</p>
-                                                        )}
                                                         <p>
-                                                            {viewingOrder.raw.shipping_address.city}, {viewingOrder.raw.shipping_address.province} {viewingOrder.raw.shipping_address.zip}
+                                                            {
+                                                                viewingOrder.raw.shipping_address?.address1 ||
+                                                                viewingOrder.raw.billing_address?.address1 ||
+                                                                viewingOrder.raw.default_address?.address1 ||
+                                                                "N/A"
+                                                            }
                                                         </p>
-                                                        {viewingOrder.raw.shipping_address.phone && (
-                                                            <p>Phone: {viewingOrder.raw.shipping_address.phone}</p>
-                                                        )}
+                                                        {(
+                                                            viewingOrder.raw.shipping_address?.address2 ||
+                                                            viewingOrder.raw.billing_address?.address2 ||
+                                                            viewingOrder.raw.default_address?.address2 ||
+                                                            "N/A"
+                                                        ) && (
+                                                                <p>
+                                                                    {
+                                                                        viewingOrder.raw.shipping_address?.address2 ||
+                                                                        viewingOrder.raw.billing_address?.address2 ||
+                                                                        viewingOrder.raw.default_address?.address2 ||
+                                                                        "N/A"
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        <p>
+                                                            {
+                                                                viewingOrder.raw.shipping_address?.city ||
+                                                                viewingOrder.raw.billing_address?.city ||
+                                                                viewingOrder.raw.default_address?.city ||
+                                                                "N/A"
+                                                            }, {
+                                                                viewingOrder.raw.shipping_address?.province ||
+                                                                viewingOrder.raw.billing_address?.province ||
+                                                                viewingOrder.raw.default_address?.province ||
+                                                                "N/A"
+                                                            } {
+                                                                viewingOrder.raw.shipping_address.zip ||
+                                                                viewingOrder.raw.billing_address?.zip ||
+                                                                viewingOrder.raw.default_address?.zip ||
+                                                                "N/A"
+                                                            }
+                                                        </p>
+                                                        {(
+                                                            viewingOrder.raw.shipping_address?.phone ||
+                                                            viewingOrder.raw.billing_address?.phone ||
+                                                            viewingOrder.raw.default_address?.phone ||
+                                                            "N/A"
+                                                        ) && (
+                                                                <p>
+                                                                    Phone: {
+                                                                        viewingOrder.raw.shipping_address?.phone ||
+                                                                        viewingOrder.raw.billing_address?.phone ||
+                                                                        viewingOrder.raw.default_address?.phone ||
+                                                                        "N/A"
+                                                                    }
+                                                                </p>
+                                                            )}
                                                     </div>
                                                 )}
                                             </div>

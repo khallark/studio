@@ -1834,7 +1834,11 @@ export default function BusinessOrdersPage() {
                                                     }
                                                 </p>
                                                 <p className="text-muted-foreground">{viewingOrder.email}</p>
-                                                {viewingOrder.raw.shipping_address && (
+                                                {(
+                                                    viewingOrder.raw.shipping_address ||
+                                                    viewingOrder.raw.billing_address ||
+                                                    viewingOrder.raw.default_address
+                                                ) && (
                                                     <div className="text-muted-foreground mt-2">
                                                         <p>
                                                             {
@@ -1870,7 +1874,7 @@ export default function BusinessOrdersPage() {
                                                                 viewingOrder.raw.default_address?.province ||
                                                                 "N/A"
                                                             } {
-                                                                viewingOrder.raw.shipping_address.zip ||
+                                                                viewingOrder.raw.shipping_address?.zip ||
                                                                 viewingOrder.raw.billing_address?.zip ||
                                                                 viewingOrder.raw.default_address?.zip ||
                                                                 "N/A"

@@ -344,7 +344,7 @@ async function processRow(
             });
 
             const productRef = businessProductDoc.ref;
-            batch.set(productRef, {
+            batch.update(productRef, {
                 'inventory.inwardAddition': businessProductQuantity,
             })
 

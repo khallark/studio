@@ -191,11 +191,13 @@ export async function POST(req: NextRequest) {
         await orderRef?.update(updateData);
 
 
-        try {
-            const shopData = (await db.collection('accounts').doc('nfkjgp-sv.myshopify.com').get()).data() as any;
-            await sendDTORefundedWhatsAppMessage(shopData, orderData as any);
-        } catch (error: any) {
-            console.error(`Whatsapp sending error: ${error?.message}`);
+        if (refundMethod === 'store_credit') {
+            try {
+                const shopData = (await db.collection('accounts').doc(shop).get()).data() as any;
+                await sendDTORefundedWhatsAppMessage(shopData, orderData as any);
+            } catch (error: any) {
+                console.error(`Whatsapp sending error: ${error?.message}`);
+            }
         }
 
         return NextResponse.json({

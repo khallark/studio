@@ -1239,10 +1239,10 @@ export default function InventoryPage() {
                         onClick={() => setBulkInwardOpen(true)}
                         className="gap-2"
                     >
-                        <>
+                        <Link>
                             <Package className="h-4 w-4" />
                             Bulk Inward
-                        </>
+                        </Link>
                     </Button>
                     <Button
                         variant="outline"

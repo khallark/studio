@@ -267,7 +267,7 @@ async function processRow(
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Non-existent zone "${zoneCode}`
+                Message: `Non-existent zone "${zoneCode}"`
             }
         };
     }
@@ -277,7 +277,7 @@ async function processRow(
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Non-existent rack "${rackCode}`
+                Message: `Non-existent rack "${rackCode}"`
             }
         };
     }
@@ -287,7 +287,7 @@ async function processRow(
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Non-existent shelf "${shelfCode}`
+                Message: `Non-existent shelf "${shelfCode}"`
             }
         };
     }

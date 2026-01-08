@@ -343,7 +343,12 @@ async function processRow(
                 performedAt: now,
             });
 
-            return 2; // number of writes added
+            const productRef = businessProductDoc.ref;
+            batch.set(productRef, {
+                'inventory.inwardAddition': businessProductQuantity,
+            })
+
+            return 3; // number of writes added
         }
     };
 }

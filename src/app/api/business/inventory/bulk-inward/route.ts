@@ -252,12 +252,42 @@ async function processRow(
         db.collection('users').doc(businessId).collection('placements').doc(placementId).get(),
     ]);
 
-    if (!warehouseDoc.exists || !zoneDoc.exists || !rackDoc.exists || !shelfDoc.exists) {
+    if (!warehouseDoc.exists) {
         return {
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Invalid warehouse hierarchy`
+                Message: `Non-existent warehouse "${warehouseCode}".`
+            }
+        };
+    }
+
+    if (!zoneDoc.exists) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Non-existent zone "${zoneCode}`
+            }
+        };
+    }
+
+    if (!rackDoc.exists) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Non-existent rack "${rackCode}`
+            }
+        };
+    }
+
+    if (!shelfDoc.exists) {
+        return {
+            result: {
+                ...row,
+                Status: 'Skipped',
+                Message: `Non-existent shelf "${shelfCode}`
             }
         };
     }
@@ -267,7 +297,7 @@ async function processRow(
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Business Product "${businessProductSKU}" does not exist`
+                Message: `Non-existent Business Product "${businessProductSKU}"`
             }
         };
     }
@@ -286,7 +316,7 @@ async function processRow(
             result: {
                 ...row,
                 Status: 'Skipped',
-                Message: `Shelf path mismatch`
+                Message: `Invalid warehouse hierarchy`
             }
         };
     }

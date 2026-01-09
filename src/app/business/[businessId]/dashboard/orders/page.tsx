@@ -859,24 +859,18 @@ export default function BusinessOrdersPage() {
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
             case 'RTO Delivered':
                 return (
-                    <div>
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>
-                    </div>
+                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
                 );
             case 'Closed':
                 return (
-                    <div>
-                        <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Undo Closed</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>
-                    </div>
+                    <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Undo Closed</DropdownMenuItem>
                 );
             case 'Cancellation Requested':
-            case 'RTO Closed':
-            case 'RTO In Transit':
-            case 'In Transit':
-            case 'Out For Delivery':
-            case 'Lost':
+                // case 'RTO Closed':
+                // case 'RTO In Transit':
+                // case 'In Transit':
+                // case 'Out For Delivery':
+                // case 'Lost':
                 return <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>;
             default:
                 return null;

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { db } from '@/lib/firebase-admin';
+import { Zone } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
@@ -47,7 +48,7 @@ export async function PUT(request: NextRequest) {
             description: description?.trim() || '',
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Zone>);
 
         return NextResponse.json({ success: true });
     } catch (error) {

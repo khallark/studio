@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
+import { Rack } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
@@ -99,7 +100,7 @@ export async function PUT(request: NextRequest) {
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Rack>);
 
         await batch.commit();
 

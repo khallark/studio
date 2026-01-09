@@ -54,13 +54,9 @@ export async function GET(request: NextRequest) {
                 code: data.code || '',
                 capacity: data.capacity || null,
                 rackId: data.rackId,
-                rackName: data.rackName || '',
                 zoneId: data.zoneId,
-                zoneName: data.zoneName || '',
                 warehouseId: data.warehouseId,
-                warehouseName: data.warehouseName || '',
                 position: data.position || 0,
-                coordinates: data.coordinates || null,
                 stats: {
                     totalProducts: data.stats?.totalProducts || 0,
                     currentOccupancy: data.stats?.currentOccupancy || 0,

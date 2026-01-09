@@ -53,9 +53,7 @@ export async function GET(request: NextRequest) {
                 name: data.name,
                 code: data.code || '',
                 zoneId: data.zoneId,
-                zoneName: data.zoneName || '',
                 warehouseId: data.warehouseId,
-                warehouseName: data.warehouseName || '',
                 position: data.position || 0,
                 stats: {
                     totalShelves: data.stats?.totalShelves || 0,

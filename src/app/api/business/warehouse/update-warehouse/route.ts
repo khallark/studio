@@ -2,6 +2,7 @@
 
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { db } from '@/lib/firebase-admin';
+import { Warehouse } from '@/types/warehouse';
 import { Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -47,7 +48,7 @@ export async function PUT(request: NextRequest) {
             address: address?.trim() || '',
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Warehouse>);
 
         return NextResponse.json({ success: true });
     } catch (error) {

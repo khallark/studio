@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Warehouse,
+    Warehouse as WarehouseIcon,
     Plus,
     ChevronRight,
     MapPin,
@@ -65,88 +65,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
 import { User } from 'firebase/auth';
-
-// ============================================================
-// TYPES
-// ============================================================
-
-interface WarehouseStats {
-    totalZones: number;
-    totalRacks: number;
-    totalShelves: number;
-    totalProducts: number;
-}
-
-interface WarehouseData {
-    id: string;
-    code: string;
-    name: string;
-    address: string;
-    stats: WarehouseStats;
-    isDeleted: boolean;
-}
-
-interface ZoneData {
-    id: string;
-    name: string;
-    code: string;
-    description?: string;
-    warehouseId: string;
-    warehouseName: string;
-    stats: {
-        totalRacks: number;
-        totalShelves: number;
-        totalProducts: number;
-    };
-}
-
-interface RackData {
-    id: string;
-    name: string;
-    code: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    position: number;
-    stats: {
-        totalShelves: number;
-        totalProducts: number;
-    };
-}
-
-interface ShelfData {
-    id: string;
-    name: string;
-    code: string;
-    rackId: string;
-    rackName: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    position: number;
-    path: string;
-    capacity?: number;
-    stats: {
-        totalProducts: number;
-        currentOccupancy: number;
-    };
-    coordinates?: {
-        aisle: string;
-        bay: number;
-        level: number;
-    };
-}
-
-interface PlacementData {
-    id: string;
-    productId: string;
-    productSKU: string;
-    quantity: number;
-    shelfId: string;
-    locationPath: string;
-}
+import { Placement, Rack, Shelf, Warehouse, Zone } from '@/types/warehouse';
 
 type EntityType = 'warehouse' | 'zone' | 'rack' | 'shelf';
 
@@ -163,11 +82,8 @@ interface MoveTarget {
     id: string;
     name: string;
     warehouseId: string;
-    warehouseName: string;
     zoneId?: string;
-    zoneName?: string;
     rackId?: string;
-    rackName?: string;
 }
 
 // ============================================================
@@ -320,7 +236,7 @@ function TreeNode({
 // PLACEMENT ROW COMPONENT
 // ============================================================
 
-function PlacementRow({ placement, level }: { placement: PlacementData; level: number }) {
+function PlacementRow({ placement, level }: { placement: Placement; level: number }) {
     return (
         <div
             className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-muted/40 transition-colors"
@@ -349,7 +265,7 @@ interface WarehouseDialogProps {
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void;
     businessId: string;
-    editData?: WarehouseData | null;
+    editData?: Warehouse | null;
     user: User | null | undefined;
 }
 
@@ -422,7 +338,7 @@ function WarehouseDialog({ open, onOpenChange, onSuccess, businessId, editData, 
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="p-2 rounded-lg bg-blue-500/10">
-                            <Warehouse className="h-5 w-5 text-blue-600" />
+                            <WarehouseIcon className="h-5 w-5 text-blue-600" />
                         </div>
                         {isEdit ? 'Edit Warehouse' : 'Create Warehouse'}
                     </DialogTitle>
@@ -498,12 +414,11 @@ interface ZoneDialogProps {
     onSuccess: () => void;
     businessId: string;
     warehouseId: string;
-    warehouseName: string;
-    editData?: ZoneData | null;
+    editData?: Zone | null;
     user: User | null | undefined;
 }
 
-function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, warehouseName, editData, user }: ZoneDialogProps) {
+function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, editData, user }: ZoneDialogProps) {
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [description, setDescription] = useState('');
@@ -545,7 +460,6 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
                     businessId,
                     zoneId: editData?.id,
                     warehouseId,
-                    warehouseName,
                     name,
                     code: isEdit ? undefined : code.trim().toUpperCase(),
                     description,
@@ -579,7 +493,7 @@ function ZoneDialog({ open, onOpenChange, onSuccess, businessId, warehouseId, wa
                         {isEdit ? 'Edit Zone' : 'Create Zone'}
                     </DialogTitle>
                     <DialogDescription>
-                        {isEdit ? 'Update zone details.' : `Add a new zone to ${warehouseName}.`}
+                        {isEdit ? 'Update zone details.' : `Add a new zone to ${warehouseId}.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -650,14 +564,12 @@ interface RackDialogProps {
     onSuccess: () => void;
     businessId: string;
     zoneId: string;
-    zoneName: string;
     warehouseId: string;
-    warehouseName: string;
-    editData?: RackData | null;
+    editData?: Rack | null;
     user: User | null | undefined;
 }
 
-function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneName, warehouseId, warehouseName, editData, user }: RackDialogProps) {
+function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, warehouseId, editData, user }: RackDialogProps) {
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [position, setPosition] = useState('');
@@ -699,9 +611,7 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
                     businessId,
                     rackId: editData?.id,
                     zoneId,
-                    zoneName,
                     warehouseId,
-                    warehouseName,
                     name,
                     code: isEdit ? undefined : code.trim().toUpperCase(),
                     position: position ? parseInt(position) : 0,
@@ -735,7 +645,7 @@ function RackDialog({ open, onOpenChange, onSuccess, businessId, zoneId, zoneNam
                         {isEdit ? 'Edit Rack' : 'Create Rack'}
                     </DialogTitle>
                     <DialogDescription>
-                        {isEdit ? 'Update rack details.' : `Add a new rack to ${zoneName}.`}
+                        {isEdit ? 'Update rack details.' : `Add a new rack to ${zoneId}.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -806,23 +716,17 @@ interface ShelfDialogProps {
     onSuccess: () => void;
     businessId: string;
     rackId: string;
-    rackName: string;
     zoneId: string;
-    zoneName: string;
     warehouseId: string;
-    warehouseName: string;
-    editData?: ShelfData | null;
+    editData?: Shelf | null;
     user: User | null | undefined;
 }
 
-function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackName, zoneId, zoneName, warehouseId, warehouseName, editData, user }: ShelfDialogProps) {
+function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, zoneId, warehouseId, editData, user }: ShelfDialogProps) {
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [position, setPosition] = useState('');
     const [capacity, setCapacity] = useState('');
-    const [aisle, setAisle] = useState('');
-    const [bay, setBay] = useState('');
-    const [level, setLevel] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
@@ -834,17 +738,11 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
             setCode(editData.code || '');
             setPosition(editData.position?.toString() || '');
             setCapacity(editData.capacity?.toString() || '');
-            setAisle(editData.coordinates?.aisle || '');
-            setBay(editData.coordinates?.bay?.toString() || '');
-            setLevel(editData.coordinates?.level?.toString() || '');
         } else {
             setName('');
             setCode('');
             setPosition('');
             setCapacity('');
-            setAisle('');
-            setBay('');
-            setLevel('');
         }
         setError(null);
     }, [editData, open]);
@@ -861,25 +759,19 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
         setError(null);
         try {
             const endpoint = isEdit ? '/api/business/warehouse/update-shelf' : '/api/business/warehouse/create-shelf';
-            const coordinates = aisle || bay || level ? { aisle: aisle || '', bay: bay ? parseInt(bay) : 0, level: level ? parseInt(level) : 0 } : null;
             const idToken = await user?.getIdToken();
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({
                     businessId,
-                    shelfId: editData?.id,
                     rackId,
-                    rackName,
                     zoneId,
-                    zoneName,
                     warehouseId,
-                    warehouseName,
                     name,
                     code: isEdit ? undefined : code.trim().toUpperCase(),
                     position: position ? parseInt(position) : 0,
                     capacity: capacity ? parseInt(capacity) : null,
-                    coordinates,
                 }),
             });
 
@@ -910,7 +802,7 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
                         {isEdit ? 'Edit Shelf' : 'Create Shelf'}
                     </DialogTitle>
                     <DialogDescription>
-                        {isEdit ? 'Update shelf details.' : `Add a new shelf to ${rackName}.`}
+                        {isEdit ? 'Update shelf details.' : `Add a new shelf to ${rackId}.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -965,14 +857,6 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, rackNa
                                 value={capacity}
                                 onChange={(e) => setCapacity(e.target.value)}
                             />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Coordinates (Optional)</Label>
-                        <div className="grid grid-cols-3 gap-4">
-                            <Input placeholder="Aisle (A)" value={aisle} onChange={(e) => setAisle(e.target.value)} />
-                            <Input type="number" placeholder="Bay (1)" value={bay} onChange={(e) => setBay(e.target.value)} />
-                            <Input type="number" placeholder="Level (1)" value={level} onChange={(e) => setLevel(e.target.value)} />
                         </div>
                     </div>
                     {error && (
@@ -1091,9 +975,9 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
     const { toast } = useToast();
 
     // Tree data
-    const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
-    const [zones, setZones] = useState<Record<string, ZoneData[]>>({});
-    const [racks, setRacks] = useState<Record<string, RackData[]>>({});
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [zones, setZones] = useState<Record<string, Zone[]>>({});
+    const [racks, setRacks] = useState<Record<string, Rack[]>>({});
 
     // Expanded state
     const [expandedWarehouses, setExpandedWarehouses] = useState<Set<string>>(new Set());
@@ -1199,7 +1083,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
         }
     };
 
-    const handleSelectWarehouse = (warehouse: WarehouseData) => {
+    const handleSelectWarehouse = (warehouse: Warehouse) => {
         if (target?.type === 'zone') {
             if (warehouse.id === target.warehouseId) return;
             setSelectedWarehouseId(warehouse.id);
@@ -1208,7 +1092,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
         }
     };
 
-    const handleSelectZone = (zone: ZoneData) => {
+    const handleSelectZone = (zone: Zone) => {
         if (target?.type === 'rack') {
             if (zone.id === target.zoneId) return;
             setSelectedWarehouseId(zone.warehouseId);
@@ -1217,7 +1101,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
         }
     };
 
-    const handleSelectRack = (rack: RackData) => {
+    const handleSelectRack = (rack: Rack) => {
         if (target?.type === 'shelf') {
             if (rack.id === target.rackId) return;
             setSelectedWarehouseId(rack.warehouseId);
@@ -1229,15 +1113,15 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
     const getSelectedInfo = () => {
         if (target?.type === 'zone' && selectedWarehouseId) {
             const warehouse = warehouses.find(w => w.id === selectedWarehouseId);
-            return warehouse ? { type: 'warehouse', name: warehouse.name, data: warehouse } : null;
+            return warehouse ? { type: 'warehouse', name: warehouse.code, data: warehouse } : null;
         }
         if (target?.type === 'rack' && selectedZoneId) {
             const zone = Object.values(zones).flat().find(z => z.id === selectedZoneId);
-            return zone ? { type: 'zone', name: `${zone.warehouseName} > ${zone.name}`, data: zone } : null;
+            return zone ? { type: 'zone', name: `${zone.warehouseId} > ${zone.code}`, data: zone } : null;
         }
         if (target?.type === 'shelf' && selectedRackId) {
             const rack = Object.values(racks).flat().find(r => r.id === selectedRackId);
-            return rack ? { type: 'rack', name: `${rack.warehouseName} > ${rack.zoneName} > ${rack.name}`, data: rack } : null;
+            return rack ? { type: 'rack', name: `${rack.warehouseId} > ${rack.zoneId} > ${rack.code}`, data: rack } : null;
         }
         return null;
     };
@@ -1255,38 +1139,32 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
             let body: any = { businessId };
 
             if (target.type === 'zone') {
-                const warehouse = selectedInfo.data as WarehouseData;
+                const warehouse = selectedInfo.data as Warehouse;
                 endpoint = '/api/business/warehouse/move-zone';
                 body = {
                     ...body,
                     zoneId: target.id,
                     targetWarehouseId: warehouse.id,
-                    targetWarehouseName: warehouse.name,
                 };
             } else if (target.type === 'rack') {
-                const zone = selectedInfo.data as ZoneData;
+                const zone = selectedInfo.data as Zone;
                 endpoint = '/api/business/warehouse/move-rack';
                 body = {
                     ...body,
                     rackId: target.id,
                     targetZoneId: zone.id,
-                    targetZoneName: zone.name,
                     targetWarehouseId: zone.warehouseId,
-                    targetWarehouseName: zone.warehouseName,
                     targetPosition: position ? parseInt(position) : undefined,
                 };
             } else if (target.type === 'shelf') {
-                const rack = selectedInfo.data as RackData;
+                const rack = selectedInfo.data as Rack;
                 endpoint = '/api/business/warehouse/move-shelf';
                 body = {
                     ...body,
                     shelfId: target.id,
                     targetRackId: rack.id,
-                    targetRackName: rack.name,
                     targetZoneId: rack.zoneId,
-                    targetZoneName: rack.zoneName,
                     targetWarehouseId: rack.warehouseId,
-                    targetWarehouseName: rack.warehouseName,
                     targetPosition: position ? parseInt(position) : undefined,
                 };
             }
@@ -1302,7 +1180,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                 throw new Error(data.error || 'Failed to move');
             }
 
-            toast({ title: 'Moved successfully', description: `${target.name} has been moved.` });
+            toast({ title: 'Moved successfully', description: `${target.id} has been moved.` });
             onOpenChange(false);
             onSuccess();
         } catch (error: any) {
@@ -1315,9 +1193,9 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
     if (!target) return null;
 
     const getDialogInfo = () => {
-        if (target.type === 'zone') return { title: 'Move Zone', description: `Select destination warehouse for "${target.name}"`, selectLabel: 'Select a warehouse', icon: <MapPin className="h-5 w-5 text-emerald-600" />, iconBg: 'bg-emerald-500/10' };
-        if (target.type === 'rack') return { title: 'Move Rack', description: `Select destination zone for "${target.name}"`, selectLabel: 'Select a zone', icon: <Grid3X3 className="h-5 w-5 text-amber-600" />, iconBg: 'bg-amber-500/10' };
-        return { title: 'Move Shelf', description: `Select destination rack for "${target.name}"`, selectLabel: 'Select a rack', icon: <Layers className="h-5 w-5 text-purple-600" />, iconBg: 'bg-purple-500/10' };
+        if (target.type === 'zone') return { title: 'Move Zone', description: `Select destination warehouse for "${target.id}"`, selectLabel: 'Select a warehouse', icon: <MapPin className="h-5 w-5 text-emerald-600" />, iconBg: 'bg-emerald-500/10' };
+        if (target.type === 'rack') return { title: 'Move Rack', description: `Select destination zone for "${target.id}"`, selectLabel: 'Select a zone', icon: <Grid3X3 className="h-5 w-5 text-amber-600" />, iconBg: 'bg-amber-500/10' };
+        return { title: 'Move Shelf', description: `Select destination rack for "${target.id}"`, selectLabel: 'Select a rack', icon: <Layers className="h-5 w-5 text-purple-600" />, iconBg: 'bg-purple-500/10' };
     };
 
     const dialogInfo = getDialogInfo();
@@ -1338,9 +1216,9 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                 <div className="flex-1 overflow-hidden flex flex-col gap-4 py-2">
                     <div className="text-sm text-muted-foreground">
                         <span className="font-medium">Current location: </span>
-                        {target.type === 'zone' && target.warehouseName}
-                        {target.type === 'rack' && `${target.warehouseName} > ${target.zoneName}`}
-                        {target.type === 'shelf' && `${target.warehouseName} > ${target.zoneName} > ${target.rackName}`}
+                        {target.type === 'zone' && target.warehouseId}
+                        {target.type === 'rack' && `${target.warehouseId} > ${target.zoneId}`}
+                        {target.type === 'shelf' && `${target.warehouseId} > ${target.zoneId} > ${target.rackId}`}
                     </div>
 
                     <div className="flex-1 border rounded-lg overflow-auto max-h-[300px]">
@@ -1387,7 +1265,7 @@ function MoveDialog({ open, onOpenChange, onSuccess, businessId, target, user }:
                                                     )}
                                                 </div>
                                                 <div className="p-1.5 rounded-md bg-blue-500/10">
-                                                    <Warehouse className="h-4 w-4 text-blue-600" />
+                                                    <WarehouseIcon className="h-4 w-4 text-blue-600" />
                                                 </div>
                                                 <span className="flex-1 text-sm font-medium truncate">{warehouse.name}</span>
                                                 {warehouse.code && <code className="text-xs text-muted-foreground bg-muted px-1 rounded">{warehouse.code}</code>}
@@ -1652,7 +1530,7 @@ function InstantWarehouseDialog({ open, onOpenChange, onSuccess, businessId, use
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20">
-                            <Warehouse className="h-5 w-5 text-blue-600" />
+                            <WarehouseIcon className="h-5 w-5 text-blue-600" />
                         </div>
                         Quick Warehouse Setup
                     </DialogTitle>
@@ -1824,7 +1702,7 @@ export default function WarehousePage() {
     const { toast } = useToast();
 
     // Data state
-    const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1835,10 +1713,10 @@ export default function WarehousePage() {
     const [expandedShelves, setExpandedShelves] = useState<Set<string>>(new Set());
 
     // Loaded data
-    const [zones, setZones] = useState<Record<string, ZoneData[]>>({});
-    const [racks, setRacks] = useState<Record<string, RackData[]>>({});
-    const [shelves, setShelves] = useState<Record<string, ShelfData[]>>({});
-    const [placements, setPlacements] = useState<Record<string, PlacementData[]>>({});
+    const [zones, setZones] = useState<Record<string, Zone[]>>({});
+    const [racks, setRacks] = useState<Record<string, Rack[]>>({});
+    const [shelves, setShelves] = useState<Record<string, Shelf[]>>({});
+    const [placements, setPlacements] = useState<Record<string, Placement[]>>({});
 
     // Loading states
     const [loadingZones, setLoadingZones] = useState<Set<string>>(new Set());
@@ -1848,19 +1726,19 @@ export default function WarehousePage() {
 
     // Dialog states
     const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false);
-    const [editWarehouse, setEditWarehouse] = useState<WarehouseData | null>(null);
+    const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null);
 
     const [zoneDialogOpen, setZoneDialogOpen] = useState(false);
-    const [editZone, setEditZone] = useState<ZoneData | null>(null);
-    const [zoneParent, setZoneParent] = useState<{ warehouseId: string; warehouseName: string } | null>(null);
+    const [editZone, setEditZone] = useState<Zone | null>(null);
+    const [zoneParent, setZoneParent] = useState<{ warehouseId: string; } | null>(null);
 
     const [rackDialogOpen, setRackDialogOpen] = useState(false);
-    const [editRack, setEditRack] = useState<RackData | null>(null);
-    const [rackParent, setRackParent] = useState<{ zoneId: string; zoneName: string; warehouseId: string; warehouseName: string } | null>(null);
+    const [editRack, setEditRack] = useState<Rack | null>(null);
+    const [rackParent, setRackParent] = useState<{ zoneId: string; warehouseId: string; } | null>(null);
 
     const [shelfDialogOpen, setShelfDialogOpen] = useState(false);
-    const [editShelf, setEditShelf] = useState<ShelfData | null>(null);
-    const [shelfParent, setShelfParent] = useState<{ rackId: string; rackName: string; zoneId: string; zoneName: string; warehouseId: string; warehouseName: string } | null>(null);
+    const [editShelf, setEditShelf] = useState<Shelf | null>(null);
+    const [shelfParent, setShelfParent] = useState<{ rackId: string; zoneId: string; warehouseId: string; } | null>(null);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -1944,53 +1822,47 @@ export default function WarehousePage() {
 
     // Dialog handlers
     const handleAddWarehouse = () => { setEditWarehouse(null); setWarehouseDialogOpen(true); };
-    const handleEditWarehouse = (w: WarehouseData) => { setEditWarehouse(w); setWarehouseDialogOpen(true); };
-    const handleDeleteWarehouse = (w: WarehouseData) => { setDeleteTarget({ type: 'warehouse', id: w.id, name: w.name, hasChildren: w.stats.totalZones > 0, childCount: w.stats.totalZones }); setDeleteDialogOpen(true); };
+    const handleEditWarehouse = (w: Warehouse) => { setEditWarehouse(w); setWarehouseDialogOpen(true); };
+    const handleDeleteWarehouse = (w: Warehouse) => { setDeleteTarget({ type: 'warehouse', id: w.id, name: w.name, hasChildren: w.stats.totalZones > 0, childCount: w.stats.totalZones }); setDeleteDialogOpen(true); };
 
-    const handleAddZone = (w: WarehouseData) => { setEditZone(null); setZoneParent({ warehouseId: w.id, warehouseName: w.name }); setZoneDialogOpen(true); };
-    const handleEditZone = (z: ZoneData) => { setEditZone(z); setZoneParent({ warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setZoneDialogOpen(true); };
-    const handleDeleteZone = (z: ZoneData) => { setDeleteTarget({ type: 'zone', id: z.id, name: z.name, hasChildren: z.stats.totalRacks > 0, childCount: z.stats.totalRacks }); setDeleteDialogOpen(true); };
-    const handleMoveZone = (z: ZoneData) => {
+    const handleAddZone = (w: Warehouse) => { setEditZone(null); setZoneParent({ warehouseId: w.id }); setZoneDialogOpen(true); };
+    const handleEditZone = (z: Zone) => { setEditZone(z); setZoneParent({ warehouseId: z.warehouseId }); setZoneDialogOpen(true); };
+    const handleDeleteZone = (z: Zone) => { setDeleteTarget({ type: 'zone', id: z.id, name: z.name, hasChildren: z.stats.totalRacks > 0, childCount: z.stats.totalRacks }); setDeleteDialogOpen(true); };
+    const handleMoveZone = (z: Zone) => {
         setMoveTarget({
             type: 'zone',
             id: z.id,
             name: z.name,
             warehouseId: z.warehouseId,
-            warehouseName: z.warehouseName,
         });
         setMoveDialogOpen(true);
     };
 
-    const handleAddRack = (z: ZoneData) => { setEditRack(null); setRackParent({ zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setRackDialogOpen(true); };
-    const handleEditRack = (r: RackData) => { setEditRack(r); setRackParent({ zoneId: r.zoneId, zoneName: r.zoneName, warehouseId: r.warehouseId, warehouseName: r.warehouseName }); setRackDialogOpen(true); };
-    const handleDeleteRack = (r: RackData) => { setDeleteTarget({ type: 'rack', id: r.id, name: r.name, hasChildren: r.stats.totalShelves > 0, childCount: r.stats.totalShelves }); setDeleteDialogOpen(true); };
-    const handleMoveRack = (r: RackData) => {
+    const handleAddRack = (z: Zone) => { setEditRack(null); setRackParent({ zoneId: z.id, warehouseId: z.warehouseId }); setRackDialogOpen(true); };
+    const handleEditRack = (r: Rack) => { setEditRack(r); setRackParent({ zoneId: r.zoneId, warehouseId: r.warehouseId }); setRackDialogOpen(true); };
+    const handleDeleteRack = (r: Rack) => { setDeleteTarget({ type: 'rack', id: r.id, name: r.name, hasChildren: r.stats.totalShelves > 0, childCount: r.stats.totalShelves }); setDeleteDialogOpen(true); };
+    const handleMoveRack = (r: Rack) => {
         setMoveTarget({
             type: 'rack',
             id: r.id,
             name: r.name,
             warehouseId: r.warehouseId,
-            warehouseName: r.warehouseName,
             zoneId: r.zoneId,
-            zoneName: r.zoneName,
         });
         setMoveDialogOpen(true);
     };
 
-    const handleAddShelf = (r: RackData, z: ZoneData) => { setEditShelf(null); setShelfParent({ rackId: r.id, rackName: r.name, zoneId: z.id, zoneName: z.name, warehouseId: z.warehouseId, warehouseName: z.warehouseName }); setShelfDialogOpen(true); };
-    const handleEditShelf = (s: ShelfData) => { setEditShelf(s); setShelfParent({ rackId: s.rackId, rackName: s.rackName, zoneId: s.zoneId, zoneName: s.zoneName, warehouseId: s.warehouseId, warehouseName: s.warehouseName }); setShelfDialogOpen(true); };
-    const handleDeleteShelf = (s: ShelfData) => { setDeleteTarget({ type: 'shelf', id: s.id, name: s.name, hasChildren: s.stats.totalProducts > 0, childCount: s.stats.totalProducts }); setDeleteDialogOpen(true); };
-    const handleMoveShelf = (s: ShelfData) => {
+    const handleAddShelf = (r: Rack, z: Zone) => { setEditShelf(null); setShelfParent({ rackId: r.id, zoneId: z.id, warehouseId: z.warehouseId }); setShelfDialogOpen(true); };
+    const handleEditShelf = (s: Shelf) => { setEditShelf(s); setShelfParent({ rackId: s.rackId, zoneId: s.zoneId, warehouseId: s.warehouseId }); setShelfDialogOpen(true); };
+    const handleDeleteShelf = (s: Shelf) => { setDeleteTarget({ type: 'shelf', id: s.id, name: s.name, hasChildren: s.stats.totalProducts > 0, childCount: s.stats.totalProducts }); setDeleteDialogOpen(true); };
+    const handleMoveShelf = (s: Shelf) => {
         setMoveTarget({
             type: 'shelf',
             id: s.id,
             name: s.name,
             warehouseId: s.warehouseId,
-            warehouseName: s.warehouseName,
             zoneId: s.zoneId,
-            zoneName: s.zoneName,
             rackId: s.rackId,
-            rackName: s.rackName,
         });
         setMoveDialogOpen(true);
     };
@@ -2045,7 +1917,7 @@ export default function WarehousePage() {
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 {[
-                    { label: 'Warehouses', value: totals.warehouses, icon: Warehouse, color: 'text-blue-600', bg: 'bg-blue-500/10' },
+                    { label: 'Warehouses', value: totals.warehouses, icon: WarehouseIcon, color: 'text-blue-600', bg: 'bg-blue-500/10' },
                     { label: 'Zones', value: totals.zones, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
                     { label: 'Racks', value: totals.racks, icon: Grid3X3, color: 'text-amber-600', bg: 'bg-amber-500/10' },
                     { label: 'Shelves', value: totals.shelves, icon: Layers, color: 'text-purple-600', bg: 'bg-purple-500/10' },
@@ -2093,7 +1965,7 @@ export default function WarehousePage() {
                     ) : (
                         <div className="py-2">
                             {filteredWarehouses.map((warehouse) => (
-                                <TreeNode key={warehouse.id} level={0} icon={Warehouse} iconColor="text-blue-600" bgColor="bg-blue-500/10" label={warehouse.name} code={warehouse.code} stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]} isExpanded={expandedWarehouses.has(warehouse.id)} isLoading={loadingZones.has(warehouse.id)} hasChildren={true} onToggle={() => toggleWarehouse(warehouse.id)} onAdd={() => handleAddZone(warehouse)} addLabel="Add Zone" onEdit={() => handleEditWarehouse(warehouse)} onDelete={() => handleDeleteWarehouse(warehouse)}>
+                                <TreeNode key={warehouse.id} level={0} icon={WarehouseIcon} iconColor="text-blue-600" bgColor="bg-blue-500/10" label={warehouse.name} code={warehouse.code} stats={[{ label: 'zones', value: warehouse.stats.totalZones }, { label: 'products', value: warehouse.stats.totalProducts }]} isExpanded={expandedWarehouses.has(warehouse.id)} isLoading={loadingZones.has(warehouse.id)} hasChildren={true} onToggle={() => toggleWarehouse(warehouse.id)} onAdd={() => handleAddZone(warehouse)} addLabel="Add Zone" onEdit={() => handleEditWarehouse(warehouse)} onDelete={() => handleDeleteWarehouse(warehouse)}>
                                     {zones[warehouse.id]?.map((zone) => (
                                         <TreeNode key={zone.id} level={1} icon={MapPin} iconColor="text-emerald-600" bgColor="bg-emerald-500/10" label={zone.name} code={zone.code} stats={[{ label: 'racks', value: zone.stats.totalRacks }, { label: 'products', value: zone.stats.totalProducts }]} isExpanded={expandedZones.has(zone.id)} isLoading={loadingRacks.has(zone.id)} hasChildren={true} onToggle={() => toggleZone(zone.id)} onAdd={() => handleAddRack(zone)} addLabel="Add Rack" onEdit={() => handleEditZone(zone)} onMove={() => handleMoveZone(zone)} onDelete={() => handleDeleteZone(zone)}>
                                             {racks[zone.id]?.map((rack) => (
@@ -2120,9 +1992,9 @@ export default function WarehousePage() {
 
             {/* Dialogs */}
             <WarehouseDialog open={warehouseDialogOpen} onOpenChange={setWarehouseDialogOpen} onSuccess={handleWarehouseSuccess} businessId={businessId} editData={editWarehouse} user={user} />
-            {zoneParent && <ZoneDialog open={zoneDialogOpen} onOpenChange={setZoneDialogOpen} onSuccess={handleZoneSuccess} businessId={businessId} warehouseId={zoneParent.warehouseId} warehouseName={zoneParent.warehouseName} editData={editZone} user={user} />}
-            {rackParent && <RackDialog open={rackDialogOpen} onOpenChange={setRackDialogOpen} onSuccess={handleRackSuccess} businessId={businessId} zoneId={rackParent.zoneId} zoneName={rackParent.zoneName} warehouseId={rackParent.warehouseId} warehouseName={rackParent.warehouseName} editData={editRack} user={user} />}
-            {shelfParent && <ShelfDialog open={shelfDialogOpen} onOpenChange={setShelfDialogOpen} onSuccess={handleShelfSuccess} businessId={businessId} rackId={shelfParent.rackId} rackName={shelfParent.rackName} zoneId={shelfParent.zoneId} zoneName={shelfParent.zoneName} warehouseId={shelfParent.warehouseId} warehouseName={shelfParent.warehouseName} editData={editShelf} user={user} />}
+            {zoneParent && <ZoneDialog open={zoneDialogOpen} onOpenChange={setZoneDialogOpen} onSuccess={handleZoneSuccess} businessId={businessId} warehouseId={zoneParent.warehouseId} editData={editZone} user={user} />}
+            {rackParent && <RackDialog open={rackDialogOpen} onOpenChange={setRackDialogOpen} onSuccess={handleRackSuccess} businessId={businessId} zoneId={rackParent.zoneId} warehouseId={rackParent.warehouseId} editData={editRack} user={user} />}
+            {shelfParent && <ShelfDialog open={shelfDialogOpen} onOpenChange={setShelfDialogOpen} onSuccess={handleShelfSuccess} businessId={businessId} rackId={shelfParent.rackId} zoneId={shelfParent.zoneId} warehouseId={shelfParent.warehouseId} editData={editShelf} user={user} />}
             <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onSuccess={handleDeleteSuccess} businessId={businessId} target={deleteTarget} user={user} />
             <MoveDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen} onSuccess={handleMoveSuccess} businessId={businessId} target={moveTarget} user={user} />
             <InstantWarehouseDialog open={instantWarehouseDialogOpen} onOpenChange={setInstantWarehouseDialogOpen} onSuccess={handleWarehouseSuccess} businessId={businessId} user={user} />

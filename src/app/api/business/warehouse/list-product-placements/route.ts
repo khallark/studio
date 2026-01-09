@@ -40,14 +40,10 @@ export async function GET(request: NextRequest) {
                 productSKU: data.productSKU,
                 quantity: data.quantity,
                 shelfId: data.shelfId,
-                shelfName: data.shelfName,
                 rackId: data.rackId,
-                rackName: data.rackName,
                 zoneId: data.zoneId,
-                zoneName: data.zoneName,
                 warehouseId: data.warehouseId,
-                warehouseName: data.warehouseName,
-                locationPath: `${data.zoneName} > ${data.rackName} > ${data.shelfName}`,
+                locationPath: `${data.zoneId} >> ${data.rackId} >> ${data.shelfId}`,
             };
         });
 

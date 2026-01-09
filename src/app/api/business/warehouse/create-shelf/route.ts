@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const {
-            businessId, rackId, rackName, zoneId, zoneName, warehouseId, warehouseName,
-            name, code, position, capacity, coordinates
+            businessId, rackId, zoneId, warehouseId,
+            name, code, position, capacity,
         } = body;
 
         if (!businessId) {
@@ -103,12 +103,8 @@ export async function POST(request: NextRequest) {
             position: finalPosition,
             capacity: capacity || null,
             rackId,
-            rackName: rackName || '',
             zoneId,
-            zoneName: zoneName || '',
             warehouseId,
-            warehouseName: warehouseName || '',
-            coordinates: coordinates || null,
             deletedAt: null,
             isDeleted: false,
             createdBy: userId,
@@ -119,6 +115,8 @@ export async function POST(request: NextRequest) {
                 totalProducts: 0,
                 currentOccupancy: 0,
             },
+            nameVersion: 1,
+            locationVersion: 1,
         };
 
         await shelfRef.set(shelfData);

@@ -2,18 +2,19 @@
 // Note: This API only updates the zone itself.
 // Cloud functions (onZoneWritten) handle:
 // - Stats updates on old/new warehouses
-// - Propagating warehouseId/warehouseName to children (racks, shelves, placements)
+// - Propagating warehouseId to children (racks, shelves, placements)
 // - Creating audit logs
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Zone } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, zoneId, targetWarehouseId, targetWarehouseName } = body;
+        const { businessId, zoneId, targetWarehouseId } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -53,10 +54,9 @@ export async function PUT(request: NextRequest) {
         // Only update the zone - cloud functions handle everything else
         await zoneRef.update({
             warehouseId: targetWarehouseId,
-            warehouseName: targetWarehouseName,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Zone>);
 
         return NextResponse.json({ success: true });
     } catch (error) {

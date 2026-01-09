@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
                 totalShelves: 0,
                 totalProducts: 0,
             },
+            nameVersion: 1,
         };
 
         await warehouseRef.set(warehouseData);

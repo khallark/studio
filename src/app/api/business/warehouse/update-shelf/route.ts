@@ -4,11 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
+import { Shelf } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, shelfId, name, position, capacity, coordinates } = body;
+        const { businessId, shelfId, name, position, capacity } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -94,17 +95,13 @@ export async function PUT(request: NextRequest) {
 
         // Update the shelf itself
         // Note: code is not updated as it serves as the document ID
-        const updateData: Record<string, any> = {
+        const updateData: Partial<Shelf> = {
             name: name.trim(),
             position: newPosition,
             capacity: capacity || null,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
         };
-
-        if (coordinates !== undefined) {
-            updateData.coordinates = coordinates;
-        }
 
         batch.update(shelfRef, updateData);
 

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Rack } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
@@ -17,9 +18,7 @@ export async function PUT(request: NextRequest) {
             businessId,
             rackId,
             targetZoneId,
-            targetZoneName,
             targetWarehouseId,
-            targetWarehouseName,
             targetPosition // Optional: if not provided, append at end
         } = body;
 
@@ -124,13 +123,11 @@ export async function PUT(request: NextRequest) {
         // ========================================
         batch.update(rackRef, {
             zoneId: targetZoneId,
-            zoneName: targetZoneName,
             warehouseId: targetWarehouseId,
-            warehouseName: targetWarehouseName,
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Rack>);
 
         await batch.commit();
 

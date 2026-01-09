@@ -9,7 +9,7 @@ import { Rack } from '@/types/warehouse';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, zoneId, zoneName, warehouseId, warehouseName, name, code, position } = body;
+        const { businessId, zoneId, warehouseId, name, code, position } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -99,9 +99,7 @@ export async function POST(request: NextRequest) {
             code: normalizedCode,
             position: finalPosition,
             zoneId,
-            zoneName: zoneName || '',
             warehouseId,
-            warehouseName: warehouseName || '',
             isDeleted: false,
             createdBy: userId,
             createdAt: now,
@@ -112,6 +110,8 @@ export async function POST(request: NextRequest) {
                 totalShelves: 0,
                 totalProducts: 0,
             },
+            nameVersion: 1,
+            locationVersion: 1,
         };
 
         await rackRef.set(rackData);

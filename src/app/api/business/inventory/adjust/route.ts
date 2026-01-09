@@ -21,13 +21,9 @@ interface InventoryData {
 interface PlacementInfo {
     // For inward - shelf location to place product
     shelfId: string;
-    shelfName: string;
     rackId: string;
-    rackName: string;
     zoneId: string;
-    zoneName: string;
     warehouseId: string;
-    warehouseName: string;
     // For deduction - existing placement to deduct from
     placementId?: string;
     currentQuantity?: number;
@@ -62,7 +58,7 @@ export function sleep(ms: number): Promise<void> {
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, sku, productName, type, amount, placement } = await req.json();
+        const { businessId, sku, type, amount, placement } = await req.json();
 
         // ============================================================
         // VALIDATION
@@ -232,13 +228,9 @@ export async function POST(req: NextRequest) {
             placement: {
                 placementId,
                 shelfId: placementInfo.shelfId,
-                shelfName: placementInfo.shelfName,
                 rackId: placementInfo.rackId,
-                rackName: placementInfo.rackName,
                 zoneId: placementInfo.zoneId,
-                zoneName: placementInfo.zoneName,
                 warehouseId: placementInfo.warehouseId,
-                warehouseName: placementInfo.warehouseName,
             },
             metadata: {
                 userAgent: req.headers.get('user-agent') || undefined,
@@ -282,19 +274,14 @@ export async function POST(req: NextRequest) {
                     productSKU: sku,
                     quantity: amount,
                     shelfId: placementInfo.shelfId,
-                    shelfName: placementInfo.shelfName,
                     rackId: placementInfo.rackId,
-                    rackName: placementInfo.rackName,
                     zoneId: placementInfo.zoneId,
-                    zoneName: placementInfo.zoneName,
                     warehouseId: placementInfo.warehouseId,
-                    warehouseName: placementInfo.warehouseName,
                     createdAt: now,
                     updatedAt: now,
                     createdBy: userId,
                     updatedBy: userId,
                     lastMovementReason: 'inward_addition',
-                    coordinates: null,
                     locationCode: null,
                     lastMovementReference: null,
                 }
@@ -342,7 +329,7 @@ export async function POST(req: NextRequest) {
                 },
                 placement: {
                     placementId,
-                    location: `${placementInfo.warehouseName} > ${placementInfo.zoneName} > ${placementInfo.rackName} > ${placementInfo.shelfName}`,
+                    location: `${placementInfo.warehouseId} > ${placementInfo.zoneId} > ${placementInfo.rackId} > ${placementInfo.shelfId}`,
                 },
                 inventory: {
                     previous: {

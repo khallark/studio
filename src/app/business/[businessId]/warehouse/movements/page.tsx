@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
+import { Movement } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -57,29 +58,9 @@ import { useBusinessContext } from '../../layout';
 
 interface LocationData {
     shelfId: string | null;
-    shelfName: string | null;
     rackId: string | null;
-    rackName: string | null;
     zoneId: string | null;
-    zoneName: string | null;
     warehouseId: string | null;
-    warehouseName: string | null;
-    path: string | null;
-}
-
-interface MovementData {
-    id: string;
-    productId: string;
-    productSKU: string;
-    type: 'inbound' | 'outbound' | 'transfer' | 'adjustment';
-    from: LocationData;
-    to: LocationData;
-    quantity: number;
-    reason: string;
-    reference: string;
-    timestamp: string;
-    userId: string;
-    userName: string;
 }
 
 // ============================================================
@@ -119,7 +100,7 @@ const movementTypeConfig = {
 
 function formatLocation(location: LocationData): string {
     if (!location.shelfId) return '—';
-    return location.path || `${location.zoneName} > ${location.rackName} > ${location.shelfName}`;
+    return `${location.zoneId} > ${location.rackId} > ${location.shelfId}`;
 }
 
 // ============================================================
@@ -130,7 +111,7 @@ export default function MovementsPage() {
     const { businessId, user } = useBusinessContext();
     const { toast } = useToast();
 
-    const [movements, setMovements] = useState<MovementData[]>([]);
+    const [movements, setMovements] = useState<Movement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -378,7 +359,7 @@ export default function MovementsPage() {
                                                     <TableCell>
                                                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                             <Calendar className="h-3.5 w-3.5" />
-                                                            {movement.timestamp ? format(new Date(movement.timestamp), 'MMM d, HH:mm') : '—'}
+                                                            {movement.timestamp ? format(new Date(movement.timestamp.toDate().toISOString()), 'MMM d, HH:mm') : '—'}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

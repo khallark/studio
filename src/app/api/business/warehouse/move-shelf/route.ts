@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Shelf } from '@/types/warehouse';
 
 export async function PUT(request: NextRequest) {
     try {
@@ -17,11 +18,8 @@ export async function PUT(request: NextRequest) {
             businessId,
             shelfId,
             targetRackId,
-            targetRackName,
             targetZoneId,
-            targetZoneName,
             targetWarehouseId,
-            targetWarehouseName,
             targetPosition // Optional: if not provided, append at end
         } = body;
 
@@ -52,7 +50,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Shelf not found' }, { status: 404 });
         }
 
-        const shelfData = shelfDoc.data()!;
+        const shelfData = shelfDoc.data()! as Shelf;
         const oldRackId = shelfData.rackId;
         const oldPosition = shelfData.position || 0;
 
@@ -124,20 +122,15 @@ export async function PUT(request: NextRequest) {
         // 3. Update the shelf itself
         // Cloud functions will handle stats and placement propagation
         // ========================================
-        const newPath = `${targetZoneName} > ${targetRackName} > ${shelfData.name}`;
 
         batch.update(shelfRef, {
             rackId: targetRackId,
-            rackName: targetRackName,
             zoneId: targetZoneId,
-            zoneName: targetZoneName,
             warehouseId: targetWarehouseId,
-            warehouseName: targetWarehouseName,
-            path: newPath,
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        } as Partial<Shelf>);
 
         await batch.commit();
 

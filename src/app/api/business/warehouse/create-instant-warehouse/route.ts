@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
                 totalShelves: 0,
                 totalProducts: 0,
             },
+            nameVersion: 1,
         };
 
         allDocs.push({
@@ -168,13 +169,14 @@ export async function POST(request: NextRequest) {
                 createdBy: userId,
                 updatedBy: userId,
                 warehouseId: normalizedWarehouseCode,
-                warehouseName: trimmedName,
                 deletedAt: null,
                 stats: {
                     totalRacks: 0,
                     totalShelves: 0,
                     totalProducts: 0,
                 },
+                nameVersion: 1,
+                locationVersion: 1,
             };
 
             allDocs.push({
@@ -198,14 +200,14 @@ export async function POST(request: NextRequest) {
                     createdBy: userId,
                     updatedBy: userId,
                     warehouseId: normalizedWarehouseCode,
-                    warehouseName: trimmedName,
                     zoneId: zoneCode,
-                    zoneName: zoneName,
                     deletedAt: null,
                     stats: {
                         totalShelves: 0,
                         totalProducts: 0,
                     },
+                    nameVersion: 1,
+                    locationVersion: 1,
                 };
 
                 allDocs.push({
@@ -230,17 +232,15 @@ export async function POST(request: NextRequest) {
                         createdBy: userId,
                         updatedBy: userId,
                         warehouseId: normalizedWarehouseCode,
-                        warehouseName: trimmedName,
                         zoneId: zoneCode,
-                        zoneName: zoneName,
                         rackId: rackCode,
-                        rackName: rackName,
                         deletedAt: null,
-                        coordinates: null,
                         stats: {
                             totalProducts: 0,
                             currentOccupancy: 0,
                         },
+                        nameVersion: 1,
+                        locationVersion: 1,
                     };
 
                     allDocs.push({

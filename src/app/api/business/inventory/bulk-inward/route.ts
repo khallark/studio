@@ -339,28 +339,24 @@ async function processRow(
                     lastMovementReason: 'inward_addition',
                 });
             } else {
-                batch.set(placementDoc.ref, {
+                const placementData: Placement = {
                     id: placementId,
                     productId: businessProductSKU,
                     productSKU: businessProductSKU,
                     quantity: businessProductQuantity,
                     shelfId: shelfData.code,
-                    shelfName: shelfData.name,
                     rackId: rackData.code,
-                    rackName: rackData.name,
                     zoneId: zoneData.code,
-                    zoneName: zoneData.name,
                     warehouseId: warehouseData.code,
-                    warehouseName: warehouseData.name,
                     createdAt: now,
                     updatedAt: now,
                     createdBy: userId,
                     updatedBy: userId,
                     lastMovementReason: 'inward_addition',
-                    coordinates: null,
                     locationCode: null,
                     lastMovementReference: null,
-                });
+                }
+                batch.set(placementDoc.ref, placementData);
             }
 
             const logRef = businessProductDoc.ref.collection('logs').doc();

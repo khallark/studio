@@ -54,7 +54,7 @@ import {
     ChevronRight,
     Loader2,
     PackageOpen,
-    Warehouse,
+    Warehouse as WarehouseIcon,
     TrendingUp,
     TrendingDown,
     ArrowUpDown,
@@ -75,6 +75,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { BulkInwardDialog } from '@/components/bulk-inward-dialog';
+import { Placement, Rack, Shelf, Warehouse, Zone } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -106,122 +107,6 @@ interface InventoryProduct extends Product {
 }
 
 type AdjustmentType = 'inward' | 'deduction';
-
-// Warehouse types for tree selection
-interface WarehouseData {
-    id: string;
-    name: string;
-    stats: { totalZones: number };
-}
-
-interface ZoneData {
-    id: string;
-    name: string;
-    code: string;
-    warehouseId: string;
-    warehouseName: string;
-    stats: { totalRacks: number };
-}
-
-interface RackData {
-    id: string;
-    name: string;
-    code: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    stats: { totalShelves: number };
-}
-
-interface ShelfData {
-    id: string;
-    name: string;
-    code: string;
-    rackId: string;
-    rackName: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    path: string;
-}
-
-interface PlacementData {
-    id: string;
-    productId: string;
-    productSKU: string;
-    quantity: number;
-    shelfId: string;
-    shelfName: string;
-    rackId: string;
-    rackName: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    locationPath: string;
-}
-
-// Warehouse types for tree selection
-interface WarehouseData {
-    id: string;
-    name: string;
-    stats: { totalZones: number };
-}
-
-interface ZoneData {
-    id: string;
-    name: string;
-    code: string;
-    warehouseId: string;
-    warehouseName: string;
-    stats: { totalRacks: number };
-}
-
-interface RackData {
-    id: string;
-    name: string;
-    code: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    stats: { totalShelves: number };
-}
-
-interface ShelfData {
-    id: string;
-    name: string;
-    code: string;
-    rackId: string;
-    rackName: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    path: string;
-}
-
-interface PlacementData {
-    id: string;
-    productId: string;
-    productSKU: string;
-    quantity: number;
-    shelfId: string;
-    shelfName: string;
-    rackId: string;
-    rackName: string;
-    zoneId: string;
-    zoneName: string;
-    warehouseId: string;
-    warehouseName: string;
-    locationPath: string;
-}
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
 
 function getInventoryValues(inventory?: InventoryData): InventoryData {
     return {
@@ -295,10 +180,10 @@ function AdjustmentDialog({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Warehouse tree state (for inward)
-    const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
-    const [zones, setZones] = useState<Record<string, ZoneData[]>>({});
-    const [racks, setRacks] = useState<Record<string, RackData[]>>({});
-    const [shelves, setShelves] = useState<Record<string, ShelfData[]>>({});
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [zones, setZones] = useState<Record<string, Zone[]>>({});
+    const [racks, setRacks] = useState<Record<string, Rack[]>>({});
+    const [shelves, setShelves] = useState<Record<string, Shelf[]>>({});
 
     const [expandedWarehouses, setExpandedWarehouses] = useState<Set<string>>(new Set());
     const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
@@ -309,12 +194,12 @@ function AdjustmentDialog({
     const [loadingRacks, setLoadingRacks] = useState<Set<string>>(new Set());
     const [loadingShelves, setLoadingShelves] = useState<Set<string>>(new Set());
 
-    const [selectedShelf, setSelectedShelf] = useState<ShelfData | null>(null);
+    const [selectedShelf, setSelectedShelf] = useState<Shelf | null>(null);
 
     // Placements state (for deduction)
-    const [placements, setPlacements] = useState<PlacementData[]>([]);
+    const [placements, setPlacements] = useState<Placement[]>([]);
     const [isLoadingPlacements, setIsLoadingPlacements] = useState(false);
-    const [selectedPlacement, setSelectedPlacement] = useState<PlacementData | null>(null);
+    const [selectedPlacement, setSelectedPlacement] = useState<Placement | null>(null);
 
     // Reset state when dialog opens/closes
     useEffect(() => {
@@ -518,25 +403,17 @@ function AdjustmentDialog({
             if (type === 'inward' && selectedShelf) {
                 body.placement = {
                     shelfId: selectedShelf.id,
-                    shelfName: selectedShelf.name,
                     rackId: selectedShelf.rackId,
-                    rackName: selectedShelf.rackName,
                     zoneId: selectedShelf.zoneId,
-                    zoneName: selectedShelf.zoneName,
                     warehouseId: selectedShelf.warehouseId,
-                    warehouseName: selectedShelf.warehouseName,
                 };
             } else if (type === 'deduction' && selectedPlacement) {
                 body.placement = {
                     placementId: selectedPlacement.id,
                     shelfId: selectedPlacement.shelfId,
-                    shelfName: selectedPlacement.shelfName,
                     rackId: selectedPlacement.rackId,
-                    rackName: selectedPlacement.rackName,
                     zoneId: selectedPlacement.zoneId,
-                    zoneName: selectedPlacement.zoneName,
                     warehouseId: selectedPlacement.warehouseId,
-                    warehouseName: selectedPlacement.warehouseName,
                     currentQuantity: selectedPlacement.quantity,
                 };
             }
@@ -576,10 +453,10 @@ function AdjustmentDialog({
     // Get selection path text
     const getSelectionText = () => {
         if (type === 'inward' && selectedShelf) {
-            return `${selectedShelf.warehouseName} > ${selectedShelf.zoneName} > ${selectedShelf.rackName} > ${selectedShelf.name}`;
+            return `${selectedShelf.warehouseId} > ${selectedShelf.zoneId} > ${selectedShelf.rackId} > ${selectedShelf.code}`;
         }
         if (type === 'deduction' && selectedPlacement) {
-            return selectedPlacement.locationPath;
+            return `${selectedPlacement.warehouseId} > ${selectedPlacement.zoneId} > ${selectedPlacement.rackId} > ${selectedPlacement.shelfId}`;
         }
         return null;
     };
@@ -690,7 +567,7 @@ function AdjustmentDialog({
                                     </div>
                                 ) : warehouses.length === 0 ? (
                                     <div className="p-8 text-center text-muted-foreground">
-                                        <Warehouse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                        <WarehouseIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                         <p className="text-sm">No warehouses found</p>
                                         <p className="text-xs">Create a warehouse first to place products</p>
                                     </div>
@@ -715,7 +592,7 @@ function AdjustmentDialog({
                                                         )}
                                                     </div>
                                                     <div className="p-1.5 rounded-md bg-blue-500/10">
-                                                        <Warehouse className="h-4 w-4 text-blue-600" />
+                                                        <WarehouseIcon className="h-4 w-4 text-blue-600" />
                                                     </div>
                                                     <span className="flex-1 text-sm font-medium truncate">{warehouse.name}</span>
                                                 </div>
@@ -888,9 +765,9 @@ function AdjustmentDialog({
                                                         <Layers className="h-4 w-4 text-purple-600" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium truncate">{placement.locationPath}</p>
+                                                        <p className="text-sm font-medium truncate">{`${placement.warehouseId} > ${placement.zoneId} > ${placement.rackId} > ${placement.shelfId}`}</p>
                                                         <p className="text-xs text-muted-foreground">
-                                                            {placement.warehouseName}
+                                                            {placement.warehouseId}
                                                         </p>
                                                     </div>
                                                     <Badge variant="outline" className="font-mono">
@@ -1221,7 +1098,7 @@ export default function InventoryPage() {
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 ring-1 ring-indigo-500/20">
-                            <Warehouse className="h-6 w-6 text-indigo-600" />
+                            <WarehouseIcon className="h-6 w-6 text-indigo-600" />
                         </div>
                         <div>
                             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Stock Overview</h1>

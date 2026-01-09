@@ -9,7 +9,7 @@ import { Zone } from '@/types/warehouse';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { businessId, warehouseId, warehouseName, name, code, description } = body;
+        const { businessId, warehouseId, name, code, description } = body;
 
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
             code: normalizedCode,
             description: description?.trim() || '',
             warehouseId,
-            warehouseName: warehouseName || '',
             deletedAt: null,
             isDeleted: false,
             createdBy: userId,
@@ -74,6 +73,8 @@ export async function POST(request: NextRequest) {
                 totalShelves: 0,
                 totalProducts: 0,
             },
+            nameVersion: 1,
+            locationVersion: 1,
         };
 
         await zoneRef.set(zoneData);

@@ -51,10 +51,13 @@ export async function POST(request: NextRequest) {
         // Check if shelf with this code already exists
         const existingShelf = await shelfRef.get();
         if (existingShelf.exists) {
-            return NextResponse.json(
-                { error: `Shelf with code "${normalizedCode}" already exists` },
-                { status: 409 }
-            );
+            const { isDeleted } = existingShelf.data() as Shelf;
+            if (!isDeleted) {
+                return NextResponse.json(
+                    { error: `Shelf with code "${normalizedCode}" already exists` },
+                    { status: 409 }
+                );
+            }
         }
 
         // Get existing shelves in the rack to determine position
@@ -96,30 +99,49 @@ export async function POST(request: NextRequest) {
 
         const now = Timestamp.now();
 
-        const shelfData: Shelf = {
-            id: normalizedCode,
-            name: name.trim(),
-            code: normalizedCode,
-            position: finalPosition,
-            capacity: capacity || null,
-            rackId,
-            zoneId,
-            warehouseId,
-            deletedAt: null,
-            isDeleted: false,
-            createdBy: userId,
-            createdAt: now,
-            updatedAt: now,
-            updatedBy: userId,
-            stats: {
-                totalProducts: 0,
-                currentOccupancy: 0,
-            },
-            nameVersion: 1,
-            locationVersion: 1,
-        };
+        if (!existingShelf.exists) {
+            const shelfData: Shelf = {
+                id: normalizedCode,
+                name: name.trim(),
+                code: normalizedCode,
+                position: finalPosition,
+                capacity: capacity || null,
+                rackId,
+                zoneId,
+                warehouseId,
+                deletedAt: null,
+                isDeleted: false,
+                createdBy: userId,
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalProducts: 0,
+                },
+                nameVersion: 1,
+                locationVersion: 1,
+            };
 
-        await shelfRef.set(shelfData);
+            await shelfRef.set(shelfData);
+        } else {
+            const shelfUpdatedData: Partial<Shelf> = {
+                name: name.trim(),
+                position: finalPosition,
+                capacity: capacity || null,
+                warehouseId,
+                zoneId,
+                rackId,
+                deletedAt: null,
+                isDeleted: false,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalProducts: 0,
+                },
+            };
+            
+            await shelfRef.update(shelfUpdatedData);
+        }
 
         return NextResponse.json({
             success: true,

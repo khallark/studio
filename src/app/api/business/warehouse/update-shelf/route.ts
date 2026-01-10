@@ -37,12 +37,12 @@ export async function PUT(request: NextRequest) {
 
         const shelfRef = db.doc(`users/${businessId}/shelves/${shelfId}`);
         const shelfDoc = await shelfRef.get();
+        const currentShelf = shelfDoc.data()! as Shelf;
 
-        if (!shelfDoc.exists) {
+        if (!shelfDoc.exists || currentShelf.isDeleted) {
             return NextResponse.json({ error: 'Shelf not found' }, { status: 404 });
         }
 
-        const currentShelf = shelfDoc.data()!;
         const oldPosition = currentShelf.position || 0;
         const newPosition = position || 0;
         const rackId = currentShelf.rackId;

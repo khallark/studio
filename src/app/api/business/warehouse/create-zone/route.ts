@@ -48,36 +48,58 @@ export async function POST(request: NextRequest) {
         // Check if zone with this code already exists
         const existingZone = await zoneRef.get();
         if (existingZone.exists) {
-            return NextResponse.json(
-                { error: `Zone with code "${normalizedCode}" already exists` },
-                { status: 409 }
-            );
+            const { isDeleted } = existingZone.data() as Zone;
+            if (!isDeleted) {
+                return NextResponse.json(
+                    { error: `Zone with code "${normalizedCode}" already exists` },
+                    { status: 409 }
+                );
+            }
         }
 
         const now = Timestamp.now();
 
-        const zoneData: Zone = {
-            id: normalizedCode, // Same as doc ID
-            name: name.trim(),
-            code: normalizedCode,
-            description: description?.trim() || '',
-            warehouseId,
-            deletedAt: null,
-            isDeleted: false,
-            createdBy: userId,
-            createdAt: now,
-            updatedAt: now,
-            updatedBy: userId,
-            stats: {
-                totalRacks: 0,
-                totalShelves: 0,
-                totalProducts: 0,
-            },
-            nameVersion: 1,
-            locationVersion: 1,
-        };
-
-        await zoneRef.set(zoneData);
+        if (!existingZone.exists) {
+            const zoneData: Zone = {
+                id: normalizedCode, // Same as doc ID
+                name: name.trim(),
+                code: normalizedCode,
+                description: description?.trim() || '',
+                warehouseId,
+                deletedAt: null,
+                isDeleted: false,
+                createdBy: userId,
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalRacks: 0,
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+                nameVersion: 1,
+                locationVersion: 1,
+            };
+    
+            await zoneRef.set(zoneData);
+        } else {
+            const zoneData: Partial<Zone> = {
+                name: name.trim(),
+                description: description?.trim() || '',
+                warehouseId,
+                deletedAt: null,
+                isDeleted: false,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalRacks: 0,
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+            };
+    
+            await zoneRef.update(zoneData);
+        }
 
         return NextResponse.json({
             success: true,

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
+import { Warehouse } from '@/types/warehouse';
 
 export async function DELETE(request: NextRequest) {
     try {
@@ -47,12 +48,13 @@ export async function DELETE(request: NextRequest) {
 
         // Soft delete
         const warehouseRef = db.doc(`users/${businessId}/warehouses/${warehouseId}`);
-        await warehouseRef.update({
+        const data: Partial<Warehouse> = {
             isDeleted: true,
             deletedAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        };
+        await warehouseRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

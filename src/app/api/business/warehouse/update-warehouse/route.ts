@@ -37,8 +37,9 @@ export async function PUT(request: NextRequest) {
 
         const warehouseRef = db.doc(`users/${businessId}/warehouses/${warehouseId}`);
         const warehouseDoc = await warehouseRef.get();
+        const currentWarehouse = warehouseDoc.data()! as Warehouse;
 
-        if (!warehouseDoc.exists) {
+        if (!warehouseDoc.exists || currentWarehouse.isDeleted) {
             return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
         }
 

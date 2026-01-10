@@ -124,7 +124,6 @@ export interface Shelf {
 
     stats: {
         totalProducts: number;
-        currentOccupancy: number;
     };
 
     locationVersion: number;

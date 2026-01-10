@@ -37,8 +37,9 @@ export async function PUT(request: NextRequest) {
 
         const zoneRef = db.doc(`users/${businessId}/zones/${zoneId}`);
         const zoneDoc = await zoneRef.get();
+        const currentZone = zoneDoc.data()! as Zone;
 
-        if (!zoneDoc.exists) {
+        if (!zoneDoc.exists || currentZone.isDeleted) {
             return NextResponse.json({ error: 'Zone not found' }, { status: 404 });
         }
 

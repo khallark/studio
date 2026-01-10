@@ -38,12 +38,12 @@ export async function PUT(request: NextRequest) {
 
         const zoneRef = db.doc(`users/${businessId}/zones/${zoneId}`);
         const zoneDoc = await zoneRef.get();
+        const zoneData = zoneDoc.data()! as Zone;
 
-        if (!zoneDoc.exists) {
+        if (!zoneDoc.exists || zoneData.isDeleted) {
             return NextResponse.json({ error: 'Zone not found' }, { status: 404 });
         }
 
-        const zoneData = zoneDoc.data()!;
         const oldWarehouseId = zoneData.warehouseId;
 
         // Don't move if same warehouse

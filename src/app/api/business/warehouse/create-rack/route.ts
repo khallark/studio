@@ -48,10 +48,13 @@ export async function POST(request: NextRequest) {
         // Check if rack with this code already exists
         const existingRack = await rackRef.get();
         if (existingRack.exists) {
-            return NextResponse.json(
-                { error: `Rack with code "${normalizedCode}" already exists` },
-                { status: 409 }
-            );
+            const { isDeleted } = existingRack.data() as Rack;
+            if (!isDeleted) {
+                return NextResponse.json(
+                    { error: `Rack with code "${normalizedCode}" already exists` },
+                    { status: 409 }
+                );
+            }
         }
 
         // Get existing racks in the zone to determine position
@@ -93,28 +96,47 @@ export async function POST(request: NextRequest) {
 
         const now = Timestamp.now();
 
-        const rackData: Rack = {
-            id: normalizedCode,
-            name: name.trim(),
-            code: normalizedCode,
-            position: finalPosition,
-            zoneId,
-            warehouseId,
-            isDeleted: false,
-            createdBy: userId,
-            createdAt: now,
-            updatedAt: now,
-            updatedBy: userId,
-            deletedAt: null,
-            stats: {
-                totalShelves: 0,
-                totalProducts: 0,
-            },
-            nameVersion: 1,
-            locationVersion: 1,
-        };
-
-        await rackRef.set(rackData);
+        if (!existingRack.exists) {
+            const rackData: Rack = {
+                id: normalizedCode,
+                name: name.trim(),
+                code: normalizedCode,
+                position: finalPosition,
+                zoneId,
+                warehouseId,
+                isDeleted: false,
+                createdBy: userId,
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: userId,
+                deletedAt: null,
+                stats: {
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+                nameVersion: 1,
+                locationVersion: 1,
+            };
+    
+            await rackRef.set(rackData);
+        } else {
+            const rackUpdatedData: Partial<Rack> = {
+                name: name.trim(),
+                position: finalPosition,
+                zoneId,
+                warehouseId,
+                isDeleted: false,
+                updatedAt: now,
+                updatedBy: userId,
+                deletedAt: null,
+                stats: {
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+            };
+    
+            await rackRef.update(rackUpdatedData);
+        }
 
         return NextResponse.json({
             success: true,

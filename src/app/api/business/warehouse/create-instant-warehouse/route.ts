@@ -237,7 +237,6 @@ export async function POST(request: NextRequest) {
                         deletedAt: null,
                         stats: {
                             totalProducts: 0,
-                            currentOccupancy: 0,
                         },
                         nameVersion: 1,
                         locationVersion: 1,

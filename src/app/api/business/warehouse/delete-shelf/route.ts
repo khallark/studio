@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { db } from '@/lib/firebase-admin';
+import { Shelf } from '@/types/warehouse';
 
 export async function DELETE(request: NextRequest) {
     try {
@@ -45,12 +46,13 @@ export async function DELETE(request: NextRequest) {
         }
 
         const shelfRef = db.doc(`users/${businessId}/shelves/${shelfId}`);
-        await shelfRef.update({
+        const data: Partial<Shelf> = {
             isDeleted: true,
             deletedAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        };
+        await shelfRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

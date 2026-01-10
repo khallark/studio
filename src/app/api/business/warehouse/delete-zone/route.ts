@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
+import { Zone } from '@/types/warehouse';
 
 export async function DELETE(request: NextRequest) {
     try {
@@ -46,12 +47,13 @@ export async function DELETE(request: NextRequest) {
         }
 
         const zoneRef = db.doc(`users/${businessId}/zones/${zoneId}`);
-        await zoneRef.update({
+        const data: Partial<Zone> = {
             isDeleted: true,
             deletedAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        };
+        await zoneRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
+import { Rack } from '@/types/warehouse';
 
 export async function DELETE(request: NextRequest) {
     try {
@@ -46,12 +47,13 @@ export async function DELETE(request: NextRequest) {
         }
 
         const rackRef = db.doc(`users/${businessId}/racks/${rackId}`);
-        await rackRef.update({
+        const data: Partial<Rack> = {
             isDeleted: true,
             deletedAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        });
+        };
+        await rackRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

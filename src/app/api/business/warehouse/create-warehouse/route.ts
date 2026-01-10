@@ -62,38 +62,63 @@ export async function POST(request: NextRequest) {
         // Check if warehouse with this code already exists
         const existingWarehouse = await warehouseRef.get();
         if (existingWarehouse.exists) {
-            return NextResponse.json(
-                { error: `Warehouse with code "${normalizedCode}" already exists` },
-                { status: 409 }
-            );
+            const { isDeleted } = existingWarehouse.data() as Warehouse;
+            if (!isDeleted) {
+                return NextResponse.json(
+                    { error: `Warehouse with code "${normalizedCode}" already exists` },
+                    { status: 409 }
+                );
+            }
         }
 
         const now = Timestamp.now();
 
-        const warehouseData: Warehouse = {
-            id: normalizedCode,
-            code: normalizedCode,
-            name: name.trim(),
-            address: address?.trim() || '',
-            storageCapacity: storageCapacity || 0,
-            operationalHours: operationalHours || 0,
-            defaultGSTstate: defaultGSTstate || '',
-            deletedAt: null,
-            isDeleted: false,
-            createdBy: userId,
-            createdAt: now,
-            updatedAt: now,
-            updatedBy: userId,
-            stats: {
-                totalZones: 0,
-                totalRacks: 0,
-                totalShelves: 0,
-                totalProducts: 0,
-            },
-            nameVersion: 1,
-        };
-
-        await warehouseRef.set(warehouseData);
+        if (!existingWarehouse.exists) {
+            const warehouseData: Warehouse = {
+                id: normalizedCode,
+                code: normalizedCode,
+                name: name.trim(),
+                address: address?.trim() || '',
+                storageCapacity: storageCapacity || 0,
+                operationalHours: operationalHours || 0,
+                defaultGSTstate: defaultGSTstate || '',
+                deletedAt: null,
+                isDeleted: false,
+                createdBy: userId,
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalZones: 0,
+                    totalRacks: 0,
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+                nameVersion: 1,
+            };
+    
+            await warehouseRef.set(warehouseData);
+        } else {
+            const warehouseUpdatedData: Partial<Warehouse> = {
+                name: name.trim(),
+                address: address?.trim() || '',
+                storageCapacity: storageCapacity || 0,
+                operationalHours: operationalHours || 0,
+                defaultGSTstate: defaultGSTstate || '',
+                deletedAt: null,
+                isDeleted: false,
+                updatedAt: now,
+                updatedBy: userId,
+                stats: {
+                    totalZones: 0,
+                    totalRacks: 0,
+                    totalShelves: 0,
+                    totalProducts: 0,
+                },
+            };
+    
+            await warehouseRef.update(warehouseUpdatedData);
+        }
 
         return NextResponse.json({
             success: true,

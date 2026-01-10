@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
                 position: data.position || 0,
                 stats: {
                     totalProducts: data.stats?.totalProducts || 0,
-                    currentOccupancy: data.stats?.currentOccupancy || 0,
                 },
                 isDeleted: data.isDeleted || false,
                 createdAt: data.createdAt?.toDate?.()?.toISOString() || null,

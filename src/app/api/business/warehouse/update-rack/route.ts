@@ -37,12 +37,12 @@ export async function PUT(request: NextRequest) {
 
         const rackRef = db.doc(`users/${businessId}/racks/${rackId}`);
         const rackDoc = await rackRef.get();
+        const currentRack = rackDoc.data()! as Rack;
 
-        if (!rackDoc.exists) {
+        if (!rackDoc.exists || currentRack.isDeleted) {
             return NextResponse.json({ error: 'Rack not found' }, { status: 404 });
         }
 
-        const currentRack = rackDoc.data()!;
         const oldPosition = currentRack.position || 0;
         const newPosition = position || 0;
         const zoneId = currentRack.zoneId;

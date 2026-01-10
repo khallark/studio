@@ -718,7 +718,7 @@ interface ShelfDialogProps {
     rackId: string;
     zoneId: string;
     warehouseId: string;
-    editData?: Shelf | null;
+    editData: Shelf | null;
     user: User | null | undefined;
 }
 
@@ -765,6 +765,7 @@ function ShelfDialog({ open, onOpenChange, onSuccess, businessId, rackId, zoneId
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
                 body: JSON.stringify({
                     businessId,
+                    shelfId: editData?.id,
                     rackId,
                     zoneId,
                     warehouseId,

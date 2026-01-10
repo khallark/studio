@@ -525,7 +525,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
             </div>
           )}
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !recordedVideo || !Object.values(qcStatuses).some(value => value === null)}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !recordedVideo || Object.values(qcStatuses).some(value => value === null)}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Submit QC
           </Button>

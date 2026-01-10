@@ -147,15 +147,14 @@ export interface ShelfLog {
 // placementId = `${productId}_${shelfId}` (composite ID)
 export interface Placement {
     id: string;
+    createUPCs: boolean;
     quantity: number;
     createdAt: Timestamp;
     updatedAt: Timestamp;
     createdBy: string;
     updatedBy: string;
-    locationCode: string | null;
 
     productId: string;
-    productSKU: string;
 
     warehouseId: string;
 
@@ -167,6 +166,41 @@ export interface Placement {
 
     lastMovementReason: string | null;
     lastMovementReference: string | null;
+}
+
+// users/{businessId}/upcs/{upcId}
+export type UPC = {
+    id: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
+
+    orderName: null;
+
+    putAway: null;
+
+    location: {
+        productId: string;
+        warehouseId: string;
+        zoneId: string;
+        rackId: string;
+        shelfId: string;
+        placementId: string;
+    }
+
+} | {
+    id: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
+
+    orderName: string;
+
+    putAway: 'inbound' | 'outbound';
+
+    location: null;
 }
 
 // /{businessId}/placements/{placementId}/logs/{logId}
@@ -186,7 +220,6 @@ export interface Movement {
     id: string;
 
     productId: string;
-    productSKU: string;
 
     type: "transfer" | "inbound" | "outbound" | "adjustment";
 

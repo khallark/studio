@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
             // Get entity name
             const entityDoc = await db.doc(`users/${businessId}/${entityType}s/${entityId}`).get();
-            const entityName = entityDoc.data()?.name || entityDoc.data()?.productSKU || 'Unknown';
+            const entityName = entityDoc.data()?.name || entityDoc.data()?.productId || 'Unknown';
 
             logsSnapshot.docs.forEach((doc) => {
                 const data = doc.data();

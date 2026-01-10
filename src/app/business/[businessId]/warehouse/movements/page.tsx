@@ -129,7 +129,7 @@ export default function MovementsPage() {
         try {
             const params = new URLSearchParams({ businessId, limit: '50' });
             if (typeFilter !== 'all') params.append('type', typeFilter);
-            if (searchQuery) params.append('productSKU', searchQuery);
+            if (searchQuery) params.append('productId', searchQuery);
             if (loadMore && lastId) params.append('startAfter', lastId);
 
             const idToken = await user?.getIdToken();
@@ -322,7 +322,7 @@ export default function MovementsPage() {
                                                             <div className="p-1.5 rounded-md bg-violet-500/10">
                                                                 <Package className="h-4 w-4 text-violet-600" />
                                                             </div>
-                                                            <code className="text-sm font-medium">{movement.productSKU}</code>
+                                                            <code className="text-sm font-medium">{movement.productId}</code>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>

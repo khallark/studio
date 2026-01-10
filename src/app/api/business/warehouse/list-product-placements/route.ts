@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
             return {
                 id: doc.id,
                 productId: data.productId,
-                productSKU: data.productSKU,
                 quantity: data.quantity,
                 shelfId: data.shelfId,
                 rackId: data.rackId,

@@ -43,12 +43,13 @@ export async function PUT(request: NextRequest) {
         }
 
         // Note: code is not updated as it serves as the document ID
-        await zoneRef.update({
+        const data: Partial<Zone> = {
             name: name.trim(),
             description: description?.trim() || '',
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Zone>);
+        };
+        await zoneRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -121,13 +121,14 @@ export async function PUT(request: NextRequest) {
         // 3. Update the rack itself
         // Cloud functions will handle stats and child propagation
         // ========================================
-        batch.update(rackRef, {
+        const data: Partial<Rack> = {
             zoneId: targetZoneId,
             warehouseId: targetWarehouseId,
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Rack>);
+        };
+        batch.update(rackRef, data);
 
         await batch.commit();
 

@@ -52,11 +52,12 @@ export async function PUT(request: NextRequest) {
         }
 
         // Only update the zone - cloud functions handle everything else
-        await zoneRef.update({
+        const data: Partial<Zone> = {
             warehouseId: targetWarehouseId,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Zone>);
+        };
+        await zoneRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

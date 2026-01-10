@@ -42,13 +42,14 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Warehouse not found' }, { status: 404 });
         }
 
-        // Note: code is not updated as it serves as the document ID
-        await warehouseRef.update({
+        const data: Partial<Warehouse> = {
             name: name.trim(),
             address: address?.trim() || '',
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Warehouse>);
+        };
+        // Note: code is not updated as it serves as the document ID
+        await warehouseRef.update(data);
 
         return NextResponse.json({ success: true });
     } catch (error) {

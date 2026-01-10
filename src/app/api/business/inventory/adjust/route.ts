@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
-import { Movement, Placement, PlacementLog } from '@/types/warehouse';
+import { Placement } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -260,8 +260,10 @@ export async function POST(req: NextRequest) {
             const existingPlacement = await placementRef.get();
 
             if (existingPlacement.exists) {
+                const { createUPCs } = existingPlacement.data() as Placement;
                 // Update existing placement - increment quantity
                 batch.update(placementRef, {
+                    createUPCs: !createUPCs,
                     quantity: FieldValue.increment(amount),
                     updatedAt: now,
                     updatedBy: userId,
@@ -271,7 +273,7 @@ export async function POST(req: NextRequest) {
                 const newPlacementData: Placement = {
                     id: placementId,
                     productId: sku,
-                    productSKU: sku,
+                    createUPCs: true,
                     quantity: amount,
                     shelfId: placementInfo.shelfId,
                     rackId: placementInfo.rackId,
@@ -282,7 +284,6 @@ export async function POST(req: NextRequest) {
                     createdBy: userId,
                     updatedBy: userId,
                     lastMovementReason: 'inward_addition',
-                    locationCode: null,
                     lastMovementReference: null,
                 }
                 // Create new placement

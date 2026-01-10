@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         const placementsSnapshot = await db
             .collection(`users/${businessId}/placements`)
             .where('shelfId', '==', shelfId)
-            .orderBy('productSKU', 'asc')
+            .orderBy('productId', 'asc')
             .get();
 
         const placements = placementsSnapshot.docs.map((doc) => {
@@ -50,13 +50,11 @@ export async function GET(request: NextRequest) {
             return {
                 id: doc.id,
                 productId: data.productId,
-                productSKU: data.productSKU,
                 quantity: data.quantity || 0,
                 shelfId: data.shelfId,
                 rackId: data.rackId,
                 zoneId: data.zoneId,
                 warehouseId: data.warehouseId,
-                locationCode: data.locationCode || null,
                 createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
                 updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
             };

@@ -247,7 +247,7 @@ function PlacementRow({ placement, level }: { placement: Placement; level: numbe
                 <Package className="h-4 w-4 text-violet-600" />
             </div>
             <div className="flex-1 min-w-0">
-                <span className="font-medium text-sm">{placement.productSKU}</span>
+                <span className="font-medium text-sm">{placement.productId}</span>
             </div>
             <Badge variant="outline" className="font-mono">
                 Qty: {placement.quantity}

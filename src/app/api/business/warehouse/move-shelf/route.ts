@@ -123,14 +123,15 @@ export async function PUT(request: NextRequest) {
         // Cloud functions will handle stats and placement propagation
         // ========================================
 
-        batch.update(shelfRef, {
+        const data: Partial<Shelf> = {
             rackId: targetRackId,
             zoneId: targetZoneId,
             warehouseId: targetWarehouseId,
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Shelf>);
+        };
+        batch.update(shelfRef, data);
 
         await batch.commit();
 

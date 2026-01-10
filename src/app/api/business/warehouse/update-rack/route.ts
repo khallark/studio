@@ -95,12 +95,13 @@ export async function PUT(request: NextRequest) {
 
         // Update the rack itself
         // Note: code is not updated as it serves as the document ID
-        batch.update(rackRef, {
+        const data: Partial<Rack> = {
             name: name.trim(),
             position: newPosition,
             updatedAt: Timestamp.now(),
             updatedBy: userId,
-        } as Partial<Rack>);
+        };
+        batch.update(rackRef, data);
 
         await batch.commit();
 

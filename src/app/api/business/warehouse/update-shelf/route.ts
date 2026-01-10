@@ -102,7 +102,6 @@ export async function PUT(request: NextRequest) {
             updatedAt: Timestamp.now(),
             updatedBy: userId,
         };
-
         batch.update(shelfRef, updateData);
 
         await batch.commit();

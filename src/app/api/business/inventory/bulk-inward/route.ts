@@ -332,7 +332,9 @@ async function processRow(
 
         applyWrites: (batch) => {
             if (placementDoc.exists) {
+                const { createUPCs } = placementDoc.data() as Placement;
                 batch.update(placementDoc.ref, {
+                    createUPCs: !createUPCs,
                     quantity: FieldValue.increment(businessProductQuantity),
                     updatedAt: now,
                     updatedBy: userId,
@@ -342,7 +344,7 @@ async function processRow(
                 const placementData: Placement = {
                     id: placementId,
                     productId: businessProductSKU,
-                    productSKU: businessProductSKU,
+                    createUPCs: true,
                     quantity: businessProductQuantity,
                     shelfId: shelfData.code,
                     rackId: rackData.code,
@@ -353,7 +355,6 @@ async function processRow(
                     createdBy: userId,
                     updatedBy: userId,
                     lastMovementReason: 'inward_addition',
-                    locationCode: null,
                     lastMovementReference: null,
                 }
                 batch.set(placementDoc.ref, placementData);

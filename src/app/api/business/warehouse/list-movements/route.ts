@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         }
 
         const type = searchParams.get('type'); // inbound, outbound, transfer, adjustment
-        const productSKU = searchParams.get('productSKU');
+        const productId = searchParams.get('productId');
         const warehouseId = searchParams.get('warehouseId');
         const limit = parseInt(searchParams.get('limit') || '50');
         const startAfter = searchParams.get('startAfter');
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
             query = query.where('type', '==', type);
         }
 
-        if (productSKU) {
-            query = query.where('productSKU', '==', productSKU);
+        if (productId) {
+            query = query.where('productId', '==', productId);
         }
 
         if (warehouseId) {
@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
             return {
                 id: doc.id,
                 productId: data.productId,
-                productSKU: data.productSKU,
                 type: data.type,
                 from: data.from,
                 to: data.to,

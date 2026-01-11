@@ -482,7 +482,7 @@ function AdjustmentDialog({
                         </div>
                         <div>
                             <DialogTitle className="text-xl">
-                                {type === 'inward' ? 'Add Inward Stock' : 'Deduct Stock'}
+                                {type === 'inward' ? 'Add Inward Stock (Upto 500 only)' : 'Deduct Stock'}
                             </DialogTitle>
                             <DialogDescription>
                                 {product.name} ({product.sku})

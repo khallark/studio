@@ -85,11 +85,24 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (typeof amount !== 'number' || amount <= 0 || !Number.isInteger(amount)) {
+        // For deduction, validate placement has enough quantity
+        if (type === 'deduction') {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'amount must be a positive integer' },
+                { error: 'Validation Error', message: 'this feature is unavailable for now' },
                 { status: 400 }
             );
+            // if (!placement.placementId) {
+            //     return NextResponse.json(
+            //         { error: 'Validation Error', message: 'placement.placementId is required for deduction' },
+            //         { status: 400 }
+            //     );
+            // }
+            // if (typeof placement.currentQuantity !== 'number' || amount > placement.currentQuantity) {
+            //     return NextResponse.json(
+            //         { error: 'Validation Error', message: `Cannot deduct ${amount} units. Only ${placement.currentQuantity || 0} available at this location.` },
+            //         { status: 400 }
+            //     );
+            // }
         }
 
         // Validate placement info
@@ -100,20 +113,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // For deduction, validate placement has enough quantity
-        if (type === 'deduction') {
-            if (!placement.placementId) {
-                return NextResponse.json(
-                    { error: 'Validation Error', message: 'placement.placementId is required for deduction' },
-                    { status: 400 }
-                );
-            }
-            if (typeof placement.currentQuantity !== 'number' || amount > placement.currentQuantity) {
-                return NextResponse.json(
-                    { error: 'Validation Error', message: `Cannot deduct ${amount} units. Only ${placement.currentQuantity || 0} available at this location.` },
-                    { status: 400 }
-                );
-            }
+        if (typeof amount !== 'number' || amount <= 0 || !Number.isInteger(amount)) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'amount must be a positive integer' },
+                { status: 400 }
+            );
+        }
+
+        if (amount > 500) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'only upto 500 products can be inwarded at a time' },
+                { status: 400 }
+            );
         }
 
         // ============================================================
@@ -208,7 +219,6 @@ export async function POST(req: NextRequest) {
 
         const userData = userDoc?.data();
         const userEmail = userData?.email || userData?.primaryContact?.email || null;
-        const userName = userData?.name || userData?.primaryContact?.name || userEmail || 'Unknown';
 
         const logEntry = {
             action: 'inventory_adjusted',

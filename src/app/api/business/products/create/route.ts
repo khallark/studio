@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
             stock: stockValue || null,
             createdBy: userId || 'unknown',
             createdAt: Timestamp.now(),
+            inShelfQuantity: 0,
             // Initialize inventory data
             inventory: {
                 openingStock: stockValue,

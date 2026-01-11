@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
                 // Remove the specific variant mapping
                 batch.update(storeProductRef, {
                     [`variantMappings.${mapping.variantId}`]: FieldValue.delete(),
+                    variantMappingsArray: FieldValue.arrayRemove(mapping.variantId),
                     [`variantMappingDetails.${mapping.variantId}`]: FieldValue.delete(),
                     updatedAt: FieldValue.serverTimestamp(),
                 });

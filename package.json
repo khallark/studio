@@ -53,6 +53,7 @@
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",
+    "nanoid": "^5.1.6",
     "next": "^15.5.7",
     "patch-package": "^8.0.0",
     "puppeteer-core": "^24.33.0",

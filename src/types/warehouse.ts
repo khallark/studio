@@ -274,6 +274,7 @@ export interface PropagationTracker {
     type: PropagationTask['type'];
     businessId: string;
     entityId: string;
+    collection: string,
 
     status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'obsolete';
 

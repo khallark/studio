@@ -5,6 +5,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Rack, Shelf, Warehouse, Zone } from '@/types/warehouse';
+import { customAlphabet } from 'nanoid';
 
 export async function POST(request: NextRequest) {
     try {
@@ -82,36 +83,8 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Generate all codes upfront and check for conflicts
-        const allCodes: { type: string; code: string; collection: string }[] = [];
-
-        for (let z = 1; z <= zones; z++) {
-            const zoneCode = `${normalizedWarehouseCode}-Z${z.toString().padStart(2, '0')}`;
-            allCodes.push({ type: 'zone', code: zoneCode, collection: 'zones' });
-
-            for (let r = 1; r <= racks; r++) {
-                const rackCode = `${zoneCode}-R${r.toString().padStart(2, '0')}`;
-                allCodes.push({ type: 'rack', code: rackCode, collection: 'racks' });
-
-                for (let s = 1; s <= shelves; s++) {
-                    const shelfCode = `${rackCode}-S${s.toString().padStart(2, '0')}`;
-                    allCodes.push({ type: 'shelf', code: shelfCode, collection: 'shelves' });
-                }
-            }
-        }
-
-        // Batch check for existing codes (check a sample if too many)
-        // For full validation, we check zones and racks (shelves are derived, less likely to conflict)
-        const zoneCodes = allCodes.filter(c => c.type === 'zone').map(c => c.code);
-        for (const zCode of zoneCodes) {
-            const zoneDoc = await db.collection(`users/${businessId}/zones`).doc(zCode).get();
-            if (zoneDoc.exists) {
-                return NextResponse.json(
-                    { error: `Zone with code "${zCode}" already exists` },
-                    { status: 409 }
-                );
-            }
-        }
+        const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        const generateId = customAlphabet(alphabet, 13);
 
         const now = Timestamp.now();
 
@@ -154,7 +127,7 @@ export async function POST(request: NextRequest) {
 
         // 2. Create zones, racks, and shelves
         for (let z = 1; z <= zones; z++) {
-            const zoneCode = `${normalizedWarehouseCode}-Z${z.toString().padStart(2, '0')}`;
+            const zoneCode = generateId();
             const zoneName = `Zone ${z}`;
             const zoneRef = db.collection(`users/${businessId}/zones`).doc(zoneCode);
 
@@ -185,7 +158,7 @@ export async function POST(request: NextRequest) {
             });
 
             for (let r = 1; r <= racks; r++) {
-                const rackCode = `${zoneCode}-R${r.toString().padStart(2, '0')}`;
+                const rackCode = generateId();
                 const rackName = `Rack ${r}`;
                 const rackRef = db.collection(`users/${businessId}/racks`).doc(rackCode);
 
@@ -216,7 +189,7 @@ export async function POST(request: NextRequest) {
                 });
 
                 for (let s = 1; s <= shelves; s++) {
-                    const shelfCode = `${rackCode}-S${s.toString().padStart(2, '0')}`;
+                    const shelfCode = generateId();
                     const shelfName = `Shelf ${s}`;
                     const shelfRef = db.collection(`users/${businessId}/shelves`).doc(shelfCode);
 
@@ -261,7 +234,7 @@ export async function POST(request: NextRequest) {
                 currentBatch = db.batch();
                 operationsInCurrentBatch = 0;
             }
-            currentBatch.set(doc.ref, doc.data);
+            currentBatch.create(doc.ref, doc.data);
             operationsInCurrentBatch++;
         }
 

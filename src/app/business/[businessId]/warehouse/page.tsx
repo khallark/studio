@@ -110,6 +110,18 @@ interface TreeNodeProps {
     children?: React.ReactNode;
 }
 
+interface UPCData {
+    id: string;
+    productId: string;
+    placementId: string;
+    shelfId: string;
+    rackId: string;
+    zoneId: string;
+    warehouseId: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
 function TreeNode({
     level,
     icon: Icon,
@@ -236,21 +248,93 @@ function TreeNode({
 // PLACEMENT ROW COMPONENT
 // ============================================================
 
-function PlacementRow({ placement, level }: { placement: Placement; level: number }) {
+function PlacementRow({
+    placement,
+    level,
+    isExpanded,
+    isLoading,
+    hasChildren,
+    onToggle,
+    children
+}: {
+    placement: Placement;
+    level: number;
+    isExpanded: boolean;
+    isLoading: boolean;
+    hasChildren: boolean;
+    onToggle: () => void;
+    children?: React.ReactNode;
+}) {
+    return (
+        <div>
+            <div
+                className={cn(
+                    "flex items-center gap-2 py-2 px-3 rounded-lg cursor-pointer hover:bg-muted/40 transition-colors",
+                    isExpanded && 'bg-muted/30'
+                )}
+                style={{ paddingLeft: `${level * 20 + 12}px` }}
+                onClick={onToggle}
+            >
+                <div className="w-5 h-5 flex items-center justify-center">
+                    {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : hasChildren ? (
+                        <motion.div
+                            animate={{ rotate: isExpanded ? 90 : 0 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </motion.div>
+                    ) : (
+                        <div className="w-4 h-4" />
+                    )}
+                </div>
+                <div className="p-1.5 rounded-md bg-violet-500/10">
+                    <Package className="h-4 w-4 text-violet-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm">{placement.productId}</span>
+                </div>
+                <Badge variant="outline" className="font-mono">
+                    Qty: {placement.quantity}
+                </Badge>
+            </div>
+
+            <AnimatePresence>
+                {isExpanded && children && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {children}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ============================================================
+// UPC ROW COMPONENT
+// ============================================================
+
+function UpcRow({ upc, level }: { upc: UPCData; level: number }) {
     return (
         <div
             className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-muted/40 transition-colors"
             style={{ paddingLeft: `${level * 20 + 12}px` }}
         >
             <div className="w-5 h-5" />
-            <div className="p-1.5 rounded-md bg-violet-500/10">
-                <Package className="h-4 w-4 text-violet-600" />
+            <div className="p-1.5 rounded-md bg-blue-500/10">
+                <Package className="h-4 w-4 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0">
-                <span className="font-medium text-sm">{placement.productId}</span>
+                <span className="font-medium text-sm font-mono">{upc.id}</span>
             </div>
-            <Badge variant="outline" className="font-mono">
-                Qty: {placement.quantity}
+            <Badge variant="secondary" className="text-xs">
+                {new Date(upc.createdAt).toLocaleDateString()}
             </Badge>
         </div>
     );
@@ -1712,18 +1796,21 @@ export default function WarehousePage() {
     const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
     const [expandedRacks, setExpandedRacks] = useState<Set<string>>(new Set());
     const [expandedShelves, setExpandedShelves] = useState<Set<string>>(new Set());
+    const [expandedPlacements, setExpandedPlacements] = useState<Set<string>>(new Set());
 
     // Loaded data
     const [zones, setZones] = useState<Record<string, Zone[]>>({});
     const [racks, setRacks] = useState<Record<string, Rack[]>>({});
     const [shelves, setShelves] = useState<Record<string, Shelf[]>>({});
     const [placements, setPlacements] = useState<Record<string, Placement[]>>({});
+    const [upcs, setUpcs] = useState<Record<string, UPCData[]>>({});
 
     // Loading states
     const [loadingZones, setLoadingZones] = useState<Set<string>>(new Set());
     const [loadingRacks, setLoadingRacks] = useState<Set<string>>(new Set());
     const [loadingShelves, setLoadingShelves] = useState<Set<string>>(new Set());
     const [loadingPlacements, setLoadingPlacements] = useState<Set<string>>(new Set());
+    const [loadingUpcs, setLoadingUpcs] = useState<Set<string>>(new Set());
 
     // Dialog states
     const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false);
@@ -1815,11 +1902,24 @@ export default function WarehousePage() {
         finally { setLoadingPlacements((prev) => { const n = new Set(prev); n.delete(shelfId); return n; }); }
     };
 
+    const fetchUpcs = async (placementId: string) => {
+        setLoadingUpcs((prev) => new Set(prev).add(placementId));
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch(`/api/business/warehouse/list-upcs?businessId=${businessId}&placementId=${placementId}`, { headers: { Authorization: `Bearer ${idToken}` } });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            setUpcs((prev) => ({ ...prev, [placementId]: data.upcs || [] }));
+        } catch (error) { console.error(error); }
+        finally { setLoadingUpcs((prev) => { const n = new Set(prev); n.delete(placementId); return n; }); }
+    };
+
     // Toggle functions
     const toggleWarehouse = (id: string) => { const expanding = !expandedWarehouses.has(id); setExpandedWarehouses((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchZones(id); };
     const toggleZone = (id: string) => { const expanding = !expandedZones.has(id); setExpandedZones((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchRacks(id); };
     const toggleRack = (id: string) => { const expanding = !expandedRacks.has(id); setExpandedRacks((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchShelves(id); };
     const toggleShelf = (id: string) => { const expanding = !expandedShelves.has(id); setExpandedShelves((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchPlacements(id); };
+    const togglePlacement = (id: string) => { const expanding = !expandedPlacements.has(id); setExpandedPlacements((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); if (expanding) fetchUpcs(id); };
 
     // Dialog handlers
     const handleAddWarehouse = () => { setEditWarehouse(null); setWarehouseDialogOpen(true); };
@@ -1886,7 +1986,7 @@ export default function WarehousePage() {
             if (s) { fetchShelves(s.rackId); const r = Object.values(racks).flat().find(x => x.id === s.rackId); if (r) { fetchRacks(r.zoneId); const z = Object.values(zones).flat().find(x => x.id === r.zoneId); if (z) fetchZones(z.warehouseId); } }
         }
     };
-    const handleMoveSuccess = () => { fetchWarehouses(); setZones({}); setRacks({}); setShelves({}); setPlacements({}); };
+    const handleMoveSuccess = () => { fetchWarehouses(); setZones({}); setRacks({}); setShelves({}); setPlacements({}); setUpcs({}); };
 
     // Filter & totals
     const filteredWarehouses = warehouses.filter((w) =>
@@ -1973,7 +2073,26 @@ export default function WarehousePage() {
                                                 <TreeNode key={rack.id} level={2} icon={Grid3X3} iconColor="text-amber-600" bgColor="bg-amber-500/10" label={rack.name} code={rack.code} stats={[{ label: 'shelves', value: rack.stats.totalShelves }, { label: 'products', value: rack.stats.totalProducts }]} isExpanded={expandedRacks.has(rack.id)} isLoading={loadingShelves.has(rack.id)} hasChildren={true} onToggle={() => toggleRack(rack.id)} onAdd={() => handleAddShelf(rack, zone)} addLabel="Add Shelf" onEdit={() => handleEditRack(rack)} onMove={() => handleMoveRack(rack)} onDelete={() => handleDeleteRack(rack)}>
                                                     {shelves[rack.id]?.map((shelf) => (
                                                         <TreeNode key={shelf.id} level={3} icon={Layers} iconColor="text-purple-600" bgColor="bg-purple-500/10" label={shelf.name} code={shelf.code} stats={[{ label: 'products', value: shelf.stats.totalProducts }]} isExpanded={expandedShelves.has(shelf.id)} isLoading={loadingPlacements.has(shelf.id)} hasChildren={shelf.stats.totalProducts > 0} onToggle={() => toggleShelf(shelf.id)} onEdit={() => handleEditShelf(shelf)} onMove={() => handleMoveShelf(shelf)} onDelete={() => handleDeleteShelf(shelf)}>
-                                                            {placements[shelf.id]?.map((p) => <PlacementRow key={p.id} placement={p} level={4} />)}
+                                                            {placements[shelf.id]?.map((p) => (
+                                                                <PlacementRow
+                                                                    key={p.id}
+                                                                    placement={p}
+                                                                    level={4}
+                                                                    isExpanded={expandedPlacements.has(p.id)}
+                                                                    isLoading={loadingUpcs.has(p.id)}
+                                                                    hasChildren={true}
+                                                                    onToggle={() => togglePlacement(p.id)}
+                                                                >
+                                                                    {upcs[p.id]?.map((upc) => (
+                                                                        <UpcRow key={upc.id} upc={upc} level={5} />
+                                                                    ))}
+                                                                    {upcs[p.id]?.length === 0 && (
+                                                                        <div className="py-3 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: `${5 * 20 + 12}px` }}>
+                                                                            No UPCs
+                                                                        </div>
+                                                                    )}
+                                                                </PlacementRow>
+                                                            ))}
                                                             {placements[shelf.id]?.length === 0 && <div className="py-3 px-3 text-sm text-muted-foreground italic" style={{ paddingLeft: `${4 * 20 + 12}px` }}>No products</div>}
                                                         </TreeNode>
                                                     ))}

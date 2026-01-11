@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
         // 1. Remove mapping from store product
         batch.update(storeProductRef, {
             [`variantMappings.${variantId}`]: FieldValue.delete(),
+            variantMappingsArray: FieldValue.arrayRemove(variantId),
             [`variantMappingDetails.${variantId}`]: FieldValue.delete(),
             updatedAt: FieldValue.serverTimestamp(),
         });

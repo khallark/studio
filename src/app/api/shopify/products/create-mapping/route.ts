@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
         // Store as: variantMappings: { [variantId]: businessSku }
         batch.update(storeProductRef, {
             [`variantMappings.${variantId}`]: businessProductSku,
+            variantMappingsArray: FieldValue.arrayUnion(variantId),
             [`variantMappingDetails.${variantId}`]: {
                 businessProductSku,
                 businessId: businessId,

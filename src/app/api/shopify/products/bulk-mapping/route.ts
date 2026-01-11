@@ -443,6 +443,7 @@ export async function POST(req: NextRequest) {
             // Update store product with variant mapping
             batch.update(storeProductRef, {
                 [`variantMappings.${variantInfo.variantId}`]: businessProductSku,
+                variantMappingsArray: FieldValue.arrayUnion(variantInfo.variantId),
                 [`variantMappingDetails.${variantInfo.variantId}`]: {
                     businessProductSku: businessProductSku,
                     businessId: businessId,

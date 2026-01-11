@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
 
                     for (const variantId of variantIds) {
                         updateData[`variantMappings.${variantId}`] = FieldValue.delete();
+                        updateData.variantMappingsArray = FieldValue.arrayRemove(variantId);
                         updateData[`variantMappingDetails.${variantId}`] = FieldValue.delete();
                     }
 

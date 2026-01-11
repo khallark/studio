@@ -63,6 +63,30 @@ interface LocationData {
     warehouseId: string | null;
 }
 
+interface MovementData {
+    id: string;
+    productId: string;
+    type: "transfer" | "inbound" | "outbound" | "adjustment";
+    from: {
+        shelfId: string | null;
+        rackId: string | null;
+        zoneId: string | null;
+        warehouseId: string | null;
+    };
+    to: {
+        shelfId: string | null;
+        rackId: string | null;
+        zoneId: string | null;
+        warehouseId: string | null;
+    };
+    quantity: number;
+    reason: string;
+    reference: string;
+    timestamp: string;
+    userId: string;
+    userName: string;
+}
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -111,7 +135,7 @@ export default function MovementsPage() {
     const { businessId, user } = useBusinessContext();
     const { toast } = useToast();
 
-    const [movements, setMovements] = useState<Movement[]>([]);
+    const [movements, setMovements] = useState<MovementData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -359,7 +383,7 @@ export default function MovementsPage() {
                                                     <TableCell>
                                                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                             <Calendar className="h-3.5 w-3.5" />
-                                                            {movement.timestamp ? format(new Date(movement.timestamp.toDate().toISOString()), 'MMM d, HH:mm') : '—'}
+                                                            {movement.timestamp ? format(new Date(movement.timestamp), 'MMM d, HH:mm') : '—'}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

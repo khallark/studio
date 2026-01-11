@@ -2,6 +2,7 @@
 
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { db } from '@/lib/firebase-admin';
+import { Movement } from '@/types/warehouse';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
         const snapshot = await query.get();
 
         const movements = snapshot.docs.map((doc) => {
-            const data = doc.data();
+            const data = doc.data() as Movement;
             return {
                 id: doc.id,
                 productId: data.productId,
@@ -74,11 +75,11 @@ export async function GET(request: NextRequest) {
                 from: data.from,
                 to: data.to,
                 quantity: data.quantity,
-                reason: data.reason || '',
-                reference: data.reference || '',
-                timestamp: data.timestamp?.toDate?.()?.toISOString() || null,
+                reason: data.reason,
+                reference: data.reference,
+                timestamp: data.timestamp.toDate().toISOString(),
                 userId: data.userId,
-                userName: data.userName || '',
+                userName: data.userName,
             };
         });
 

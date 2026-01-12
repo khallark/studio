@@ -68,6 +68,7 @@ export interface Order {
   vendors: string[];
   unboxing_video_path?: string;
   pickupReady?: boolean;
+  isEligibleForPickup?: boolean;
   raw: {
     total_price: string;
     cancelled_at: string | null;

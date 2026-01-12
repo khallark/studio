@@ -331,8 +331,12 @@ export function useOrders(
                             return true;
                         })
                     );
-                    filteredOrders = filteredOrders.filter((_, i) => availabilityChecks[i]);
-
+                    filteredOrders = filteredOrders.filter((_, i) => availabilityChecks[i]).map(item => {
+                        return {
+                            ...item,
+                            isEligibleForPickup: true
+                        }
+                    });
                 } else if (filters.availabilityFilter === 'not eligible') {
                     const unavailabilityChecks = await Promise.all(
                         filteredOrders.map(async (order) => {

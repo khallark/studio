@@ -1168,9 +1168,10 @@ export default function BusinessOrdersPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="all">All Items</SelectItem>
-                                                        <SelectItem value="available">Available ({availabilityCounts?.available || 0})</SelectItem>
-                                                        <SelectItem value="unavailable">Unavailable ({availabilityCounts?.unavailable || 0})</SelectItem>
+                                                        <SelectItem value="eligible">Eligible ({availabilityCounts?.available || 0})</SelectItem>
+                                                        <SelectItem value="not eligible">Not eligible ({availabilityCounts?.unavailable || 0})</SelectItem>
                                                         <SelectItem value="picked up">Picked up ({availabilityCounts?.pending || 0})</SelectItem>
+                                                        <SelectItem value="unmapped">Unmapped ({availabilityCounts?.pending || 0})</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         const upcsSnapshot = await db
             .collection(`users/${businessId}/upcs`)
             .where('placementId', '==', placementId)
-            .where('putAway', '==', null)
+            .where('putAway', '==', 'none')
             .get();
 
         const upcs = upcsSnapshot.docs.map((doc) => {

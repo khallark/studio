@@ -118,7 +118,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
               order,
               isUnmapped,
               isEligible: !isUnmapped && isEligible,
-              isNotEligible: !isUnmapped && !isEligible,
+              isNotEligible: !isUnmapped && !isEligible && !order.pickupReady,
               isPickedUp: !!order.pickupReady
             };
           })

@@ -128,6 +128,8 @@ import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
 import { TaxReportDialog } from '@/components/tax-report-dialog';
+import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
@@ -292,6 +294,7 @@ function MobileOrderCard({
 export default function BusinessOrdersPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const queryClient = useQueryClient(); // Add this line if not present
 
     const {
         isAuthorized,
@@ -346,6 +349,8 @@ export default function BusinessOrdersPage() {
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
     const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
     const [orderForRefund, setOrderForRefund] = useState<Order | null>(null);
+    const [isPerformPickupDialogOpen, setIsPerformPickupDialogOpen] = useState(false);
+    const [orderForPickup, setOrderForPickup] = useState<Order | null>(null);
 
     // ============================================================
     // DATA FETCHING
@@ -826,6 +831,17 @@ export default function BusinessOrdersPage() {
                     <>
                         <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
+                        {/* ADD THIS: Show "Perform Pickup" option only for picked up orders */}
+                        {order.pickupReady && (
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setOrderForPickup(order);
+                                    setIsPerformPickupDialogOpen(true);
+                                }}
+                            >
+                                Perform Pickup
+                            </DropdownMenuItem>
+                        )}
                     </>
                 ) : null;
             case 'Ready To Dispatch':
@@ -866,11 +882,6 @@ export default function BusinessOrdersPage() {
                     <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Undo Closed</DropdownMenuItem>
                 );
             case 'Cancellation Requested':
-                // case 'RTO Closed':
-                // case 'RTO In Transit':
-                // case 'In Transit':
-                // case 'Out For Delivery':
-                // case 'Lost':
                 return <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>;
             default:
                 return null;
@@ -1770,6 +1781,24 @@ export default function BusinessOrdersPage() {
                 user={user}
                 businessId={businessId}
             />
+
+            {/* Perform Pickup Dialog */}
+            {orderForPickup && user && (
+                <PerformPickupDialog
+                    isOpen={isPerformPickupDialogOpen}
+                    onClose={() => {
+                        setIsPerformPickupDialogOpen(false);
+                        setOrderForPickup(null);
+                    }}
+                    order={orderForPickup}
+                    businessId={businessId}
+                    user={user}
+                    onSuccess={() => {
+                        refetchOrders();
+                        queryClient.invalidateQueries({ queryKey: ['availabilityCounts', businessId] });
+                    }}
+                />
+            )}
 
             {/* Order Detail Dialog */}
             <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>

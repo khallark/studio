@@ -167,7 +167,7 @@ export interface Placement {
     lastMovementReference: string | null;
 }
 
-// usersusers/{businessId}/upcs/{upcId}
+// users/{businessId}/upcs/{upcId}
 export interface UPC {
   id: string;
   createdAt: Timestamp;
@@ -175,9 +175,10 @@ export interface UPC {
   createdBy: string;
   updatedBy: string;
 
-  orderName: null;
+  storeId: string | null;
+  orderId: string | null;
 
-  putAway: null | "inbound" | "outbound";
+  putAway: "none" | "inbound" | "outbound";
 
   productId: string;
   warehouseId: string;

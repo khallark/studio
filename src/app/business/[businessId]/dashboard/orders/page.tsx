@@ -327,7 +327,7 @@ export default function BusinessOrdersPage() {
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
-    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'pending' | 'available' | 'unavailable'>('all');
+    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable' | 'picked up'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
 
     // Dialog state
@@ -1168,9 +1168,9 @@ export default function BusinessOrdersPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="all">All Items</SelectItem>
-                                                        <SelectItem value="pending">Pending ({availabilityCounts?.pending || 0})</SelectItem>
                                                         <SelectItem value="available">Available ({availabilityCounts?.available || 0})</SelectItem>
                                                         <SelectItem value="unavailable">Unavailable ({availabilityCounts?.unavailable || 0})</SelectItem>
+                                                        <SelectItem value="picked up">Picked up ({availabilityCounts?.pending || 0})</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

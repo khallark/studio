@@ -67,6 +67,7 @@ export interface Order {
   vendorName?: string;
   vendors: string[];
   unboxing_video_path?: string;
+  pickupReady?: boolean;
   raw: {
     total_price: string;
     cancelled_at: string | null;
@@ -132,7 +133,7 @@ export interface UseOrdersFilters {
     to?: Date;
   };
   courierFilter?: 'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
-  availabilityFilter?: 'all' | 'available' | 'unavailable' | 'pending';
+  availabilityFilter?: 'all' | 'available' | 'unavailable' | 'picked up';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
   vendorName?: string;
   invertSearch?: boolean;

@@ -70,9 +70,9 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
       });
 
       return {
-        pending: totalPending,
         available: totalAvailable,
         unavailable: totalUnavailable,
+        pending: totalPending,
       };
     },
 

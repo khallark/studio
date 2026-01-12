@@ -2,7 +2,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { collection, query, where, orderBy, limit, getDocs, and } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, and, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
@@ -294,22 +294,63 @@ export function useOrders(
 
             // Availability filter (Confirmed tab only)
             if (activeTab === 'Confirmed' && filters.availabilityFilter !== 'all') {
+                const availabilityChecks = await Promise.all(
+                    filteredOrders.map(async (order) => {
+                        const lineItems = order.raw.line_items;
+
+                        const businessProductIds: string[][] = [];
+
+                        for (const item of lineItems) {
+                            const storeProductRef = doc(db, 'accounts', order.storeId, 'products', item.product_id);
+                            const storeProductDoc = await getDoc(storeProductRef);
+                            const docData = storeProductDoc.data();
+
+                            if (
+                                !storeProductDoc.exists() ||
+                                !docData ||
+                                !docData.variantMappings[item.variant_id]
+                            ) return true; // unmapped → treat as available
+
+                            businessProductIds.push([
+                                String(docData.variantMappings[item.variant_id]),
+                                item.quantity,
+                            ]);
+                        }
+
+                        for (const [id, quantity] of businessProductIds) {
+                            const businessProductRef = doc(db, 'users', businessId, 'products', id);
+                            const businessProductDoc = await getDoc(businessProductRef);
+                            const docData = businessProductDoc.data();
+                            if (!businessProductDoc.exists() ||
+                                !docData ||
+                                docData.inShelfQuantity < quantity
+                            ) return false;
+                        }
+
+                        return true;
+                    })
+                );
                 if (filters.availabilityFilter === 'available') {
-                    filteredOrders = filteredOrders.filter((order) =>
-                        order.tags_confirmed?.includes('Available')
-                    );
+                    // filteredOrders = filteredOrders.filter((order) =>
+                    //     order.tags_confirmed?.includes('Available')
+                    // );
+                    filteredOrders = filteredOrders.filter((_, i) => availabilityChecks[i]);
+
                 } else if (filters.availabilityFilter === 'unavailable') {
-                    filteredOrders = filteredOrders.filter((order) =>
-                        order.tags_confirmed?.includes('Unavailable')
-                    );
+                    // filteredOrders = filteredOrders.filter((order) =>
+                    //     order.tags_confirmed?.includes('Unavailable')
+                    // );
+                    filteredOrders = filteredOrders.filter((_, i) => !availabilityChecks[i]);
                 } else {
-                    filteredOrders = filteredOrders.filter(
-                        (order) =>
-                            !order.tags_confirmed ||
-                            (Array.isArray(order.tags_confirmed) &&
-                                order.tags_confirmed.length === 0) ||
-                            order.tags_confirmed?.includes('Pending')
-                    );
+                    // filteredOrders = filteredOrders.filter(
+                    //     (order) =>
+                    //         !order.tags_confirmed ||
+                    //         (Array.isArray(order.tags_confirmed) &&
+                    //             order.tags_confirmed.length === 0) ||
+                    //         order.tags_confirmed?.includes('Pending')
+                    // );
+                    const pickUpReadyCheck = filteredOrders.map(order => !!order.pickupReady);
+                    filteredOrders = filteredOrders.filter((_, i) => pickUpReadyCheck[i]);
                 }
             }
 

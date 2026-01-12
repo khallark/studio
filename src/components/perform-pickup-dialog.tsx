@@ -101,7 +101,7 @@ export function PerformPickupDialog({
           const upcsQuery = query(
             collection(db, 'users', businessId, 'upcs'),
             where('productId', '==', String(businessProductId)),
-            where('putAway', '==', null),
+            where('putAway', '==', 'none'),
             where('orderId', '==', null),
             orderBy('createdAt', 'asc'),
             limit(item.quantity)

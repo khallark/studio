@@ -178,7 +178,7 @@ export interface UPC {
   storeId: string | null;
   orderId: string | null;
 
-  putAway: "none" | "inbound" | "outbound";
+  putAway: "none" | "inbound" | "outbound" | null;
 
   productId: string;
   warehouseId: string;

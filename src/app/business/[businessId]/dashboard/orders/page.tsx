@@ -327,7 +327,7 @@ export default function BusinessOrdersPage() {
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
-    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable' | 'picked up'>('all');
+    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
 
     // Dialog state

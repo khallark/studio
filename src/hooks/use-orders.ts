@@ -295,9 +295,6 @@ export function useOrders(
             // Availability filter (Confirmed tab only)
             if (activeTab === 'Confirmed' && filters.availabilityFilter !== 'all') {
                 if (filters.availabilityFilter === 'eligible') {
-                    // filteredOrders = filteredOrders.filter((order) =>
-                    //     order.tags_confirmed?.includes('Available')
-                    // );
                     const availabilityChecks = await Promise.all(
                         filteredOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
@@ -313,7 +310,7 @@ export function useOrders(
                                     !storeProductDoc.exists() ||
                                     !docData ||
                                     !docData.variantMappings[item.variant_id]
-                                ) return false; // unmapped → treat as available
+                                ) return false; // unmapped → do not treat as available
 
                                 businessProductIds.push([
                                     String(docData.variantMappings[item.variant_id]),
@@ -337,57 +334,47 @@ export function useOrders(
                     filteredOrders = filteredOrders.filter((_, i) => availabilityChecks[i]);
 
                 } else if (filters.availabilityFilter === 'not eligible') {
-                    // filteredOrders = filteredOrders.filter((order) =>
-                    //     order.tags_confirmed?.includes('Unavailable')
-                    // );
                     const unavailabilityChecks = await Promise.all(
-                    filteredOrders.map(async (order) => {
-                        const lineItems = order.raw.line_items;
+                        filteredOrders.map(async (order) => {
+                            const lineItems = order.raw.line_items;
 
-                        const businessProductIds: string[][] = [];
+                            const businessProductIds: string[][] = [];
 
-                        for (const item of lineItems) {
-                            const storeProductRef = doc(db, 'accounts', order.storeId, 'products', String(item.product_id));
-                            const storeProductDoc = await getDoc(storeProductRef);
-                            const docData = storeProductDoc.data();
+                            for (const item of lineItems) {
+                                const storeProductRef = doc(db, 'accounts', order.storeId, 'products', String(item.product_id));
+                                const storeProductDoc = await getDoc(storeProductRef);
+                                const docData = storeProductDoc.data();
 
-                            if (
-                                !storeProductDoc.exists() ||
-                                !docData ||
-                                !docData.variantMappings[item.variant_id]
-                            ) return false; // unmapped → treat as available
+                                if (
+                                    !storeProductDoc.exists() ||
+                                    !docData ||
+                                    !docData.variantMappings[item.variant_id]
+                                ) return false; // unmapped → do not treat as unavailable
 
-                            businessProductIds.push([
-                                String(docData.variantMappings[item.variant_id]),
-                                item.quantity,
-                            ]);
-                        }
+                                businessProductIds.push([
+                                    String(docData.variantMappings[item.variant_id]),
+                                    item.quantity,
+                                ]);
+                            }
 
-                        for (const [id, quantity] of businessProductIds) {
-                            const businessProductRef = doc(db, 'users', businessId, 'products', id);
-                            const businessProductDoc = await getDoc(businessProductRef);
-                            const docData = businessProductDoc.data();
-                            if (!businessProductDoc.exists() ||
-                                !docData ||
-                                docData.inShelfQuantity < quantity
-                            ) return true;
-                        }
+                            for (const [id, quantity] of businessProductIds) {
+                                const businessProductRef = doc(db, 'users', businessId, 'products', id);
+                                const businessProductDoc = await getDoc(businessProductRef);
+                                const docData = businessProductDoc.data();
+                                if (!businessProductDoc.exists() ||
+                                    !docData ||
+                                    docData.inShelfQuantity < quantity
+                                ) return true;
+                            }
 
-                        return false;
-                    })
-                );
-                    filteredOrders = filteredOrders.filter((_, i) => !unavailabilityChecks[i]);
+                            return false;
+                        })
+                    );
+                    filteredOrders = filteredOrders.filter((_, i) => unavailabilityChecks[i]);
                 } else if (filters.availabilityFilter === 'picked up') {
-                    // filteredOrders = filteredOrders.filter(
-                    //     (order) =>
-                    //         !order.tags_confirmed ||
-                    //         (Array.isArray(order.tags_confirmed) &&
-                    //             order.tags_confirmed.length === 0) ||
-                    //         order.tags_confirmed?.includes('Pending')
-                    // );
                     const pickUpReadyCheck = filteredOrders.map(order => !!order.pickupReady);
                     filteredOrders = filteredOrders.filter((_, i) => pickUpReadyCheck[i]);
-                } else {
+                } else if (filters.availabilityFilter === 'unmapped') {
                     const unmappedChecks = await Promise.all(
                         filteredOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
@@ -409,6 +396,22 @@ export function useOrders(
                     );
 
                     filteredOrders = filteredOrders.filter((_, i) => unmappedChecks[i]);
+                } else if (filters.availabilityFilter === 'pending') {
+                    filteredOrders = filteredOrders.filter(
+                        (order) =>
+                            !order.tags_confirmed ||
+                            (Array.isArray(order.tags_confirmed) &&
+                                order.tags_confirmed.length === 0) ||
+                            order.tags_confirmed?.includes('Pending')
+                    );
+                } else if (filters.availabilityFilter === 'unavailable') {
+                    filteredOrders = filteredOrders.filter((order) =>
+                        order.tags_confirmed?.includes('Unavailable')
+                    );
+                } else if (filters.availabilityFilter === 'available') {
+                    filteredOrders = filteredOrders.filter((order) =>
+                        order.tags_confirmed?.includes('Available')
+                    );
                 }
             }
 

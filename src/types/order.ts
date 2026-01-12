@@ -133,7 +133,7 @@ export interface UseOrdersFilters {
     to?: Date;
   };
   courierFilter?: 'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
-  availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped';
+  availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
   vendorName?: string;
   invertSearch?: boolean;

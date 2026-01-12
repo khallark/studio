@@ -327,7 +327,7 @@ export default function BusinessOrdersPage() {
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
-    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped'>('all');
+    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
 
     // Dialog state
@@ -1168,10 +1168,13 @@ export default function BusinessOrdersPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="all">All Items</SelectItem>
-                                                        <SelectItem value="eligible">Eligible ({availabilityCounts?.available || 0})</SelectItem>
-                                                        <SelectItem value="not eligible">Not eligible ({availabilityCounts?.unavailable || 0})</SelectItem>
-                                                        <SelectItem value="picked up">Picked up ({availabilityCounts?.pending || 0})</SelectItem>
-                                                        <SelectItem value="unmapped">Unmapped ({availabilityCounts?.pending || 0})</SelectItem>
+                                                        <SelectItem value="eligible">Eligible 0</SelectItem>
+                                                        <SelectItem value="not eligible">Not eligible 0</SelectItem>
+                                                        <SelectItem value="picked up">Picked up 0</SelectItem>
+                                                        <SelectItem value="unmapped">Unmapped 0</SelectItem>
+                                                        <SelectItem value="pending">Manually Pending ({availabilityCounts?.pending || 0})</SelectItem>
+                                                        <SelectItem value="unavailable">Manually Unavailble ({availabilityCounts?.unavailable || 0})</SelectItem>
+                                                        <SelectItem value="available">Manually Available ({availabilityCounts?.available || 0})</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

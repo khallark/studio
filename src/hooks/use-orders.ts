@@ -301,7 +301,7 @@ export function useOrders(
                         const businessProductIds: string[][] = [];
 
                         for (const item of lineItems) {
-                            const storeProductRef = doc(db, 'accounts', order.storeId, 'products', item.product_id);
+                            const storeProductRef = doc(db, 'accounts', order.storeId, 'products', String(item.product_id));
                             const storeProductDoc = await getDoc(storeProductRef);
                             const docData = storeProductDoc.data();
 

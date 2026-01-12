@@ -832,7 +832,7 @@ export default function BusinessOrdersPage() {
                         <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
                         {/* ADD THIS: Show "Perform Pickup" option only for picked up orders */}
-                        {order.pickupReady && (
+                        {/* {order.pickupReady && ( */}
                             <DropdownMenuItem
                                 onClick={() => {
                                     setOrderForPickup(order);
@@ -841,7 +841,7 @@ export default function BusinessOrdersPage() {
                             >
                                 Perform Pickup
                             </DropdownMenuItem>
-                        )}
+                        {/* )} */}
                     </>
                 ) : null;
             case 'Ready To Dispatch':

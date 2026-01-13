@@ -523,7 +523,7 @@ export default function BookReturnPage() {
                         if (orderError) setOrderError(null);
                         if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                       }}
-                      className="sm:pl-[88px] text-sm"
+                      className="text-sm"
                       required
                     />
                   </div>

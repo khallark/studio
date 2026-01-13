@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const redirectUri = `${appUrl}/api/shopify/callback`;
 
   // Construct the authorization URL with the state parameter
-  const authUrl = `https://${shop}.myshopify.com/admin/oauth/authorize?client_id=${shopifyApiKey}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`;
+  const authUrl = `https://admin.shopify.com/store/${shop}/oauth/install_custom_app?client_id=${shopifyApiKey}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`;
 
   return NextResponse.json({ redirectUrl: authUrl });
 }

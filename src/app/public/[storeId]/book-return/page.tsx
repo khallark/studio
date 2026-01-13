@@ -512,13 +512,13 @@ export default function BookReturnPage() {
                     <Label htmlFor="orderNumber" className="text-xs sm:text-sm">Order Number</Label>
                     <div className="relative flex items-center">
                       <div className="absolute left-[5px] flex items-center pointer-events-none">
-                        <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
+                        {/* <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
                           #OWR-MT
-                        </span>
+                        </span> */}
                       </div>
                       <Input
                         id="orderNumber"
-                        placeholder="e.g., 14569"
+                        placeholder="Enter the full order number, example #OWR-MT12345"
                         value={orderNumber}
                         onChange={(e) => {
                           setOrderNumber(e.target.value);

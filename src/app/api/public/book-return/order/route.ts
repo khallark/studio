@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
+import { SHARED_STORE_ID, SHARED_STORE_ID_2, SHARED_STORE_IDS } from "@/lib/shared-constants";
 
 // Helper to normalize phone numbers for comparison
 function normalizePhoneNumber(phone: string): string {
@@ -27,16 +28,26 @@ export async function POST(req: NextRequest) {
         }
 
         // Query for the order by name within the correct account
-        const ordersRef = db.collection('accounts').doc(session.storeId).collection('orders');
-        const querySnapshot = await ordersRef.where(
-            'name',
-            '==',
-            orderNumber.length >= 3
-                ? orderNumber.substring(0, 2).toLowerCase() === 'mt'
-                    ? `#OWR-${orderNumber.toUpperCase()}`
-                    : `#OWR-MT${orderNumber}`
-                : orderNumber
-        ).limit(1).get();
+        let ordersRef, querySnapshot;
+
+        if (SHARED_STORE_IDS.includes(session.storeId)) {
+            let finalStoreId = '';
+            if(orderNumber.toLowerCase().includes('owr-mt')) finalStoreId = SHARED_STORE_ID;
+            if(orderNumber.toLowerCase().includes('owr-maj-')) finalStoreId = SHARED_STORE_ID_2;
+            ordersRef = db.collection('accounts').doc(finalStoreId).collection('orders');
+            querySnapshot = await ordersRef.where(
+                'name',
+                '==',
+                orderNumber
+            ).limit(1).get();
+        } else {
+            ordersRef = db.collection('accounts').doc(session.storeId).collection('orders');
+            querySnapshot = await ordersRef.where(
+                'name',
+                '==',
+                orderNumber
+            ).limit(1).get();
+        }
 
         if (querySnapshot.empty) {
             return NextResponse.json({ error: 'Order not found. Please check the order number.' }, { status: 404 });

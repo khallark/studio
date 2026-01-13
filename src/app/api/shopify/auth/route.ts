@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   // Generate a random state token for CSRF protection
   const state = crypto.randomBytes(16).toString('hex');
-  
+
   // Store the state in a secure, httpOnly cookie
   cookies().set('shopify_oauth_state', state, {
     httpOnly: true,
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
   const redirectUri = `${appUrl}/api/shopify/callback`;
 
   // Construct the authorization URL with the state parameter
-  // const authUrl = `https://admin.shopify.com/store/${shop}/oauth/install_custom_app?client_id=${shopifyApiKey}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`;
-  const authUrl = `https://admin.shopify.com/store/${shop}/oauth/install_custom_app?client_id=517070555a7f7c340d3c31613f79f8f3&no_redirect=true&signature=eyJleHBpcmVzX2F0IjoxNzY4ODg4MTcyLCJwZXJtYW5lbnRfZG9tYWluIjoiZ2o5ZWpnLWN1Lm15c2hvcGlmeS5jb20iLCJjbGllbnRfaWQiOiI1MTcwNzA1NTVhN2Y3YzM0MGQzYzMxNjEzZjc5ZjhmMyIsInB1cnBvc2UiOiJjdXN0b21fYXBwIn0%3D--ea2297b9b9c50fabcd8d85aa1f026525476907ad`;
+  const authUrl = `https://${shop}.myshopify.com/admin/oauth/authorize?client_id=${shopifyApiKey}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`;
+  // const authUrl = `https://admin.shopify.com/store/${shop}/oauth/install_custom_app?client_id=517070555a7f7c340d3c31613f79f8f3&no_redirect=true&signature=eyJleHBpcmVzX2F0IjoxNzY4ODg4MTcyLCJwZXJtYW5lbnRfZG9tYWluIjoiZ2o5ZWpnLWN1Lm15c2hvcGlmeS5jb20iLCJjbGllbnRfaWQiOiI1MTcwNzA1NTVhN2Y3YzM0MGQzYzMxNjEzZjc5ZjhmMyIsInB1cnBvc2UiOiJjdXN0b21fYXBwIn0%3D--ea2297b9b9c50fabcd8d85aa1f026525476907ad`;
 
   return NextResponse.json({ redirectUrl: authUrl });
 }

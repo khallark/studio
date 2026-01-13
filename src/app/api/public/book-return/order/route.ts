@@ -15,13 +15,13 @@ function normalizePhoneNumber(phone: string): string {
 export async function POST(req: NextRequest) {
     try {
         const session = await validateCustomerSession(req);
-        
+
         const { orderNumber, phoneNo } = await req.json();
 
         if (!orderNumber || !phoneNo) {
             return NextResponse.json({ error: 'Order Number and Phone Number are required.' }, { status: 400 });
         }
-        
+
         const normalizedPhone = normalizePhoneNumber(phoneNo);
         if (!normalizedPhone) {
             return NextResponse.json({ error: 'A valid phone number is required.' }, { status: 400 });
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
 
         if (SHARED_STORE_IDS.includes(session.storeId)) {
             let finalStoreId = '';
-            if(orderNumber.toLowerCase().includes('owr-mt')) finalStoreId = SHARED_STORE_ID;
-            if(orderNumber.toLowerCase().includes('owr-maj-')) finalStoreId = SHARED_STORE_ID_2;
+            if (orderNumber.toLowerCase().includes('owr-mt')) finalStoreId = SHARED_STORE_ID;
+            if (orderNumber.toLowerCase().includes('owr-maj-')) finalStoreId = SHARED_STORE_ID_2;
             ordersRef = db.collection('accounts').doc(finalStoreId).collection('orders');
             querySnapshot = await ordersRef.where(
                 'name',
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         const orderDoc = querySnapshot.docs[0];
         const orderData = orderDoc.data();
-        
+
         // Verify phone number
         const billingPhone = normalizePhoneNumber(orderData.raw?.billing_address?.phone || '');
         const shippingPhone = normalizePhoneNumber(orderData.raw?.shipping_address?.phone || '');
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
         // Return curated order data
         return NextResponse.json({
             id: orderDoc.id,
+            storeId: orderData.storeId,
             name: orderData.raw.name,
             awb: orderData.awb ?? '',
             awb_reverse: orderData.awb_reverse ?? '',

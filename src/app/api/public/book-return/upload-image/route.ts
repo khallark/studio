@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
         const session = await validateCustomerSession(req);
         const formData = await req.formData();
         const imageFile = formData.get('image') as File;
+        const storeId = formData.get('storeId') as string;
         const orderId = formData.get('orderId') as string;
 
         // Input validation
@@ -56,11 +57,11 @@ export async function POST(req: NextRequest) {
         }
 
         // ✅ Lookup businessId (null for shared store)
-        const businessId = await getBusinessIdForStore(session.storeId);
+        const businessId = await getBusinessIdForStore(storeId);
         
         // For shared store, businessId will be null, which is fine
-        if (!businessId && !SHARED_STORE_IDS.includes(session.storeId)) {
-            console.error(`Could not find business for store: ${session.storeId}`);
+        if (!businessId && !SHARED_STORE_IDS.includes(storeId)) {
+            console.error(`Could not find business for store: ${storeId}`);
             return NextResponse.json({ 
                 error: 'Store configuration error. Please contact support.' 
             }, { status: 500 });
@@ -72,12 +73,12 @@ export async function POST(req: NextRequest) {
 
         // Generate unique filename
         const fileExtension = imageFile.name.split('.').pop() || 'jpg';
-        const uniqueFileName = `${session.storeId}_${orderId}_${uuidv4()}.${fileExtension}`;
+        const uniqueFileName = `${storeId}_${orderId}_${uuidv4()}.${fileExtension}`;
 
         // ✅ Get appropriate path (shared or business-specific)
         const filePath = getReturnImagesPath(
             businessId,
-            session.storeId,
+            storeId,
             orderId,
             uniqueFileName
         );
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
                 contentType: imageFile.type,
                 metadata: {
                     orderId: orderId,
-                    storeId: session.storeId,
+                    storeId: storeId,
                     uploadedAt: new Date().toISOString(),
                     originalName: imageFile.name
                 }
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Add image filename to order document
-        const storeRef = db.collection('accounts').doc(session.storeId);
+        const storeRef = db.collection('accounts').doc(storeId);
         const orderRef = storeRef.collection('orders').doc(orderId.trim());
         
         await orderRef.update({

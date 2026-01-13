@@ -30,70 +30,70 @@ export async function POST(req: NextRequest) {
     try {
         // Validate session first
         const session = await validateCustomerSession(req);
-        
+
         // Parse and validate request body
         const body = await req.json();
-        const { orderId, selectedVariantIds, booked_return_images, booked_return_reason } = body;
+        const { storeId, orderId, selectedVariantIds, booked_return_images, booked_return_reason } = body;
 
         // Input validation
-        if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
-            return NextResponse.json({ 
-                error: 'Valid Order ID is required.' 
+        if (!storeId || !orderId || typeof orderId !== 'string' || orderId.trim() === '') {
+            return NextResponse.json({
+                error: 'Valid Order ID is required.'
             }, { status: 400 });
         }
 
         if (!selectedVariantIds || !Array.isArray(selectedVariantIds) || selectedVariantIds.length === 0) {
-            return NextResponse.json({ 
-                error: 'At least one item variant must be selected for return.' 
+            return NextResponse.json({
+                error: 'At least one item variant must be selected for return.'
             }, { status: 400 });
         }
 
         // Validate variant IDs are numbers
-        const validVariantIds = selectedVariantIds.filter(id => 
+        const validVariantIds = selectedVariantIds.filter(id =>
             typeof id === 'number' && !isNaN(id) && id > 0
         );
 
         if (validVariantIds.length === 0) {
-            return NextResponse.json({ 
-                error: 'Valid item variant IDs are required.' 
+            return NextResponse.json({
+                error: 'Valid item variant IDs are required.'
             }, { status: 400 });
         }
 
         // Validate return images
         if (!booked_return_images || !Array.isArray(booked_return_images)) {
-            return NextResponse.json({ 
-                error: 'At least one image is required for return request.' 
+            return NextResponse.json({
+                error: 'At least one image is required for return request.'
             }, { status: 400 });
         }
 
         if (booked_return_images.length > 10) {
-            return NextResponse.json({ 
-                error: 'Maximum 10 images are allowed.' 
+            return NextResponse.json({
+                error: 'Maximum 10 images are allowed.'
             }, { status: 400 });
         }
 
         // Validate return reason
         if (!booked_return_reason || typeof booked_return_reason !== 'string' || booked_return_reason.trim() === '') {
-            return NextResponse.json({ 
-                error: 'Return reason is required.' 
+            return NextResponse.json({
+                error: 'Return reason is required.'
             }, { status: 400 });
         }
 
         if (booked_return_reason.length > 500) {
-            return NextResponse.json({ 
-                error: 'Return reason must not exceed 500 characters.' 
+            return NextResponse.json({
+                error: 'Return reason must not exceed 500 characters.'
             }, { status: 400 });
         }
 
         // Get store and order references
-        const storeRef = db.collection('accounts').doc(session.storeId);
+        const storeRef = db.collection('accounts').doc(storeId);
         const orderRef = storeRef.collection('orders').doc(orderId.trim());
-        
+
         // Fetch order
         const orderDoc = await orderRef.get();
         if (!orderDoc.exists) {
-            return NextResponse.json({ 
-                error: 'Order not found. Please check the order number.' 
+            return NextResponse.json({
+                error: 'Order not found. Please check the order number.'
             }, { status: 404 });
         }
 
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
                 createdAt: Timestamp.now(),
                 remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
             }
-            if(currentStatus === 'DTO Requested') {
+            if (currentStatus === 'DTO Requested') {
                 logEntry = {
                     status: "DTO Requested Again",
                     createdAt: Timestamp.now(),
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
         if (IN_TRANSIT_STATUSES.includes(currentStatus)) {
             try {
                 const updatedStatus = await checkDeliveryStatus(storeRef, orderData);
-                
+
                 if (updatedStatus === "Delivered") {
                     // Order was delivered, allow return
                     await orderRef.update({
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
                     }, { status: 200 });
                 } else if (updatedStatus && updatedStatus !== currentStatus) {
                     // Update status but deny return
-                    await orderRef.update({ 
+                    await orderRef.update({
                         customStatus: updatedStatus,
                         lastStatusUpdate: FieldValue.serverTimestamp()
                     });
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
 
             } catch (trackingError) {
                 console.error('Delivery tracking failed:', trackingError);
-                
+
                 // Fallback: deny return if we can't verify delivery
                 return NextResponse.json({
                     success: false,
@@ -209,12 +209,12 @@ export async function POST(req: NextRequest) {
 
     } catch (error: any) {
         console.error('Book return request failed:', error);
-        
+
         // Handle specific session errors
         if (error.message?.includes('SESSION') || error.message?.includes('CSRF')) {
             const sessionExpired = error.message === 'SESSION_EXPIRED';
-            return NextResponse.json({ 
-                error: sessionExpired 
+            return NextResponse.json({
+                error: sessionExpired
                     ? 'Your session has expired. Please refresh the page.'
                     : 'Your session is invalid. Please refresh the page.',
                 sessionError: true
@@ -223,14 +223,14 @@ export async function POST(req: NextRequest) {
 
         // Handle JSON parsing errors
         if (error instanceof SyntaxError) {
-            return NextResponse.json({ 
-                error: 'Invalid request format.' 
+            return NextResponse.json({
+                error: 'Invalid request format.'
             }, { status: 400 });
         }
 
         // Generic server error
-        return NextResponse.json({ 
-            error: 'An internal server error occurred. Please try again later.' 
+        return NextResponse.json({
+            error: 'An internal server error occurred. Please try again later.'
         }, { status: 500 });
     }
 }
@@ -238,9 +238,9 @@ export async function POST(req: NextRequest) {
 async function checkDeliveryStatus(storeRef: any, orderData: any): Promise<string | null> {
     try {
         // Determine courier from order data
-        const courierProvider = orderData.courierProvider || 
-                               (orderData.courier?.split(':')[0]?.trim());
-        
+        const courierProvider = orderData.courierProvider ||
+            (orderData.courier?.split(':')[0]?.trim());
+
         if (!courierProvider) {
             throw new Error('Courier provider not found in order');
         }
@@ -255,13 +255,13 @@ async function checkDeliveryStatus(storeRef: any, orderData: any): Promise<strin
         switch (courierProvider.toLowerCase()) {
             case 'delhivery':
                 return await checkDelhiveryStatus(storeRef, awb);
-            
+
             case 'shiprocket':
                 return await checkShiprocketStatus(storeRef, awb);
-            
+
             case 'xpressbees':
                 return await checkXpressbeesStatus(storeRef, awb);
-            
+
             default:
                 console.warn(`Unsupported courier provider: ${courierProvider}`);
                 return null;
@@ -279,7 +279,7 @@ async function checkDelhiveryStatus(storeRef: any, awb: string): Promise<string 
     try {
         const storeDoc = await storeRef.get();
         const apiKey = storeDoc.data()?.integrations?.couriers?.delhivery?.apiKey;
-        
+
         if (!apiKey) {
             throw new Error('Delhivery API key not configured');
         }
@@ -298,7 +298,7 @@ async function checkDelhiveryStatus(storeRef: any, awb: string): Promise<string 
         }
 
         const trackingData: TrackingResponse = await response.json();
-        
+
         if (!trackingData.ShipmentData?.length) {
             throw new Error('No shipment data available');
         }
@@ -343,11 +343,11 @@ async function checkShiprocketStatus(storeRef: any, awb: string): Promise<string
     try {
         const storeDoc = await storeRef.get();
         const shiprocketCfg = storeDoc.data()?.integrations?.couriers?.shiprocket || {};
-        const apiKey = shiprocketCfg?.accessToken || 
-                      shiprocketCfg?.token || 
-                      shiprocketCfg?.apiKey || 
-                      shiprocketCfg?.bearer;
-        
+        const apiKey = shiprocketCfg?.accessToken ||
+            shiprocketCfg?.token ||
+            shiprocketCfg?.apiKey ||
+            shiprocketCfg?.bearer;
+
         if (!apiKey) {
             throw new Error('Shiprocket API key not configured');
         }
@@ -366,7 +366,7 @@ async function checkShiprocketStatus(storeRef: any, awb: string): Promise<string
         }
 
         const trackingData = await response.json();
-        
+
         // Shiprocket response structure: { tracking_data: { shipment_track: [...] } }
         const shipmentTrack = trackingData?.tracking_data?.shipment_track;
         if (!Array.isArray(shipmentTrack) || shipmentTrack.length === 0) {
@@ -434,7 +434,7 @@ async function checkXpressbeesStatus(storeRef: any, awb: string): Promise<string
         const xpressbeesCfg = storeDoc.data()?.integrations?.couriers?.xpressbees || {};
         const email = xpressbeesCfg?.email;
         const password = xpressbeesCfg?.password;
-        
+
         if (!email || !password) {
             throw new Error('Xpressbees credentials not configured');
         }
@@ -461,16 +461,16 @@ async function checkXpressbeesStatus(storeRef: any, awb: string): Promise<string
         }
 
         const trackingData = await response.json();
-        
+
         // Xpressbees response structure: { status: true, data: { status: "..." } }
         if (!trackingData?.status || !trackingData?.data) {
             throw new Error('No tracking data available');
         }
 
-        const currentStatus = trackingData.data.status !== 'rto' 
-            ? trackingData.data.status 
+        const currentStatus = trackingData.data.status !== 'rto'
+            ? trackingData.data.status
             : trackingData.data.history?.[0]?.status_code;
-            
+
         if (!currentStatus) {
             throw new Error('No current status available');
         }

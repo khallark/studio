@@ -514,11 +514,6 @@ export default function BookReturnPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="orderNumber" className="text-xs sm:text-sm">Order Number</Label>
                   <div className="relative flex items-center">
-                    <div className="absolute left-[5px] flex items-center pointer-events-none">
-                      {/* <span className="text-[10px] sm:text-sm font-semibold bg-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-gray-300">
-                          #OWR-MT
-                        </span> */}
-                    </div>
                     <Input
                       id="orderNumber"
                       placeholder="Enter the full order number, example #OWR-MT12345"
@@ -528,7 +523,7 @@ export default function BookReturnPage() {
                         if (orderError) setOrderError(null);
                         if (selectedVariantIds.size > 0) setSelectedVariantIds(new Set());
                       }}
-                      className="pl-[70px] sm:pl-[88px] text-sm"
+                      className="sm:pl-[88px] text-sm"
                       required
                     />
                   </div>

@@ -6,6 +6,7 @@ import { collection, query, where, orderBy, limit, getDocs, and, doc, getDoc } f
 import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 // ============================================================
 // HOOK - Now business-wide, not store-specific
@@ -72,8 +73,6 @@ export function useOrders(
             // ============================================================
 
             const allOrders: Order[] = [];
-            const SHARED_STORE_ID = 'nfkjgp-sv.myshopify.com';
-            const SUPER_ADMIN_ID = 'vD8UJMLtHNefUfkMgbcF605SNAm2';
 
             // Fetch orders from each store in parallel
             const storeQueries = storesToQuery.map(async (storeId) => {
@@ -86,7 +85,7 @@ export function useOrders(
                 const excludedStatuses = ['New', 'DTO Requested', 'Pending Refunds'];
 
                 // ✅ NEW: Filter by vendor for shared store
-                if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
+                if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
                         const allPermutations = [
                             ["OWR"],
@@ -113,7 +112,7 @@ export function useOrders(
                 }
 
                 // Filter by status tab - use customStatus for all tabs
-                const isSharedStoreNonSuperAdmin = storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID;
+                const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
 
                 // Server-side search
                 const hasSearch = searchType === 'name' || searchType === 'awb';

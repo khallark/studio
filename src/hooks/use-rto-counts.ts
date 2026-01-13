@@ -4,9 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 export function useRtoInTransitCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({
@@ -31,7 +29,7 @@ export function useRtoInTransitCounts(businessId: string | null, stores: string[
           where('customStatus', '==', 'RTO In Transit')
         );
 
-        if (storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID && vendorName) {
+        if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
           q = query(q, where("vendors", "array-contains", vendorName));
         }
 

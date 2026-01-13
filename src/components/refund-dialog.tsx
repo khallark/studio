@@ -25,6 +25,7 @@ import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SHARED_STORE_IDS } from '@/lib/authoriseUser';
 
 interface RefundDialogProps {
   isOpen: boolean;
@@ -36,8 +37,6 @@ interface RefundDialogProps {
 }
 
 type RefundMethod = 'store_credit' | 'manual';
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 
 export function RefundDialog({
   isOpen,
@@ -79,7 +78,7 @@ export function RefundDialog({
             try {
               // Try appropriate path based on store
               let imageRef;
-              if (order.storeId === SHARED_STORE_ID) {
+              if (SHARED_STORE_IDS.includes(order.storeId)) {
                 imageRef = ref(storage, `return-images/shared/${order.storeId}/${order.id}/${imageName}`);
               } else {
                 imageRef = ref(storage, `return-images/${businessId}/${order.storeId}/${order.id}/${imageName}`);

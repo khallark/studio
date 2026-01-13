@@ -11,9 +11,7 @@ import { Building2, ChevronRight, Users, Crown, Sparkles, ArrowRight, Package, Z
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/logo';
 import { doc, getDoc } from 'firebase/firestore';
-
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID;
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID;
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 interface BusinessMembership {
   businessId: string;
@@ -255,9 +253,9 @@ export default function BusinessListPage() {
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const userStores = userData.stores || [];
+          const userStores = userData.stores as string[] || [];
 
-          if (userStores.includes(SHARED_STORE_ID)) {
+          if (userStores.every(ele => SHARED_STORE_IDS.includes(ele))) {
             setShowJoinMajime(false);
           } else {
             setShowJoinMajime(true);

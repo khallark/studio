@@ -130,9 +130,7 @@ import { useBusinessContext } from '../../layout';
 import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 // ============================================================
 // STATUS TABS CONFIGURATION
@@ -424,7 +422,7 @@ export default function BusinessOrdersPage() {
     // ✅ Check if any selected order is from SHARED_STORE_ID
     const hasSharedStoreOrder = selectedOrders.some(orderId => {
         const order = orders.find(o => o.id === orderId);
-        return order?.storeId === SHARED_STORE_ID;
+        return SHARED_STORE_IDS.includes(String(order?.storeId));
     });
 
     // ✅ Track loading states from mutations
@@ -821,13 +819,13 @@ export default function BusinessOrdersPage() {
                 return (
                     <>
                         <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>Confirm</DropdownMenuItem>
-                        {(businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) &&
+                        {(businessId === SUPER_ADMIN_ID || SHARED_STORE_IDS.includes(order.storeId)) &&
                             <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
                         }
                     </>
                 );
             case 'Confirmed':
-                return (businessId === SUPER_ADMIN_ID || order.storeId !== SHARED_STORE_ID) ? (
+                return (businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) ? (
                     <>
                         <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
@@ -1388,7 +1386,7 @@ export default function BusinessOrdersPage() {
                                             </DropdownMenuItem>
                                             {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
                                                 const order = orders.find(o => o.id === orderId);
-                                                return order?.storeId === SHARED_STORE_ID;
+                                                return SHARED_STORE_IDS.includes(String(order?.storeId));
                                             })) && (
                                                     <DropdownMenuItem
                                                         onClick={handleAssignAwbClick}

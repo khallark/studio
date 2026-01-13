@@ -3,15 +3,14 @@
 import { ref, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { db } from './firebase-admin';
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
+import { SHARED_STORE_IDS } from './authoriseUser';
 
 /**
  * Get businessId for a store, or null if it's a shared store
  */
 export async function getBusinessIdForStore(storeId: string): Promise<string | null> {
   // ✅ Special case: shared store
-  if (storeId === SHARED_STORE_ID) {
+  if (SHARED_STORE_IDS.includes(storeId)) {
     console.log(`Store ${storeId} is shared - using shared path`);
     return null; // Signal to use shared path
   }
@@ -45,7 +44,7 @@ export function getReturnImagesPath(
   orderId: string,
   fileName: string
 ): string {
-  if (storeId === SHARED_STORE_ID || !businessId) {
+  if (SHARED_STORE_IDS.includes(storeId) || !businessId) {
     // Shared store or no businessId - use shared path
     return `return-images/shared/${storeId}/${orderId}/${fileName}`;
   } else {

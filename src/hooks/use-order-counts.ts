@@ -6,9 +6,7 @@ import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
 
 // ============================================================
 // HOOK WITH REAL-TIME UPDATES - Business-wide aggregation
@@ -94,7 +92,7 @@ export function useOrderCounts(businessId: string | null, vendorName: string | n
     // Set up listener for each store
     stores.forEach((storeId) => {
       let metadataRef = null;
-      if(storeId === SHARED_STORE_ID) {
+      if(SHARED_STORE_IDS.includes(storeId)) {
         if(businessId === SUPER_ADMIN_ID) {
           metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');  
         } else {

@@ -19,6 +19,7 @@ import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
+import { SHARED_STORE_IDS } from '@/lib/authoriseUser';
 
 type QcStatus = 'QC Pass' | 'QC Fail' | 'Not Received';
 
@@ -47,8 +48,6 @@ interface StartQcDialogProps {
   shopId: string;
   businessId: any;
 }
-
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 
 export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: StartQcDialogProps) {
   const [qcStatuses, setQcStatuses] = useState<Record<string | number, QcStatus | null>>({});
@@ -83,7 +82,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
             try {
               // ✅ Try appropriate path based on store
               let imageRef;
-              if (shopId === SHARED_STORE_ID) {
+              if (SHARED_STORE_IDS.includes(shopId)) {
                 imageRef = ref(storage, `return-images/shared/${shopId}/${order.id}/${imageName}`);
               } else {
                 imageRef = ref(storage, `return-images/${businessId}/${shopId}/${order.id}/${imageName}`);
@@ -279,7 +278,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
 
       // ✅ Use appropriate path based on store
       let filePath: string;
-      if (shopId === SHARED_STORE_ID) {
+      if (SHARED_STORE_IDS.includes(shopId)) {
         filePath = `return-images/shared/${shopId}/${order.id}/${fileName}`;
       } else {
         filePath = `return-images/${businessId}/${shopId}/${order.id}/${fileName}`;

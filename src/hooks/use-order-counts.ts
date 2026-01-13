@@ -6,7 +6,7 @@ import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // HOOK WITH REAL-TIME UPDATES - Business-wide aggregation

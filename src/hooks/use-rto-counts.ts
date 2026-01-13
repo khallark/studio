@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 export function useRtoInTransitCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Order } from './use-orders';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 export function useAvailabilityCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({

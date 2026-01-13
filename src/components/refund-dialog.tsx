@@ -25,7 +25,7 @@ import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SHARED_STORE_IDS } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 interface RefundDialogProps {
   isOpen: boolean;

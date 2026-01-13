@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, limit, getDocs, and, doc, getDoc } f
 import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // HOOK - Now business-wide, not store-specific

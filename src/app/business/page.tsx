@@ -11,7 +11,7 @@ import { Building2, ChevronRight, Users, Crown, Sparkles, ArrowRight, Package, Z
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/logo';
 import { doc, getDoc } from 'firebase/firestore';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 interface BusinessMembership {
   businessId: string;

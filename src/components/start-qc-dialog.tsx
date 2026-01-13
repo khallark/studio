@@ -19,7 +19,7 @@ import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
-import { SHARED_STORE_IDS } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 type QcStatus = 'QC Pass' | 'QC Fail' | 'Not Received';
 

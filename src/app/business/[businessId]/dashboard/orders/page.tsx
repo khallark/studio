@@ -130,7 +130,7 @@ import { useBusinessContext } from '../../layout';
 import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // STATUS TABS CONFIGURATION

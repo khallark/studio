@@ -3,7 +3,7 @@
 import { ref, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { db } from './firebase-admin';
-import { SHARED_STORE_IDS } from './authoriseUser';
+import { SHARED_STORE_IDS } from './shared-constants';
 
 /**
  * Get businessId for a store, or null if it's a shared store

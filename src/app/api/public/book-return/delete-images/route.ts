@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
 import { storage } from "@/lib/firebase-admin";
 import { getBusinessIdForStore } from "@/lib/storage-helpers";
-import { SHARED_STORE_ID } from "@/lib/authoriseUser";
+import { SHARED_STORE_IDS } from "@/lib/shared-constants";
 
 export async function POST(req: NextRequest) {
     try {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         // ✅ Determine paths to check
         let foldersToCheck: string[] = [];
         
-        if (session.storeId === SHARED_STORE_ID) {
+        if (SHARED_STORE_IDS.includes(session.storeId)) {
             // Shared store - check shared path
             foldersToCheck.push(`return-images/shared/${session.storeId}/${orderId}/`);
         } else if (businessId) {

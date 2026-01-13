@@ -6,8 +6,8 @@ import { storage, db } from "@/lib/firebase-admin";
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from "firebase-admin/firestore";
 import { getBusinessIdForStore, getReturnImagesPath } from "@/lib/storage-helpers";
+import { SHARED_STORE_IDS } from "@/lib/shared-constants";
 
-const SHARED_STORE_ID = process.env.NEXT_PUBLIC_SHARED_STORE_ID!;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = [
     'image/jpeg',
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         const businessId = await getBusinessIdForStore(session.storeId);
         
         // For shared store, businessId will be null, which is fine
-        if (!businessId && session.storeId !== SHARED_STORE_ID) {
+        if (!businessId && !SHARED_STORE_IDS.includes(session.storeId)) {
             console.error(`Could not find business for store: ${session.storeId}`);
             return NextResponse.json({ 
                 error: 'Store configuration error. Please contact support.' 

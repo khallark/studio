@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth, storage } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const orderData = orderDoc.data();
 
-    if (shop === SHARED_STORE_ID) {
+    if (SHARED_STORE_IDS.includes(shop)) {
       const vendorName = businessData?.vendorName;
       const vendors = orderData?.vendors;
       const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });

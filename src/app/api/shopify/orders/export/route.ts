@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 const formatAddress = (address: any): string => {
   if (!address) return 'N/A';
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
       const order = doc.data();
       if (!order) return;
 
-      if (shop === SHARED_STORE_ID) {
+      if (SHARED_STORE_IDS.includes(shop)) {
         const vendorName = businessData?.vendorName;
         const vendors = order?.vendors;
         const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });

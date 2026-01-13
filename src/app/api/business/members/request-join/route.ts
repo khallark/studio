@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getUserIdFromToken, SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { getUserIdFromToken } from '@/lib/authoriseUser';
+import { SHARED_STORE_ID, SHARED_STORE_ID_2, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 interface JoinRequest {
     userId: string;
@@ -29,29 +30,41 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Check if user is already a member
-        const memberRef = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(userId);
-        const memberDoc = await memberRef.get();
+        const memberRef1 = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(userId);
+        const memberDoc1 = await memberRef1.get();
+        const memberRef2 = db.collection('accounts').doc(SHARED_STORE_ID_2).collection('members').doc(userId);
+        const memberDoc2 = await memberRef2.get();
 
-        if (memberDoc.exists) {
+        if (memberDoc1.exists && memberDoc2.exists) {
             return NextResponse.json({ error: 'You are already a vendor of Majime.' }, { status: 400 });
         }
 
         // 3. Check if vendorName already exists (case-insensitive)
-        const existingVendorQuery = await db.collection('accounts')
+        const existingVendorQuery1 = await db.collection('accounts')
             .doc(SHARED_STORE_ID)
             .collection('members')
             .get();
 
+        const existingVendorQuery2 = await db.collection('accounts')
+            .doc(SHARED_STORE_ID_2)
+            .collection('members')
+            .get();
+
         const vendorNameLower = vendorName.trim().toLowerCase();
-        const vendorNameExists = existingVendorQuery.docs.some(doc => {
+        const vendorNameExists = existingVendorQuery1.docs.some(doc => {
             const data = doc.data();
             const existingVendorName = data.vendorName;
             return existingVendorName && existingVendorName.toLowerCase() === vendorNameLower;
-        });
+        }) &&
+            existingVendorQuery1.docs.some(doc => {
+                const data = doc.data();
+                const existingVendorName = data.vendorName;
+                return existingVendorName && existingVendorName.toLowerCase() === vendorNameLower;
+            });
 
         if (vendorNameExists) {
-            return NextResponse.json({ 
-                error: 'This vendor name is already taken. Please choose a different name.' 
+            return NextResponse.json({
+                error: 'This vendor name is already taken. Please choose a different name.'
             }, { status: 400 });
         }
 
@@ -69,19 +82,19 @@ export async function POST(req: NextRequest) {
         });
 
         if (vendorNameInPendingRequests) {
-            return NextResponse.json({ 
-                error: 'A request with this vendor name is already pending. Please choose a different name or wait for that request to be processed.' 
+            return NextResponse.json({
+                error: 'A request with this vendor name is already pending. Please choose a different name or wait for that request to be processed.'
             }, { status: 400 });
         }
 
         // 5. Check if there's already a pending request from this user
-        const userPendingRequest = existingPendingRequests.docs.find(doc => 
+        const userPendingRequest = existingPendingRequests.docs.find(doc =>
             doc.data().userId === userId
         );
 
         if (userPendingRequest) {
-            return NextResponse.json({ 
-                error: 'You already have a pending request to become a vendor at MAJIME.' 
+            return NextResponse.json({
+                error: 'You already have a pending request to become a vendor at MAJIME.'
             }, { status: 400 });
         }
 

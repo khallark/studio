@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { authUserForBusiness, SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { authUserForBusiness } from '@/lib/authoriseUser';
+import { SHARED_STORE_ID, SHARED_STORE_ID_2, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 interface JoinRequest {
     id: string;
@@ -53,10 +54,12 @@ export async function POST(req: NextRequest) {
             }
 
             // Check if user is already a member
-            const memberRef = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(requestUserId);
-            const memberDoc = await transaction.get(memberRef);
+            const memberRef1 = db.collection('accounts').doc(SHARED_STORE_ID).collection('members').doc(requestUserId);
+            const memberDoc1 = await transaction.get(memberRef1);
+            const memberRef2 = db.collection('accounts').doc(SHARED_STORE_ID_2).collection('members').doc(requestUserId);
+            const memberDoc2 = await transaction.get(memberRef2);
 
-            if (memberDoc.exists) {
+            if (memberDoc1.exists && memberDoc2.exists) {
                 throw new Error('User is already a vendor of MAJIME');
             }
 
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
 
             // Update user's stores array and vendorName
             transaction.update(requestedBusinessRef, {
-                stores: FieldValue.arrayUnion(SHARED_STORE_ID),
+                stores: FieldValue.arrayUnion(SHARED_STORE_ID, SHARED_STORE_ID_2),
                 vendorName: requestData.requestedVendorName,
             });
 
@@ -85,7 +88,8 @@ export async function POST(req: NextRequest) {
                 joinedAt: FieldValue.serverTimestamp(),
                 status: 'active',
             };
-            transaction.set(memberRef, memberData);
+            transaction.set(memberRef1, memberData);
+            transaction.set(memberRef2, memberData);
 
             // Mark request as accepted
             transaction.update(requestRef, {

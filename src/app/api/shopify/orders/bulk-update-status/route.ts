@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore, SHARED_STORE_ID } from '@/lib/authoriseUser';
+import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
         const secret = process.env.ENQUEUE_FUNCTION_SECRET;
         const orderIdsBeingSplit = new Set<string | number>(); // Track orders being split
 
-        if (shop === SHARED_STORE_ID && url && secret) {
+        if (SHARED_STORE_IDS.includes(shop) && url && secret) {
             console.log(`Processing ${orderIds.length} orders for splitting...`);
 
             // Process splits sequentially to avoid overwhelming the system
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 // For SHARED_STORE_ID, check authorization
-                if (shop === SHARED_STORE_ID) {
+                if (SHARED_STORE_IDS.includes(shop)) {
                     const vendorName = result.businessDoc?.data()?.vendorName ?? "";
                     const vendors = orderDoc.data()?.vendors;
                     const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });

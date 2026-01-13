@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
 import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
-import { SHARED_STORE_ID } from '@/lib/authoriseUser';
-import { boolean } from 'zod';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 // Fire-and-forget pattern: Webhook responds immediately and processes async
 // This prevents timeout issues on starter plans with 45-50 second limits
@@ -262,7 +261,7 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
         // Extract store ID from document
         const shop = orderData?.storeId;
 
-        if (shop && shop === SHARED_STORE_ID) {
+        if (shop && SHARED_STORE_IDS.includes(shop)) {
             const vendors = orderData?.vendors || [];
             const orderId = orderData?.orderId || orderDoc.id;
 

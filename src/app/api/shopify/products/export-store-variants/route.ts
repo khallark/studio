@@ -7,8 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
-import { authUserForBusiness, authUserForBusinessAndStore, SHARED_STORE_ID, SUPER_ADMIN_ID } from '@/lib/authoriseUser';
+import { authUserForBusiness, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import ExcelJS from 'exceljs';
+import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // TYPES
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
         const exportData: ExportVariant[] = [];
 
         for (const storeId of storesToQuery) {
-            const productsQuery = storeId === SHARED_STORE_ID && businessId !== SUPER_ADMIN_ID
+            const productsQuery = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID
                 ? db
                     .collection('accounts')
                     .doc(storeId)

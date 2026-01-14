@@ -1012,7 +1012,7 @@ export default function BusinessOrdersPage() {
                                                 Perform Items availability
                                             </DropdownMenuItem>
                                         )}
-                                        {['Ready To Dispatch', 'RTO Delivered', 'RTO Processed'].includes(activeTab) && (
+                                        {['Ready To Dispatch', 'RTO Delivered', 'RTO In Transit'].includes(activeTab) && (
                                             <DropdownMenuItem
                                                 onClick={() => {
                                                     setIsAwbBulkSelectOpen(true);

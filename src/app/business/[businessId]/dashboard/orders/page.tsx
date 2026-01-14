@@ -155,6 +155,7 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
     { value: 'DTO Refunded', label: 'DTO Refunded', shortLabel: 'Refunded' },
     { value: 'Lost', label: 'Lost', shortLabel: 'Lost' },
     { value: 'Closed', label: 'Closed', shortLabel: 'Closed' },
+    { value: 'RTO Processed', label: 'RTO Processed', shortLabel: 'RTO-P' },
     { value: 'RTO Closed', label: 'RTO Closed', shortLabel: 'RTO-C' },
     { value: 'Cancellation Requested', label: 'Cancellation Requested', shortLabel: 'Cancel-R' },
     { value: 'Cancelled', label: 'Cancelled', shortLabel: 'Cancel' },
@@ -802,6 +803,7 @@ export default function BusinessOrdersPage() {
             case 'Lost':
             case 'Cancelled': return 'destructive';
             case 'Closed':
+            case 'RTO Processed':
             case 'RTO Closed': return 'outline';
             default: return 'secondary';
         }
@@ -1010,7 +1012,7 @@ export default function BusinessOrdersPage() {
                                                 Perform Items availability
                                             </DropdownMenuItem>
                                         )}
-                                        {['Ready To Dispatch', 'RTO Delivered'].includes(activeTab) && (
+                                        {['Ready To Dispatch', 'RTO Delivered', 'RTO Processed'].includes(activeTab) && (
                                             <DropdownMenuItem
                                                 onClick={() => {
                                                     setIsAwbBulkSelectOpen(true);
@@ -1415,6 +1417,15 @@ export default function BusinessOrdersPage() {
                                         >
                                             {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                             Close Orders
+                                        </DropdownMenuItem>
+                                    )}
+                                    {activeTab === 'RTO Processed' && (
+                                        <DropdownMenuItem
+                                            onClick={() => handleBulkUpdateStatus('RTO Processed')}
+                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                        >
+                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                            Mark RTO Processed
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'RTO Delivered' && (

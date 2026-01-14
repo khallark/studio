@@ -106,6 +106,7 @@ const STATUS_LABELS: Record<string, string> = {
     "Cancelled": "Cancelled",
     // Returns
     "RTO Delivered": "RTO Delivered",
+    "RTO Processed": "RTO Processed",
     "RTO Closed": "RTO Closed",
     "DTO Delivered": "DTO Delivered",
     "Pending Refund": "Pending Refund",
@@ -119,7 +120,7 @@ const STATUS_ORDER: Record<string, string[]> = {
     inTransit: ["Dispatched", "In Transit", "Out For Delivery", "RTO In Transit", "DTO Requested", "DTO Booked", "DTO In Transit"],
     delivered: ["Closed", "Delivered"],
     cancellations: ["Cancellation Requested", "Cancelled"],
-    returns: ["RTO Delivered", "RTO Closed", "DTO Delivered", "Pending Refund", "DTO Refunded", "Lost"],
+    returns: ["RTO Delivered", "RTO Processed", "RTO Closed", "DTO Delivered", "Pending Refund", "DTO Refunded", "Lost"],
 };
 
 // ============================================================

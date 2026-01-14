@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
         const validStatuses = [
             'Confirmed',
             'Closed',
+            'RTO Processed',
             'RTO Closed',
         ];
         if (!validStatuses.includes(status)) {
@@ -159,6 +160,8 @@ export async function POST(req: NextRequest) {
                                 return "This order was received by the customer and manually closed";
                             case "RTO Closed":
                                 return "This order was returned and received by the owner and manually closed";
+                            case "RTO Processed":
+                                return "This order was returned and processed by the user, but not yet updated to 'RTO Delivered' by the courier."
                             default:
                                 return "";
                         }

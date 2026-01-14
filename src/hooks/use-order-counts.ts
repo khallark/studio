@@ -32,6 +32,7 @@ export function useOrderCounts(businessId: string | null, vendorName: string | n
     'DTO Refunded': 0,
     'Lost': 0,
     'Closed': 0,
+    'RTO Processed': 0,
     'RTO Closed': 0,
     'Cancellation Requested': 0,
     'Cancelled': 0,
@@ -74,6 +75,7 @@ export function useOrderCounts(businessId: string | null, vendorName: string | n
         'DTO Refunded': 0,
         'Lost': 0,
         'Closed': 0,
+        'RTO Processed': 0,
         'RTO Closed': 0,
         'Cancellation Requested': 0,
         'Cancelled': 0,
@@ -124,7 +126,7 @@ export function useOrderCounts(businessId: string | null, vendorName: string | n
                 'Dispatched': 0, 'In Transit': 0, 'Out For Delivery': 0, 'Delivered': 0,
                 'RTO In Transit': 0, 'RTO Delivered': 0, 'DTO Requested': 0, 'DTO Booked': 0,
                 'DTO In Transit': 0, 'DTO Delivered': 0, 'Pending Refunds': 0, 'DTO Refunded': 0, 'Lost': 0,
-                'Closed': 0, 'RTO Closed': 0, 'Cancellation Requested': 0, 'Cancelled': 0,
+                'Closed': 0, 'RTO Processed': 0, 'RTO Closed': 0, 'Cancellation Requested': 0, 'Cancelled': 0,
               });
             }
           }
@@ -180,6 +182,7 @@ async function calculateCounts(storeId: string): Promise<StatusCounts> {
     'DTO Refunded': 0,
     'Lost': 0,
     'Closed': 0,
+    'RTO Processed': 0,
     'RTO Closed': 0,
     'Cancellation Requested': 0,
     'Cancelled': 0,

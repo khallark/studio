@@ -49,6 +49,7 @@ const STATUS_MAP: Record<string, string> = {
   'DTO Refunded': 'Refunded',
   'Lost': 'Lost',
   'Closed': 'Delivered',
+  'RTO Processed': 'Return Completed',
   'RTO Closed': 'Return Completed',
   'Cancellation Requested': 'Cancellation Requested',
   'Cancelled': 'Cancelled'
@@ -449,7 +450,7 @@ export default function BookReturnPage() {
   const canRequest = ['Delivered'];
   const alreadyRequested = ['DTO Requested'];
   const canTryRequesting = ['In Transit', 'Out For Delivery', 'RTO In Transit'];
-  const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Closed', 'Cancellation Requested'];
+  const notEligible = ['New', 'Confirmed', 'Ready To Dispatch', 'Dispatched', 'RTO Delivered', 'Lost', 'Closed', 'RTO Processed', 'RTO Closed', 'Cancellation Requested'];
   const alreadyInProcess = ['DTO Booked', 'DTO In Transit', 'DTO Delivered', 'Pending Refunds', 'DTO Refunded'];
 
   if (loading) {

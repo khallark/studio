@@ -1419,7 +1419,7 @@ export default function BusinessOrdersPage() {
                                             Close Orders
                                         </DropdownMenuItem>
                                     )}
-                                    {activeTab === 'RTO Processed' && (
+                                    {activeTab === 'RTO In Transit' && (
                                         <DropdownMenuItem
                                             onClick={() => handleBulkUpdateStatus('RTO Processed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}

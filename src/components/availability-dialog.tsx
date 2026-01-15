@@ -28,6 +28,7 @@ import { Loader2 } from 'lucide-react';
 interface Order {
   id: string;
   name: string;
+  storeId: string;
   tags_confirmed?: string[];
   raw: {
     line_items: Array<{
@@ -98,7 +99,7 @@ export function AvailabilityDialog({
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           businessId,
-          shop: shopId,
+          shop: order.storeId,
           orderId: order.id,
           tag: action,
         }),

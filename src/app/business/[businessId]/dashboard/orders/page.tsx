@@ -827,10 +827,14 @@ export default function BusinessOrdersPage() {
                     </>
                 );
             case 'Confirmed':
-                return (businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) ? (
+                return (
                     <>
-                        <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
+                        {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
+                            <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
+                        }
+                        {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
+                            <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
+                        }
                         {/* ADD THIS: Show "Perform Pickup" option only for picked up orders */}
                         {order.isEligibleForPickup && (
                             <DropdownMenuItem
@@ -843,7 +847,7 @@ export default function BusinessOrdersPage() {
                             </DropdownMenuItem>
                         )}
                     </>
-                ) : null;
+                );
             case 'Ready To Dispatch':
                 return (
                     <>

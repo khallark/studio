@@ -298,7 +298,7 @@ export function useOrders(
                         filteredOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
                             if(order.pickupReady) return false;
-                            
+
                             const businessProductIds: string[][] = [];
 
                             for (const item of lineItems) {
@@ -324,7 +324,7 @@ export function useOrders(
                                 const docData = businessProductDoc.data();
                                 if (!businessProductDoc.exists() ||
                                     !docData ||
-                                    docData.inShelfQuantity < quantity
+                                    Number(docData.inShelfQuantity || 0) < Number(quantity)
                                 ) return false;
                             }
 
@@ -368,7 +368,7 @@ export function useOrders(
                                 const docData = businessProductDoc.data();
                                 if (!businessProductDoc.exists() ||
                                     !docData ||
-                                    docData.inShelfQuantity < quantity
+                                    Number(docData.inShelfQuantity || 0) < Number(quantity)
                                 ) return true;
                             }
 

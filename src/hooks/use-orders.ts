@@ -197,7 +197,6 @@ export function useOrders(
                     const snapshot = await getDocs(q);
                     let orders = snapshot.docs.map((doc) => ({
                         id: doc.id,
-                        storeId, // Add store ID to each order
                         ...doc.data(),
                     })) as Order[];
 
@@ -395,7 +394,7 @@ export function useOrders(
                                 ) return true; // unmapped → treat as umapped
                             }
 
-                            return true;
+                            return false;
                         })
                     );
 

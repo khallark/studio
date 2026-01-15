@@ -196,8 +196,9 @@ export function useOrders(
                 try {
                     const snapshot = await getDocs(q);
                     let orders = snapshot.docs.map((doc) => ({
-                        id: doc.id,
                         ...doc.data(),
+                        id: doc.id,
+                        storeId, // Add store ID to each order
                     })) as Order[];
 
                     // ✅ Apply client-side status filter if needed

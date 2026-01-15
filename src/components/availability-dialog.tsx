@@ -104,7 +104,7 @@ export function AvailabilityDialog({
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.details || 'Failed to update order');
+      if (!response.ok) throw new Error(result.error || 'Failed to update order');
       
       // Animate out after success
       setTimeout(() => {

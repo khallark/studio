@@ -297,7 +297,8 @@ export function useOrders(
                     const availabilityChecks = await Promise.all(
                         filteredOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
-
+                            if(order.pickupReady) return false;
+                            
                             const businessProductIds: string[][] = [];
 
                             for (const item of lineItems) {

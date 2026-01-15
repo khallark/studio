@@ -34,6 +34,7 @@ import {
     AlertTriangle,
     Link2,
     ArrowRight,
+    Store,
 } from 'lucide-react';
 
 // ============================================================
@@ -218,6 +219,7 @@ export function BulkMappingDialog({
         const worksheet = workbook.addWorksheet('Mappings');
 
         worksheet.columns = [
+            { header: 'Store ID', key: 'storeId', width: 25 },
             { header: 'Store Product Title', key: 'storeProductTitle', width: 35 },
             { header: 'Store Product SKU', key: 'storeProductSku', width: 20 },
             { header: 'Business Product SKU', key: 'businessProductSku', width: 20 },
@@ -233,16 +235,19 @@ export function BulkMappingDialog({
 
         // Add sample data
         worksheet.addRow({
+            storeId: 'mystore.myshopify.com',
             storeProductTitle: 'Blue Cotton T-Shirt - Small',
             storeProductSku: 'BLU-TSH-S',
             businessProductSku: 'TSH-001',
         });
         worksheet.addRow({
+            storeId: 'mystore.myshopify.com',
             storeProductTitle: 'Blue Cotton T-Shirt - Medium',
             storeProductSku: 'BLU-TSH-M',
             businessProductSku: 'TSH-001',
         });
         worksheet.addRow({
+            storeId: 'secondstore.myshopify.com',
             storeProductTitle: 'Classic Denim Jeans - 32',
             storeProductSku: 'DNM-JNS-32',
             businessProductSku: 'JNS-002',
@@ -282,8 +287,8 @@ export function BulkMappingDialog({
                         <Info className="h-4 w-4 text-blue-500" />
                         <AlertTitle className="text-blue-700">How it works</AlertTitle>
                         <AlertDescription className="text-blue-600/80">
-                            Upload a file with store variant SKUs and their corresponding business product SKUs.
-                            Each row will create a mapping between the store variant and business product.
+                            Upload a file with store IDs, variant SKUs and their corresponding business product SKUs.
+                            Each row will create a mapping between the specified store variant and business product.
                         </AlertDescription>
                     </Alert>
 
@@ -308,6 +313,10 @@ export function BulkMappingDialog({
                         <div className="text-sm text-muted-foreground space-y-2">
                             <ul className="list-disc list-inside space-y-1.5 ml-2">
                                 <li>
+                                    <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Store ID</code>
+                                    {' '}- The Shopify store domain (e.g., mystore.myshopify.com)
+                                </li>
+                                <li>
                                     <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Store Product Title</code>
                                     {' '}- For reference (helps identify products)
                                 </li>
@@ -323,13 +332,19 @@ export function BulkMappingDialog({
 
                             <div className="mt-3 p-3 bg-muted/50 rounded-md">
                                 <p className="text-xs font-medium text-foreground mb-2">Example:</p>
-                                <div className="flex items-center gap-2 text-xs">
-                                    <span className="px-2 py-1 bg-background rounded border">BLU-TSH-S</span>
-                                    <ArrowRight className="h-3 w-3 text-emerald-500" />
-                                    <span className="px-2 py-1 bg-emerald-500/10 text-emerald-700 rounded border border-emerald-500/20">TSH-001</span>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <Store className="h-3 w-3 text-muted-foreground" />
+                                        <span className="px-2 py-1 bg-background rounded border text-[10px]">mystore.myshopify.com</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs ml-4">
+                                        <span className="px-2 py-1 bg-background rounded border">BLU-TSH-S</span>
+                                        <ArrowRight className="h-3 w-3 text-emerald-500" />
+                                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-700 rounded border border-emerald-500/20">TSH-001</span>
+                                    </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                    Store variant "BLU-TSH-S" will be mapped to business product "TSH-001"
+                                    Store variant "BLU-TSH-S" from "mystore.myshopify.com" will be mapped to business product "TSH-001"
                                 </p>
                             </div>
                         </div>

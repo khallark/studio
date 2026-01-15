@@ -10,6 +10,7 @@ import ExcelJS from 'exceljs';
 // ============================================================
 
 interface MappingRow {
+    'Store ID'?: string;
     'Store Product Title'?: string;
     'Store Product SKU'?: string;
     'Business Product SKU'?: string;
@@ -50,7 +51,7 @@ function validateFileStructure(data: MappingRow[]): ValidationResult {
     const firstRow = data[0];
     const columns = Object.keys(firstRow);
 
-    const requiredColumns = ['Store Product Title', 'Store Product SKU', 'Business Product SKU'];
+    const requiredColumns = ['Store ID', 'Store Product Title', 'Store Product SKU', 'Business Product SKU'];
 
     for (const col of requiredColumns) {
         if (!columns.some(c => c.toLowerCase().trim() === col.toLowerCase())) {
@@ -71,7 +72,9 @@ function normalizeColumnNames(row: any): MappingRow {
     for (const [key, value] of Object.entries(row)) {
         const normalizedKey = key.trim();
 
-        if (/^store\s*product\s*title$/i.test(normalizedKey)) {
+        if (/^store\s*id$/i.test(normalizedKey) || /^storeid$/i.test(normalizedKey)) {
+            normalized['Store ID'] = value as string;
+        } else if (/^store\s*product\s*title$/i.test(normalizedKey)) {
             normalized['Store Product Title'] = value as string;
         } else if (/^store\s*product\s*sku$/i.test(normalizedKey) || /^store\s*sku$/i.test(normalizedKey) || /^variant\s*sku$/i.test(normalizedKey)) {
             normalized['Store Product SKU'] = value as string;
@@ -86,9 +89,14 @@ function normalizeColumnNames(row: any): MappingRow {
 }
 
 function validateRow(row: MappingRow, rowIndex: number): { valid: boolean; error?: string } {
+    const storeId = row['Store ID']?.toString().trim();
     const storeProductTitle = row['Store Product Title']?.toString().trim();
     const storeProductSku = row['Store Product SKU']?.toString().trim();
     const businessProductSku = row['Business Product SKU']?.toString().trim();
+
+    if (!storeId) {
+        return { valid: false, error: `Row ${rowIndex}: Store ID is required` };
+    }
 
     if (!storeProductTitle) {
         return { valid: false, error: `Row ${rowIndex}: Store Product Title is required` };
@@ -174,6 +182,7 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
     const worksheet = workbook.addWorksheet('Mapping Results');
 
     worksheet.columns = [
+        { header: 'Store ID', key: 'Store ID', width: 25 },
         { header: 'Store Product Title', key: 'Store Product Title', width: 35 },
         { header: 'Store Product SKU', key: 'Store Product SKU', width: 20 },
         { header: 'Business Product SKU', key: 'Business Product SKU', width: 20 },
@@ -298,7 +307,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ============================================================
-        // GET LINKED STORES AND BUILD VARIANT INDEX
+        // GET LINKED STORES
         // ============================================================
 
         const businessData = businessDoc?.data();
@@ -309,38 +318,6 @@ export async function POST(req: NextRequest) {
                 { error: 'Validation Error', message: 'No linked stores found for this business' },
                 { status: 400 }
             );
-        }
-
-        // Build an index of all store variants by SKU
-        const storeVariantIndex: Map<string, StoreVariantInfo> = new Map();
-
-        for (const storeId of linkedStores) {
-            const storeProductsSnap = await db
-                .collection('accounts')
-                .doc(storeId)
-                .collection('products')
-                .get();
-
-            storeProductsSnap.docs.forEach(doc => {
-                const product = doc.data();
-                const variants = product.variants || [];
-                const variantMappings = product.variantMappings || {};
-
-                variants.forEach((variant: any) => {
-                    const variantSku = variant.sku?.toString().trim().toUpperCase();
-                    if (variantSku) {
-                        storeVariantIndex.set(variantSku, {
-                            storeId,
-                            productId: doc.id,
-                            productTitle: product.title || '',
-                            variantId: variant.id,
-                            variantTitle: variant.title || 'Default Title',
-                            variantSku: variant.sku,
-                            currentMapping: variantMappings[variant.id] || null,
-                        });
-                    }
-                });
-            });
         }
 
         // ============================================================
@@ -378,10 +355,11 @@ export async function POST(req: NextRequest) {
             const rowIndex = i + 2;
 
             // Skip empty rows
+            const storeId = row['Store ID']?.toString().trim();
             const storeProductSku = row['Store Product SKU']?.toString().trim().toUpperCase();
             const businessProductSku = row['Business Product SKU']?.toString().trim().toUpperCase();
 
-            if (!storeProductSku && !businessProductSku) {
+            if (!storeId && !storeProductSku && !businessProductSku) {
                 continue;
             }
 
@@ -397,13 +375,54 @@ export async function POST(req: NextRequest) {
                 continue;
             }
 
-            // Check if store variant exists
-            const variantInfo = storeVariantIndex.get(storeProductSku!);
+            // Check if store is linked to business
+            if (!linkedStores.includes(storeId!)) {
+                results.push({
+                    ...row,
+                    Status: 'Skipped',
+                    Message: `Store "${storeId}" is not linked to this business`,
+                });
+                skippedCount++;
+                continue;
+            }
+
+            // Find the variant in the specified store
+            const storeProductsSnap = await db
+                .collection('accounts')
+                .doc(storeId!)
+                .collection('products')
+                .get();
+
+            let variantInfo: StoreVariantInfo | null = null;
+
+            for (const doc of storeProductsSnap.docs) {
+                const product = doc.data();
+                const variants = product.variants || [];
+                const variantMappings = product.variantMappings || {};
+
+                const matchingVariant = variants.find((v: any) =>
+                    v.sku?.toString().trim().toUpperCase() === storeProductSku
+                );
+
+                if (matchingVariant) {
+                    variantInfo = {
+                        storeId: storeId!,
+                        productId: doc.id,
+                        productTitle: product.title || '',
+                        variantId: matchingVariant.id,
+                        variantTitle: matchingVariant.title || 'Default Title',
+                        variantSku: matchingVariant.sku,
+                        currentMapping: variantMappings[matchingVariant.id] || null,
+                    };
+                    break;
+                }
+            }
+
             if (!variantInfo) {
                 results.push({
                     ...row,
                     Status: 'Skipped',
-                    Message: `Store Product SKU "${storeProductSku}" not found in any linked store`,
+                    Message: `Store Product SKU "${storeProductSku}" not found in store "${storeId}"`,
                 });
                 skippedCount++;
                 continue;
@@ -497,9 +516,6 @@ export async function POST(req: NextRequest) {
                 },
             });
             batchCount++;
-
-            // Update the index to reflect the new mapping
-            variantInfo.currentMapping = businessProductSku!;
 
             results.push({
                 ...row,

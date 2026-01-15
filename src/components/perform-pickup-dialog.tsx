@@ -31,7 +31,8 @@ interface SubItem {
   variantId: string;
   assignedUpc: {
     id: string;
-    code: string;
+    rackId: string;
+    shelfId: string;
   } | null;
   isChecked: boolean;
 }
@@ -128,7 +129,8 @@ export function PerformPickupDialog({
               variantId: String(item.variant_id),
               assignedUpc: {
                 id: upcDoc.id,
-                code: upcDoc.data().code || upcDoc.id,
+                rackId: upcDoc.data().rackId,
+                shelfId: upcDoc.data().shelfId,
               },
               isChecked: false,
             });
@@ -290,7 +292,7 @@ export function PerformPickupDialog({
                             <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
                               <span className="text-muted-foreground">Assigned UPC: </span>
                               <span className="font-mono font-medium">
-                                {subItem.assignedUpc.code}
+                                {subItem.assignedUpc.rackId} - {subItem.assignedUpc.shelfId}
                               </span>
                             </div>
                           )}

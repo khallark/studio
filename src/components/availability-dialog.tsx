@@ -90,6 +90,7 @@ export function AvailabilityDialog({
     setProcessingOrder(order.id);
     setProcessingAction(action);
 
+    console.log(businessId, shopId, order.id, action);
     try {
       const idToken = await user.getIdToken();
       const response = await fetch('/api/shopify/orders/update-confirmed-orders-availability-tag', {

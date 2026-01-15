@@ -22,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Order } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
+import { string } from 'zod';
 
 interface SubItem {
   id: string; // unique ID for this sub-item
@@ -119,6 +120,25 @@ export function PerformPickupDialog({
             break;
           }
 
+          const assignedUpcs: {
+              id: string;
+              rackId: string;
+              shelfId: string;
+            }[] = [];
+          
+          for(const upc of upcsSnapshot.docs) {
+            const rackRef = doc(db, 'users', businessId, 'racks', upc.data().rackId);
+            const rackDoc = await getDoc(rackRef);
+            const shelfRef = doc(db, 'users', businessId, 'shelves', upc.data().shelfId);
+            const shelfDoc = await getDoc(shelfRef);
+
+            assignedUpcs.push({
+              id: upc.id,
+              rackId: rackDoc.data()?.name,
+              shelfId: shelfDoc.data()?.name,
+            })
+          }
+          
           // Create sub-items for each quantity
           upcsSnapshot.docs.forEach((upcDoc, index) => {
             items.push({
@@ -127,11 +147,7 @@ export function PerformPickupDialog({
               itemSku: item.sku || 'N/A',
               productId: String(businessProductId),
               variantId: String(item.variant_id),
-              assignedUpc: {
-                id: upcDoc.id,
-                rackId: upcDoc.data().rackId,
-                shelfId: upcDoc.data().shelfId,
-              },
+              assignedUpc: assignedUpcs[index],
               isChecked: false,
             });
           });

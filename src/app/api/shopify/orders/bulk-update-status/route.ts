@@ -3,6 +3,7 @@ import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { SHARED_STORE_IDS } from '@/lib/shared-constants';
+import { UPC } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
 
         const shopRef = db.collection('accounts').doc(shop);
         const ordersColRef = shopRef.collection('orders');
+
+        // Check if this is an RTO status that needs UPC handling
+        const isRTOStatus = status === 'RTO Closed' || status === 'RTO Processed';
 
         // ============================================
         // STEP 1: Enqueue order splits BEFORE transaction
@@ -116,6 +120,8 @@ export async function POST(req: NextRequest) {
         // STEP 2: Update order statuses in transaction
         // ============================================
         let updatedCount = 0;
+        const successfullyUpdatedOrderIds: Array<string | number> = [];
+
         await db.runTransaction(async (transaction) => {
             // Fetch all orders first (transaction requirement)
             const orderRefs = orderIds.map(id => ordersColRef.doc(String(id)));
@@ -178,15 +184,187 @@ export async function POST(req: NextRequest) {
                 });
 
                 updatedCount++;
+                successfullyUpdatedOrderIds.push(orderId);
             }
         });
 
+        // ============================================
+        // STEP 3: Handle UPCs for RTO orders
+        // ============================================
+        let upcUpdateCount = 0;
+        let upcCreateCount = 0;
+        const ordersWithoutUPCs: Array<string | number> = [];
+
+        if (isRTOStatus && successfullyUpdatedOrderIds.length > 0) {
+            console.log(`🔄 Processing UPCs for ${successfullyUpdatedOrderIds.length} RTO orders...`);
+
+            for (const orderId of successfullyUpdatedOrderIds) {
+                try {
+                    // Query UPCs for this order
+                    const upcsSnapshot = await db
+                        .collection(`users/${businessId}/upcs`)
+                        .where('orderId', '==', String(orderId))
+                        .get();
+
+                    if (upcsSnapshot.empty) {
+                        console.warn(`⚠️ Order ${orderId} has no UPCs - needs manual creation`);
+                        ordersWithoutUPCs.push(orderId);
+                        continue;
+                    }
+
+                    // Update all UPCs for this order to putAway: 'inbound'
+                    const batch = db.batch();
+                    let batchCount = 0;
+
+                    upcsSnapshot.docs.forEach(upcDoc => {
+                        const upcData = upcDoc.data() as UPC;
+                        const currentPutAway = upcData.putAway;
+
+                        // Only update if putAway is not already 'inbound'
+                        if (currentPutAway !== 'inbound') {
+                            const updatedData: Partial<UPC> = {
+                                putAway: 'inbound',
+                                updatedAt: Timestamp.now(),
+                                updatedBy: result.userId,
+                            }
+                            batch.update(upcDoc.ref, updatedData);
+                            batchCount++;
+                        }
+                    });
+
+                    if (batchCount > 0) {
+                        await batch.commit();
+                        upcUpdateCount += batchCount;
+                        console.log(`✅ Updated ${batchCount} UPCs to 'inbound' for order ${orderId}`);
+                    } else {
+                        console.log(`⏭️ All UPCs already 'inbound' for order ${orderId}`);
+                    }
+
+                } catch (upcError) {
+                    console.error(`❌ Error processing UPCs for order ${orderId}:`, upcError);
+                    // Continue with other orders - don't fail the whole batch
+                }
+            }
+        }
+
+        // ============================================
+        // STEP 4: Create UPCs for orders without any
+        // ============================================
+        if (isRTOStatus && ordersWithoutUPCs.length > 0) {
+            console.log(`📦 Creating UPCs for ${ordersWithoutUPCs.length} orders without UPCs...`);
+
+            for (const orderId of ordersWithoutUPCs) {
+                try {
+                    // Get order details
+                    const orderDoc = await ordersColRef.doc(String(orderId)).get();
+                    if (!orderDoc.exists) continue;
+
+                    const orderData = orderDoc.data();
+                    const lineItems = orderData?.raw?.line_items || [];
+
+                    if (lineItems.length === 0) {
+                        console.warn(`⚠️ Order ${orderId} has no line items, skipping UPC creation`);
+                        continue;
+                    }
+
+                    const batch = db.batch();
+                    let createdCount = 0;
+
+                    for (const item of lineItems) {
+                        const productId = String(item.product_id);
+                        const variantId = String(item.variant_id);
+                        const quantity = Number(item.quantity) || 1;
+
+                        // Get product mapping to find business product
+                        const storeProductDoc = await db
+                            .doc(`accounts/${shop}/products/${productId}`)
+                            .get();
+
+                        if (!storeProductDoc.exists) {
+                            console.warn(`⚠️ Store product ${productId} not found for order ${orderId}`);
+                            continue;
+                        }
+
+                        const storeProductData = storeProductDoc.data();
+                        const variantMapping = storeProductData?.variantMappingDetails?.[variantId]
+                            || storeProductData?.variantMappings?.[variantId];
+
+                        if (!variantMapping) {
+                            console.warn(`⚠️ No mapping for variant ${variantId} in order ${orderId}`);
+                            continue;
+                        }
+
+                        const businessProductSku = typeof variantMapping === 'object'
+                            ? variantMapping.businessProductSku
+                            : variantMapping;
+
+                        // Create UPCs for this line item (one per quantity)
+                        for (let i = 0; i < quantity; i++) {
+                            const upcRef = db.collection(`users/${businessId}/upcs`).doc();
+
+                            const upcData: UPC = {
+                                id: upcRef.id,
+                                createdAt: Timestamp.now(),
+                                updatedAt: Timestamp.now(),
+                                createdBy: result.userId!,
+                                updatedBy: result.userId!,
+                                storeId: shop,
+                                orderId: String(orderId),
+                                putAway: 'inbound', // ✅ Set to inbound for RTO
+                                productId: businessProductSku,
+                                warehouseId: null,
+                                zoneId: null,
+                                rackId: null,
+                                shelfId: null,
+                                placementId: null,
+                            }
+
+                            batch.set(upcRef, upcData);
+
+                            createdCount++;
+                        }
+                    }
+
+                    if (createdCount > 0) {
+                        await batch.commit();
+                        upcCreateCount += createdCount;
+                        console.log(`✅ Created ${createdCount} UPCs for order ${orderId}`);
+                    }
+
+                } catch (createError) {
+                    console.error(`❌ Error creating UPCs for order ${orderId}:`, createError);
+                    // Continue with other orders
+                }
+            }
+        }
+
+        // ============================================
+        // STEP 5: Build response message
+        // ============================================
         const splitCount = orderIdsBeingSplit.size;
-        const message = splitCount > 0
+        let message = splitCount > 0
             ? `${updatedCount} order(s) successfully updated to ${status}. ${splitCount} order(s) queued for splitting (not ${status === 'Confirmed' ? 'confirmed' : 'updated'}).`
             : `${updatedCount} order(s) successfully updated to ${status}`;
 
-        return NextResponse.json({ message });
+        if (isRTOStatus) {
+            if (upcUpdateCount > 0) {
+                message += ` ${upcUpdateCount} UPC(s) updated to 'inbound'.`;
+            }
+            if (upcCreateCount > 0) {
+                message += ` ${upcCreateCount} UPC(s) created with 'inbound' status.`;
+            }
+        }
+
+        return NextResponse.json({
+            message,
+            details: {
+                ordersUpdated: updatedCount,
+                ordersSplit: splitCount,
+                upcsUpdated: upcUpdateCount,
+                upcsCreated: upcCreateCount,
+                ordersWithoutUPCs: ordersWithoutUPCs.length,
+            }
+        });
 
     } catch (error) {
         console.error('Error during bulk order status update:', error);

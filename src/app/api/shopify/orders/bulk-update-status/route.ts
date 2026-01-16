@@ -98,8 +98,9 @@ export async function POST(req: NextRequest) {
                             console.warn(`Order ${orderId} split enqueue failed: ${json.error}`);
                         } else {
                             console.log(`✓ Order ${orderId} split enqueued`);
-                            orderIdsBeingSplit.add(orderId); // Mark as being split
                         }
+
+                        orderIdsBeingSplit.add(orderId); // Mark as being split
                     } else {
                         console.warn(`Order ${orderId} not eligible for splitting, skipping split`);
                     }

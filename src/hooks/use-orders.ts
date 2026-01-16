@@ -95,24 +95,7 @@ export function useOrders(
                 // ✅ NEW: Filter by vendor for shared store
                 if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
-                        const allPermutations = [
-                            ["OWR"],
-                            ["Ghamand"],
-                            ["BBB"],
-                            ["OWR", "Ghamand"],
-                            ["Ghamand", "OWR"],
-                            ["OWR", "BBB"],
-                            ["BBB", "OWR"],
-                            ["Ghamand", "BBB"],
-                            ["BBB", "Ghamand"],
-                            ["OWR", "Ghamand", "BBB"],
-                            ["OWR", "BBB", "Ghamand"],
-                            ["Ghamand", "OWR", "BBB"],
-                            ["Ghamand", "BBB", "OWR"],
-                            ["BBB", "OWR", "Ghamand"],
-                            ["BBB", "Ghamand", "OWR"]
-                        ];
-                        q = query(q, where('vendors', 'in', allPermutations));
+                        q = query(q, where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
                     }
                     else {
                         q = query(q, where('vendors', 'array-contains', vendorName));

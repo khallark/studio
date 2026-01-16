@@ -16,8 +16,8 @@ import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
  * Check if order should be excluded from availability filters
  */
 function shouldSkipOrder(order: Order): boolean {
-  // Skip Shopify-cancelled orders
-  return !!order?.raw?.cancelled_at;
+    // Skip Shopify-cancelled orders
+    return !!order?.raw?.cancelled_at;
 }
 
 export function useOrders(
@@ -96,6 +96,11 @@ export function useOrders(
                 if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
                         q = query(q, where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
+                        
+                        // ✅ FIX: Force client-side status filtering for OWR
+                        if (activeTab === 'All Orders') {
+                            needsClientSideStatusFilter = true;
+                        }
                     }
                     else {
                         q = query(q, where('vendors', 'array-contains', vendorName));

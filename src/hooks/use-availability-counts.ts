@@ -104,7 +104,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
                 
                 if (!businessProductDoc.exists() ||
                     !docData ||
-                    docData.inShelfQuantity < quantity
+                    Number(docData.inShelfQuantity || 0) < Number(quantity)
                 ) {
                   isEligible = false;
                   break;

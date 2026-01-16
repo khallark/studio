@@ -141,7 +141,7 @@ function generateSlipHTML(
       <div class="seller-row">
         <div class="seller-info">
           <div class="seller-name">Seller: ${escapeHtml(sellerDetails.name)}</div>
-          <div class="seller-gst">GST: ${escapeHtml(sellerDetails.gst)}</div>
+          <div class="seller-gst">GST: 03AAQCM9385B1Z8</div>
         </div>
         <div class="order-number">${escapeHtml(orderNumber)}</div>
       </div>

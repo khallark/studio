@@ -10,13 +10,13 @@ import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 export function useAvailabilityCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
   return useQuery({
     queryKey: ['availabilityCounts', businessId, stores],
-    
+
     queryFn: async () => {
       if (!businessId) throw new Error('No business ID provided');
       if (!stores || stores.length === 0) {
-        return { 
-          pending: 0, 
-          available: 0, 
+        return {
+          pending: 0,
+          available: 0,
           unavailable: 0,
           eligible: 0,
           notEligible: 0,
@@ -36,16 +36,16 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
       // Query each store in parallel
       const storeQueries = stores.map(async (storeId) => {
         const ordersRef = collection(db, 'accounts', storeId, 'orders');
-        
+
         let q = query(
           ordersRef,
           where('customStatus', '==', 'Confirmed')
         );
 
-        if(SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
+        if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
           q = query(q, where("vendors", "array-contains", vendorName));
         }
-        
+
         const snapshot = await getDocs(q);
 
         let available = 0;
@@ -66,7 +66,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
         // Check eligibility for all orders
         const eligibilityChecks = await Promise.all(
           orders.map(async (order) => {
-            // Skip Shopify-cancelled orders
+            // ✅ FIX 1: Skip Shopify-cancelled orders
             if (order?.raw?.cancelled_at) return null;
 
             const lineItems = order?.raw?.line_items || [];
@@ -79,17 +79,27 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
               const storeProductDoc = await getDoc(storeProductRef);
               const docData = storeProductDoc.data();
 
+              // ✅ FIX 2: Use variantMappingDetails (or variantMappings - confirm which is correct!)
+              // Change this line based on your actual field name:
+              const variantMapping = docData?.variantMappingDetails?.[item.variant_id]
+                || docData?.variantMappings?.[item.variant_id];
+
               if (
                 !storeProductDoc.exists() ||
                 !docData ||
-                !docData.variantMappings?.[item.variant_id]
+                !variantMapping
               ) {
                 isUnmapped = true;
                 break;
               }
 
+              // If using variantMappingDetails, extract the SKU:
+              const businessProductSku = typeof variantMapping === 'object'
+                ? variantMapping.businessProductSku
+                : variantMapping;
+
               businessProductIds.push([
-                String(docData.variantMappings[item.variant_id]),
+                String(businessProductSku),
                 item.quantity,
               ]);
             }
@@ -101,10 +111,10 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
                 const businessProductRef = doc(db, 'users', businessId, 'products', id);
                 const businessProductDoc = await getDoc(businessProductRef);
                 const docData = businessProductDoc.data();
-                
+
                 if (!businessProductDoc.exists() ||
-                    !docData ||
-                    Number(docData.inShelfQuantity || 0) < Number(quantity)
+                  !docData ||
+                  Number(docData.inShelfQuantity || 0) < Number(quantity)
                 ) {
                   isEligible = false;
                   break;
@@ -115,14 +125,15 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
             return {
               order,
               isUnmapped,
-              isEligible: !isUnmapped && isEligible,
+              // ✅ FIX 3: Exclude picked up orders from eligible count
+              isEligible: !isUnmapped && isEligible && !order.pickupReady,
               isNotEligible: !isUnmapped && !isEligible && !order.pickupReady,
               isPickedUp: !!order.pickupReady
             };
           })
         );
 
-        // Count each category
+        // Count each category (now mutually exclusive except for picked up)
         eligibilityChecks.forEach((check) => {
           if (!check) return; // Skip cancelled orders
 
@@ -137,7 +148,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
             pending++;
           }
 
-          // Eligibility-based counts
+          // Eligibility-based counts (mutually exclusive)
           if (isUnmapped) {
             unmapped++;
           } else if (isEligible) {
@@ -146,7 +157,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
             notEligible++;
           }
 
-          // Picked up count
+          // Picked up count (independent category)
           if (isPickedUp) {
             pickedUp++;
           }
@@ -157,7 +168,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
 
       // Wait for all stores
       const results = await Promise.all(storeQueries);
-      
+
       // Aggregate results
       results.forEach(({ available, unavailable, pending, eligible, notEligible, pickedUp, unmapped }) => {
         totalAvailable += available;

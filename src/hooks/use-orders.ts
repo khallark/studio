@@ -12,6 +12,14 @@ import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 // HOOK - Now business-wide, not store-specific
 // ============================================================
 
+/**
+ * Check if order should be excluded from availability filters
+ */
+function shouldSkipOrder(order: Order): boolean {
+  // Skip Shopify-cancelled orders
+  return !!order?.raw?.cancelled_at;
+}
+
 export function useOrders(
     businessId: string | null,
     stores: string[], // All stores in the business
@@ -293,11 +301,14 @@ export function useOrders(
 
             // Availability filter (Confirmed tab only)
             if (activeTab === 'Confirmed' && filters.availabilityFilter !== 'all') {
+                // ✅ FIX: Filter out cancelled orders first
+                const nonCancelledOrders = filteredOrders.filter(order => !shouldSkipOrder(order));
+
                 if (filters.availabilityFilter === 'eligible') {
                     const availabilityChecks = await Promise.all(
-                        filteredOrders.map(async (order) => {
+                        nonCancelledOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
-                            if(order.pickupReady) return false;
+                            if (order.pickupReady) return false;
 
                             const businessProductIds: string[][] = [];
 
@@ -306,14 +317,23 @@ export function useOrders(
                                 const storeProductDoc = await getDoc(storeProductRef);
                                 const docData = storeProductDoc.data();
 
+                                // ✅ FIX: Use variantMappingDetails or variantMappings
+                                const variantMapping = docData?.variantMappingDetails?.[item.variant_id]
+                                    || docData?.variantMappings?.[item.variant_id];
+
                                 if (
                                     !storeProductDoc.exists() ||
                                     !docData ||
-                                    !docData.variantMappings[item.variant_id]
+                                    !variantMapping
                                 ) return false; // unmapped → do not treat as available
 
+                                // Extract business product SKU
+                                const businessProductSku = typeof variantMapping === 'object'
+                                    ? variantMapping.businessProductSku
+                                    : variantMapping;
+
                                 businessProductIds.push([
-                                    String(docData.variantMappings[item.variant_id]),
+                                    String(businessProductSku),
                                     item.quantity,
                                 ]);
                             }
@@ -331,7 +351,7 @@ export function useOrders(
                             return true;
                         })
                     );
-                    filteredOrders = filteredOrders.filter((_, i) => availabilityChecks[i]).map(item => {
+                    filteredOrders = nonCancelledOrders.filter((_, i) => availabilityChecks[i]).map(item => {
                         return {
                             ...item,
                             isEligibleForPickup: true
@@ -339,9 +359,9 @@ export function useOrders(
                     });
                 } else if (filters.availabilityFilter === 'not eligible') {
                     const unavailabilityChecks = await Promise.all(
-                        filteredOrders.map(async (order) => {
+                        nonCancelledOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
-                            if(order.pickupReady) return false;
+                            if (order.pickupReady) return false;
 
                             const businessProductIds: string[][] = [];
 
@@ -350,14 +370,23 @@ export function useOrders(
                                 const storeProductDoc = await getDoc(storeProductRef);
                                 const docData = storeProductDoc.data();
 
+                                // ✅ FIX: Use variantMappingDetails or variantMappings
+                                const variantMapping = docData?.variantMappingDetails?.[item.variant_id]
+                                    || docData?.variantMappings?.[item.variant_id];
+
                                 if (
                                     !storeProductDoc.exists() ||
                                     !docData ||
-                                    !docData.variantMappings[item.variant_id]
+                                    !variantMapping
                                 ) return false; // unmapped → do not treat as unavailable
 
+                                // Extract business product SKU
+                                const businessProductSku = typeof variantMapping === 'object'
+                                    ? variantMapping.businessProductSku
+                                    : variantMapping;
+
                                 businessProductIds.push([
-                                    String(docData.variantMappings[item.variant_id]),
+                                    String(businessProductSku),
                                     item.quantity,
                                 ]);
                             }
@@ -375,13 +404,13 @@ export function useOrders(
                             return false;
                         })
                     );
-                    filteredOrders = filteredOrders.filter((_, i) => unavailabilityChecks[i]);
+                    filteredOrders = nonCancelledOrders.filter((_, i) => unavailabilityChecks[i]);
                 } else if (filters.availabilityFilter === 'picked up') {
-                    const pickUpReadyCheck = filteredOrders.map(order => !!order.pickupReady);
-                    filteredOrders = filteredOrders.filter((_, i) => pickUpReadyCheck[i]);
+                    const pickUpReadyCheck = nonCancelledOrders.map(order => !!order.pickupReady);
+                    filteredOrders = nonCancelledOrders.filter((_, i) => pickUpReadyCheck[i]);
                 } else if (filters.availabilityFilter === 'unmapped') {
                     const unmappedChecks = await Promise.all(
-                        filteredOrders.map(async (order) => {
+                        nonCancelledOrders.map(async (order) => {
                             const lineItems = order.raw.line_items;
 
                             for (const item of lineItems) {
@@ -389,20 +418,24 @@ export function useOrders(
                                 const storeProductDoc = await getDoc(storeProductRef);
                                 const docData = storeProductDoc.data();
 
+                                // ✅ FIX: Use variantMappingDetails or variantMappings
+                                const variantMapping = docData?.variantMappingDetails?.[item.variant_id]
+                                    || docData?.variantMappings?.[item.variant_id];
+
                                 if (
                                     !storeProductDoc.exists() ||
                                     !docData ||
-                                    !docData.variantMappings[item.variant_id]
-                                ) return true; // unmapped → treat as umapped
+                                    !variantMapping
+                                ) return true; // unmapped → treat as unmapped
                             }
 
                             return false;
                         })
                     );
 
-                    filteredOrders = filteredOrders.filter((_, i) => unmappedChecks[i]);
+                    filteredOrders = nonCancelledOrders.filter((_, i) => unmappedChecks[i]);
                 } else if (filters.availabilityFilter === 'pending') {
-                    filteredOrders = filteredOrders.filter(
+                    filteredOrders = nonCancelledOrders.filter(
                         (order) =>
                             !order.tags_confirmed ||
                             (Array.isArray(order.tags_confirmed) &&
@@ -410,11 +443,11 @@ export function useOrders(
                             order.tags_confirmed?.includes('Pending')
                     );
                 } else if (filters.availabilityFilter === 'unavailable') {
-                    filteredOrders = filteredOrders.filter((order) =>
+                    filteredOrders = nonCancelledOrders.filter((order) =>
                         order.tags_confirmed?.includes('Unavailable')
                     );
                 } else if (filters.availabilityFilter === 'available') {
-                    filteredOrders = filteredOrders.filter((order) =>
+                    filteredOrders = nonCancelledOrders.filter((order) =>
                         order.tags_confirmed?.includes('Available')
                     );
                 }

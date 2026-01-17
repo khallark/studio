@@ -70,12 +70,14 @@ import {
     MapPin,
     Grid3X3,
     Layers,
+    Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { BulkInwardDialog } from '@/components/bulk-inward-dialog';
 import { Placement, Rack, Shelf, Warehouse, Zone } from '@/types/warehouse';
+import ExcelJS from 'exceljs';
 
 // ============================================================
 // TYPES
@@ -107,6 +109,133 @@ interface InventoryProduct extends Product {
 }
 
 type AdjustmentType = 'inward' | 'deduction';
+
+// Add this function before the main component
+async function exportInventoryToExcel(products: InventoryProduct[]) {
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Inventory', {
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }]
+    });
+
+    // Define columns with proper widths
+    worksheet.columns = [
+        { header: 'Product Name', key: 'name', width: 30 },
+        { header: 'SKU', key: 'sku', width: 15 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Opening Stock', key: 'openingStock', width: 12 },
+        { header: 'Inward Addition', key: 'inwardAddition', width: 15 },
+        { header: 'Deduction', key: 'deduction', width: 12 },
+        { header: 'Auto Addition', key: 'autoAddition', width: 12 },
+        { header: 'Auto Deduction', key: 'autoDeduction', width: 15 },
+        { header: 'Physical Stock', key: 'physicalStock', width: 15 },
+        { header: 'Blocked Stock', key: 'blockedStock', width: 13 },
+        { header: 'Available Stock', key: 'availableStock', width: 15 },
+        { header: 'Status', key: 'status', width: 12 },
+    ];
+
+    // Style the header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4F46E5' } // Indigo color
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 25;
+
+    // Add data rows
+    products.forEach(product => {
+        const inv = getInventoryValues(product.inventory);
+        const status = product.availableStock <= 0
+            ? 'Out of Stock'
+            : product.availableStock <= 10
+                ? 'Low Stock'
+                : 'In Stock';
+
+        const row = worksheet.addRow({
+            name: product.name,
+            sku: product.sku,
+            category: product.category || 'N/A',
+            openingStock: inv.openingStock,
+            inwardAddition: inv.inwardAddition,
+            deduction: inv.deduction,
+            autoAddition: inv.autoAddition,
+            autoDeduction: inv.autoDeduction,
+            physicalStock: product.physicalStock,
+            blockedStock: inv.blockedStock,
+            availableStock: product.availableStock,
+            status: status,
+        });
+
+        // Center align numeric columns
+        [4, 5, 6, 7, 8, 9, 10, 11].forEach(colNum => {
+            row.getCell(colNum).alignment = { horizontal: 'center' };
+        });
+
+        // Color code the status cell
+        const statusCell = row.getCell(12);
+        statusCell.alignment = { horizontal: 'center' };
+
+        if (status === 'Out of Stock') {
+            statusCell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFFEF2F2' } // Light red
+            };
+            statusCell.font = { color: { argb: 'FFDC2626' }, bold: true };
+        } else if (status === 'Low Stock') {
+            statusCell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFFFFBEB' } // Light amber
+            };
+            statusCell.font = { color: { argb: 'FFD97706' }, bold: true };
+        } else {
+            statusCell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF0FDF4' } // Light green
+            };
+            statusCell.font = { color: { argb: 'FF16A34A' }, bold: true };
+        }
+
+        // Highlight negative or zero physical stock
+        const physicalStockCell = row.getCell(9);
+        if (product.physicalStock <= 0) {
+            physicalStockCell.font = { color: { argb: 'FFDC2626' }, bold: true };
+        }
+    });
+
+    // Add borders to all cells
+    worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+            };
+        });
+    });
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `inventory_export_${timestamp}.xlsx`;
+
+    // Download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+}
 
 function getInventoryValues(inventory?: InventoryData): InventoryData {
     return {
@@ -1048,6 +1177,29 @@ export default function InventoryPage() {
     // HANDLERS
     // ============================================================
 
+    const handleExportInventory = async () => {
+        try {
+            toast({
+                title: 'Exporting Inventory',
+                description: 'Preparing Excel file...',
+            });
+
+            await exportInventoryToExcel(filteredProducts);
+
+            toast({
+                title: 'Export Successful',
+                description: `Exported ${filteredProducts.length} products to Excel`,
+            });
+        } catch (error) {
+            console.error('Export error:', error);
+            toast({
+                title: 'Export Failed',
+                description: 'Failed to generate Excel file',
+                variant: 'destructive',
+            });
+        }
+    };
+
     const handleSort = (field: typeof sortField) => {
         if (sortField === field) {
             setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -1112,14 +1264,20 @@ export default function InventoryPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                     <Button
                         variant="outline"
-                        asChild
+                        onClick={handleExportInventory}
+                        disabled={loading || products.length === 0}
+                        className="gap-2"
+                    >
+                        <Download className="h-4 w-4" />
+                        Export Inventory
+                    </Button>
+                    <Button
+                        variant="outline"
                         onClick={() => setBulkInwardOpen(true)}
                         className="gap-2"
                     >
-                        <span>
-                            <Package className="h-4 w-4" />
-                            Bulk Inward
-                        </span>
+                        <Package className="h-4 w-4" />
+                        Bulk Inward
                     </Button>
                     <Button
                         variant="outline"

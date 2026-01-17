@@ -114,9 +114,7 @@ type AdjustmentType = 'inward' | 'deduction';
 async function exportInventoryToExcel(products: InventoryProduct[]) {
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Inventory', {
-        views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }]
-    });
+    const worksheet = workbook.addWorksheet('Inventory');
 
     // Define columns with proper widths
     worksheet.columns = [
@@ -136,13 +134,16 @@ async function exportInventoryToExcel(products: InventoryProduct[]) {
 
     // Style the header row
     const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4F46E5' } // Indigo color
-    };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    for (let i = 1; i <= 12; i++) {
+        const cell = headerRow.getCell(i);
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4F46E5' }, // Indigo
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
     headerRow.height = 25;
 
     // Add data rows

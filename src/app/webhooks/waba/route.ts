@@ -40,38 +40,34 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         console.log('📥 Webhook received');
 
-        // Handle incoming messages (button clicks, text messages, etc.)
+        // Handle incoming messages - process ONCE and route by type
         if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
-            console.log('📨 Processing button clicks...');
-            // Fire and forget - don't await, let it run in background
+            const messages = body.entry[0].changes[0].value.messages;
+            console.log(`📨 Processing ${messages.length} messages...`);
+
             try {
-                await handleButtonClicks(body.entry[0].changes[0].value.messages)
-                console.log('✅ Button clicks handled')
+                // Process each message based on type
+                for (const message of messages) {
+                    if (message.type === 'button') {
+                        await handleButtonClicks([message]);
+                    } else if (message.type === 'text') {
+                        await handleTextMessages([message]);
+                    }
+                }
+                console.log('✅ Messages handled')
             } catch (error) {
-                console.error('❌ Button click error:', error);
+                console.error('❌ Message processing error:', error);
             }
         }
 
         // Handle status updates with batching
         if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
             console.log('📊 Processing status updates...');
-            // Fire and forget - don't await, let it run in background
             try {
                 await handleStatusUpdates(body.entry[0].changes[0].value.statuses)
                 console.log('✅ Status updates handled')
             } catch (error) {
                 console.error('❌ Status update error:', error);
-            }
-        }
-
-        // ✅ ADD THIS NEW BLOCK HERE
-        if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
-            console.log('💬 Processing text messages...');
-            try {
-                await handleTextMessages(body.entry[0].changes[0].value.messages)
-                console.log('✅ Text messages handled')
-            } catch (error) {
-                console.error('❌ Text message error:', error);
             }
         }
 

@@ -59,11 +59,11 @@ async function logWebhookToCentralCollection(
 
 function normalizePhoneNumber(phoneNumber: string): string {
   // Remove all whitespace characters from the phone number
-  const cleanedNumber = phoneNumber.replace(/\s/g, "");
+  const cleanedNumber = String(phoneNumber)?.replace(/\s/g, "");
   // Check if the cleaned number length is >= 10
-  if (cleanedNumber.length >= 10) {
+  if (String(cleanedNumber)?.length >= 10) {
     // Extract the last 10 digits
-    return cleanedNumber.slice(-10);
+    return String(cleanedNumber)?.slice(-10);
   } else {
     // Return the whole string if length is less than 10
     return cleanedNumber;

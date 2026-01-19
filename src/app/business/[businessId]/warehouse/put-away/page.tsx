@@ -250,6 +250,172 @@ function usePutAwayBatch(businessId: string | null, user: User | null | undefine
 // LOCATION SELECTOR DIALOG
 // ============================================================
 
+function useWarehouseHierarchy(
+    open: boolean,
+    businessId: string,
+    user: User | null | undefined
+) {
+    const [warehouses, setWarehouses] = React.useState<Warehouse[]>([]);
+    const [zones, setZones] = React.useState<Zone[]>([]);
+    const [racks, setRacks] = React.useState<Rack[]>([]);
+    const [shelves, setShelves] = React.useState<Shelf[]>([]);
+
+    const [selectedWarehouse, setSelectedWarehouse] = React.useState('');
+    const [selectedZone, setSelectedZone] = React.useState('');
+    const [selectedRack, setSelectedRack] = React.useState('');
+    const [selectedShelf, setSelectedShelf] = React.useState('');
+
+    const [isLoadingWarehouses, setIsLoadingWarehouses] = React.useState(false);
+    const [isLoadingZones, setIsLoadingZones] = React.useState(false);
+    const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
+    const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
+
+    // ─────────────────────────────────────────────
+    // Fetch Warehouses
+    // ─────────────────────────────────────────────
+    React.useEffect(() => {
+        if (!open) return;
+
+        const fetchWarehouses = async () => {
+            setIsLoadingWarehouses(true);
+
+            const idToken = await user?.getIdToken();
+
+            const res = await fetch(
+                `/api/business/warehouse/list-warehouses?businessId=${businessId}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+
+            const data = await res.json();
+            setWarehouses(data.warehouses || []);
+            setIsLoadingWarehouses(false);
+        };
+
+        fetchWarehouses();
+    }, [open, businessId, user]);
+
+    // Reset children when warehouse changes
+    React.useEffect(() => {
+        setSelectedZone('');
+        setSelectedRack('');
+        setSelectedShelf('');
+        setZones([]);
+        setRacks([]);
+        setShelves([]);
+    }, [selectedWarehouse]);
+
+    // ─────────────────────────────────────────────
+    // Fetch Zones
+    // ─────────────────────────────────────────────
+    React.useEffect(() => {
+        if (!selectedWarehouse) return;
+
+        const fetchZones = async () => {
+            setIsLoadingZones(true);
+
+            const idToken = await user?.getIdToken();
+
+            const res = await fetch(
+                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${selectedWarehouse}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+
+            const data = await res.json();
+            setZones(data.zones || []);
+            setIsLoadingZones(false);
+        };
+
+        fetchZones();
+    }, [selectedWarehouse, businessId, user]);
+
+    // Reset racks & shelves when zone changes
+    React.useEffect(() => {
+        setSelectedRack('');
+        setSelectedShelf('');
+        setRacks([]);
+        setShelves([]);
+    }, [selectedZone]);
+
+    // ─────────────────────────────────────────────
+    // Fetch Racks
+    // ─────────────────────────────────────────────
+    React.useEffect(() => {
+        if (!selectedZone) return;
+
+        const fetchRacks = async () => {
+            setIsLoadingRacks(true);
+
+            const idToken = await user?.getIdToken();
+
+            const res = await fetch(
+                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${selectedZone}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+
+            const data = await res.json();
+            setRacks(data.racks || []);
+            setIsLoadingRacks(false);
+        };
+
+        fetchRacks();
+    }, [selectedZone, businessId, user]);
+
+    // Reset shelves when rack changes
+    React.useEffect(() => {
+        setSelectedShelf('');
+        setShelves([]);
+    }, [selectedRack]);
+
+    // ─────────────────────────────────────────────
+    // Fetch Shelves
+    // ─────────────────────────────────────────────
+    React.useEffect(() => {
+        if (!selectedRack) return;
+
+        const fetchShelves = async () => {
+            setIsLoadingShelves(true);
+
+            const idToken = await user?.getIdToken();
+
+            const res = await fetch(
+                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${selectedRack}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+
+            const data = await res.json();
+            setShelves(data.shelves || []);
+            setIsLoadingShelves(false);
+        };
+
+        fetchShelves();
+    }, [selectedRack, businessId, user]);
+
+    return {
+        warehouses,
+        zones,
+        racks,
+        shelves,
+
+        selectedWarehouse,
+        setSelectedWarehouse,
+
+        selectedZone,
+        setSelectedZone,
+
+        selectedRack,
+        setSelectedRack,
+
+        selectedShelf,
+        setSelectedShelf,
+
+        isLoadingWarehouses,
+        isLoadingZones,
+        isLoadingRacks,
+        isLoadingShelves,
+    };
+}
+
+
 function LocationSelectorDialog({
     open,
     onOpenChange,
@@ -270,86 +436,47 @@ function LocationSelectorDialog({
     businessId: string;
     user: User | null | undefined;
 }) {
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [racks, setRacks] = useState<Rack[]>([]);
-    const [shelves, setShelves] = useState<Shelf[]>([]);
 
-    const [selectedWarehouse, setSelectedWarehouse] = useState('');
-    const [selectedZone, setSelectedZone] = useState('');
-    const [selectedRack, setSelectedRack] = useState('');
-    const [selectedShelf, setSelectedShelf] = useState('');
+    const {
+        warehouses,
+        zones,
+        racks,
+        shelves,
 
-    const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
-    const [isLoadingZones, setIsLoadingZones] = useState(false);
-    const [isLoadingRacks, setIsLoadingRacks] = useState(false);
-    const [isLoadingShelves, setIsLoadingShelves] = useState(false);
+        selectedWarehouse,
+        setSelectedWarehouse,
 
-    // Fetch warehouses
-    React.useEffect(() => {
-        if (open) {
-            setIsLoadingWarehouses(true);
-            fetch(`/api/business/warehouse/list-warehouses?businessId=${businessId}`, {
-                headers: { Authorization: `Bearer mock-token` },
-            })
-                .then(res => res.json())
-                .then(data => setWarehouses(data.warehouses || []))
-                .finally(() => setIsLoadingWarehouses(false));
-        }
-    }, [open, businessId]);
+        selectedZone,
+        setSelectedZone,
 
-    // Fetch zones when warehouse selected
-    React.useEffect(() => {
-        if (selectedWarehouse) {
-            setIsLoadingZones(true);
-            fetch(`/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${selectedWarehouse}`, {
-                headers: { Authorization: `Bearer mock-token` },
-            })
-                .then(res => res.json())
-                .then(data => setZones(data.zones || []))
-                .finally(() => setIsLoadingZones(false));
-        }
-    }, [selectedWarehouse, businessId]);
+        selectedRack,
+        setSelectedRack,
 
-    // Fetch racks when zone selected
-    React.useEffect(() => {
-        if (selectedZone) {
-            setIsLoadingRacks(true);
-            fetch(`/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${selectedZone}`, {
-                headers: { Authorization: `Bearer mock-token` },
-            })
-                .then(res => res.json())
-                .then(data => setRacks(data.racks || []))
-                .finally(() => setIsLoadingRacks(false));
-        }
-    }, [selectedZone, businessId]);
+        selectedShelf,
+        setSelectedShelf,
 
-    // Fetch shelves when rack selected
-    React.useEffect(() => {
-        if (selectedRack) {
-            setIsLoadingShelves(true);
-            fetch(`/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${selectedRack}`, {
-                headers: { Authorization: `Bearer mock-token` },
-            })
-                .then(res => res.json())
-                .then(data => setShelves(data.shelves || []))
-                .finally(() => setIsLoadingShelves(false));
-        }
-    }, [selectedRack, businessId]);
+        isLoadingWarehouses,
+        isLoadingZones,
+        isLoadingRacks,
+        isLoadingShelves,
+    } = useWarehouseHierarchy(open, businessId, user);
 
     const handleConfirm = () => {
-        if (selectedWarehouse && selectedZone && selectedRack && selectedShelf) {
-            onConfirm({
-                warehouseId: selectedWarehouse,
-                zoneId: selectedZone,
-                rackId: selectedRack,
-                shelfId: selectedShelf,
-            });
-            onOpenChange(false);
-        }
+        onConfirm({
+            warehouseId: selectedWarehouse,
+            zoneId: selectedZone,
+            rackId: selectedRack,
+            shelfId: selectedShelf,
+        });
+
+        onOpenChange(false);
     };
 
-    const canConfirm = selectedWarehouse && selectedZone && selectedRack && selectedShelf;
+    const canConfirm =
+        selectedWarehouse &&
+        selectedZone &&
+        selectedRack &&
+        selectedShelf;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -361,21 +488,31 @@ function LocationSelectorDialog({
                         </div>
                         Select Put Away Location
                     </DialogTitle>
+
                     <DialogDescription>
                         Choose the warehouse location for {selectedUPCs.length} UPC(s)
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
+
+                    {/* WAREHOUSE */}
                     <div className="space-y-2">
                         <Label>Warehouse</Label>
-                        <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+
+                        <Select
+                            value={selectedWarehouse}
+                            onValueChange={setSelectedWarehouse}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select warehouse" />
                             </SelectTrigger>
+
                             <SelectContent>
                                 {isLoadingWarehouses ? (
-                                    <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                    <div className="p-2 text-center text-sm text-muted-foreground">
+                                        Loading...
+                                    </div>
                                 ) : (
                                     warehouses.map(w => (
                                         <SelectItem key={w.id} value={w.id}>
@@ -387,8 +524,10 @@ function LocationSelectorDialog({
                         </Select>
                     </div>
 
+                    {/* ZONE */}
                     <div className="space-y-2">
                         <Label>Zone</Label>
+
                         <Select
                             value={selectedZone}
                             onValueChange={setSelectedZone}
@@ -397,9 +536,12 @@ function LocationSelectorDialog({
                             <SelectTrigger>
                                 <SelectValue placeholder="Select zone" />
                             </SelectTrigger>
+
                             <SelectContent>
                                 {isLoadingZones ? (
-                                    <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                    <div className="p-2 text-center text-sm text-muted-foreground">
+                                        Loading...
+                                    </div>
                                 ) : (
                                     zones.map(z => (
                                         <SelectItem key={z.id} value={z.id}>
@@ -411,8 +553,10 @@ function LocationSelectorDialog({
                         </Select>
                     </div>
 
+                    {/* RACK */}
                     <div className="space-y-2">
                         <Label>Rack</Label>
+
                         <Select
                             value={selectedRack}
                             onValueChange={setSelectedRack}
@@ -421,9 +565,12 @@ function LocationSelectorDialog({
                             <SelectTrigger>
                                 <SelectValue placeholder="Select rack" />
                             </SelectTrigger>
+
                             <SelectContent>
                                 {isLoadingRacks ? (
-                                    <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                    <div className="p-2 text-center text-sm text-muted-foreground">
+                                        Loading...
+                                    </div>
                                 ) : (
                                     racks.map(r => (
                                         <SelectItem key={r.id} value={r.id}>
@@ -435,8 +582,10 @@ function LocationSelectorDialog({
                         </Select>
                     </div>
 
+                    {/* SHELF */}
                     <div className="space-y-2">
                         <Label>Shelf</Label>
+
                         <Select
                             value={selectedShelf}
                             onValueChange={setSelectedShelf}
@@ -445,9 +594,12 @@ function LocationSelectorDialog({
                             <SelectTrigger>
                                 <SelectValue placeholder="Select shelf" />
                             </SelectTrigger>
+
                             <SelectContent>
                                 {isLoadingShelves ? (
-                                    <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                    <div className="p-2 text-center text-sm text-muted-foreground">
+                                        Loading...
+                                    </div>
                                 ) : (
                                     shelves.map(s => (
                                         <SelectItem key={s.id} value={s.id}>
@@ -458,21 +610,25 @@ function LocationSelectorDialog({
                             </SelectContent>
                         </Select>
                     </div>
+
                 </div>
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
+
                     <Button onClick={handleConfirm} disabled={!canConfirm}>
                         <Check className="h-4 w-4 mr-2" />
                         Confirm Location
                     </Button>
                 </DialogFooter>
+
             </DialogContent>
         </Dialog>
     );
 }
+
 
 // ============================================================
 // UPC GROUP CARD

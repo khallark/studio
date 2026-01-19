@@ -177,7 +177,7 @@ export function useOrders(
                 }
 
                 // Sorting - always by time for business-wide view
-                if (activeTab === 'RTO Delivered') {
+                if (activeTab === 'RTO Delivered' || activeTab === "RTO Closed") {
                     q = query(q, orderBy('lastStatusUpdate', 'desc'));
                 } else {
                     q = query(q, orderBy('createdAt', 'desc')); // Time-wise sorting

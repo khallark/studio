@@ -26,6 +26,7 @@ import {
   Warehouse,
   Logs,
   ListCollapse,
+  Truck,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -691,6 +692,12 @@ export default function BusinessLayout({
                     icon={Logs}
                     label="Activity Logs"
                     isActive={pathname === `/business/${businessId}/warehouse/logs`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/put-away`}
+                    icon={Truck}
+                    label="Put Away"
+                    isActive={pathname === `/business/${businessId}/warehouse/put-away`}
                   />
                 </NavSection>
               </SidebarMenuItem>

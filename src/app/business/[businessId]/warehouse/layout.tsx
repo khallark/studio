@@ -18,6 +18,7 @@ import {
     History,
     Package,
     Settings,
+    Truck,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -199,6 +200,12 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/logs`,
             icon: History,
             description: 'All activity logs',
+        },
+        {
+            label: 'Put Away',
+            href: `/business/${businessId}/warehouse/put-away`,
+            icon: Truck,
+            description: 'Process put away UPCs',
         },
     ];
 

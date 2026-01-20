@@ -102,6 +102,8 @@ export async function POST(request: NextRequest) {
                 putAway: 'none',
                 updatedAt: Timestamp.now(),
                 updatedBy: userId,
+                orderId: null,
+                storeId: null,
             };
             batch.update(upcDoc.ref, updateUpcData);
         }

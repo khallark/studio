@@ -693,12 +693,12 @@ export default function BusinessLayout({
                     label="Activity Logs"
                     isActive={pathname === `/business/${businessId}/warehouse/logs`}
                   />
-                  <NavItem
+                  {/* <NavItem
                     href={`/business/${businessId}/warehouse/put-away`}
                     icon={Truck}
                     label="Put Away"
                     isActive={pathname === `/business/${businessId}/warehouse/put-away`}
-                  />
+                  /> */}
                 </NavSection>
               </SidebarMenuItem>
             </SidebarMenu>

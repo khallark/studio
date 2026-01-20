@@ -201,12 +201,12 @@ export default function WarehouseLayout({
             icon: History,
             description: 'All activity logs',
         },
-        {
-            label: 'Put Away',
-            href: `/business/${businessId}/warehouse/put-away`,
-            icon: Truck,
-            description: 'Process put away UPCs',
-        },
+        // {
+        //     label: 'Put Away',
+        //     href: `/business/${businessId}/warehouse/put-away`,
+        //     icon: Truck,
+        //     description: 'Process put away UPCs',
+        // },
     ];
 
     const isActive = (href: string) => {

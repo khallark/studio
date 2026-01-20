@@ -168,7 +168,7 @@ export interface Placement {
 }
 
 // users/{businessId}/upcs/{upcId}
-export interface UPC {
+export type UPC = {
   id: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -178,7 +178,25 @@ export interface UPC {
   storeId: string | null;
   orderId: string | null;
 
-  putAway: "none" | "inbound" | "outbound" | null;
+  putAway: "none" | "outbound" | null;
+
+  productId: string;
+  warehouseId: string;
+  zoneId: string;
+  rackId: string;
+  shelfId: string;
+  placementId: string;
+} | {
+  id: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  updatedBy: string;
+
+  storeId: string | null;
+  orderId: string | null;
+
+  putAway: "inbound";
 
   productId: string;
   warehouseId: string | null;

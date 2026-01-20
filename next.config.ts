@@ -366,6 +366,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/delete-shelf/route',
       },
       {
+        source: '/api/business/warehouse/put-away-batch',
+        destination: '/api/business/warehouse/put-away-batch/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

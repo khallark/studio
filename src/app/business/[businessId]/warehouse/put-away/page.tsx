@@ -6,7 +6,6 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useBusinessContext } from '../../layout';
 import { db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
-import { UPC } from '@/types/warehouse';
 import { Order } from '@/types/order';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,10 +48,30 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // ============================================================
 // TYPES
 // ============================================================
+interface UPC {
+    id: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
+
+    storeId: string | null;
+    orderId: string | null;
+
+    putAway: "none" | "inbound" | "outbound" | null;
+
+    productId: string;
+    warehouseId: string | null;
+    zoneId: string | null;
+    rackId: string | null;
+    shelfId: string | null;
+    placementId: string | null;
+}
 
 interface GroupedUPC extends UPC {
     orderName: string;
@@ -177,7 +196,54 @@ function useGroupedInboundUPCs(
         },
         enabled: upcs.length > 0 && stores.length > 0 && !!businessId,
         staleTime: 10 * 1000,
-        refetchInterval: 60 * 1000, // Refresh every minute
+        refetchInterval: 60 * 1000,
+    });
+}
+
+// NEW: Hook to enrich outbound/dispatched UPCs with order info
+function useEnrichedUPCs(upcs: UPC[], businessId: string | null) {
+    return useQuery({
+        queryKey: ['enrichedUPCs', upcs.map(u => u.id).join(','), businessId],
+        queryFn: async () => {
+            if (upcs.length === 0) return [];
+
+            const enriched: GroupedUPC[] = [];
+
+            for (const upc of upcs) {
+                if (!upc.storeId || !upc.orderId) {
+                    enriched.push({
+                        ...upc,
+                        orderName: 'Unknown',
+                        orderStatus: 'No Order',
+                        storeName: upc.storeId || 'Unknown',
+                    });
+                    continue;
+                }
+
+                try {
+                    const orderDoc = await getDoc(doc(db, 'accounts', String(upc.storeId), 'orders', String(upc.orderId)));
+                    const orderData = orderDoc.data() as Order;
+
+                    enriched.push({
+                        ...upc,
+                        orderName: String(orderData?.name || 'Unknown'),
+                        orderStatus: String(orderData?.customStatus || 'Unknown'),
+                        storeName: String(upc.storeId),
+                    });
+                } catch (error) {
+                    enriched.push({
+                        ...upc,
+                        orderName: 'Unknown',
+                        orderStatus: 'Error',
+                        storeName: String(upc.storeId),
+                    });
+                }
+            }
+
+            return enriched;
+        },
+        enabled: upcs.length > 0 && !!businessId,
+        staleTime: 10 * 1000,
     });
 }
 
@@ -270,9 +336,7 @@ function useWarehouseHierarchy(
     const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
     const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
 
-    // ─────────────────────────────────────────────
     // Fetch Warehouses
-    // ─────────────────────────────────────────────
     React.useEffect(() => {
         if (!open) return;
 
@@ -304,9 +368,7 @@ function useWarehouseHierarchy(
         setShelves([]);
     }, [selectedWarehouse]);
 
-    // ─────────────────────────────────────────────
     // Fetch Zones
-    // ─────────────────────────────────────────────
     React.useEffect(() => {
         if (!selectedWarehouse) return;
 
@@ -336,9 +398,7 @@ function useWarehouseHierarchy(
         setShelves([]);
     }, [selectedZone]);
 
-    // ─────────────────────────────────────────────
     // Fetch Racks
-    // ─────────────────────────────────────────────
     React.useEffect(() => {
         if (!selectedZone) return;
 
@@ -366,9 +426,7 @@ function useWarehouseHierarchy(
         setShelves([]);
     }, [selectedRack]);
 
-    // ─────────────────────────────────────────────
     // Fetch Shelves
-    // ─────────────────────────────────────────────
     React.useEffect(() => {
         if (!selectedRack) return;
 
@@ -811,23 +869,28 @@ function UPCGroupCard({
 export default function PutAwayPage() {
     const { businessId, user, stores } = useBusinessContext();
     const { toast } = useToast();
+    const queryClient = useQueryClient();
     const [locationDialogOpen, setLocationDialogOpen] = useState(false);
     const [selectedUPCsForPutAway, setSelectedUPCsForPutAway] = useState<GroupedUPC[]>([]);
 
     // Data fetching
-    const { data: upcs = [], isLoading } = usePutAwayUPCs(businessId, user);
+    const { data: upcs = [], isLoading, refetch } = usePutAwayUPCs(businessId, user);
     const { data: grouped, isLoading: isLoadingGrouped } = useGroupedInboundUPCs(
         upcs,
         stores,
         businessId
     );
 
-    // Mutations
-    const putAwayMutation = usePutAwayBatch(businessId, user);
-
     // Categorize UPCs
     const outboundUPCs = upcs.filter(u => u.putAway === 'outbound');
     const dispatchedUPCs = upcs.filter(u => u.putAway === null);
+
+    // Enrich outbound and dispatched UPCs with order info
+    const { data: enrichedOutbound = [], isLoading: isLoadingOutbound } = useEnrichedUPCs(outboundUPCs, businessId);
+    const { data: enrichedDispatched = [], isLoading: isLoadingDispatched } = useEnrichedUPCs(dispatchedUPCs, businessId);
+
+    // Mutations
+    const putAwayMutation = usePutAwayBatch(businessId, user);
 
     // Stats
     const stats = [
@@ -855,6 +918,14 @@ export default function PutAwayPage() {
         });
     };
 
+    // Handle refresh - refetch all queries
+    const handleRefresh = () => {
+        queryClient.invalidateQueries({ queryKey: ['putAwayUPCs', businessId] });
+        queryClient.invalidateQueries({ queryKey: ['groupedInboundUPCs'] });
+        queryClient.invalidateQueries({ queryKey: ['enrichedUPCs'] });
+        refetch();
+    };
+
     return (
         <div className="min-h-full p-6 space-y-6">
             {/* Header */}
@@ -863,7 +934,7 @@ export default function PutAwayPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Put Away Management</h1>
                     <p className="text-muted-foreground">Process and organize returning inventory</p>
                 </div>
-                <Button variant="outline" onClick={() => window.location.reload()}>
+                <Button variant="outline" onClick={handleRefresh}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                 </Button>
@@ -967,13 +1038,13 @@ export default function PutAwayPage() {
                 </TabsContent>
 
                 <TabsContent value="outbound" className="space-y-4">
-                    {isLoading ? (
+                    {isLoadingOutbound ? (
                         <Card>
                             <CardHeader>
                                 <Skeleton className="h-8 w-48" />
                             </CardHeader>
                         </Card>
-                    ) : outboundUPCs.length > 0 ? (
+                    ) : enrichedOutbound.length > 0 ? (
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-3">
@@ -983,14 +1054,14 @@ export default function PutAwayPage() {
                                     <div>
                                         <CardTitle className="text-lg">Ready for Pickup</CardTitle>
                                         <CardDescription>
-                                            {outboundUPCs.length} UPC(s) waiting for courier
+                                            {enrichedOutbound.length} UPC(s) waiting for courier
                                         </CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="border rounded-lg divide-y max-h-[500px] overflow-auto">
-                                    {outboundUPCs.map((upc) => (
+                                    {enrichedOutbound.map((upc) => (
                                         <div
                                             key={upc.id}
                                             className="p-3 hover:bg-muted/40 transition-colors"
@@ -1002,7 +1073,28 @@ export default function PutAwayPage() {
                                                     {upc.productId}
                                                 </Badge>
                                             </div>
-                                            <p className="text-xs text-muted-foreground ml-6">
+                                            {upc.orderName && (
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground ml-6">
+                                                    <FileText className="h-3 w-3" />
+                                                    <span>{upc.orderName}</span>
+                                                    {upc.storeName && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Store className="h-3 w-3" />
+                                                            <span>{upc.storeName}</span>
+                                                        </>
+                                                    )}
+                                                    {upc.orderStatus && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Badge variant="secondary" className="text-xs h-5">
+                                                                {upc.orderStatus}
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-muted-foreground ml-6 mt-1">
                                                 Updated: {upc.updatedAt.toDate().toLocaleString()}
                                             </p>
                                         </div>
@@ -1024,13 +1116,13 @@ export default function PutAwayPage() {
                 </TabsContent>
 
                 <TabsContent value="dispatched" className="space-y-4">
-                    {isLoading ? (
+                    {isLoadingDispatched ? (
                         <Card>
                             <CardHeader>
                                 <Skeleton className="h-8 w-48" />
                             </CardHeader>
                         </Card>
-                    ) : dispatchedUPCs.length > 0 ? (
+                    ) : enrichedDispatched.length > 0 ? (
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-3">
@@ -1040,14 +1132,14 @@ export default function PutAwayPage() {
                                     <div>
                                         <CardTitle className="text-lg">Out for Delivery</CardTitle>
                                         <CardDescription>
-                                            {dispatchedUPCs.length} UPC(s) currently dispatched
+                                            {enrichedDispatched.length} UPC(s) currently dispatched
                                         </CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="border rounded-lg divide-y max-h-[500px] overflow-auto">
-                                    {dispatchedUPCs.map((upc) => (
+                                    {enrichedDispatched.map((upc) => (
                                         <div
                                             key={upc.id}
                                             className="p-3 hover:bg-muted/40 transition-colors"
@@ -1059,7 +1151,28 @@ export default function PutAwayPage() {
                                                     {upc.productId}
                                                 </Badge>
                                             </div>
-                                            <p className="text-xs text-muted-foreground ml-6">
+                                            {upc.orderName && (
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground ml-6">
+                                                    <FileText className="h-3 w-3" />
+                                                    <span>{upc.orderName}</span>
+                                                    {upc.storeName && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Store className="h-3 w-3" />
+                                                            <span>{upc.storeName}</span>
+                                                        </>
+                                                    )}
+                                                    {upc.orderStatus && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Badge variant="secondary" className="text-xs h-5">
+                                                                {upc.orderStatus}
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-muted-foreground ml-6 mt-1">
                                                 Dispatched: {upc.updatedAt.toDate().toLocaleString()}
                                             </p>
                                         </div>

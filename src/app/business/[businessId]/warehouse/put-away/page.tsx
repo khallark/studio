@@ -149,7 +149,9 @@ function useGroupedInboundUPCs(
     return useQuery({
         queryKey: ['groupedInboundUPCs', upcs.length, businessId, stores.join(',')],
         queryFn: async () => {
-            const inboundUPCs = upcs.filter(upc => upc.putAway === 'inbound');
+            const inboundUPCs = upcs
+                .filter(upc => upc.putAway === 'inbound')
+                .sort((a, b) => a.productId.localeCompare(b.productId));
 
             if (inboundUPCs.length === 0) {
                 return { rtoUPCs: [], dtoUPCs: [], unknownUPCs: [] };

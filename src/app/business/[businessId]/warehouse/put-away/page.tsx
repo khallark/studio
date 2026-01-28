@@ -187,7 +187,7 @@ function useGroupedInboundUPCs(
                     unknownUPCs.push(groupedUPC);
                 } else if (orderData.customStatus === 'RTO Processed' || orderData.customStatus === 'RTO Closed') {
                     rtoUPCs.push(groupedUPC);
-                } else if (orderData.customStatus === 'Pending Refunds') {
+                } else if (orderData.customStatus === 'Pending Refunds' || orderData.customStatus === 'DTO Refunded') {
                     dtoUPCs.push(groupedUPC);
                 } else {
                     unknownUPCs.push(groupedUPC);

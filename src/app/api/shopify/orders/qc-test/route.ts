@@ -4,6 +4,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 import { UPC } from '@/types/warehouse';
+import { Order } from '@/types/order';
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,7 +63,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const orderData = orderDoc.data();
+    const orderData = orderDoc.data() as any;
+
+    if (!orderData) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    if (orderData.customStatus && !['DTO In Transit', 'DTO Delivered'].includes(String(orderData.customStatus))) {
+      return NextResponse.json({ error: "Only 'DTO In Transit' and 'DTO Delivered' orders can be processed" }, { status: 400 });
+    }
 
     if (SHARED_STORE_IDS.includes(shop)) {
       const vendorName = businessData?.vendorName;

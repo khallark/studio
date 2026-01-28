@@ -874,6 +874,7 @@ export default function BusinessOrdersPage() {
                     </>
                 );
             case 'DTO Delivered':
+            case 'DTO In Transit':
                 return <DropdownMenuItem onClick={() => { setOrderForQc(order); setIsQcDialogOpen(true); }}>Start QC</DropdownMenuItem>;
             case 'Pending Refunds':
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;

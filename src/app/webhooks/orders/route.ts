@@ -277,6 +277,7 @@ async function handleOrderWebhook(
     totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
     currency: orderData.currency,
     vendors,
+    lastStatusUpdate: FieldValue.serverTimestamp(),
     raw: orderData,
     lastWebhookTopic: topic,
     receivedAt: FieldValue.serverTimestamp(),

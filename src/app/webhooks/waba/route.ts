@@ -320,7 +320,7 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
 
             await orderDoc.ref.update({
                 customStatus: 'Confirmed',
-                confirmedAt: FieldValue.serverTimestamp(),
+                lastStatusUpdate: FieldValue.serverTimestamp(),
                 customStatusesLogs: FieldValue.arrayUnion(log),
             });
         }

@@ -6,7 +6,7 @@ import { authUserForBusiness } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
-    const { businessId, customerCode, loginId, licenceKey } = await req.json();
+    const { businessId, customerCode, loginId, licenceKey, appApiKey, appApiSecret } = await req.json();
 
     if (!businessId) {
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
           bluedart: {
             customerCode,
             loginId,
-            licenceKey
+            licenceKey,
+            appApiKey,
+            appApiSecret,
           }
         }
       },

@@ -108,6 +108,8 @@ export default function AppsSettingsPage() {
     const [blueDartCustomerCode, setBlueDartCustomerCode] = useState('');
     const [blueDartLoginId, setBlueDartLoginId] = useState('');
     const [blueDartLicenceKey, setBlueDartLicenceKey] = useState('');
+    const [blueDartAppAPIKey, setBlueDartAppAPIKey] = useState('');
+    const [blueDartAppAPISecret, setBlueDartAppAPISecret] = useState('');
     const [isEditingBlueDart, setIsEditingBlueDart] = useState(false);
     const [isSubmittingBlueDart, setIsSubmittingBlueDart] = useState(false);
 
@@ -213,7 +215,7 @@ export default function AppsSettingsPage() {
     };
 
     const handleSaveBlueDartCreds = async () => {
-        if (!businessId || !user || !blueDartCustomerCode || !blueDartLoginId || !blueDartLicenceKey) {
+        if (!businessId || !user || !blueDartCustomerCode || !blueDartLoginId || !blueDartLicenceKey || !blueDartAppAPIKey || !blueDartAppAPISecret) {
             toast({ title: "All fields are required", variant: "destructive" });
             return;
         }
@@ -232,6 +234,8 @@ export default function AppsSettingsPage() {
                     customerCode: blueDartCustomerCode,
                     loginId: blueDartLoginId,
                     licenceKey: blueDartLicenceKey,
+                    appApiKey: blueDartAppAPIKey,
+                    appApiSecret: blueDartAppAPISecret,
                 })
             });
 
@@ -745,6 +749,26 @@ export default function AppsSettingsPage() {
                                             <h4 className="font-medium">Blue Dart Credentials</h4>
                                             <div className="grid md:grid-cols-3 gap-4">
                                                 <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">App's API Key</label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="Your API key here"
+                                                        value={blueDartAppAPIKey}
+                                                        onChange={(e) => setBlueDartAppAPIKey(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">App's API Secret</label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="Your API secret here"
+                                                        value={blueDartAppAPISecret}
+                                                        onChange={(e) => setBlueDartAppAPISecret(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1.5">
                                                     <label className="text-sm font-medium">Customer Code</label>
                                                     <Input
                                                         type="text"
@@ -783,6 +807,8 @@ export default function AppsSettingsPage() {
                                                         setBlueDartCustomerCode('');
                                                         setBlueDartLoginId('');
                                                         setBlueDartLicenceKey('');
+                                                        setBlueDartAppAPIKey('');
+                                                        setBlueDartAppAPISecret('');
                                                     }}
                                                     disabled={isSubmittingBlueDart}
                                                 >

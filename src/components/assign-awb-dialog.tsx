@@ -46,6 +46,7 @@ interface CourierIntegrations {
   delhivery?: { apiKey: string; };
   shiprocket?: { email: string; apiKey: string; };
   xpressbees?: { email: string; apiKey: string; };
+  bluedart?: { customerCode: string; loginId: string; licenceKey: string; }; // Added Blue Dart
   priorityEnabled?: boolean;
   priorityList?: string[];
 }
@@ -83,6 +84,7 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
             if (integrations.delhivery) courierOptions.push('Delhivery');
             if (integrations.shiprocket) courierOptions.push('Shiprocket');
             if (integrations.xpressbees) courierOptions.push('Xpressbees');
+            if (integrations.bluedart) courierOptions.push('Blue Dart'); // Added Blue Dart
           }
 
           setAvailableCouriers(courierOptions);
@@ -155,7 +157,8 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
       toast({ title: "Selection Required", description: "Please select a warehouse.", variant: "destructive" });
       return;
     }
-    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && !selectedMode) {
+    // Updated: Blue Dart also requires shipping mode selection
+    if ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees' || selectedCourier === 'Blue Dart') && !selectedMode) {
       toast({ title: "Selection Required", description: "Please select a shipping mode.", variant: "destructive" });
       return;
     }
@@ -216,6 +219,7 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
           </div>
         );
       case 3:
+        // Updated: Skip shipping mode for Shiprocket and Priority only
         if (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') return null;
         return (
           <div className="space-y-4">
@@ -235,7 +239,13 @@ export function AssignAwbDialog({ businessId, isOpen, onClose, orders, onConfirm
     }
   };
 
-  const isFinalStep = ((selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees') && step === 3) || ((selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 2);
+  // Updated: Blue Dart requires shipping mode, so it follows the 3-step flow like Delhivery/Xpressbees
+  const isFinalStep = (
+    (selectedCourier === 'Delhivery' || selectedCourier === 'Xpressbees' || selectedCourier === 'Blue Dart') && step === 3
+  ) || (
+      (selectedCourier === 'Shiprocket' || selectedCourier === 'Priority') && step === 2
+    );
+
   const canProceed = availableCouriers.length > 0 && availableWarehouses.length > 0;
 
 

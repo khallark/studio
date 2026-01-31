@@ -48,6 +48,7 @@ interface CourierSetting {
 }
 
 interface CourierIntegrations {
+    bluedart?: { customerCode: string; loginId: string; licenceKey: string; };
     delhivery?: { apiKey: string; };
     shiprocket?: { email: string; apiKey: string; };
     xpressbees?: { email: string; apiKey: string; };
@@ -104,6 +105,12 @@ export default function AppsSettingsPage() {
     const [isEditingXpressbees, setIsEditingXpressbees] = useState(false);
     const [isSubmittingXpressbees, setIsSubmittingXpressbees] = useState(false);
 
+    const [blueDartCustomerCode, setBlueDartCustomerCode] = useState('');
+    const [blueDartLoginId, setBlueDartLoginId] = useState('');
+    const [blueDartLicenceKey, setBlueDartLicenceKey] = useState('');
+    const [isEditingBlueDart, setIsEditingBlueDart] = useState(false);
+    const [isSubmittingBlueDart, setIsSubmittingBlueDart] = useState(false);
+
     const [courierPriorityEnabled, setCourierPriorityEnabled] = useState(false);
     const [courierPriorityList, setCourierPriorityList] = useState<CourierSetting[]>([]);
     const [isSubmittingPriority, setIsSubmittingPriority] = useState(false);
@@ -130,6 +137,9 @@ export default function AppsSettingsPage() {
                 const couriers = data.integrations?.couriers;
 
                 setDelhiveryApiKey(couriers?.delhivery?.apiKey || '');
+                setBlueDartCustomerCode(couriers?.bluedart?.customerCode || '');
+                setBlueDartLoginId(couriers?.bluedart?.loginId || '');
+                setBlueDartLicenceKey(couriers?.bluedart?.licenceKey || '');
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
                 const mergedList = mergePriorityList(couriers?.priorityList, couriers);
                 setCourierPriorityList(mergedList);
@@ -200,6 +210,51 @@ export default function AppsSettingsPage() {
         );
         setCourierPriorityList(newList);
         updatePrioritySettings(courierPriorityEnabled, newList);
+    };
+
+    const handleSaveBlueDartCreds = async () => {
+        if (!businessId || !user || !blueDartCustomerCode || !blueDartLoginId || !blueDartLicenceKey) {
+            toast({ title: "All fields are required", variant: "destructive" });
+            return;
+        }
+
+        setIsSubmittingBlueDart(true);
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/integrations/bluedart/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    businessId,
+                    customerCode: blueDartCustomerCode,
+                    loginId: blueDartLoginId,
+                    licenceKey: blueDartLicenceKey,
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || 'Failed to connect to Blue Dart');
+
+            toast({
+                title: 'Blue Dart Connected',
+                description: 'Blue Dart integration has been successfully set up.'
+            });
+            setIsEditingBlueDart(false);
+            setBlueDartCustomerCode('');
+            setBlueDartLoginId('');
+            setBlueDartLicenceKey('');
+        } catch (error) {
+            toast({
+                title: 'Connection Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: "destructive"
+            });
+        } finally {
+            setIsSubmittingBlueDart(false);
+        }
     };
 
     const handleSaveDelhiveryKey = async () => {
@@ -309,6 +364,7 @@ export default function AppsSettingsPage() {
     };
 
     // const isReadOnly = memberRole === 'Staff';
+    const hasBlueDartCreds = !!settingsData?.integrations?.couriers?.bluedart?.customerCode;
     const hasDelhiveryKey = !!settingsData?.integrations?.couriers?.delhivery?.apiKey;
     const hasShiprocketCreds = !!settingsData?.integrations?.couriers?.shiprocket?.apiKey;
     const hasXpressbeesCreds = !!settingsData?.integrations?.couriers?.xpressbees?.apiKey;
@@ -337,7 +393,7 @@ export default function AppsSettingsPage() {
 
     if (!isAuthorized) {
         return null;
-    }    
+    }
 
     return (
         <TooltipProvider>
@@ -393,7 +449,7 @@ export default function AppsSettingsPage() {
                                                         <Select
                                                             value={courier.mode}
                                                             onValueChange={(value: 'Surface' | 'Express') => handlePriorityModeChange(courier.name, value)}
-                                                            // disabled={isReadOnly}
+                                                        // disabled={isReadOnly}
                                                         >
                                                             <SelectTrigger className="w-[120px] h-8">
                                                                 <SelectValue />
@@ -635,6 +691,105 @@ export default function AppsSettingsPage() {
                                                 </Button>
                                                 <Button onClick={handleSaveXpressbeesCreds} disabled={isSubmittingXpressbees}>
                                                     {isSubmittingXpressbees ? 'Connecting...' : 'Save & Connect'}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+
+                                {/* Blue Dart */}
+                                <div className="border-t p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div>
+                                            <h3 className="text-xl font-semibold">Blue Dart</h3>
+                                            <p className="text-sm text-muted-foreground">Integrate with your Blue Dart account.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        {hasBlueDartCreds && !isEditingBlueDart ? (
+                                            <>
+                                                <Badge variant="default">Connected</Badge>
+                                                <Button variant="outline" onClick={() => setIsEditingBlueDart(true)}>Change Credentials</Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="destructive" size="icon" disabled={deletingCourier === 'bluedart'}>
+                                                            {deletingCourier === 'bluedart' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This will disconnect your Blue Dart integration and remove it from your priority list. This action cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleRemoveCourier('bluedart')}>Remove</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </>
+                                        ) : (
+                                            <Button variant="outline" onClick={() => setIsEditingBlueDart(true)}>
+                                                Connect
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {isEditingBlueDart && (
+                                    <div className="border-t bg-muted/50 p-6">
+                                        <div className="space-y-4">
+                                            <h4 className="font-medium">Blue Dart Credentials</h4>
+                                            <div className="grid md:grid-cols-3 gap-4">
+                                                <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">Customer Code</label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="e.g., 917825"
+                                                        value={blueDartCustomerCode}
+                                                        onChange={(e) => setBlueDartCustomerCode(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">Login ID</label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="e.g., LDH91828"
+                                                        value={blueDartLoginId}
+                                                        onChange={(e) => setBlueDartLoginId(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">Licence Key</label>
+                                                    <Input
+                                                        type="password"
+                                                        placeholder="Your licence key"
+                                                        value={blueDartLicenceKey}
+                                                        onChange={(e) => setBlueDartLicenceKey(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        setIsEditingBlueDart(false);
+                                                        setBlueDartCustomerCode('');
+                                                        setBlueDartLoginId('');
+                                                        setBlueDartLicenceKey('');
+                                                    }}
+                                                    disabled={isSubmittingBlueDart}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button onClick={handleSaveBlueDartCreds} disabled={isSubmittingBlueDart}>
+                                                    {isSubmittingBlueDart ? 'Connecting...' : 'Save & Connect'}
                                                 </Button>
                                             </div>
                                         </div>

@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/bulk-update-status/route',
       },
       {
+        source: '/api/shopify/orders/export',
+        destination: '/api/shopify/orders/export/route',
+      },
+      {
         source: '/api/shopify/account/update-address',
         destination: '/api/shopify/account/update-address/route',
       },
@@ -66,8 +70,8 @@ const nextConfig: NextConfig = {
         destination: '/api/integrations/courier/update/route',
       },
       {
-        source: '/api/shopify/orders/export',
-        destination: '/api/shopify/orders/export/route',
+        source: "/api/integrations/bluedart/update",
+        destination: "/api/integrations/bluedart/update/route",
       },
       {
         source: '/api/integrations/shiprocket/update',

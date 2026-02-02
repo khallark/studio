@@ -107,6 +107,18 @@ function generateSlipHTML(
       <!-- AWB Section -->
       <div class="awb-section">
         <div class="awb-label">AWB# ${escapeHtml(awbNumber)}</div>
+
+        ${
+          String(order?.courierProvider || '') === 'Blue Dart'
+            ? `
+              <div style="margin-top:6px; font-size:16px; font-weight:700;">
+                DEST: ${escapeHtml(order.bdDestinationArea || '')}
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                CLUSTER: ${escapeHtml(order.bdClusterCode || '')}
+              </div>
+            `
+            : ''
+        }
       </div>
       
       <!-- Barcode -->

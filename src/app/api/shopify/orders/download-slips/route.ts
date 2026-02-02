@@ -50,6 +50,14 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function maskPhoneForBlueDart(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.length < 4) return 'XXXX';
+
+  return `${digits[0]}XXXXX${digits.slice(-3)}`;
+}
+
 function generateSlipHTML(
   order: any,
   sellerDetails: { name: string; gst: string; returnAddress: string }
@@ -107,18 +115,6 @@ function generateSlipHTML(
       <!-- AWB Section -->
       <div class="awb-section">
         <div class="awb-label">AWB# ${escapeHtml(awbNumber)}</div>
-
-        ${
-          String(order?.courierProvider || '') === 'Blue Dart'
-            ? `
-              <div style="margin-top:6px; font-size:16px; font-weight:900;">
-                DESTINATION: ${escapeHtml(order.bdDestinationArea || 'NIL')}
-                &nbsp;|&nbsp;
-                CLUSTER: ${escapeHtml(order.bdClusterCode || 'NIL')}
-              </div>
-            `
-            : ''
-        }
       </div>
       
       <!-- Barcode -->
@@ -134,8 +130,26 @@ function generateSlipHTML(
           ${addressLine2 ? `<div class="address-line">${escapeHtml(addressLine2)}</div>` : ''}
           <div class="address-line">${escapeHtml(city)}</div>
           <div class="address-line">${escapeHtml(state)}${state && country ? ', ' : ''}${escapeHtml(country)}</div>
-          ${pincode ? `<div class="address-line pin">PIN - ${escapeHtml(pincode)}</div>` : ''}
-          ${phone ? `<div class="address-line phone">Phone: ${escapeHtml(phone)}</div>` : ''}
+          ${pincode ? `
+            <div class="address-line pin">
+              PIN - ${escapeHtml(pincode)}
+              ${String(order?.courierProvider || '') === 'Blue Dart'
+              ? ` | ${escapeHtml(order.bdDestinationArea || 'NIL')} | ${escapeHtml(order.bdClusterCode || 'NIL')}`
+              : ''
+            }
+            </div>
+          ` : ''}
+
+          ${phone ? `
+            <div class="address-line phone">
+              Phone:
+              ${
+                String(order?.courierProvider || '') === 'Blue Dart'
+                  ? escapeHtml(maskPhoneForBlueDart(phone))
+                  : escapeHtml(phone)
+              }
+            </div>
+          ` : ''}
         </div>
         <div class="payment-info">
           <div class="payment-type">${escapeHtml(paymentMethod)} - ${escapeHtml(shippingMode)}</div>

@@ -112,9 +112,9 @@ function generateSlipHTML(
           String(order?.courierProvider || '') === 'Blue Dart'
             ? `
               <div style="margin-top:6px; font-size:16px; font-weight:900;">
-                DESTINATION: <b>${escapeHtml<(order.bdDestinationArea || '')}</b>
+                DESTINATION: ${escapeHtml<(order.bdDestinationArea || '')}
                 &nbsp;|&nbsp;
-                CLUSTER: <b>${escapeHtml(order.bdClusterCode || '')}</b>
+                CLUSTER: ${escapeHtml(order.bdClusterCode || '')}
               </div>
             `
             : ''

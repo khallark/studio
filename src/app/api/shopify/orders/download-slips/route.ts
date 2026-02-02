@@ -58,6 +58,92 @@ function maskPhoneForBlueDart(phone: string): string {
   return `${digits[0]}XXXXX${digits.slice(-3)}`;
 }
 
+/* ----------------------------
+   Number to words (Indian)
+   Returns a string like:
+   "Rupees One Thousand Two Hundred Thirty Four and Fifty Six Paise Only"
+   ---------------------------- */
+function _twoDigitToWords(n: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  if (n < 20) return ones[n];
+  const ten = Math.floor(n / 10);
+  const unit = n % 10;
+  return tens[ten] + (unit ? ' ' + ones[unit] : '');
+}
+
+function _threeDigitToWords(n: number): string {
+  let out = '';
+  if (n >= 100) {
+    const h = Math.floor(n / 100);
+    out += `${_twoDigitToWords(h)} Hundred`;
+    n = n % 100;
+    if (n) out += ' ';
+  }
+  if (n > 0) {
+    out += _twoDigitToWords(n);
+  }
+  return out;
+}
+
+function integerToIndianWords(num: number): string {
+  if (num === 0) return 'Zero';
+
+  let resultParts: string[] = [];
+
+  const crore = Math.floor(num / 10000000);
+  if (crore > 0) {
+    resultParts.push(`${integerToIndianWords(crore)} Crore`);
+    num = num % 10000000;
+  }
+
+  const lakh = Math.floor(num / 100000);
+  if (lakh > 0) {
+    resultParts.push(`${_twoDigitToWords(lakh)} Lakh`);
+    num = num % 100000;
+  }
+
+  const thousand = Math.floor(num / 1000);
+  if (thousand > 0) {
+    resultParts.push(`${_twoDigitToWords(thousand)} Thousand`);
+    num = num % 1000;
+  }
+
+  if (num > 0) {
+    resultParts.push(_threeDigitToWords(num));
+  }
+
+  return resultParts.join(' ').trim();
+}
+
+function numberToRupeesWords(amount: number | string): string {
+  const n = Number(amount) || 0;
+  const abs = Math.abs(n);
+  const integerPart = Math.floor(abs);
+  const paisePart = Math.round((abs - integerPart) * 100);
+
+  const rupeesWords = integerToIndianWords(integerPart);
+  const paiseWords = paisePart ? integerToIndianWords(paisePart) : '';
+
+  const sign = n < 0 ? 'Minus ' : '';
+
+  if (integerPart === 0 && paisePart === 0) {
+    return `${sign}Rupees Zero Only`;
+  }
+
+  if (paisePart === 0) {
+    return `${sign}Rupees ${rupeesWords} Only`;
+  }
+
+  if (integerPart === 0) {
+    return `${sign}Rupees Zero and ${paiseWords} Paise Only`;
+  }
+
+  return `${sign}Rupees ${rupeesWords} and ${paiseWords} Paise Only`;
+}
+
 function generateSlipHTML(
   order: any,
   sellerDetails: { name: string; gst: string; returnAddress: string }
@@ -103,6 +189,12 @@ function generateSlipHTML(
     `;
   }).join('');
 
+  // Collectable amount (raw.total_outstanding) - ensure numeric and formatted
+  const collectableRaw = order.raw?.total_outstanding ?? order.raw?.total_due ?? 0;
+  const collectableNumber = Number(collectableRaw) || 0;
+  const collectableFormatted = collectableNumber.toFixed(2);
+  const collectableInWords = numberToRupeesWords(collectableNumber);
+
   return `
     <div class="slip">
       <!-- Header -->
@@ -134,26 +226,34 @@ function generateSlipHTML(
             <div class="address-line pin">
               PIN - ${escapeHtml(pincode)}
               ${String(order?.courierProvider || '') === 'Blue Dart'
-              ? ` | ${escapeHtml(order.bdDestinationArea || 'NIL')} | ${escapeHtml(order.bdClusterCode || 'NIL')}`
-              : ''
-            }
+        ? ` | ${escapeHtml(order.bdDestinationArea || 'NIL')} | ${escapeHtml(order.bdClusterCode || 'NIL')}`
+        : ''
+      }
             </div>
           ` : ''}
 
           ${phone ? `
             <div class="address-line phone">
               Phone:
-              ${
-                String(order?.courierProvider || '') === 'Blue Dart'
-                  ? escapeHtml(maskPhoneForBlueDart(phone))
-                  : escapeHtml(phone)
-              }
+              ${String(order?.courierProvider || '') === 'Blue Dart'
+        ? escapeHtml(maskPhoneForBlueDart(phone))
+        : escapeHtml(phone)
+      }
             </div>
           ` : ''}
         </div>
         <div class="payment-info">
-          <div class="payment-type">${escapeHtml(paymentMethod)} - ${escapeHtml(shippingMode)}</div>
-          <div class="payment-amount">INR ${escapeHtml(order.raw?.total_price || '0')}</div>
+          <div class="payment-type">${escapeHtml(paymentMethod)} - ${order.courierProvider === 'Blue Dart' ? 'Express' : escapeHtml(shippingMode)}</div>
+          <div class="payment-amount">INR ${escapeHtml(String(order.raw?.total_price ?? '0'))}</div>
+
+          <!-- COLLECTABLE AMOUNT (new) -->
+          <div class="collectable-amount" style="font-size:18px;font-weight:700;margin-top:6px;">
+            Collectable: INR ${escapeHtml(collectableFormatted)}
+          </div>
+          <div class="collectable-words" style="font-size:14px;font-weight:700;margin-top:4px;">
+            (${escapeHtml(collectableInWords)})
+          </div>
+
           <div class="date-section">
             <div class="date-label">Date</div>
             <div class="date-value">${escapeHtml(orderDate)}</div>
@@ -333,7 +433,15 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         .payment-amount {
           font-size: 22px;
           font-weight: 700;
-          margin-bottom: 20px;
+          margin-bottom: 8px;
+        }
+
+        .collectable-amount {
+          /* styling left minimal - inlined in template as well */
+        }
+
+        .collectable-words {
+          /* styling left minimal - inlined in template as well */
         }
         
         .date-section {

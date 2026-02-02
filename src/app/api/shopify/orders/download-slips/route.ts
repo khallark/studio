@@ -247,10 +247,10 @@ function generateSlipHTML(
           <div class="payment-amount">INR ${escapeHtml(String(order.raw?.total_price ?? '0'))}</div>
 
           <!-- COLLECTABLE AMOUNT (new) -->
-          <div class="collectable-amount" style="font-size:18px;font-weight:700;margin-top:6px;">
+          <div class="collectable-amount" style="font-size:20px;font-weight:900;margin-top:6px;">
             Collectable: INR ${escapeHtml(collectableFormatted)}
           </div>
-          <div class="collectable-words" style="font-size:14px;font-weight:700;margin-top:4px;">
+          <div class="collectable-words" style="font-size:17px;font-weight:900;margin-top:4px;">
             (${escapeHtml(collectableInWords)})
           </div>
 

@@ -134,7 +134,7 @@ export interface UseOrdersFilters {
     from: Date;
     to?: Date;
   };
-  courierFilter?: 'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
+  courierFilter?: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
   availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
   vendorName?: string;

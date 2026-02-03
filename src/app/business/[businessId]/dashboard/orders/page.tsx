@@ -328,7 +328,7 @@ export default function BusinessOrdersPage() {
     const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
     const [invertSearch, setInvertSearch] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-    const [courierFilter, setCourierFilter] = useState<'all' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
+    const [courierFilter, setCourierFilter] = useState<'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
 
@@ -1166,6 +1166,7 @@ export default function BusinessOrdersPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="all">All Couriers</SelectItem>
+                                                        <SelectItem value="Blue Dart">Blue Dart</SelectItem>
                                                         <SelectItem value="Delhivery">Delhivery</SelectItem>
                                                         <SelectItem value="Shiprocket">Shiprocket</SelectItem>
                                                         <SelectItem value="Xpressbees">Xpressbees</SelectItem>

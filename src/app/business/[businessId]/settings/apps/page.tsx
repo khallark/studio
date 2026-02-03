@@ -48,7 +48,7 @@ interface CourierSetting {
 }
 
 interface CourierIntegrations {
-    bluedart?: { customerCode: string; loginId: string; licenceKey: string; };
+    bluedart?: { customerCode: string; loginId: string; licenceKey: string; trackingLicenceKey: string };
     delhivery?: { apiKey: string; };
     shiprocket?: { email: string; apiKey: string; };
     xpressbees?: { email: string; apiKey: string; };
@@ -107,6 +107,7 @@ export default function AppsSettingsPage() {
 
     const [blueDartCustomerCode, setBlueDartCustomerCode] = useState('');
     const [blueDartLoginId, setBlueDartLoginId] = useState('');
+    const [blueDartTrackingLicenceKey, setBlueDartTrackingLicenceKey] = useState('');
     const [blueDartLicenceKey, setBlueDartLicenceKey] = useState('');
     const [blueDartAppAPIKey, setBlueDartAppAPIKey] = useState('');
     const [blueDartAppAPISecret, setBlueDartAppAPISecret] = useState('');
@@ -142,6 +143,7 @@ export default function AppsSettingsPage() {
                 setBlueDartCustomerCode(couriers?.bluedart?.customerCode || '');
                 setBlueDartLoginId(couriers?.bluedart?.loginId || '');
                 setBlueDartLicenceKey(couriers?.bluedart?.licenceKey || '');
+                setBlueDartTrackingLicenceKey(couriers?.bluedart?.trackingLicenceKey || '')
                 setCourierPriorityEnabled(couriers?.priorityEnabled || false);
                 const mergedList = mergePriorityList(couriers?.priorityList, couriers);
                 setCourierPriorityList(mergedList);
@@ -215,7 +217,7 @@ export default function AppsSettingsPage() {
     };
 
     const handleSaveBlueDartCreds = async () => {
-        if (!businessId || !user || !blueDartCustomerCode || !blueDartLoginId || !blueDartLicenceKey || !blueDartAppAPIKey || !blueDartAppAPISecret) {
+        if (!businessId || !user || !blueDartCustomerCode || !blueDartLoginId || !blueDartLicenceKey || !blueDartTrackingLicenceKey || !blueDartAppAPIKey || !blueDartAppAPISecret) {
             toast({ title: "All fields are required", variant: "destructive" });
             return;
         }
@@ -233,6 +235,7 @@ export default function AppsSettingsPage() {
                     businessId,
                     customerCode: blueDartCustomerCode,
                     loginId: blueDartLoginId,
+                    trackingLicenceKey: blueDartTrackingLicenceKey,
                     licenceKey: blueDartLicenceKey,
                     appApiKey: blueDartAppAPIKey,
                     appApiSecret: blueDartAppAPISecret,
@@ -250,6 +253,7 @@ export default function AppsSettingsPage() {
             setBlueDartCustomerCode('');
             setBlueDartLoginId('');
             setBlueDartLicenceKey('');
+            setBlueDartTrackingLicenceKey('');
         } catch (error) {
             toast({
                 title: 'Connection Failed',
@@ -751,7 +755,7 @@ export default function AppsSettingsPage() {
                                                 <div className="grid gap-1.5">
                                                     <label className="text-sm font-medium">App's API Key</label>
                                                     <Input
-                                                        type="text"
+                                                        type="password"
                                                         placeholder="Your API key here"
                                                         value={blueDartAppAPIKey}
                                                         onChange={(e) => setBlueDartAppAPIKey(e.target.value)}
@@ -761,7 +765,7 @@ export default function AppsSettingsPage() {
                                                 <div className="grid gap-1.5">
                                                     <label className="text-sm font-medium">App's API Secret</label>
                                                     <Input
-                                                        type="text"
+                                                        type="password"
                                                         placeholder="Your API secret here"
                                                         value={blueDartAppAPISecret}
                                                         onChange={(e) => setBlueDartAppAPISecret(e.target.value)}
@@ -789,12 +793,22 @@ export default function AppsSettingsPage() {
                                                     />
                                                 </div>
                                                 <div className="grid gap-1.5">
-                                                    <label className="text-sm font-medium">Licence Key</label>
+                                                    <label className="text-sm font-medium">Shipping Licence Key</label>
                                                     <Input
                                                         type="password"
                                                         placeholder="Your licence key"
                                                         value={blueDartLicenceKey}
                                                         onChange={(e) => setBlueDartLicenceKey(e.target.value)}
+                                                        disabled={isSubmittingBlueDart}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-1.5">
+                                                    <label className="text-sm font-medium">Tracking Licence Key</label>
+                                                    <Input
+                                                        type="password"
+                                                        placeholder="Your licence key"
+                                                        value={blueDartTrackingLicenceKey}
+                                                        onChange={(e) => setBlueDartTrackingLicenceKey(e.target.value)}
                                                         disabled={isSubmittingBlueDart}
                                                     />
                                                 </div>
@@ -807,6 +821,7 @@ export default function AppsSettingsPage() {
                                                         setBlueDartCustomerCode('');
                                                         setBlueDartLoginId('');
                                                         setBlueDartLicenceKey('');
+                                                        setBlueDartTrackingLicenceKey('');
                                                         setBlueDartAppAPIKey('');
                                                         setBlueDartAppAPISecret('');
                                                     }}

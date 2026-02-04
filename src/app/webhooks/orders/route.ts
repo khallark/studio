@@ -445,7 +445,7 @@ async function handleOrderWebhook(
                   const upcData = upcDoc.data() as UPC;
 
                   // Double-check it's the right order and status
-                  if (upcData.orderId === String(orderId) && (upcData.putAway === 'outbound' || upcData.putAway !== null)) {
+                  if (upcData.orderId === String(orderId) && upcData.putAway === 'outbound') {
                     const updatedData: Partial<UPC> = {
                       putAway: 'inbound',
                       updatedAt: Timestamp.now(),

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { buildProductData } from '@/lib/shopify/product-utils';
+import { UPC } from '@/types/warehouse';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -379,6 +380,96 @@ async function handleOrderWebhook(
         };
         updateData.customStatus = 'Cancelled';
         console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
+
+        try {
+          // Get the order data from Firestore (not webhook payload)
+          const orderSnapshot = await tx.get(orderRef);
+          const firestoreOrderData = orderSnapshot.data();
+
+          // Only process if order was marked as pickup ready
+          if (firestoreOrderData?.pickupReady === true) {
+            const lineItems = firestoreOrderData.raw?.line_items || [];
+
+            if (!Array.isArray(lineItems) || lineItems.length === 0) {
+              console.warn(`Order ${orderId} has no line items, skipping UPC inbounding`);
+            } else {
+              console.log(`Processing UPC inbounding for cancelled order ${orderId} with ${lineItems.length} line items`);
+
+              // Extract product and variant IDs
+              const productsAndVariantIds = lineItems.map((item: any) => ({
+                productId: String(item.product_id),
+                variantId: String(item.variant_id),
+              }));
+
+              let processedCount = 0;
+              let skippedCount = 0;
+
+              for (const { productId, variantId } of productsAndVariantIds) {
+                // Get store product mapping
+                const storeProductRef = db.doc(`accounts/${shopDomain}/products/${productId}`);
+                const storeProductDoc = await tx.get(storeProductRef);
+
+                if (!storeProductDoc.exists) {
+                  console.warn(`Product ${productId} not found, skipping`);
+                  skippedCount++;
+                  continue;
+                }
+
+                const productData = storeProductDoc.data() as any;
+                const variantMapping = productData?.variantMappingDetails?.[variantId];
+
+                if (!variantMapping?.businessId) {
+                  console.warn(`No business mapping found for product ${productId}, variant ${variantId}`);
+                  skippedCount++;
+                  continue;
+                }
+
+                const businessId = variantMapping.businessId;
+
+                // Query UPCs associated with this order
+                const upcQuery = db
+                  .collection(`users/${businessId}/upcs`)
+                  .where('orderId', '==', String(orderId))
+                  .where('putAway', '==', 'outbound'); // Only get outbound UPCs
+
+                const upcSnapshot = await tx.get(upcQuery);
+
+                if (upcSnapshot.empty) {
+                  console.log(`No outbound UPCs found for order ${orderId}, business ${businessId}`);
+                  skippedCount++;
+                  continue;
+                }
+
+                // Update each UPC back to inbound
+                for (const upcDoc of upcSnapshot.docs) {
+                  const upcData = upcDoc.data() as UPC;
+
+                  // Double-check it's the right order and status
+                  if (upcData.orderId === String(orderId) && (upcData.putAway === 'outbound' || upcData.putAway !== null)) {
+                    const updatedData: Partial<UPC> = {
+                      putAway: 'inbound',
+                      updatedAt: Timestamp.now(),
+                      updatedBy: businessId,
+                    };
+
+                    tx.update(upcDoc.ref, updatedData);
+                    processedCount++;
+                    console.log(`Inbounded UPC ${upcDoc.id} for cancelled order ${orderId}`);
+                  }
+                }
+              }
+
+              console.log(`UPC inbounding complete for order ${orderId}: ${processedCount} updated, ${skippedCount} skipped`);
+            }
+          } else {
+            console.log(`Order ${orderId} was not pickup ready, skipping UPC inbounding`);
+          }
+        } catch (error: any) {
+          console.error(`Error inbounding UPCs for cancelled order ${orderId}:`, error);
+          console.error(JSON.stringify(error, null, 2));
+          // Consider: throw error to fail the transaction if UPC consistency is critical
+          // throw new Error(`Failed to inbound UPCs for cancelled order: ${error.message}`);
+        }
       } else {
         log = {
           status: "Updated By Shopify",

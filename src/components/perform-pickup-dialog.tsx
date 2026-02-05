@@ -91,18 +91,42 @@ export function PerformPickupDialog({
           }
 
           const storeProductData = storeProductDoc.data();
-          const businessProductId = storeProductData?.variantMappings?.[item.variant_id];
+          
+          // Get variant mapping from either variantMappingDetails or variantMappings
+          const variantMapping = storeProductData?.variantMappingDetails?.[item.variant_id]
+            || storeProductData?.variantMappings?.[item.variant_id];
 
-          if (!businessProductId) {
+          if (!variantMapping) {
             setError(`Product variant ${item.name} not mapped to business inventory`);
             hasInsufficientStock = true;
             break;
           }
 
-          // Query UPCs for this product (FIFO - earliest created first)
+          // Extract actual businessId and businessProductSku from the mapping
+          const actualBusinessId = typeof variantMapping === 'object'
+            ? variantMapping.businessId
+            : null;
+
+          const businessProductSku = typeof variantMapping === 'object'
+            ? variantMapping.businessProductSku
+            : variantMapping;
+
+          if (!actualBusinessId) {
+            setError(`No business ID found for product variant ${item.name}`);
+            hasInsufficientStock = true;
+            break;
+          }
+
+          if (!businessProductSku) {
+            setError(`No business product SKU found for product variant ${item.name}`);
+            hasInsufficientStock = true;
+            break;
+          }
+
+          // Query UPCs for this product using the actual businessId (FIFO - earliest created first)
           const upcsQuery = query(
-            collection(db, 'users', businessId, 'upcs'),
-            where('productId', '==', String(businessProductId)),
+            collection(db, 'users', actualBusinessId, 'upcs'),
+            where('productId', '==', String(businessProductSku)),
             where('putAway', '==', 'none'),
             where('orderId', '==', null),
             orderBy('createdAt', 'asc'),
@@ -127,9 +151,9 @@ export function PerformPickupDialog({
             }[] = [];
           
           for(const upc of upcsSnapshot.docs) {
-            const rackRef = doc(db, 'users', businessId, 'racks', upc.data().rackId);
+            const rackRef = doc(db, 'users', actualBusinessId, 'racks', upc.data().rackId);
             const rackDoc = await getDoc(rackRef);
-            const shelfRef = doc(db, 'users', businessId, 'shelves', upc.data().shelfId);
+            const shelfRef = doc(db, 'users', actualBusinessId, 'shelves', upc.data().shelfId);
             const shelfDoc = await getDoc(shelfRef);
 
             assignedUpcs.push({
@@ -145,7 +169,7 @@ export function PerformPickupDialog({
               id: `${item.id}-${index}`,
               itemName: item.name,
               itemSku: item.sku || 'N/A',
-              productId: String(businessProductId),
+              productId: String(businessProductSku),
               variantId: String(item.variant_id),
               assignedUpc: assignedUpcs[index],
               isChecked: false,

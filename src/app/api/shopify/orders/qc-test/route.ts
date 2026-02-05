@@ -114,23 +114,6 @@ export async function POST(req: NextRequest) {
     if (qcPassItems.length > 0) {
       console.log(`🔄 Processing UPCs for ${qcPassItems.length} QC Pass items...`);
 
-      // Query all UPCs for this order
-      const upcsSnapshot = await db
-        .collection(`users/${businessId}/upcs`)
-        .where('orderId', '==', String(orderId))
-        .get();
-
-      // Group existing UPCs by productId
-      const existingUPCsByProduct = new Map<string, any[]>();
-      upcsSnapshot.docs.forEach(doc => {
-        const upcData = doc.data() as UPC;
-        const productId = upcData.productId;
-        if (!existingUPCsByProduct.has(productId)) {
-          existingUPCsByProduct.set(productId, []);
-        }
-        existingUPCsByProduct.get(productId)!.push({ ref: doc.ref, data: upcData });
-      });
-
       // Process each QC Pass item individually
       for (const item of qcPassItems) {
         try {
@@ -138,7 +121,7 @@ export async function POST(req: NextRequest) {
           const variantId = String(item.variant_id);
           const quantity = Number(item.quantity) || 1;
 
-          // Get product mapping
+          // Get product mapping to find actual businessId
           const storeProductDoc = await db
             .doc(`accounts/${shop}/products/${productId}`)
             .get();
@@ -157,34 +140,50 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
+          const actualBusinessId = typeof variantMapping === 'object'
+            ? variantMapping.businessId
+            : null;
+
           const businessProductSku = typeof variantMapping === 'object'
             ? variantMapping.businessProductSku
             : variantMapping;
 
-          // Check if UPCs already exist for this product
-          const existingUPCs = existingUPCsByProduct.get(businessProductSku) || [];
+          if (!actualBusinessId) {
+            console.warn(`⚠️ No businessId found in variant mapping for product ${productId} - skipping this item`);
+            continue;
+          }
 
-          if (existingUPCs.length > 0) {
+          // Query UPCs for this specific product using the actual businessId
+          const upcsSnapshot = await db
+            .collection(`users/${actualBusinessId}/upcs`)
+            .where('orderId', '==', String(orderId))
+            .where('productId', '==', businessProductSku)
+            .get();
+
+          if (!upcsSnapshot.empty) {
             // Update existing UPCs to 'inbound'
             const batch = db.batch();
             let batchCount = 0;
 
-            for (const upc of existingUPCs) {
-              if (upc.data.putAway !== 'inbound') {
+            upcsSnapshot.docs.forEach(doc => {
+              const upcData = doc.data() as UPC;
+              if (upcData.putAway !== 'inbound') {
                 const updatedData: Partial<UPC> = {
                   putAway: 'inbound',
                   updatedAt: Timestamp.now(),
                   updatedBy: result.userId!,
                 };
-                batch.update(upc.ref, updatedData);
+                batch.update(doc.ref, updatedData);
                 batchCount++;
               }
-            }
+            });
 
             if (batchCount > 0) {
               await batch.commit();
               upcUpdateCount += batchCount;
               console.log(`✅ Updated ${batchCount} UPCs to 'inbound' for product ${businessProductSku}`);
+            } else {
+              console.log(`⏭️ All UPCs already 'inbound' for product ${businessProductSku}`);
             }
           } else {
             // Create new UPCs for this item
@@ -192,7 +191,7 @@ export async function POST(req: NextRequest) {
             let createdCount = 0;
 
             for (let i = 0; i < quantity; i++) {
-              const upcRef = db.collection(`users/${businessId}/upcs`).doc();
+              const upcRef = db.collection(`users/${actualBusinessId}/upcs`).doc();
 
               const upcData: UPC = {
                 id: upcRef.id,

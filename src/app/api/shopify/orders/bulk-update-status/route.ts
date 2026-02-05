@@ -200,9 +200,61 @@ export async function POST(req: NextRequest) {
 
             for (const orderId of successfullyUpdatedOrderIds) {
                 try {
-                    // Query UPCs for this order
+                    // Get order details to find the correct businessId
+                    const orderDoc = await ordersColRef.doc(String(orderId)).get();
+                    if (!orderDoc.exists) {
+                        console.warn(`⚠️ Order ${orderId} not found, skipping UPC processing`);
+                        continue;
+                    }
+
+                    const orderData = orderDoc.data();
+                    const lineItems = orderData?.raw?.line_items || [];
+
+                    if (lineItems.length === 0) {
+                        console.warn(`⚠️ Order ${orderId} has no line items, skipping UPC processing`);
+                        ordersWithoutUPCs.push(orderId);
+                        continue;
+                    }
+
+                    // Get the first line item to determine businessId
+                    const firstItem = lineItems[0];
+                    const productId = String(firstItem.product_id);
+                    const variantId = String(firstItem.variant_id);
+
+                    // Get product mapping to find actual businessId
+                    const storeProductDoc = await db
+                        .doc(`accounts/${shop}/products/${productId}`)
+                        .get();
+
+                    if (!storeProductDoc.exists) {
+                        console.warn(`⚠️ Store product ${productId} not found for order ${orderId}`);
+                        ordersWithoutUPCs.push(orderId);
+                        continue;
+                    }
+
+                    const storeProductData = storeProductDoc.data();
+                    const variantMapping = storeProductData?.variantMappingDetails?.[variantId]
+                        || storeProductData?.variantMappings?.[variantId];
+
+                    if (!variantMapping) {
+                        console.warn(`⚠️ No mapping for variant ${variantId} in order ${orderId}`);
+                        ordersWithoutUPCs.push(orderId);
+                        continue;
+                    }
+
+                    const actualBusinessId = typeof variantMapping === 'object'
+                        ? variantMapping.businessId
+                        : null;
+
+                    if (!actualBusinessId) {
+                        console.warn(`⚠️ No businessId found in variant mapping for order ${orderId}`);
+                        ordersWithoutUPCs.push(orderId);
+                        continue;
+                    }
+
+                    // Query UPCs for this order using the actual businessId
                     const upcsSnapshot = await db
-                        .collection(`users/${businessId}/upcs`)
+                        .collection(`users/${actualBusinessId}/upcs`)
                         .where('orderId', '==', String(orderId))
                         .get();
 
@@ -294,13 +346,22 @@ export async function POST(req: NextRequest) {
                             continue;
                         }
 
+                        const actualBusinessId = typeof variantMapping === 'object'
+                            ? variantMapping.businessId
+                            : null;
+
                         const businessProductSku = typeof variantMapping === 'object'
                             ? variantMapping.businessProductSku
                             : variantMapping;
 
+                        if (!actualBusinessId) {
+                            console.warn(`⚠️ No businessId found in variant mapping for order ${orderId}`);
+                            continue;
+                        }
+
                         // Create UPCs for this line item (one per quantity)
                         for (let i = 0; i < quantity; i++) {
-                            const upcRef = db.collection(`users/${businessId}/upcs`).doc();
+                            const upcRef = db.collection(`users/${actualBusinessId}/upcs`).doc();
 
                             const upcData: UPC = {
                                 id: upcRef.id,

@@ -48,8 +48,6 @@ export async function POST(req: NextRequest) {
 
     await orderRef.update({
       customStatus: 'Confirmed',
-      pickupReady: false,
-      pickupReadyAt: FieldValue.delete(),
       awb: FieldValue.delete(),
       courier: FieldValue.delete(),
       lastUpdatedAt: FieldValue.serverTimestamp(),

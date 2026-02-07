@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
             returnAwb: order.awb_reverse ?? 'N/A',
             courier: order.courier ?? 'N/A',
             orderDate: formatDate(order.createdAt),
-            lastStatusUpdated: formatDate(order.lastStatusUpdated?.toDate()?.toString() || ''),
+            lastStatusUpdate: formatDate(order.lastStatusUpdate?.toDate()?.toString() || ''),
             customer: customerName,
             email: order.raw.customer?.email || order.raw?.contact_email || 'N/A',
             phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',

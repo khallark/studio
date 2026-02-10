@@ -107,8 +107,8 @@ async function postToDelhivery(apiKey: string, payload: any) {
 }
 
 /** Pops one AWB from accounts/{shop}/unused_awbs by deleting the first doc. */
-async function allocateAwb(shop: string): Promise<string> {
-  const coll = db.collection("accounts").doc(shop).collection("unused_awbs").limit(1);
+async function allocateAwb(businessId: string): Promise<string> {
+  const coll = db.collection("users").doc(businessId).collection("unused_awbs").limit(1);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(coll);
     if (snap.empty) throw new Error("NO_AWB_AVAILABLE");
@@ -120,10 +120,10 @@ async function allocateAwb(shop: string): Promise<string> {
 }
 
 /** Optionally push AWB back if you want strict accounting on failures. */
-async function releaseAwb(shop: string, awb: string) {
+async function releaseAwb(businessId: string, awb: string) {
   await db
-    .collection("accounts")
-    .doc(shop)
+    .collection("users")
+    .doc(businessId)
     .collection("unused_awbs")
     .doc(awb)
     .set({ status: "unused", createdAt: new Date() }, { merge: true });
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
 
     const pickupName = pickupResult.pickupName;
 
-    const awb = await allocateAwb(shop);
+    const awb = await allocateAwb(businessId);
 
     // Prefer shipping address, fallback to billing
     const addr =
@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
     const dlvResp = await postToDelhivery(delhiveryApiKey, payload);
     const respBody = await dlvResp.json();
     if (!dlvResp.ok) {
-      await releaseAwb(shop, awb)
+      await releaseAwb(businessId, awb)
       console.error(JSON.stringify(respBody))
       return NextResponse.json(
         {
@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
     const verdict = evalDelhiveryResp(respBody)
 
     if (!verdict.ok) {
-      await releaseAwb(shop, awb)
+      await releaseAwb(businessId, awb)
       return NextResponse.json(
         {
           ok: false,

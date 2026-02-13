@@ -15,7 +15,7 @@ interface QueryParams {
     order: string | null;
 }
 
-type CourierProvider = 'Delhivery' | 'Xpressbees' | 'Shiprocket';
+type CourierProvider = 'Delhivery' | 'Xpressbees' | 'Shiprocket' | 'Blue Dart';
 
 type Status = 'loading' | 'error';
 
@@ -39,7 +39,8 @@ export default function TrackingRedirect() {
         const courierMap: Record<CourierProvider, string> = {
             'Delhivery': `https://www.delhivery.com/track-v2/package/${awb}`,
             'Xpressbees': `https://www.xpressbees.com/shipment/tracking?awbNo=${awb}`,
-            'Shiprocket': `https://shiprocket.co/tracking/${awb}`
+            'Shiprocket': `https://shiprocket.co/tracking/${awb}`,
+            'Blue Dart': `https://bluedart.com/tracking?pasteThisAWB=${awb}`,
         };
 
         return courierMap[courier as CourierProvider] || null;

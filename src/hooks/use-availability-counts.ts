@@ -43,7 +43,7 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
         );
 
         if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
-          if(vendorName !== 'OWR') {
+          if (vendorName !== 'OWR') {
             q = query(q, where("vendors", "array-contains", vendorName));
           } else {
             q = query(q, where("vendors", "array-contains-any", ['OWR', 'BBB', 'Ghamand']));
@@ -102,8 +102,13 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
                 ? variantMapping.businessProductSku
                 : variantMapping;
 
+              // Extract business id
+              const mappedBusinessId = typeof variantMapping === 'object'
+                ? variantMapping.businessId
+                : variantMapping;
+
               if (
-                businessProductSku !== businessId
+                mappedBusinessId !== businessId
               ) {
                 isUnmapped = true;
                 break;

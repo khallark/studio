@@ -322,7 +322,12 @@ export function useOrders(
                                     ? variantMapping.businessProductSku
                                     : variantMapping;
 
-                                if(businessProductSku !== businessId) return false // unmapped for this business account
+                                // Extract business id
+                                const mappedBusinessId = typeof variantMapping === 'object'
+                                    ? variantMapping.businessId
+                                    : variantMapping;
+
+                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
 
                                 businessProductIds.push([
                                     String(businessProductSku),
@@ -377,7 +382,12 @@ export function useOrders(
                                     ? variantMapping.businessProductSku
                                     : variantMapping;
                                 
-                                if(businessProductSku !== businessId) return false // unmapped for this business account
+                                // Extract business id
+                                const mappedBusinessId = typeof variantMapping === 'object'
+                                    ? variantMapping.businessId
+                                    : variantMapping;
+
+                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
 
                                 businessProductIds.push([
                                     String(businessProductSku),
@@ -422,12 +432,12 @@ export function useOrders(
                                     !variantMapping
                                 ) return true; // unmapped → treat as unmapped
 
-                                // Extract business product SKU
-                                const businessProductSku = typeof variantMapping === 'object'
-                                    ? variantMapping.businessProductSku
+                                // Extract business id
+                                const mappedBusinessId = typeof variantMapping === 'object'
+                                    ? variantMapping.businessId
                                     : variantMapping;
 
-                                if(businessProductSku !== businessId) return false // unmapped for this business account
+                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
                             }
 
                             return false;

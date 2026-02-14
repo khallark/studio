@@ -102,6 +102,13 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
                 ? variantMapping.businessProductSku
                 : variantMapping;
 
+              if (
+                businessProductSku !== businessId
+              ) {
+                isUnmapped = true;
+                break;
+              }
+
               businessProductIds.push([
                 String(businessProductSku),
                 item.quantity,

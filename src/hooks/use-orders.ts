@@ -322,6 +322,8 @@ export function useOrders(
                                     ? variantMapping.businessProductSku
                                     : variantMapping;
 
+                                if(businessProductSku !== businessId) return false // unmapped for this business account
+
                                 businessProductIds.push([
                                     String(businessProductSku),
                                     item.quantity,
@@ -374,6 +376,8 @@ export function useOrders(
                                 const businessProductSku = typeof variantMapping === 'object'
                                     ? variantMapping.businessProductSku
                                     : variantMapping;
+                                
+                                if(businessProductSku !== businessId) return false // unmapped for this business account
 
                                 businessProductIds.push([
                                     String(businessProductSku),
@@ -417,6 +421,13 @@ export function useOrders(
                                     !docData ||
                                     !variantMapping
                                 ) return true; // unmapped → treat as unmapped
+
+                                // Extract business product SKU
+                                const businessProductSku = typeof variantMapping === 'object'
+                                    ? variantMapping.businessProductSku
+                                    : variantMapping;
+
+                                if(businessProductSku !== businessId) return false // unmapped for this business account
                             }
 
                             return false;

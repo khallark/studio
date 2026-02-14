@@ -201,15 +201,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch pickup location from tracking API
-    const pickupResult = await fetchPickupLocation(forwardAwb, delhiveryApiKey);
-    if (!pickupResult.ok || !pickupResult.pickupName) {
-      return NextResponse.json({
-        ok: false,
-        reason: pickupResult.error || 'Failed to fetch pickup location from tracking API'
-      }, { status: 400 });
-    }
+    // const pickupResult = await fetchPickupLocation(forwardAwb, delhiveryApiKey);
+    // if (!pickupResult.ok || !pickupResult.pickupName) {
+    //   return NextResponse.json({
+    //     ok: false,
+    //     reason: pickupResult.error || 'Failed to fetch pickup location from tracking API'
+    //   }, { status: 400 });
+    // }
 
-    const pickupName = pickupResult.pickupName;
+    // const pickupName = pickupResult.pickupName;
 
     const awb = await allocateAwb(businessId);
 
@@ -325,7 +325,7 @@ export async function POST(req: NextRequest) {
 
     const payload: any = {
       shipments: [shipment],
-      pickup_location: { name: pickupName },
+      pickup_location: { name: "Majime Productions 2" },
     };
 
     // Call Delhivery

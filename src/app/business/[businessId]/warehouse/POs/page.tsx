@@ -107,7 +107,6 @@ interface Product {
 
 interface POItemFormRow {
     sku: string;
-    productId: string;
     productName: string;
     orderedQty: number;
     unitCost: number;
@@ -214,14 +213,12 @@ function useProducts(businessId: string | null, user: User | null | undefined) {
 function ProductSearchInput({
     products,
     selectedSku,
-    selectedProductId,
     onSelect,
     existingSkus,
     disabled,
 }: {
     products: Product[];
     selectedSku: string;
-    selectedProductId: string;
     onSelect: (product: Product | null) => void;
     existingSkus: string[];
     disabled?: boolean;
@@ -282,11 +279,11 @@ function ProductSearchInput({
                     placeholder="Search SKU or name..."
                     className={cn(
                         'h-8 text-sm pl-7',
-                        selectedProductId && 'border-emerald-300 bg-emerald-50/30'
+                        selectedSku && 'border-emerald-300 bg-emerald-50/30'
                     )}
                     disabled={disabled}
                 />
-                {selectedProductId && (
+                {selectedSku && (
                     <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-500" />
                 )}
             </div>
@@ -485,7 +482,7 @@ function POFormDialog({
     const [expectedDate, setExpectedDate] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<POItemFormRow[]>([
-        { sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 },
+        { sku: '', productName: '', orderedQty: 1, unitCost: 0 },
     ]);
 
     // Reset form when dialog opens
@@ -502,7 +499,6 @@ function POFormDialog({
                 setItems(
                     editingPO.items.map(i => ({
                         sku: i.sku,
-                        productId: i.productId,
                         productName: i.productName,
                         orderedQty: i.orderedQty,
                         unitCost: i.unitCost,
@@ -516,7 +512,7 @@ function POFormDialog({
                 setCurrency('INR');
                 setExpectedDate('');
                 setNotes('');
-                setItems([{ sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+                setItems([{ sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
             }
         }
     }, [open, editingPO]);
@@ -525,12 +521,11 @@ function POFormDialog({
         setItems(prev => prev.map((item, i) => {
             if (i !== index) return item;
             if (!product) {
-                return { ...item, sku: '', productId: '', productName: '' };
+                return { ...item, sku: '', productName: '' };
             }
             return {
                 ...item,
                 sku: product.sku,
-                productId: product.id,
                 productName: product.name,
             };
         }));
@@ -541,7 +536,7 @@ function POFormDialog({
     };
 
     const addItem = () => {
-        setItems(prev => [...prev, { sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+        setItems(prev => [...prev, { sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
     };
 
     const removeItem = (index: number) => {
@@ -571,7 +566,7 @@ function POFormDialog({
         warehouseId.trim() &&
         expectedDate &&
         !hasDuplicates &&
-        items.every(i => i.sku.trim() && i.productId && i.productName && i.orderedQty > 0 && i.unitCost >= 0);
+        items.every(i => i.sku.trim() && i.productName && i.orderedQty > 0 && i.unitCost >= 0);
 
     const handleSubmit = () => {
         onSubmit({
@@ -585,7 +580,6 @@ function POFormDialog({
             notes: notes.trim() || null,
             items: items.map(i => ({
                 sku: i.sku.trim(),
-                productId: i.productId,
                 productName: i.productName,
                 orderedQty: i.orderedQty,
                 unitCost: i.unitCost,
@@ -716,7 +710,6 @@ function POFormDialog({
                                             <ProductSearchInput
                                                 products={products}
                                                 selectedSku={item.sku}
-                                                selectedProductId={item.productId}
                                                 onSelect={(product) => handleProductSelect(index, product)}
                                                 existingSkus={getExistingSkusForRow(index)}
                                             />
@@ -736,15 +729,6 @@ function POFormDialog({
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-3 pr-8">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Product ID</Label>
-                                            <Input
-                                                value={item.productId}
-                                                disabled
-                                                placeholder="Auto-filled"
-                                                className="h-8 text-sm bg-muted/50 font-mono text-xs"
-                                            />
-                                        </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Quantity <span className="text-destructive">*</span></Label>
                                             <Input

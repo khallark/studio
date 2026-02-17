@@ -307,7 +307,6 @@ export type POItemStatus = 'pending' | 'partially_received' | 'fully_received' |
 
 export interface PurchaseOrderItem {
     sku: string;
-    productId: string;
     productName: string;
     orderedQty: number;
     unitCost: number;

@@ -194,7 +194,6 @@ export async function POST(req: NextRequest) {
         if (items && Array.isArray(items) && items.length > 0) {
             const poItems: PurchaseOrderItem[] = items.map((item: any) => ({
                 sku: item.sku,
-                productId: item.productId,
                 productName: item.productName,
                 orderedQty: item.orderedQty,
                 unitCost: item.unitCost,

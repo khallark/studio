@@ -163,7 +163,6 @@ export async function POST(req: NextRequest) {
         if (items && Array.isArray(items) && items.length > 0) {
             const grnItems: GRNItem[] = items.map((item: any) => ({
                 sku: item.sku,
-                productId: item.productId,
                 productName: item.productName,
                 receivedQty: item.receivedQty,
                 acceptedQty: item.acceptedQty,

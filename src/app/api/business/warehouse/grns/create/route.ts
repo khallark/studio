@@ -49,9 +49,9 @@ export async function POST(req: NextRequest) {
         }
 
         for (const item of items) {
-            if (!item.sku || !item.productId || !item.productName) {
+            if (!item.sku || !item.productName) {
                 return NextResponse.json(
-                    { error: 'Validation Error', message: 'Each item must have sku, productId, and productName' },
+                    { error: 'Validation Error', message: 'Each item must have sku, and productName' },
                     { status: 400 }
                 );
             }
@@ -188,7 +188,6 @@ export async function POST(req: NextRequest) {
 
         const grnItems: GRNItem[] = items.map((item: any) => ({
             sku: item.sku,
-            productId: item.productId,
             productName: item.productName,
 
             receivedQty: item.receivedQty,

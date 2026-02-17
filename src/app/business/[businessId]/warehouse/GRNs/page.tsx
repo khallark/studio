@@ -38,6 +38,8 @@ import {
     ShieldCheck,
     AlertTriangle,
     Link2,
+    ArrowDownToLine,
+    MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,21 +96,48 @@ import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
 // TYPES
 // ============================================================
 
-// type GRNStatus = 'draft' | 'completed' | 'cancelled';
-// type POStatus = 'draft' | 'confirmed' | 'partially_received' | 'fully_received' | 'closed' | 'cancelled';
 type SortField = 'createdAt' | 'receivedAt' | 'totalAcceptedValue' | 'grnNumber';
 type SortOrder = 'asc' | 'desc';
 
 interface GRNItemFormRow {
     sku: string;
-    productId: string;
     productName: string;
     receivedQty: number;
     acceptedQty: number;
     rejectedQty: number;
     rejectionReason: string | null;
     unitCost: number;
-    maxQty: number; // remaining qty from PO
+    maxQty: number;
+}
+
+interface WarehouseItem {
+    id: string;
+    name: string;
+    code: string;
+}
+
+interface ZoneItem {
+    id: string;
+    name: string;
+    code: string;
+    warehouseId: string;
+}
+
+interface RackItem {
+    id: string;
+    name: string;
+    code: string;
+    zoneId: string;
+    warehouseId: string;
+}
+
+interface ShelfItem {
+    id: string;
+    name: string;
+    code: string;
+    rackId: string;
+    zoneId: string;
+    warehouseId: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -193,7 +222,6 @@ function useReceivablePOs(businessId: string | null, user: User | null | undefin
                 ...doc.data(),
             })) as PurchaseOrder[];
 
-            // Only POs that can receive goods
             return allPOs.filter(po =>
                 po.status === 'confirmed' || po.status === 'partially_received'
             );
@@ -201,6 +229,153 @@ function useReceivablePOs(businessId: string | null, user: User | null | undefin
         enabled: !!businessId && !!user,
         staleTime: 30 * 1000,
     });
+}
+
+// ============================================================
+// WAREHOUSE HIERARCHY HOOK (from put-away reference)
+// ============================================================
+
+function useWarehouseHierarchy(
+    open: boolean,
+    businessId: string,
+    user: User | null | undefined
+) {
+    const [warehouses, setWarehouses] = React.useState<WarehouseItem[]>([]);
+    const [zones, setZones] = React.useState<ZoneItem[]>([]);
+    const [racks, setRacks] = React.useState<RackItem[]>([]);
+    const [shelves, setShelves] = React.useState<ShelfItem[]>([]);
+
+    const [selectedWarehouse, setSelectedWarehouse] = React.useState('');
+    const [selectedZone, setSelectedZone] = React.useState('');
+    const [selectedRack, setSelectedRack] = React.useState('');
+    const [selectedShelf, setSelectedShelf] = React.useState('');
+
+    const [isLoadingWarehouses, setIsLoadingWarehouses] = React.useState(false);
+    const [isLoadingZones, setIsLoadingZones] = React.useState(false);
+    const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
+    const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
+
+    // Reset all when dialog closes/opens
+    React.useEffect(() => {
+        if (!open) {
+            setSelectedWarehouse('');
+            setSelectedZone('');
+            setSelectedRack('');
+            setSelectedShelf('');
+            setZones([]);
+            setRacks([]);
+            setShelves([]);
+        }
+    }, [open]);
+
+    // Fetch Warehouses
+    React.useEffect(() => {
+        if (!open || !businessId || !user) return;
+
+        const fetchWarehouses = async () => {
+            setIsLoadingWarehouses(true);
+            const idToken = await user.getIdToken();
+            const res = await fetch(
+                `/api/business/warehouse/list-warehouses?businessId=${businessId}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+            const data = await res.json();
+            setWarehouses(data.warehouses || []);
+            setIsLoadingWarehouses(false);
+        };
+
+        fetchWarehouses();
+    }, [open, businessId, user]);
+
+    // Reset children when warehouse changes
+    React.useEffect(() => {
+        setSelectedZone('');
+        setSelectedRack('');
+        setSelectedShelf('');
+        setZones([]);
+        setRacks([]);
+        setShelves([]);
+    }, [selectedWarehouse]);
+
+    // Fetch Zones
+    React.useEffect(() => {
+        if (!selectedWarehouse || !user) return;
+
+        const fetchZones = async () => {
+            setIsLoadingZones(true);
+            const idToken = await user.getIdToken();
+            const res = await fetch(
+                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${selectedWarehouse}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+            const data = await res.json();
+            setZones(data.zones || []);
+            setIsLoadingZones(false);
+        };
+
+        fetchZones();
+    }, [selectedWarehouse, businessId, user]);
+
+    // Reset racks & shelves when zone changes
+    React.useEffect(() => {
+        setSelectedRack('');
+        setSelectedShelf('');
+        setRacks([]);
+        setShelves([]);
+    }, [selectedZone]);
+
+    // Fetch Racks
+    React.useEffect(() => {
+        if (!selectedZone || !user) return;
+
+        const fetchRacks = async () => {
+            setIsLoadingRacks(true);
+            const idToken = await user.getIdToken();
+            const res = await fetch(
+                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${selectedZone}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+            const data = await res.json();
+            setRacks(data.racks || []);
+            setIsLoadingRacks(false);
+        };
+
+        fetchRacks();
+    }, [selectedZone, businessId, user]);
+
+    // Reset shelves when rack changes
+    React.useEffect(() => {
+        setSelectedShelf('');
+        setShelves([]);
+    }, [selectedRack]);
+
+    // Fetch Shelves
+    React.useEffect(() => {
+        if (!selectedRack || !user) return;
+
+        const fetchShelves = async () => {
+            setIsLoadingShelves(true);
+            const idToken = await user.getIdToken();
+            const res = await fetch(
+                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${selectedRack}`,
+                { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+            const data = await res.json();
+            setShelves(data.shelves || []);
+            setIsLoadingShelves(false);
+        };
+
+        fetchShelves();
+    }, [selectedRack, businessId, user]);
+
+    return {
+        warehouses, zones, racks, shelves,
+        selectedWarehouse, setSelectedWarehouse,
+        selectedZone, setSelectedZone,
+        selectedRack, setSelectedRack,
+        selectedShelf, setSelectedShelf,
+        isLoadingWarehouses, isLoadingZones, isLoadingRacks, isLoadingShelves,
+    };
 }
 
 // ============================================================
@@ -318,6 +493,50 @@ function useDeleteGRN(businessId: string | null, user: User | null | undefined) 
     });
 }
 
+function useBulkInward(businessId: string | null, user: User | null | undefined) {
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    return useMutation({
+        mutationFn: async (data: {
+            grnId: string;
+            items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
+            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+        }) => {
+            if (!businessId || !user) throw new Error('Invalid parameters');
+
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/business/warehouse/bulk-inward-products', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ businessId, ...data }),
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || errData.error || 'Failed to perform GRN inward');
+            }
+
+            return response.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
+            queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
+            toast({
+                title: 'GRN Performed Successfully',
+                description: `${data.items?.length || 0} product(s) inwarded from ${data.grnNumber}.`,
+            });
+        },
+        onError: (error: Error) => {
+            toast({ title: 'GRN Inward Failed', description: error.message, variant: 'destructive' });
+        },
+    });
+}
+
 // ============================================================
 // CREATE GRN DIALOG
 // ============================================================
@@ -341,7 +560,6 @@ function GRNFormDialog({
 
     const selectedPO = receivablePOs.find(po => po.id === selectedPOId) || null;
 
-    // When PO is selected, populate items from PO's unfulfilled line items
     React.useEffect(() => {
         if (selectedPO) {
             const formItems: GRNItemFormRow[] = selectedPO.items
@@ -350,7 +568,6 @@ function GRNFormDialog({
                     const remaining = item.orderedQty - item.receivedQty;
                     return {
                         sku: item.sku,
-                        productId: item.productId,
                         productName: item.productName,
                         receivedQty: remaining,
                         acceptedQty: remaining,
@@ -366,7 +583,6 @@ function GRNFormDialog({
         }
     }, [selectedPO]);
 
-    // Reset form on open
     React.useEffect(() => {
         if (open) {
             setSelectedPOId('');
@@ -378,16 +594,12 @@ function GRNFormDialog({
     const updateItem = (index: number, field: keyof GRNItemFormRow, value: any) => {
         setItems(prev => prev.map((item, i) => {
             if (i !== index) return item;
-
             const updated = { ...item, [field]: value };
-
-            // Auto-calculate rejectedQty
             if (field === 'receivedQty' || field === 'acceptedQty') {
                 const received = field === 'receivedQty' ? value : updated.receivedQty;
                 const accepted = field === 'acceptedQty' ? value : updated.acceptedQty;
                 updated.rejectedQty = Math.max(0, received - accepted);
             }
-
             return updated;
         }));
     };
@@ -401,7 +613,6 @@ function GRNFormDialog({
 
     const handleSubmit = () => {
         if (!selectedPO) return;
-
         onSubmit({
             poId: selectedPOId,
             poNumber: selectedPO.poNumber,
@@ -409,7 +620,6 @@ function GRNFormDialog({
             warehouseName: selectedPO.warehouseName || '',
             items: items.map(i => ({
                 sku: i.sku,
-                productId: i.productId,
                 productName: i.productName,
                 receivedQty: i.receivedQty,
                 acceptedQty: i.acceptedQty,
@@ -438,7 +648,6 @@ function GRNFormDialog({
                 </DialogHeader>
 
                 <div className="space-y-5 py-4">
-                    {/* PO Selection */}
                     <div className="space-y-2">
                         <Label>Purchase Order <span className="text-destructive">*</span></Label>
                         <Select value={selectedPOId} onValueChange={setSelectedPOId}>
@@ -462,7 +671,6 @@ function GRNFormDialog({
                         </Select>
                     </div>
 
-                    {/* Selected PO Info */}
                     {selectedPO && (
                         <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg text-sm">
                             <div className="flex items-center gap-2 mb-2">
@@ -476,17 +684,12 @@ function GRNFormDialog({
                         </div>
                     )}
 
-                    {/* Items */}
                     {items.length > 0 && (
                         <div className="space-y-3">
                             <Label className="text-base font-semibold">Received Items</Label>
-
                             <div className="space-y-3">
                                 {items.map((item, index) => (
-                                    <div
-                                        key={item.sku}
-                                        className="p-3 border rounded-lg space-y-3 bg-muted/20"
-                                    >
+                                    <div key={item.sku} className="p-3 border rounded-lg space-y-3 bg-muted/20">
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <p className="font-medium text-sm">{item.productName}</p>
@@ -496,7 +699,6 @@ function GRNFormDialog({
                                                 Max: {item.maxQty} remaining
                                             </Badge>
                                         </div>
-
                                         <div className="grid grid-cols-4 gap-3">
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Received Qty</Label>
@@ -521,12 +723,7 @@ function GRNFormDialog({
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Rejected Qty</Label>
-                                                <Input
-                                                    type="number"
-                                                    value={item.rejectedQty}
-                                                    disabled
-                                                    className="h-8 text-sm bg-muted"
-                                                />
+                                                <Input type="number" value={item.rejectedQty} disabled className="h-8 text-sm bg-muted" />
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Unit Cost</Label>
@@ -538,7 +735,6 @@ function GRNFormDialog({
                                                 />
                                             </div>
                                         </div>
-
                                         {item.rejectedQty > 0 && (
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Rejection Reason</Label>
@@ -550,21 +746,18 @@ function GRNFormDialog({
                                                 />
                                             </div>
                                         )}
-
                                         <div className="text-xs text-muted-foreground text-right">
                                             Accepted value: {formatCurrency(item.acceptedQty * item.unitCost)}
                                         </div>
                                     </div>
                                 ))}
                             </div>
-
                             <div className="text-right font-semibold text-sm pt-2 border-t">
                                 Total Accepted Value: {formatCurrency(totalAcceptedValue)}
                             </div>
                         </div>
                     )}
 
-                    {/* Notes */}
                     <div className="space-y-2">
                         <Label>Notes</Label>
                         <Textarea
@@ -583,6 +776,283 @@ function GRNFormDialog({
                     <Button onClick={handleSubmit} disabled={!canSubmit || isLoading}>
                         {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Create GRN
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ============================================================
+// PERFORM GRN DIALOG (Inward items to warehouse)
+// ============================================================
+
+function PerformGRNDialog({
+    open,
+    onOpenChange,
+    grn,
+    businessId,
+    user,
+    onConfirm,
+    isLoading,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    grn: GRN | null;
+    businessId: string;
+    user: User | null | undefined;
+    onConfirm: (data: {
+        grnId: string;
+        items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
+        location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+    }) => void;
+    isLoading: boolean;
+}) {
+    const {
+        warehouses, zones, racks, shelves,
+        selectedWarehouse, setSelectedWarehouse,
+        selectedZone, setSelectedZone,
+        selectedRack, setSelectedRack,
+        selectedShelf, setSelectedShelf,
+        isLoadingWarehouses, isLoadingZones, isLoadingRacks, isLoadingShelves,
+    } = useWarehouseHierarchy(open, businessId, user);
+
+    if (!grn) return null;
+
+    // Filter to items with acceptedQty > 0
+    const inwardableItems = grn.items.filter(item => item.acceptedQty > 0);
+    const totalInwardQty = inwardableItems.reduce((sum, i) => sum + i.acceptedQty, 0);
+
+    const canConfirm =
+        selectedWarehouse &&
+        selectedZone &&
+        selectedRack &&
+        selectedShelf &&
+        inwardableItems.length > 0;
+
+    const handleConfirm = () => {
+        onConfirm({
+            grnId: grn.id,
+            items: inwardableItems.map(item => ({
+                sku: item.sku,
+                productName: item.productName,
+                acceptedQty: item.acceptedQty,
+                unitCost: item.unitCost,
+            })),
+            location: {
+                warehouseId: selectedWarehouse,
+                zoneId: selectedZone,
+                rackId: selectedRack,
+                shelfId: selectedShelf,
+            },
+        });
+    };
+
+    // Build location breadcrumb text
+    const selectedWarehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
+    const selectedZoneName = zones.find(z => z.id === selectedZone)?.name;
+    const selectedRackName = racks.find(r => r.id === selectedRack)?.name;
+    const selectedShelfName = shelves.find(s => s.id === selectedShelf)?.name;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-emerald-500/10">
+                            <ArrowDownToLine className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        Perform GRN — {grn.grnNumber}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Inward accepted items into warehouse location. This will update inventory and mark the GRN as completed.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5 py-4">
+                    {/* GRN Info */}
+                    <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg text-sm">
+                        <div className="grid grid-cols-3 gap-3 text-blue-800">
+                            <div>PO: <span className="font-medium font-mono">{grn.poNumber}</span></div>
+                            <div>Warehouse: <span className="font-medium">{grn.warehouseName || grn.warehouseId}</span></div>
+                            <div>Items: <span className="font-medium">{inwardableItems.length} ({totalInwardQty} units)</span></div>
+                        </div>
+                    </div>
+
+                    {/* Items to Inward */}
+                    <div className="space-y-2">
+                        <Label className="text-base font-semibold">Items to Inward</Label>
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                        <TableHead className="text-xs">SKU</TableHead>
+                                        <TableHead className="text-xs">Product</TableHead>
+                                        <TableHead className="text-xs text-right">Accepted Qty</TableHead>
+                                        <TableHead className="text-xs text-right">Unit Cost</TableHead>
+                                        <TableHead className="text-xs text-right">Total</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {inwardableItems.map((item, idx) => (
+                                        <TableRow key={idx}>
+                                            <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                            <TableCell className="text-sm">{item.productName}</TableCell>
+                                            <TableCell className="text-right text-sm font-medium text-emerald-600">
+                                                {item.acceptedQty}
+                                            </TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                {formatCurrency(item.unitCost)}
+                                            </TableCell>
+                                            <TableCell className="text-right text-sm font-medium">
+                                                {formatCurrency(item.acceptedQty * item.unitCost)}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {grn.totalRejectedQty > 0 && (
+                            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                {grn.totalRejectedQty} unit(s) rejected — only accepted items will be inwarded.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Location Selector */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <Label className="text-base font-semibold">Inward Location</Label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Warehouse */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Warehouse <span className="text-destructive">*</span></Label>
+                                <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Select warehouse" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingWarehouses ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                        ) : warehouses.length === 0 ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">No warehouses found</div>
+                                        ) : (
+                                            warehouses.map(w => (
+                                                <SelectItem key={w.id} value={w.id}>
+                                                    {w.name} ({w.code})
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Zone */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Zone <span className="text-destructive">*</span></Label>
+                                <Select value={selectedZone} onValueChange={setSelectedZone} disabled={!selectedWarehouse}>
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Select zone" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingZones ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                        ) : zones.length === 0 ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">No zones found</div>
+                                        ) : (
+                                            zones.map(z => (
+                                                <SelectItem key={z.id} value={z.id}>
+                                                    {z.name} ({z.code})
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Rack */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Rack <span className="text-destructive">*</span></Label>
+                                <Select value={selectedRack} onValueChange={setSelectedRack} disabled={!selectedZone}>
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Select rack" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingRacks ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                        ) : racks.length === 0 ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">No racks found</div>
+                                        ) : (
+                                            racks.map(r => (
+                                                <SelectItem key={r.id} value={r.id}>
+                                                    {r.name} ({r.code})
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Shelf */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs">Shelf <span className="text-destructive">*</span></Label>
+                                <Select value={selectedShelf} onValueChange={setSelectedShelf} disabled={!selectedRack}>
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="Select shelf" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingShelves ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
+                                        ) : shelves.length === 0 ? (
+                                            <div className="p-2 text-center text-sm text-muted-foreground">No shelves found</div>
+                                        ) : (
+                                            shelves.map(s => (
+                                                <SelectItem key={s.id} value={s.id}>
+                                                    {s.name} ({s.code})
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {/* Location breadcrumb */}
+                        {canConfirm && (
+                            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
+                                <Warehouse className="h-3.5 w-3.5 shrink-0" />
+                                <span className="font-medium">{selectedWarehouseName}</span>
+                                <ChevronDown className="h-3 w-3 -rotate-90" />
+                                <span className="font-medium">{selectedZoneName}</span>
+                                <ChevronDown className="h-3 w-3 -rotate-90" />
+                                <span className="font-medium">{selectedRackName}</span>
+                                <ChevronDown className="h-3 w-3 -rotate-90" />
+                                <span className="font-medium">{selectedShelfName}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleConfirm}
+                        disabled={!canConfirm || isLoading}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                        {isLoading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <ArrowDownToLine className="h-4 w-4 mr-2" />
+                        )}
+                        Confirm Inward ({totalInwardQty} units)
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -621,7 +1091,6 @@ function GRNDetailDialog({
                 </DialogHeader>
 
                 <div className="space-y-5 py-4">
-                    {/* Info Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Linked PO</p>
@@ -651,7 +1120,6 @@ function GRNDetailDialog({
                         )}
                     </div>
 
-                    {/* Summary Stats */}
                     <div className="grid grid-cols-3 gap-3">
                         <div className="p-3 bg-blue-50 rounded-lg text-center">
                             <p className="text-xl font-bold text-blue-700">{grn.totalReceivedQty}</p>
@@ -674,7 +1142,6 @@ function GRNDetailDialog({
                         </div>
                     )}
 
-                    {/* Items Table */}
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Line Items ({grn.items.length})</h4>
                         <div className="border rounded-lg overflow-hidden">
@@ -720,7 +1187,6 @@ function GRNDetailDialog({
                         </div>
                     </div>
 
-                    {/* Put-in Locations (if any item has them) */}
                     {grn.items.some(i => i.putInLocations.length > 0) && (
                         <div className="space-y-2">
                             <h4 className="font-semibold text-sm">Storage Locations</h4>
@@ -775,6 +1241,7 @@ export default function GRNsPage() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [viewingGRN, setViewingGRN] = useState<GRN | null>(null);
     const [deletingGRN, setDeletingGRN] = useState<GRN | null>(null);
+    const [performingGRN, setPerformingGRN] = useState<GRN | null>(null);
 
     // Data
     const { data: grns = [], isLoading, refetch } = useGRNs(businessId, user);
@@ -784,6 +1251,7 @@ export default function GRNsPage() {
     const createMutation = useCreateGRN(businessId, user);
     const updateMutation = useUpdateGRN(businessId, user);
     const deleteMutation = useDeleteGRN(businessId, user);
+    const bulkInwardMutation = useBulkInward(businessId, user);
 
     // Filter + Sort + Paginate
     const filteredAndSorted = useMemo(() => {
@@ -806,16 +1274,9 @@ export default function GRNsPage() {
 
         result.sort((a, b) => {
             let aVal: any, bVal: any;
-
             switch (sortField) {
-                case 'grnNumber':
-                    aVal = a.grnNumber;
-                    bVal = b.grnNumber;
-                    break;
-                case 'totalAcceptedValue':
-                    aVal = a.totalAcceptedValue;
-                    bVal = b.totalAcceptedValue;
-                    break;
+                case 'grnNumber': aVal = a.grnNumber; bVal = b.grnNumber; break;
+                case 'totalAcceptedValue': aVal = a.totalAcceptedValue; bVal = b.totalAcceptedValue; break;
                 case 'receivedAt':
                     aVal = a.receivedAt?.toDate?.()?.getTime?.() || 0;
                     bVal = b.receivedAt?.toDate?.()?.getTime?.() || 0;
@@ -826,7 +1287,6 @@ export default function GRNsPage() {
                     bVal = b.createdAt?.toDate?.()?.getTime?.() || 0;
                     break;
             }
-
             if (typeof aVal === 'string') {
                 return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
             }
@@ -850,11 +1310,9 @@ export default function GRNsPage() {
     const stats = useMemo(() => {
         const counts: Record<GRNStatus, number> = { draft: 0, completed: 0, cancelled: 0 };
         grns.forEach(grn => { counts[grn.status] = (counts[grn.status] || 0) + 1; });
-
         const totalReceived = grns.reduce((s, g) => s + g.totalReceivedQty, 0);
         const totalAccepted = grns.reduce((s, g) => s + g.totalAcceptedQty, 0);
         const totalRejected = grns.reduce((s, g) => s + g.totalRejectedQty, 0);
-
         return { counts, totalReceived, totalAccepted, totalRejected };
     }, [grns]);
 
@@ -865,6 +1323,20 @@ export default function GRNsPage() {
 
     const handleStatusUpdate = (grn: GRN, newStatus: GRNStatus) => {
         updateMutation.mutate({ grnId: grn.id, status: newStatus });
+    };
+
+    const handlePerformGRN = (grn: GRN) => {
+        setPerformingGRN(grn);
+    };
+
+    const handlePerformGRNConfirm = (data: {
+        grnId: string;
+        items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
+        location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+    }) => {
+        bulkInwardMutation.mutate(data, {
+            onSuccess: () => setPerformingGRN(null),
+        });
     };
 
     const handleDelete = () => {
@@ -937,8 +1409,6 @@ export default function GRNsPage() {
                         </CardContent>
                     </Card>
                 ))}
-
-                {/* Aggregate stats */}
                 <Card>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
@@ -1171,10 +1641,10 @@ export default function GRNsPage() {
                                                             <>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
-                                                                    onClick={() => handleStatusUpdate(grn, 'completed')}
+                                                                    onClick={() => handlePerformGRN(grn)}
                                                                 >
-                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                                    Mark Completed
+                                                                    <ArrowDownToLine className="h-4 w-4 mr-2" />
+                                                                    Perform GRN
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
@@ -1271,6 +1741,16 @@ export default function GRNsPage() {
                 open={!!viewingGRN}
                 onOpenChange={(open) => { if (!open) setViewingGRN(null); }}
                 grn={viewingGRN}
+            />
+
+            <PerformGRNDialog
+                open={!!performingGRN}
+                onOpenChange={(open) => { if (!open) setPerformingGRN(null); }}
+                grn={performingGRN}
+                businessId={businessId || ''}
+                user={user}
+                onConfirm={handlePerformGRNConfirm}
+                isLoading={bulkInwardMutation.isPending}
             />
 
             {/* Delete Confirmation */}

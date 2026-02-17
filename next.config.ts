@@ -398,6 +398,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/grns/delete/route',
       },
       {
+        source: '/api/business/warehouse/bulk-inward-products',
+        destination: '/api/business/warehouse/bulk-inward-products/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

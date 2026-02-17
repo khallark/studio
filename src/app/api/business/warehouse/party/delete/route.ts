@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
         const linkedPOs = await businessDoc!.ref
             .collection('purchaseOrders')
-            .where('supplierId', '==', partyId)
+            .where('supplierPartyId', '==', partyId)
             .get();
 
         const openPOs = linkedPOs.docs.filter(doc => {

@@ -211,6 +211,12 @@ export default function WarehouseLayout({
             description: 'Process put away UPCs',
         },
         {
+            label: 'Party Master',
+            href: `/business/${businessId}/warehouse/party-master`,
+            icon: Handshake,
+            description: 'List of Business Parties',
+        },
+        {
             label: 'Purchase Orders',
             href: `/business/${businessId}/warehouse/POs`,
             icon: MessageCircleReplyIcon,
@@ -221,12 +227,6 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/GRNs`,
             icon: Shirt,
             description: 'Process GRNs',
-        },
-        {
-            label: 'Party Master',
-            href: `/business/${businessId}/warehouse/party-master`,
-            icon: Handshake,
-            description: 'List of Business Parties',
         },
     ];
 

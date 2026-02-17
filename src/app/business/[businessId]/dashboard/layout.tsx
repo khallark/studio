@@ -702,6 +702,12 @@ export default function BusinessLayout({
                     isActive={pathname === `/business/${businessId}/warehouse/put-away`}
                   />
                   <NavItem
+                    href={`/business/${businessId}/warehouse/party-master`}
+                    icon={Handshake}
+                    label="Party Master"
+                    isActive={pathname === `/business/${businessId}/warehouse/party-master`}
+                  />
+                  <NavItem
                     href={`/business/${businessId}/warehouse/POs`}
                     icon={MessageCircleReplyIcon}
                     label="Purchase Orders"
@@ -712,12 +718,6 @@ export default function BusinessLayout({
                     icon={Shirt}
                     label="Process GRNs"
                     isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/warehouse/party-master`}
-                    icon={Handshake}
-                    label="Party Master"
-                    isActive={pathname === `/business/${businessId}/warehouse/party-master`}
                   />
                 </NavSection>
               </SidebarMenuItem>

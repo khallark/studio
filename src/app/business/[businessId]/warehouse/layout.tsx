@@ -21,6 +21,7 @@ import {
     Truck,
     MessageCircleReplyIcon,
     Shirt,
+    Handshake,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -216,9 +217,9 @@ export default function WarehouseLayout({
             description: 'Create new POs',
         },
         {
-            label: 'GRNs',
-            href: `/business/${businessId}/warehouse/GRNs`,
-            icon: Shirt,
+            label: 'Party Master',
+            href: `/business/${businessId}/warehouse/party-master`,
+            icon: Handshake,
             description: 'Process GRNs',
         },
     ];

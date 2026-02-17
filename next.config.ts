@@ -402,6 +402,18 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/bulk-inward-products/route',
       },
       {
+        source: '/api/business/warehouse/party/create',
+        destination: '/api/business/warehouse/party/create/route'
+      },
+      {
+        source: '/api/business/warehouse/party/update',
+        destination: '/api/business/warehouse/party/update/route'
+      },
+      {
+        source: '/api/business/warehouse/party/delete',
+        destination: '/api/business/warehouse/party/delete/route'
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

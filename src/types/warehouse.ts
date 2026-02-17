@@ -402,3 +402,37 @@ export interface GRN {
 
     notes: string | null;
 }
+
+// users/{businessId}/parties/{partyId}
+export interface Party {
+    id: string;
+    name: string;
+    type: 'supplier' | 'customer' | 'both';
+    code: string | null;
+    contactPerson: string | null;
+    phone: string | null;
+    email: string | null;
+    address: {
+        line1: string | null;
+        line2: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        country: string;
+    } | null;
+    gstin: string | null;
+    pan: string | null;
+    bankDetails: {
+        accountName: string | null;
+        accountNumber: string | null;
+        ifsc: string | null;
+        bankName: string | null;
+    } | null;
+    defaultPaymentTerms: string | null;
+    notes: string | null;
+    isActive: boolean;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
+}

@@ -28,6 +28,7 @@ import {
   ListCollapse,
   Truck,
   MessageCircleReplyIcon,
+  Handshake,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -711,6 +712,12 @@ export default function BusinessLayout({
                     icon={Shirt}
                     label="Process GRNs"
                     isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/party-master`}
+                    icon={Handshake}
+                    label="Party Master"
+                    isActive={pathname === `/business/${businessId}/warehouse/party-master`}
                   />
                 </NavSection>
               </SidebarMenuItem>

@@ -13,6 +13,7 @@ interface InwardItem {
     productName: string;
     acceptedQty: number;
     unitCost: number;
+    location: LocationInfo;
 }
 
 interface LocationInfo {
@@ -56,7 +57,7 @@ function calculatePhysicalStock(inv: InventoryData): number {
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, grnId, items, location } = await req.json();
+        const { businessId, grnId, items } = await req.json();
 
         // ============================================================
         // VALIDATION
@@ -83,14 +84,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (!location || !location.warehouseId || !location.zoneId || !location.rackId || !location.shelfId) {
-            return NextResponse.json(
-                { error: 'Validation Error', message: 'Complete location is required (warehouseId, zoneId, rackId, shelfId)' },
-                { status: 400 }
-            );
-        }
-
-        // Validate each item
+        // Validate each item (including its per-item location)
         for (const item of items) {
             if (!item.sku || typeof item.sku !== 'string') {
                 return NextResponse.json(
@@ -107,6 +101,12 @@ export async function POST(req: NextRequest) {
             if (item.acceptedQty > 500) {
                 return NextResponse.json(
                     { error: 'Validation Error', message: `Item ${item.sku}: max 500 units per product per inward` },
+                    { status: 400 }
+                );
+            }
+            if (!item.location || !item.location.warehouseId || !item.location.zoneId || !item.location.rackId || !item.location.shelfId) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Item ${item.sku}: complete location is required (warehouseId, zoneId, rackId, shelfId)` },
                     { status: 400 }
                 );
             }
@@ -156,7 +156,6 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const productsCollection = businessDoc!.ref.collection('products');
-        const locationInfo = location as LocationInfo;
         const now = Timestamp.now();
 
         const userData = userDoc?.data();
@@ -179,8 +178,8 @@ export async function POST(req: NextRequest) {
 
             productDocs.set(item.sku, productSnap);
 
-            // Placement doc
-            const placementId = `${item.sku}_${locationInfo.shelfId}`;
+            // Placement doc (uses item's own location)
+            const placementId = `${item.sku}_${item.location.shelfId}`;
             const placementRef = db.doc(`users/${businessId}/placements/${placementId}`);
             const placementSnap = await placementRef.get();
             placementDocs.set(placementId, placementSnap);
@@ -206,6 +205,7 @@ export async function POST(req: NextRequest) {
         for (const item of items as InwardItem[]) {
             if (item.acceptedQty <= 0) continue;
 
+            const itemLocation = item.location;
             const productSnap = productDocs.get(item.sku)!;
             const productRef = productsCollection.doc(item.sku);
             const productData = productSnap.data();
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
             });
 
             // 2. Create or update placement
-            const placementId = `${item.sku}_${locationInfo.shelfId}`;
+            const placementId = `${item.sku}_${itemLocation.shelfId}`;
             const placementRef = db.doc(`users/${businessId}/placements/${placementId}`);
             const existingPlacement = placementDocs.get(placementId)!;
 
@@ -245,10 +245,10 @@ export async function POST(req: NextRequest) {
                     productId: item.sku,
                     createUPCs: true,
                     quantity: item.acceptedQty,
-                    shelfId: locationInfo.shelfId,
-                    rackId: locationInfo.rackId,
-                    zoneId: locationInfo.zoneId,
-                    warehouseId: locationInfo.warehouseId,
+                    shelfId: itemLocation.shelfId,
+                    rackId: itemLocation.rackId,
+                    zoneId: itemLocation.zoneId,
+                    warehouseId: itemLocation.warehouseId,
                     createdAt: now,
                     updatedAt: now,
                     createdBy: userId,
@@ -281,10 +281,10 @@ export async function POST(req: NextRequest) {
                 performedAt: now,
                 placement: {
                     placementId,
-                    shelfId: locationInfo.shelfId,
-                    rackId: locationInfo.rackId,
-                    zoneId: locationInfo.zoneId,
-                    warehouseId: locationInfo.warehouseId,
+                    shelfId: itemLocation.shelfId,
+                    rackId: itemLocation.rackId,
+                    zoneId: itemLocation.zoneId,
+                    warehouseId: itemLocation.warehouseId,
                 },
                 metadata: {
                     userAgent: req.headers.get('user-agent') || undefined,
@@ -300,6 +300,7 @@ export async function POST(req: NextRequest) {
                 productName: item.productName,
                 quantityInwarded: item.acceptedQty,
                 placementId,
+                location: `${itemLocation.warehouseId} > ${itemLocation.zoneId} > ${itemLocation.rackId} > ${itemLocation.shelfId}`,
                 previousPhysicalStock,
                 newPhysicalStock,
             });
@@ -311,12 +312,6 @@ export async function POST(req: NextRequest) {
             updatedAt: now,
             inwardedAt: now,
             inwardedBy: userId,
-            inwardLocation: {
-                warehouseId: locationInfo.warehouseId,
-                zoneId: locationInfo.zoneId,
-                rackId: locationInfo.rackId,
-                shelfId: locationInfo.shelfId,
-            },
         });
 
         // ============================================================
@@ -336,7 +331,6 @@ export async function POST(req: NextRequest) {
                 grnId,
                 grnNumber: grnData.grnNumber,
                 grnStatus: 'completed',
-                location: `${locationInfo.warehouseId} > ${locationInfo.zoneId} > ${locationInfo.rackId} > ${locationInfo.shelfId}`,
                 items: results,
             },
             { status: 200 }

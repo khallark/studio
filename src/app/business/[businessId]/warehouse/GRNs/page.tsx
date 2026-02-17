@@ -232,48 +232,22 @@ function useReceivablePOs(businessId: string | null, user: User | null | undefin
 }
 
 // ============================================================
-// WAREHOUSE HIERARCHY HOOK (from put-away reference)
+// WAREHOUSE FETCHING (warehouses loaded once, zones/racks/shelves per-item)
 // ============================================================
 
-function useWarehouseHierarchy(
+function useWarehouses(
     open: boolean,
     businessId: string,
     user: User | null | undefined
 ) {
     const [warehouses, setWarehouses] = React.useState<WarehouseItem[]>([]);
-    const [zones, setZones] = React.useState<ZoneItem[]>([]);
-    const [racks, setRacks] = React.useState<RackItem[]>([]);
-    const [shelves, setShelves] = React.useState<ShelfItem[]>([]);
+    const [isLoading, setIsLoading] = React.useState(false);
 
-    const [selectedWarehouse, setSelectedWarehouse] = React.useState('');
-    const [selectedZone, setSelectedZone] = React.useState('');
-    const [selectedRack, setSelectedRack] = React.useState('');
-    const [selectedShelf, setSelectedShelf] = React.useState('');
-
-    const [isLoadingWarehouses, setIsLoadingWarehouses] = React.useState(false);
-    const [isLoadingZones, setIsLoadingZones] = React.useState(false);
-    const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
-    const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
-
-    // Reset all when dialog closes/opens
-    React.useEffect(() => {
-        if (!open) {
-            setSelectedWarehouse('');
-            setSelectedZone('');
-            setSelectedRack('');
-            setSelectedShelf('');
-            setZones([]);
-            setRacks([]);
-            setShelves([]);
-        }
-    }, [open]);
-
-    // Fetch Warehouses
     React.useEffect(() => {
         if (!open || !businessId || !user) return;
 
         const fetchWarehouses = async () => {
-            setIsLoadingWarehouses(true);
+            setIsLoading(true);
             const idToken = await user.getIdToken();
             const res = await fetch(
                 `/api/business/warehouse/list-warehouses?businessId=${businessId}`,
@@ -281,31 +255,52 @@ function useWarehouseHierarchy(
             );
             const data = await res.json();
             setWarehouses(data.warehouses || []);
-            setIsLoadingWarehouses(false);
+            setIsLoading(false);
         };
 
         fetchWarehouses();
     }, [open, businessId, user]);
 
-    // Reset children when warehouse changes
-    React.useEffect(() => {
-        setSelectedZone('');
-        setSelectedRack('');
-        setSelectedShelf('');
-        setZones([]);
-        setRacks([]);
-        setShelves([]);
-    }, [selectedWarehouse]);
+    return { warehouses, isLoading };
+}
 
-    // Fetch Zones
+// Per-item cascading location selector row
+function ItemLocationRow({
+    item,
+    warehouses,
+    isLoadingWarehouses,
+    businessId,
+    user,
+    location,
+    onLocationChange,
+}: {
+    item: { sku: string; productName: string; acceptedQty: number; unitCost: number };
+    warehouses: WarehouseItem[];
+    isLoadingWarehouses: boolean;
+    businessId: string;
+    user: User | null | undefined;
+    location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+    onLocationChange: (loc: { warehouseId: string; zoneId: string; rackId: string; shelfId: string }) => void;
+}) {
+    const [zones, setZones] = React.useState<ZoneItem[]>([]);
+    const [racks, setRacks] = React.useState<RackItem[]>([]);
+    const [shelves, setShelves] = React.useState<ShelfItem[]>([]);
+
+    const [isLoadingZones, setIsLoadingZones] = React.useState(false);
+    const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
+    const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
+
+    const { warehouseId, zoneId, rackId, shelfId } = location;
+
+    // Fetch Zones when warehouse changes
     React.useEffect(() => {
-        if (!selectedWarehouse || !user) return;
+        if (!warehouseId || !user) { setZones([]); return; }
 
         const fetchZones = async () => {
             setIsLoadingZones(true);
             const idToken = await user.getIdToken();
             const res = await fetch(
-                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${selectedWarehouse}`,
+                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`,
                 { headers: { Authorization: `Bearer ${idToken}` } }
             );
             const data = await res.json();
@@ -314,25 +309,17 @@ function useWarehouseHierarchy(
         };
 
         fetchZones();
-    }, [selectedWarehouse, businessId, user]);
+    }, [warehouseId, businessId, user]);
 
-    // Reset racks & shelves when zone changes
+    // Fetch Racks when zone changes
     React.useEffect(() => {
-        setSelectedRack('');
-        setSelectedShelf('');
-        setRacks([]);
-        setShelves([]);
-    }, [selectedZone]);
-
-    // Fetch Racks
-    React.useEffect(() => {
-        if (!selectedZone || !user) return;
+        if (!zoneId || !user) { setRacks([]); return; }
 
         const fetchRacks = async () => {
             setIsLoadingRacks(true);
             const idToken = await user.getIdToken();
             const res = await fetch(
-                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${selectedZone}`,
+                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`,
                 { headers: { Authorization: `Bearer ${idToken}` } }
             );
             const data = await res.json();
@@ -341,23 +328,17 @@ function useWarehouseHierarchy(
         };
 
         fetchRacks();
-    }, [selectedZone, businessId, user]);
+    }, [zoneId, businessId, user]);
 
-    // Reset shelves when rack changes
+    // Fetch Shelves when rack changes
     React.useEffect(() => {
-        setSelectedShelf('');
-        setShelves([]);
-    }, [selectedRack]);
-
-    // Fetch Shelves
-    React.useEffect(() => {
-        if (!selectedRack || !user) return;
+        if (!rackId || !user) { setShelves([]); return; }
 
         const fetchShelves = async () => {
             setIsLoadingShelves(true);
             const idToken = await user.getIdToken();
             const res = await fetch(
-                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${selectedRack}`,
+                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`,
                 { headers: { Authorization: `Bearer ${idToken}` } }
             );
             const data = await res.json();
@@ -366,16 +347,155 @@ function useWarehouseHierarchy(
         };
 
         fetchShelves();
-    }, [selectedRack, businessId, user]);
+    }, [rackId, businessId, user]);
 
-    return {
-        warehouses, zones, racks, shelves,
-        selectedWarehouse, setSelectedWarehouse,
-        selectedZone, setSelectedZone,
-        selectedRack, setSelectedRack,
-        selectedShelf, setSelectedShelf,
-        isLoadingWarehouses, isLoadingZones, isLoadingRacks, isLoadingShelves,
+    const setWarehouse = (val: string) => {
+        onLocationChange({ warehouseId: val, zoneId: '', rackId: '', shelfId: '' });
     };
+    const setZone = (val: string) => {
+        onLocationChange({ ...location, zoneId: val, rackId: '', shelfId: '' });
+    };
+    const setRack = (val: string) => {
+        onLocationChange({ ...location, rackId: val, shelfId: '' });
+    };
+    const setShelf = (val: string) => {
+        onLocationChange({ ...location, shelfId: val });
+    };
+
+    const isComplete = warehouseId && zoneId && rackId && shelfId;
+
+    // Breadcrumb names
+    const whName = warehouses.find(w => w.id === warehouseId)?.name;
+    const znName = zones.find(z => z.id === zoneId)?.name;
+    const rkName = racks.find(r => r.id === rackId)?.name;
+    const shName = shelves.find(s => s.id === shelfId)?.name;
+
+    return (
+        <div className="p-3 border rounded-lg space-y-3 bg-muted/20">
+            {/* Product info header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="font-medium text-sm">{item.productName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                    <Badge variant="outline" className="text-xs font-medium text-emerald-600 border-emerald-200 bg-emerald-50">
+                        {item.acceptedQty} units
+                    </Badge>
+                    <span className="text-muted-foreground">{formatCurrency(item.acceptedQty * item.unitCost)}</span>
+                </div>
+            </div>
+
+            {/* 4 cascading location selects in a grid */}
+            <div className="grid grid-cols-4 gap-2">
+                {/* Warehouse */}
+                <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Warehouse</Label>
+                    <Select value={warehouseId} onValueChange={setWarehouse}>
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Warehouse" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingWarehouses ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
+                            ) : warehouses.length === 0 ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
+                            ) : (
+                                warehouses.map(w => (
+                                    <SelectItem key={w.id} value={w.id}>
+                                        {w.name} ({w.code})
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Zone */}
+                <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Zone</Label>
+                    <Select value={zoneId} onValueChange={setZone} disabled={!warehouseId}>
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Zone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingZones ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
+                            ) : zones.length === 0 ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
+                            ) : (
+                                zones.map(z => (
+                                    <SelectItem key={z.id} value={z.id}>
+                                        {z.name} ({z.code})
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Rack */}
+                <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Rack</Label>
+                    <Select value={rackId} onValueChange={setRack} disabled={!zoneId}>
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Rack" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingRacks ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
+                            ) : racks.length === 0 ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
+                            ) : (
+                                racks.map(r => (
+                                    <SelectItem key={r.id} value={r.id}>
+                                        {r.name} ({r.code})
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Shelf */}
+                <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Shelf</Label>
+                    <Select value={shelfId} onValueChange={setShelf} disabled={!rackId}>
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Shelf" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingShelves ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
+                            ) : shelves.length === 0 ? (
+                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
+                            ) : (
+                                shelves.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                        {s.name} ({s.code})
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            {/* Location breadcrumb when complete */}
+            {isComplete && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-md">
+                    <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    <span>{whName}</span>
+                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
+                    <span>{znName}</span>
+                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
+                    <span>{rkName}</span>
+                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
+                    <span>{shName}</span>
+                </div>
+            )}
+        </div>
+    );
 }
 
 // ============================================================
@@ -500,8 +620,13 @@ function useBulkInward(businessId: string | null, user: User | null | undefined)
     return useMutation({
         mutationFn: async (data: {
             grnId: string;
-            items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
-            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+            items: {
+                sku: string;
+                productName: string;
+                acceptedQty: number;
+                unitCost: number;
+                location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+            }[];
         }) => {
             if (!businessId || !user) throw new Error('Invalid parameters');
 
@@ -803,32 +928,54 @@ function PerformGRNDialog({
     user: User | null | undefined;
     onConfirm: (data: {
         grnId: string;
-        items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
-        location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+        items: {
+            sku: string;
+            productName: string;
+            acceptedQty: number;
+            unitCost: number;
+            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+        }[];
     }) => void;
     isLoading: boolean;
 }) {
-    const {
-        warehouses, zones, racks, shelves,
-        selectedWarehouse, setSelectedWarehouse,
-        selectedZone, setSelectedZone,
-        selectedRack, setSelectedRack,
-        selectedShelf, setSelectedShelf,
-        isLoadingWarehouses, isLoadingZones, isLoadingRacks, isLoadingShelves,
-    } = useWarehouseHierarchy(open, businessId, user);
+    const { warehouses, isLoading: isLoadingWarehouses } = useWarehouses(open, businessId, user);
+
+    // Per-item locations state, keyed by sku
+    const [itemLocations, setItemLocations] = React.useState<
+        Record<string, { warehouseId: string; zoneId: string; rackId: string; shelfId: string }>
+    >({});
+
+    // Reset locations when dialog opens with a new GRN
+    React.useEffect(() => {
+        if (open && grn) {
+            const initial: Record<string, { warehouseId: string; zoneId: string; rackId: string; shelfId: string }> = {};
+            grn.items.forEach(item => {
+                if (item.acceptedQty > 0) {
+                    initial[item.sku] = { warehouseId: '', zoneId: '', rackId: '', shelfId: '' };
+                }
+            });
+            setItemLocations(initial);
+        }
+    }, [open, grn]);
 
     if (!grn) return null;
 
-    // Filter to items with acceptedQty > 0
     const inwardableItems = grn.items.filter(item => item.acceptedQty > 0);
     const totalInwardQty = inwardableItems.reduce((sum, i) => sum + i.acceptedQty, 0);
 
-    const canConfirm =
-        selectedWarehouse &&
-        selectedZone &&
-        selectedRack &&
-        selectedShelf &&
-        inwardableItems.length > 0;
+    const allLocationsComplete = inwardableItems.length > 0 && inwardableItems.every(item => {
+        const loc = itemLocations[item.sku];
+        return loc && loc.warehouseId && loc.zoneId && loc.rackId && loc.shelfId;
+    });
+
+    const completedCount = inwardableItems.filter(item => {
+        const loc = itemLocations[item.sku];
+        return loc && loc.warehouseId && loc.zoneId && loc.rackId && loc.shelfId;
+    }).length;
+
+    const handleLocationChange = (sku: string, loc: { warehouseId: string; zoneId: string; rackId: string; shelfId: string }) => {
+        setItemLocations(prev => ({ ...prev, [sku]: loc }));
+    };
 
     const handleConfirm = () => {
         onConfirm({
@@ -838,25 +985,14 @@ function PerformGRNDialog({
                 productName: item.productName,
                 acceptedQty: item.acceptedQty,
                 unitCost: item.unitCost,
+                location: itemLocations[item.sku],
             })),
-            location: {
-                warehouseId: selectedWarehouse,
-                zoneId: selectedZone,
-                rackId: selectedRack,
-                shelfId: selectedShelf,
-            },
         });
     };
 
-    // Build location breadcrumb text
-    const selectedWarehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name;
-    const selectedZoneName = zones.find(z => z.id === selectedZone)?.name;
-    const selectedRackName = racks.find(r => r.id === selectedRack)?.name;
-    const selectedShelfName = shelves.find(s => s.id === selectedShelf)?.name;
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="p-2 rounded-lg bg-emerald-500/10">
@@ -865,7 +1001,7 @@ function PerformGRNDialog({
                         Perform GRN — {grn.grnNumber}
                     </DialogTitle>
                     <DialogDescription>
-                        Inward accepted items into warehouse location. This will update inventory and mark the GRN as completed.
+                        Assign a warehouse location for each item. This will inward inventory and mark the GRN as completed.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -879,162 +1015,49 @@ function PerformGRNDialog({
                         </div>
                     </div>
 
-                    {/* Items to Inward */}
+                    {grn.totalRejectedQty > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {grn.totalRejectedQty} unit(s) rejected — only accepted items will be inwarded.
+                        </div>
+                    )}
+
+                    {/* Per-item location assignment */}
                     <div className="space-y-2">
-                        <Label className="text-base font-semibold">Items to Inward</Label>
-                        <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/40">
-                                        <TableHead className="text-xs">SKU</TableHead>
-                                        <TableHead className="text-xs">Product</TableHead>
-                                        <TableHead className="text-xs text-right">Accepted Qty</TableHead>
-                                        <TableHead className="text-xs text-right">Unit Cost</TableHead>
-                                        <TableHead className="text-xs text-right">Total</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {inwardableItems.map((item, idx) => (
-                                        <TableRow key={idx}>
-                                            <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                            <TableCell className="text-sm">{item.productName}</TableCell>
-                                            <TableCell className="text-right text-sm font-medium text-emerald-600">
-                                                {item.acceptedQty}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                {formatCurrency(item.unitCost)}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm font-medium">
-                                                {formatCurrency(item.acceptedQty * item.unitCost)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                <Label className="text-base font-semibold">Assign Locations</Label>
+                            </div>
+                            <Badge variant="outline" className={cn(
+                                'text-xs',
+                                allLocationsComplete
+                                    ? 'text-emerald-600 border-emerald-200 bg-emerald-50'
+                                    : 'text-muted-foreground'
+                            )}>
+                                {completedCount}/{inwardableItems.length} assigned
+                            </Badge>
                         </div>
 
-                        {grn.totalRejectedQty > 0 && (
-                            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                {grn.totalRejectedQty} unit(s) rejected — only accepted items will be inwarded.
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Location Selector */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <Label className="text-base font-semibold">Inward Location</Label>
+                        <div className="space-y-3">
+                            {inwardableItems.map((item) => (
+                                <ItemLocationRow
+                                    key={item.sku}
+                                    item={{
+                                        sku: item.sku,
+                                        productName: item.productName,
+                                        acceptedQty: item.acceptedQty,
+                                        unitCost: item.unitCost,
+                                    }}
+                                    warehouses={warehouses}
+                                    isLoadingWarehouses={isLoadingWarehouses}
+                                    businessId={businessId}
+                                    user={user}
+                                    location={itemLocations[item.sku] || { warehouseId: '', zoneId: '', rackId: '', shelfId: '' }}
+                                    onLocationChange={(loc) => handleLocationChange(item.sku, loc)}
+                                />
+                            ))}
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Warehouse */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs">Warehouse <span className="text-destructive">*</span></Label>
-                                <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Select warehouse" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingWarehouses ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
-                                        ) : warehouses.length === 0 ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">No warehouses found</div>
-                                        ) : (
-                                            warehouses.map(w => (
-                                                <SelectItem key={w.id} value={w.id}>
-                                                    {w.name} ({w.code})
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Zone */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs">Zone <span className="text-destructive">*</span></Label>
-                                <Select value={selectedZone} onValueChange={setSelectedZone} disabled={!selectedWarehouse}>
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Select zone" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingZones ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
-                                        ) : zones.length === 0 ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">No zones found</div>
-                                        ) : (
-                                            zones.map(z => (
-                                                <SelectItem key={z.id} value={z.id}>
-                                                    {z.name} ({z.code})
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Rack */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs">Rack <span className="text-destructive">*</span></Label>
-                                <Select value={selectedRack} onValueChange={setSelectedRack} disabled={!selectedZone}>
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Select rack" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingRacks ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
-                                        ) : racks.length === 0 ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">No racks found</div>
-                                        ) : (
-                                            racks.map(r => (
-                                                <SelectItem key={r.id} value={r.id}>
-                                                    {r.name} ({r.code})
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Shelf */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs">Shelf <span className="text-destructive">*</span></Label>
-                                <Select value={selectedShelf} onValueChange={setSelectedShelf} disabled={!selectedRack}>
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Select shelf" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingShelves ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
-                                        ) : shelves.length === 0 ? (
-                                            <div className="p-2 text-center text-sm text-muted-foreground">No shelves found</div>
-                                        ) : (
-                                            shelves.map(s => (
-                                                <SelectItem key={s.id} value={s.id}>
-                                                    {s.name} ({s.code})
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Location breadcrumb */}
-                        {canConfirm && (
-                            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
-                                <Warehouse className="h-3.5 w-3.5 shrink-0" />
-                                <span className="font-medium">{selectedWarehouseName}</span>
-                                <ChevronDown className="h-3 w-3 -rotate-90" />
-                                <span className="font-medium">{selectedZoneName}</span>
-                                <ChevronDown className="h-3 w-3 -rotate-90" />
-                                <span className="font-medium">{selectedRackName}</span>
-                                <ChevronDown className="h-3 w-3 -rotate-90" />
-                                <span className="font-medium">{selectedShelfName}</span>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -1044,7 +1067,7 @@ function PerformGRNDialog({
                     </Button>
                     <Button
                         onClick={handleConfirm}
-                        disabled={!canConfirm || isLoading}
+                        disabled={!allLocationsComplete || isLoading}
                         className="bg-emerald-600 hover:bg-emerald-700"
                     >
                         {isLoading ? (
@@ -1331,8 +1354,13 @@ export default function GRNsPage() {
 
     const handlePerformGRNConfirm = (data: {
         grnId: string;
-        items: { sku: string; productName: string; acceptedQty: number; unitCost: number }[];
-        location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+        items: {
+            sku: string;
+            productName: string;
+            acceptedQty: number;
+            unitCost: number;
+            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
+        }[];
     }) => {
         bulkInwardMutation.mutate(data, {
             onSuccess: () => setPerformingGRN(null),

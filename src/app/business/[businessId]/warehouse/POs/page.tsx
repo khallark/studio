@@ -88,7 +88,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { POStatus, PurchaseOrder } from '@/types/warehouse';
+import { POStatus, PurchaseOrder, Party } from '@/types/warehouse';
 import { Timestamp } from 'firebase-admin/firestore';
 
 // ============================================================
@@ -203,6 +203,28 @@ function useProducts(businessId: string | null, user: User | null | undefined) {
         },
         enabled: !!businessId && !!user,
         staleTime: 60 * 1000,
+    });
+}
+
+/**
+ * Fetches active supplier parties (type 'supplier' or 'both', isActive true).
+ * Used for supplier selection in the PO form.
+ */
+function useSupplierParties(businessId: string | null, user: User | null | undefined) {
+    return useQuery({
+        queryKey: ['supplierParties', businessId],
+        queryFn: async () => {
+            if (!businessId) throw new Error('No business ID');
+
+            const partiesRef = collection(db, 'users', businessId, 'parties');
+            const snapshot = await getDocs(partiesRef);
+
+            return snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }) as Party)
+                .filter(p => p.isActive && (p.type === 'supplier' || p.type === 'both'));
+        },
+        enabled: !!businessId && !!user,
+        staleTime: 30 * 1000,
     });
 }
 
@@ -347,6 +369,148 @@ function ProductSearchInput({
 }
 
 // ============================================================
+// SUPPLIER SEARCH INPUT COMPONENT
+// ============================================================
+
+function SupplierSearchInput({
+    parties,
+    selectedPartyId,
+    onSelect,
+    disabled,
+}: {
+    parties: Party[];
+    selectedPartyId: string;
+    onSelect: (party: Party | null) => void;
+    disabled?: boolean;
+}) {
+    const [searchValue, setSearchValue] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Find selected party for display
+    const selectedParty = useMemo(
+        () => parties.find(p => p.id === selectedPartyId) || null,
+        [parties, selectedPartyId]
+    );
+
+    // Sync display when parent resets
+    useEffect(() => {
+        setSearchValue(selectedParty?.name || '');
+    }, [selectedParty]);
+
+    // Close on outside click
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+                // Reset text to selected party name if user didn't pick anything
+                if (!selectedPartyId) setSearchValue('');
+                else setSearchValue(selectedParty?.name || '');
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [selectedPartyId, selectedParty]);
+
+    const filteredParties = useMemo(() => {
+        if (!searchValue.trim()) return parties.slice(0, 20);
+        const q = searchValue.toLowerCase();
+        return parties
+            .filter(
+                p =>
+                    p.name.toLowerCase().includes(q) ||
+                    p.code?.toLowerCase().includes(q) ||
+                    p.gstin?.toLowerCase().includes(q) ||
+                    p.contactPerson?.toLowerCase().includes(q)
+            )
+            .slice(0, 20);
+    }, [parties, searchValue]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchValue(e.target.value);
+        setIsOpen(true);
+        if (selectedPartyId) {
+            onSelect(null);
+        }
+    };
+
+    const handleSelect = (party: Party) => {
+        setSearchValue(party.name);
+        setIsOpen(false);
+        onSelect(party);
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                    value={searchValue}
+                    onChange={handleInputChange}
+                    onFocus={() => setIsOpen(true)}
+                    placeholder="Search supplier by name, code, GSTIN..."
+                    className={cn(
+                        'pl-8',
+                        selectedPartyId && 'border-emerald-300 bg-emerald-50/30'
+                    )}
+                    disabled={disabled}
+                />
+                {selectedPartyId && (
+                    <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-500" />
+                )}
+            </div>
+
+            <AnimatePresence>
+                {isOpen && filteredParties.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute z-50 mt-1 w-full max-h-52 overflow-auto bg-popover border rounded-md shadow-md"
+                    >
+                        {filteredParties.map(party => (
+                            <button
+                                key={party.id}
+                                type="button"
+                                className={cn(
+                                    'w-full text-left px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors flex items-center justify-between',
+                                    party.id === selectedPartyId && 'bg-emerald-50'
+                                )}
+                                onClick={() => handleSelect(party)}
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-medium text-sm truncate">{party.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                        {[party.code, party.gstin, party.contactPerson].filter(Boolean).join(' · ')}
+                                    </p>
+                                </div>
+                                {party.id === selectedPartyId && (
+                                    <Check className="h-3.5 w-3.5 text-emerald-500 ml-2 shrink-0" />
+                                )}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+
+                {isOpen && searchValue.trim() && filteredParties.length === 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-md p-3"
+                    >
+                        <p className="text-xs text-muted-foreground text-center">
+                            No supplier found for &quot;{searchValue}&quot;
+                        </p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ============================================================
 // HOOKS - MUTATIONS
 // ============================================================
 
@@ -466,6 +630,7 @@ function POFormDialog({
     isLoading,
     editingPO,
     products,
+    parties,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -473,6 +638,7 @@ function POFormDialog({
     isLoading: boolean;
     editingPO: PurchaseOrder | null;
     products: Product[];
+    parties: Party[];
 }) {
     const [supplierPartyId, setSupplierPartyId] = useState('');
     const [supplierName, setSupplierName] = useState('');
@@ -516,6 +682,16 @@ function POFormDialog({
             }
         }
     }, [open, editingPO]);
+
+    const handleSupplierSelect = (party: Party | null) => {
+        if (party) {
+            setSupplierPartyId(party.id);
+            setSupplierName(party.name);
+        } else {
+            setSupplierPartyId('');
+            setSupplierName('');
+        }
+    };
 
     const handleProductSelect = (index: number, product: Product | null) => {
         setItems(prev => prev.map((item, i) => {
@@ -603,24 +779,19 @@ function POFormDialog({
                 </DialogHeader>
 
                 <div className="space-y-5 py-4">
-                    {/* Supplier Info */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Supplier ID <span className="text-destructive">*</span></Label>
-                            <Input
-                                value={supplierPartyId}
-                                onChange={(e) => setSupplierPartyId(e.target.value)}
-                                placeholder="e.g. SUP-001"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Supplier Name <span className="text-destructive">*</span></Label>
-                            <Input
-                                value={supplierName}
-                                onChange={(e) => setSupplierName(e.target.value)}
-                                placeholder="e.g. Fabric World Pvt Ltd"
-                            />
-                        </div>
+                    {/* Supplier */}
+                    <div className="space-y-2">
+                        <Label>Supplier <span className="text-destructive">*</span></Label>
+                        <SupplierSearchInput
+                            parties={parties}
+                            selectedPartyId={supplierPartyId}
+                            onSelect={handleSupplierSelect}
+                        />
+                        {supplierPartyId && (
+                            <p className="text-xs text-muted-foreground">
+                                ID: <span className="font-mono">{supplierPartyId}</span>
+                            </p>
+                        )}
                     </div>
 
                     {/* Warehouse & Date */}
@@ -1019,6 +1190,7 @@ export default function PurchaseOrdersPage() {
     // Data
     const { data: purchaseOrders = [], isLoading, refetch } = usePurchaseOrders(businessId, user);
     const { data: products = [] } = useProducts(businessId, user);
+    const { data: supplierParties = [] } = useSupplierParties(businessId, user);
 
     // Mutations
     const createMutation = useCreatePO(businessId, user);
@@ -1132,6 +1304,7 @@ export default function PurchaseOrdersPage() {
     const handleRefresh = () => {
         queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
         queryClient.invalidateQueries({ queryKey: ['products', businessId] });
+        queryClient.invalidateQueries({ queryKey: ['supplierParties', businessId] });
         refetch();
     };
 
@@ -1503,6 +1676,7 @@ export default function PurchaseOrdersPage() {
                 isLoading={createMutation.isPending}
                 editingPO={null}
                 products={products}
+                parties={supplierParties}
             />
 
             <POFormDialog
@@ -1512,6 +1686,7 @@ export default function PurchaseOrdersPage() {
                 isLoading={updateMutation.isPending}
                 editingPO={editingPO}
                 products={products}
+                parties={supplierParties}
             />
 
             <PODetailDialog

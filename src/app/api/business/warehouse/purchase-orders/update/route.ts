@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const result = await authUserForBusiness({ businessId, req });
-
+        
         if (!result.authorised) {
             const { error, status: authStatus } = result;
             return NextResponse.json({ error }, { status: authStatus });
@@ -120,6 +120,38 @@ export async function POST(req: NextRequest) {
                 },
                 { status: 400 }
             );
+        }
+
+        // ============================================================
+        // PARTY VALIDATION (if supplier is being changed)
+        // ============================================================
+
+        if (supplierPartyId && supplierPartyId !== existingPO.supplierPartyId) {
+            const partyRef = db.collection('users').doc(businessId).collection('parties').doc(supplierPartyId);
+            const partySnap = await partyRef.get();
+
+            if (!partySnap.exists) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: 'Supplier party not found. Please select a valid supplier.' },
+                    { status: 400 }
+                );
+            }
+
+            const partyData = partySnap.data()!;
+
+            if (!partyData.isActive) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Supplier "${partyData.name}" is inactive. Cannot assign an inactive party.` },
+                    { status: 400 }
+                );
+            }
+
+            if (partyData.type !== 'supplier' && partyData.type !== 'both') {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Party "${partyData.name}" is not a supplier (type: ${partyData.type}).` },
+                    { status: 400 }
+                );
+            }
         }
 
         // ============================================================

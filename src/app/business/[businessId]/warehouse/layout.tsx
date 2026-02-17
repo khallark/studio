@@ -217,10 +217,16 @@ export default function WarehouseLayout({
             description: 'Create new POs',
         },
         {
+            label: 'GRNs',
+            href: `/business/${businessId}/warehouse/GRNs`,
+            icon: Shirt,
+            description: 'Process GRNs',
+        },
+        {
             label: 'Party Master',
             href: `/business/${businessId}/warehouse/party-master`,
             icon: Handshake,
-            description: 'Process GRNs',
+            description: 'List of Business Parties',
         },
     ];
 

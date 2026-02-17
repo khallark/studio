@@ -109,16 +109,46 @@ export async function POST(req: NextRequest) {
         const result = await authUserForBusiness({ businessId, req });
         const { userId } = result;
 
-        if (!userId) {
+        if(!userId) {
             return NextResponse.json(
                 { error: 'User not logged in' },
                 { status: 401 }
             );
         }
-
+        
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
+        }
+
+        // ============================================================
+        // PARTY VALIDATION
+        // ============================================================
+
+        const partyRef = db.collection('users').doc(businessId).collection('parties').doc(supplierPartyId);
+        const partySnap = await partyRef.get();
+
+        if (!partySnap.exists) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'Supplier party not found. Please select a valid supplier.' },
+                { status: 400 }
+            );
+        }
+
+        const partyData = partySnap.data()!;
+
+        if (!partyData.isActive) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: `Supplier "${partyData.name}" is inactive. Cannot create PO for an inactive party.` },
+                { status: 400 }
+            );
+        }
+
+        if (partyData.type !== 'supplier' && partyData.type !== 'both') {
+            return NextResponse.json(
+                { error: 'Validation Error', message: `Party "${partyData.name}" is not a supplier (type: ${partyData.type}).` },
+                { status: 400 }
+            );
         }
 
         // ============================================================
@@ -183,7 +213,7 @@ export async function POST(req: NextRequest) {
         const totalAmount = poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.orderedQty * item.unitCost), 0);
 
         const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc();
-
+        
         const poData: PurchaseOrder = {
             id: poRef.id,
             poNumber,

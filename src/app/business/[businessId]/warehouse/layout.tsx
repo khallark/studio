@@ -19,6 +19,8 @@ import {
     Package,
     Settings,
     Truck,
+    MessageCircleReplyIcon,
+    Shirt,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -206,6 +208,18 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/put-away`,
             icon: Truck,
             description: 'Process put away UPCs',
+        },
+        {
+            label: 'Purchase Orders',
+            href: `/business/${businessId}/warehouse/POs`,
+            icon: MessageCircleReplyIcon,
+            description: 'Create new POs',
+        },
+        {
+            label: 'GRNs',
+            href: `/business/${businessId}/warehouse/GRNs`,
+            icon: Shirt,
+            description: 'Process GRNs',
         },
     ];
 

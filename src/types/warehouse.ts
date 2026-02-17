@@ -297,3 +297,109 @@ export interface PropagationTracker {
     // For version control
     version?: number;
 }
+
+// ============================================================
+// PO TYPES
+// ============================================================
+
+export type POStatus = 'draft' | 'confirmed' | 'partially_received' | 'fully_received' | 'closed' | 'cancelled';
+export type POItemStatus = 'pending' | 'partially_received' | 'fully_received' | 'closed';
+
+export interface PurchaseOrderItem {
+    sku: string;
+    productId: string;
+    productName: string;
+    orderedQty: number;
+    unitCost: number;
+    receivedQty: number;
+    rejectedQty: number;
+    status: 'pending' | 'partially_received' | 'fully_received' | 'closed';
+}
+
+// users/{businessId}/purchaseOrders/{purchaseOrderId}
+export interface PurchaseOrder {
+    id: string;
+    poNumber: string;
+    businessId: string;
+    supplierPartyId: string;
+    supplierName: string;
+    warehouseId: string;
+    warehouseName: string | null;
+    status: 'draft' | 'confirmed' | 'partially_received' | 'fully_received' | 'closed' | 'cancelled';
+
+    orderedSkus: string[];
+    itemCount: number;
+
+    items: PurchaseOrderItem[];
+
+    totalAmount: number;
+    currency: string | null;
+
+    expectedDate: Timestamp;
+    confirmedAt: Timestamp | null;
+    completedAt: Timestamp | null;
+    cancelledAt: Timestamp | null;
+    cancelReason: string | null;
+
+    notes: string | null;
+    createdBy: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ============================================================
+// GRN TYPES
+// ============================================================
+
+export type GRNStatus = 'draft' | 'completed' | 'cancelled';
+
+export interface GRNItemLocation {
+    qty: number;
+    shelfId: string;
+    shelfName: string | null;
+}
+
+export interface GRNItem {
+    sku: string;
+    productName: string;
+
+    receivedQty: number;
+    acceptedQty: number;
+    rejectedQty: number;
+    rejectionReason: string | null;
+
+    unitCost: number;
+    totalCost: number;
+
+    putInLocations: GRNItemLocation[];
+}
+
+// users/{businessId}/grns/{grnId}
+export interface GRN {
+    id: string;
+    grnNumber: string;
+    businessId: string;
+    poId: string;
+    poNumber: string;
+    warehouseId: string;
+    warehouseName: string | null;
+
+    status: 'draft' | 'completed' | 'cancelled';
+
+    receivedSkus: string[];
+    items: GRNItem[];
+
+    totalAcceptedValue: number;
+
+    totalReceivedQty: number;
+    totalAcceptedQty: number;
+    totalRejectedQty: number;
+
+    receivedBy: string;
+    inspectedBy: string | null;
+    receivedAt: Timestamp;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+
+    notes: string | null;
+}

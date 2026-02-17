@@ -374,6 +374,30 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/put-away-batch/route',
       },
       {
+        source: '/api/business/warehouse/purchase-orders/create',
+        destination: '/api/business/warehouse/purchase-orders/create/route',
+      },
+      {
+        source: '/api/business/warehouse/purchase-orders/update',
+        destination: '/api/business/warehouse/purchase-orders/update/route',
+      },
+      {
+        source: '/api/business/warehouse/purchase-orders/delete',
+        destination: '/api/business/warehouse/purchase-orders/delete/route',
+      },
+      {
+        source: '/api/business/warehouse/grns/create',
+        destination: '/api/business/warehouse/grns/create/route',
+      },
+      {
+        source: '/api/business/warehouse/grns/update',
+        destination: '/api/business/warehouse/grns/update/route',
+      },
+      {
+        source: '/api/business/warehouse/grns/delete',
+        destination: '/api/business/warehouse/grns/delete/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },

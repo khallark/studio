@@ -86,22 +86,67 @@ export async function POST(req: NextRequest) {
         }
 
         // ============================================================
+        // DUPLICATE SKU VALIDATION
+        // ============================================================
+
+        const skus = items.map((item: any) => item.sku);
+        const uniqueSkus = new Set(skus);
+        if (uniqueSkus.size !== skus.length) {
+            const duplicates = skus.filter((sku: string, index: number) => skus.indexOf(sku) !== index);
+            return NextResponse.json(
+                {
+                    error: 'Validation Error',
+                    message: `Duplicate SKUs found in line items: ${[...new Set(duplicates)].join(', ')}. Each product can only appear once.`,
+                },
+                { status: 400 }
+            );
+        }
+
+        // ============================================================
         // AUTHORIZATION
         // ============================================================
 
         const result = await authUserForBusiness({ businessId, req });
         const { userId } = result;
 
-        if(!userId) {
+        if (!userId) {
             return NextResponse.json(
                 { error: 'User not logged in' },
                 { status: 401 }
             );
         }
-        
+
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
+        }
+
+        // ============================================================
+        // PRODUCT EXISTENCE VALIDATION
+        // ============================================================
+
+        const productsRef = db.collection('users').doc(businessId).collection('products');
+        const missingProducts: string[] = [];
+
+        for (const item of items) {
+            const productSnap = await productsRef
+                .where('sku', '==', item.sku)
+                .limit(1)
+                .get();
+
+            if (productSnap.empty) {
+                missingProducts.push(item.sku);
+            }
+        }
+
+        if (missingProducts.length > 0) {
+            return NextResponse.json(
+                {
+                    error: 'Validation Error',
+                    message: `Products not found for SKUs: ${missingProducts.join(', ')}. Please ensure all products exist before creating a PO.`,
+                },
+                { status: 400 }
+            );
         }
 
         // ============================================================
@@ -139,7 +184,7 @@ export async function POST(req: NextRequest) {
         const totalAmount = poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.orderedQty * item.unitCost), 0);
 
         const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc();
-        
+
         const poData: PurchaseOrder = {
             id: poRef.id,
             poNumber,

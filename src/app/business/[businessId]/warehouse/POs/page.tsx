@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useBusinessContext } from '../../layout';
@@ -98,8 +98,16 @@ import { Timestamp } from 'firebase-admin/firestore';
 type SortField = 'createdAt' | 'expectedDate' | 'totalAmount' | 'poNumber';
 type SortOrder = 'asc' | 'desc';
 
+interface Product {
+    id: string;
+    sku: string;
+    name: string;
+    [key: string]: any;
+}
+
 interface POItemFormRow {
     sku: string;
+    productId: string;
     productName: string;
     orderedQty: number;
     unitCost: number;
@@ -174,6 +182,171 @@ function usePurchaseOrders(businessId: string | null, user: User | null | undefi
         staleTime: 15 * 1000,
         refetchInterval: 60 * 1000,
     });
+}
+
+/**
+ * Fetches all products for the business (cached).
+ * Used for client-side SKU search in the PO form.
+ */
+function useProducts(businessId: string | null, user: User | null | undefined) {
+    return useQuery({
+        queryKey: ['products', businessId],
+        queryFn: async () => {
+            if (!businessId) throw new Error('No business ID');
+
+            const productsRef = collection(db, 'users', businessId, 'products');
+            const snapshot = await getDocs(productsRef);
+
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as Product[];
+        },
+        enabled: !!businessId && !!user,
+        staleTime: 60 * 1000,
+    });
+}
+
+// ============================================================
+// PRODUCT SEARCH INPUT COMPONENT
+// ============================================================
+
+function ProductSearchInput({
+    products,
+    selectedSku,
+    selectedProductId,
+    onSelect,
+    existingSkus,
+    disabled,
+}: {
+    products: Product[];
+    selectedSku: string;
+    selectedProductId: string;
+    onSelect: (product: Product | null) => void;
+    existingSkus: string[];
+    disabled?: boolean;
+}) {
+    const [searchValue, setSearchValue] = useState(selectedSku);
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Sync when parent resets (e.g. dialog open/close)
+    useEffect(() => {
+        setSearchValue(selectedSku);
+    }, [selectedSku]);
+
+    // Close on outside click
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredProducts = useMemo(() => {
+        if (!searchValue.trim()) return products.slice(0, 20);
+        const q = searchValue.toLowerCase();
+        return products
+            .filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
+            .slice(0, 20);
+    }, [products, searchValue]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchValue(e.target.value);
+        setIsOpen(true);
+        // Deselect if user modifies the text away from current selection
+        if (selectedSku && e.target.value !== selectedSku) {
+            onSelect(null);
+        }
+    };
+
+    const handleSelect = (product: Product) => {
+        setSearchValue(product.sku);
+        setIsOpen(false);
+        onSelect(product);
+    };
+
+    const isDuplicate = (sku: string) => existingSkus.includes(sku);
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input
+                    value={searchValue}
+                    onChange={handleInputChange}
+                    onFocus={() => setIsOpen(true)}
+                    placeholder="Search SKU or name..."
+                    className={cn(
+                        'h-8 text-sm pl-7',
+                        selectedProductId && 'border-emerald-300 bg-emerald-50/30'
+                    )}
+                    disabled={disabled}
+                />
+                {selectedProductId && (
+                    <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-500" />
+                )}
+            </div>
+
+            <AnimatePresence>
+                {isOpen && filteredProducts.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute z-50 mt-1 w-full max-h-48 overflow-auto bg-popover border rounded-md shadow-md"
+                    >
+                        {filteredProducts.map(product => {
+                            const duplicate = isDuplicate(product.sku) && product.sku !== selectedSku;
+                            return (
+                                <button
+                                    key={product.id}
+                                    type="button"
+                                    className={cn(
+                                        'w-full text-left px-3 py-2 text-sm hover:bg-muted/60 transition-colors flex items-center justify-between',
+                                        duplicate && 'opacity-50 cursor-not-allowed',
+                                        product.sku === selectedSku && 'bg-emerald-50'
+                                    )}
+                                    onClick={() => { if (!duplicate) handleSelect(product); }}
+                                    disabled={duplicate}
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-xs font-medium truncate">{product.sku}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{product.name}</p>
+                                    </div>
+                                    {duplicate && (
+                                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 ml-2 shrink-0">
+                                            Already added
+                                        </Badge>
+                                    )}
+                                    {product.sku === selectedSku && (
+                                        <Check className="h-3.5 w-3.5 text-emerald-500 ml-2 shrink-0" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </motion.div>
+                )}
+
+                {isOpen && searchValue.trim() && filteredProducts.length === 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-md p-3"
+                    >
+                        <p className="text-xs text-muted-foreground text-center">
+                            No product found for &quot;{searchValue}&quot;
+                        </p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
 }
 
 // ============================================================
@@ -295,12 +468,14 @@ function POFormDialog({
     onSubmit,
     isLoading,
     editingPO,
+    products,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit: (data: any) => void;
     isLoading: boolean;
     editingPO: PurchaseOrder | null;
+    products: Product[];
 }) {
     const [supplierPartyId, setSupplierPartyId] = useState('');
     const [supplierName, setSupplierName] = useState('');
@@ -310,7 +485,7 @@ function POFormDialog({
     const [expectedDate, setExpectedDate] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<POItemFormRow[]>([
-        { sku: '', productName: '', orderedQty: 1, unitCost: 0 },
+        { sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 },
     ]);
 
     // Reset form when dialog opens
@@ -327,6 +502,7 @@ function POFormDialog({
                 setItems(
                     editingPO.items.map(i => ({
                         sku: i.sku,
+                        productId: i.productId,
                         productName: i.productName,
                         orderedQty: i.orderedQty,
                         unitCost: i.unitCost,
@@ -340,17 +516,32 @@ function POFormDialog({
                 setCurrency('INR');
                 setExpectedDate('');
                 setNotes('');
-                setItems([{ sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+                setItems([{ sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 }]);
             }
         }
     }, [open, editingPO]);
+
+    const handleProductSelect = (index: number, product: Product | null) => {
+        setItems(prev => prev.map((item, i) => {
+            if (i !== index) return item;
+            if (!product) {
+                return { ...item, sku: '', productId: '', productName: '' };
+            }
+            return {
+                ...item,
+                sku: product.sku,
+                productId: product.id,
+                productName: product.name,
+            };
+        }));
+    };
 
     const updateItem = (index: number, field: keyof POItemFormRow, value: any) => {
         setItems(prev => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
     };
 
     const addItem = () => {
-        setItems(prev => [...prev, { sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+        setItems(prev => [...prev, { sku: '', productId: '', productName: '', orderedQty: 1, unitCost: 0 }]);
     };
 
     const removeItem = (index: number) => {
@@ -360,12 +551,27 @@ function POFormDialog({
 
     const totalAmount = items.reduce((sum, item) => sum + item.orderedQty * item.unitCost, 0);
 
+    // Collect SKUs already used in other rows (for a given row index)
+    const getExistingSkusForRow = (currentIndex: number): string[] => {
+        return items
+            .filter((_, i) => i !== currentIndex)
+            .map(i => i.sku)
+            .filter(Boolean);
+    };
+
+    // Global duplicate check across all items
+    const hasDuplicates = useMemo(() => {
+        const skus = items.map(i => i.sku).filter(Boolean);
+        return new Set(skus).size !== skus.length;
+    }, [items]);
+
     const canSubmit =
         supplierPartyId.trim() &&
         supplierName.trim() &&
         warehouseId.trim() &&
         expectedDate &&
-        items.every(i => i.sku.trim() && i.productName.trim() && i.orderedQty > 0 && i.unitCost >= 0);
+        !hasDuplicates &&
+        items.every(i => i.sku.trim() && i.productId && i.productName && i.orderedQty > 0 && i.unitCost >= 0);
 
     const handleSubmit = () => {
         onSubmit({
@@ -378,9 +584,11 @@ function POFormDialog({
             expectedDate: new Date(expectedDate).toISOString(),
             notes: notes.trim() || null,
             items: items.map(i => ({
-                ...i,
                 sku: i.sku.trim(),
-                productName: i.productName.trim(),
+                productId: i.productId,
+                productName: i.productName,
+                orderedQty: i.orderedQty,
+                unitCost: i.unitCost,
             })),
         });
     };
@@ -469,7 +677,15 @@ function POFormDialog({
                     {/* Items */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <Label className="text-base font-semibold">Line Items</Label>
+                            <div>
+                                <Label className="text-base font-semibold">Line Items</Label>
+                                {hasDuplicates && (
+                                    <p className="text-xs text-destructive mt-0.5 flex items-center gap-1">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        Duplicate products detected. Each product can only appear once.
+                                    </p>
+                                )}
+                            </div>
                             <Button type="button" variant="outline" size="sm" onClick={addItem}>
                                 <Plus className="h-3.5 w-3.5 mr-1" />
                                 Add Item
@@ -494,28 +710,41 @@ function POFormDialog({
                                         </Button>
                                     )}
 
-                                    <div className="grid grid-cols-3 gap-3 pr-8">
+                                    <div className="grid grid-cols-2 gap-3 pr-8">
                                         <div className="space-y-1">
-                                            <Label className="text-xs">SKU <span className="text-destructive">*</span></Label>
-                                            <Input
-                                                value={item.sku}
-                                                onChange={(e) => updateItem(index, 'sku', e.target.value)}
-                                                placeholder="SKU"
-                                                className="h-8 text-sm"
+                                            <Label className="text-xs">Product SKU <span className="text-destructive">*</span></Label>
+                                            <ProductSearchInput
+                                                products={products}
+                                                selectedSku={item.sku}
+                                                selectedProductId={item.productId}
+                                                onSelect={(product) => handleProductSelect(index, product)}
+                                                existingSkus={getExistingSkusForRow(index)}
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label className="text-xs">Product Name <span className="text-destructive">*</span></Label>
+                                            <Label className="text-xs">Product Name</Label>
                                             <Input
                                                 value={item.productName}
-                                                onChange={(e) => updateItem(index, 'productName', e.target.value)}
-                                                placeholder="Product name"
-                                                className="h-8 text-sm"
+                                                disabled
+                                                placeholder="Auto-filled from product"
+                                                className={cn(
+                                                    'h-8 text-sm bg-muted/50',
+                                                    item.productName && 'text-foreground'
+                                                )}
                                             />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-3 pr-8">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Product ID</Label>
+                                            <Input
+                                                value={item.productId}
+                                                disabled
+                                                placeholder="Auto-filled"
+                                                className="h-8 text-sm bg-muted/50 font-mono text-xs"
+                                            />
+                                        </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Quantity <span className="text-destructive">*</span></Label>
                                             <Input
@@ -805,6 +1034,7 @@ export default function PurchaseOrdersPage() {
 
     // Data
     const { data: purchaseOrders = [], isLoading, refetch } = usePurchaseOrders(businessId, user);
+    const { data: products = [] } = useProducts(businessId, user);
 
     // Mutations
     const createMutation = useCreatePO(businessId, user);
@@ -917,6 +1147,7 @@ export default function PurchaseOrdersPage() {
 
     const handleRefresh = () => {
         queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
+        queryClient.invalidateQueries({ queryKey: ['products', businessId] });
         refetch();
     };
 
@@ -1287,6 +1518,7 @@ export default function PurchaseOrdersPage() {
                 onSubmit={handleCreateSubmit}
                 isLoading={createMutation.isPending}
                 editingPO={null}
+                products={products}
             />
 
             <POFormDialog
@@ -1295,6 +1527,7 @@ export default function PurchaseOrdersPage() {
                 onSubmit={handleEditSubmit}
                 isLoading={updateMutation.isPending}
                 editingPO={editingPO}
+                products={products}
             />
 
             <PODetailDialog

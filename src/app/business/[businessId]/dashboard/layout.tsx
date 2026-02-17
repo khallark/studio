@@ -27,6 +27,7 @@ import {
   Logs,
   ListCollapse,
   Truck,
+  MessageCircleReplyIcon,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -698,6 +699,18 @@ export default function BusinessLayout({
                     icon={Truck}
                     label="Put Away"
                     isActive={pathname === `/business/${businessId}/warehouse/put-away`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/POs`}
+                    icon={MessageCircleReplyIcon}
+                    label="Purchase Orders"
+                    isActive={pathname === `/business/${businessId}/warehouse/POs`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/GRNs`}
+                    icon={Shirt}
+                    label="Process GRNs"
+                    isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
                   />
                 </NavSection>
               </SidebarMenuItem>

@@ -112,6 +112,9 @@ export async function POST(req: NextRequest) {
             phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',
             itemTitle: item.title,
             itemSku: item.sku || 'N/A',
+            returnRequested: order.returnItemsVariantIds
+              ? order.returnItemsVariantIds?.includes(item.variant_id) ? "Yes" : "No"
+              : "N/A",
             itemQuantity: item.quantity,
             itemPrice: item.price - ((item.discount_allocations)?.reduce((sum: number, item: any) => sum + Number(item?.amount || 0), 0) || 0),
             totalPrice: proportionatePrice,
@@ -148,6 +151,7 @@ export async function POST(req: NextRequest) {
           phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',
           itemTitle: 'N/A',
           itemSku: 'N/A',
+          returnRequested: "N/A",
           itemQuantity: 0,
           itemPrice: 0,
           totalPrice: Number(order.raw.total_price),
@@ -188,6 +192,7 @@ export async function POST(req: NextRequest) {
       { header: 'Phone', key: 'phone', width: 15 },
       { header: 'Item title', key: 'itemTitle', width: 30 },
       { header: 'Item SKU', key: 'itemSku', width: 15 },
+      { header: 'Return Requested', key: 'returnRequested', width: 20 },
       { header: 'Item Quantity', key: 'itemQuantity', width: 12 },
       { header: 'Item Price', key: 'itemPrice', width: 12 },
       { header: 'Total Price', key: 'totalPrice', width: 15 },

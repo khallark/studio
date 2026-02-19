@@ -90,13 +90,21 @@ export async function POST(req: NextRequest) {
       const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() || order.email;
 
       if (order.raw.line_items && order.raw.line_items.length > 0) {
+        const totalMRP = order.raw.line_items.reduce(
+          (acc: number, item: any) => acc + Number(item.price) * Number(item.quantity || 1),
+          0
+        );
         order.raw.line_items.forEach((item: any) => {
+          const itemMRP = Number(item.price) * Number(item.quantity || 1);
+          const proportion = totalMRP > 0 ? itemMRP / totalMRP : 0;
+          const proportionatePrice = Number((Number(order.raw.total_price) * proportion).toFixed(2));
+          const proportionateOutstanding = Number((Number(order.raw.total_outstanding) * proportion).toFixed(2));
           const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
           flattenedData.push({
             orderName: order.name,
             awb: order.awb ?? 'N/A',
             returnAwb: order.awb_reverse ?? 'N/A',
-            courier: order.courier ?? 'N/A',
+            courier: order.courierProvider ?? 'N/A',
             orderDate: formatDate(order.createdAt),
             lastStatusUpdate: formatDate(order.lastStatusUpdate?.toDate()?.toISOString() || ''),
             customer: customerName,
@@ -105,8 +113,9 @@ export async function POST(req: NextRequest) {
             itemTitle: item.title,
             itemSku: item.sku || 'N/A',
             itemQuantity: item.quantity,
-            itemPrice: item.price,
-            totalOrderPrice: order.totalPrice,
+            itemPrice: item.price - ((item.discount_allocations)?.reduce((sum: number, item: any) => sum + Number(item?.amount || 0), 0) || 0),
+            totalPrice: proportionatePrice,
+            totalOutstanding: proportionateOutstanding,
             discount: order.raw.total_discounts || 0,
             vendor: item.vendor || 'N/A',
             currency: order.currency,
@@ -131,7 +140,7 @@ export async function POST(req: NextRequest) {
           orderName: order.name,
           awb: order.awb ?? 'N/A',
           returnAwb: order.awb_reverse ?? 'N/A',
-          courier: order.courier ?? 'N/A',
+          courier: order.courierProvider ?? 'N/A',
           orderDate: formatDate(order.createdAt),
           lastStatusUpdate: formatDate(order.lastStatusUpdate?.toDate()?.toISOString() || ''),
           customer: customerName,
@@ -141,7 +150,8 @@ export async function POST(req: NextRequest) {
           itemSku: 'N/A',
           itemQuantity: 0,
           itemPrice: 0,
-          totalOrderPrice: order.totalPrice,
+          totalPrice: Number(order.raw.total_price),
+          totalOutstanding: Number(order.raw.total_outstanding),
           discount: order.raw.total_discounts || 0,
           vendor: 'N/A',
           currency: order.currency,
@@ -180,7 +190,8 @@ export async function POST(req: NextRequest) {
       { header: 'Item SKU', key: 'itemSku', width: 15 },
       { header: 'Item Quantity', key: 'itemQuantity', width: 12 },
       { header: 'Item Price', key: 'itemPrice', width: 12 },
-      { header: 'Total Order Price', key: 'totalOrderPrice', width: 15 },
+      { header: 'Total Price', key: 'totalPrice', width: 15 },
+      { header: 'Total Outstanding', key: 'totalOutstanding', width: 15 },
       { header: 'Discount', key: 'discount', width: 10 },
       { header: 'Vendor', key: 'vendor', width: 15 },
       { header: 'Currency', key: 'currency', width: 10 },

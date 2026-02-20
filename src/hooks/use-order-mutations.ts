@@ -235,10 +235,12 @@ export function useBulkUpdateStatus(
       orderIds,
       status,
       storeId,
+      createUPCsForNonPickupReady,
     }: {
       orderIds: string[];
       status: CustomStatus;
       storeId: string | null;
+      createUPCsForNonPickupReady: boolean;
     }) => {
       if (!storeId || !user || orderIds.length === 0) {
         throw new Error('Invalid parameters');
@@ -251,7 +253,7 @@ export function useBulkUpdateStatus(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ businessId, shop: storeId, orderIds, status }),
+        body: JSON.stringify({ businessId, shop: storeId, orderIds, status, createUPCsForNonPickupReady }),
       });
 
       if (!response.ok) {

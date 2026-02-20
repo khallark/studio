@@ -350,6 +350,9 @@ export default function BusinessOrdersPage() {
     const [orderForRefund, setOrderForRefund] = useState<Order | null>(null);
     const [isPerformPickupDialogOpen, setIsPerformPickupDialogOpen] = useState(false);
     const [orderForPickup, setOrderForPickup] = useState<Order | null>(null);
+    // RTO UPC confirmation dialog
+    const [isRTOUPCDialogOpen, setIsRTOUPCDialogOpen] = useState(false);
+    const [pendingRTOStatus, setPendingRTOStatus] = useState<'RTO Processed' | 'RTO Closed' | null>(null);
 
     // ============================================================
     // DATA FETCHING
@@ -532,7 +535,7 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            bulkUpdate.mutate({ orderIds: storeOrderIds, status, storeId }, {
+            bulkUpdate.mutate({ orderIds: storeOrderIds, status, storeId, createUPCsForNonPickupReady: false }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -700,6 +703,43 @@ export default function BusinessOrdersPage() {
         }
     };
 
+    const handleRTOBulkAction = (status: 'RTO Processed' | 'RTO Closed') => {
+        setPendingRTOStatus(status);
+        setIsRTOUPCDialogOpen(true);
+    };
+
+    const executeRTOUpdate = (createUPCsForNonPickupReady: boolean) => {
+        if (!pendingRTOStatus) return;
+        setIsRTOUPCDialogOpen(false);
+
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const order = orders.find(o => o.id === orderId);
+            if (order?.storeId) {
+                if (!ordersByStore.has(order.storeId)) ordersByStore.set(order.storeId, []);
+                ordersByStore.get(order.storeId)!.push(orderId);
+            }
+        });
+
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+        const statusToUpdate = pendingRTOStatus;
+
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            bulkUpdate.mutate(
+                { orderIds: storeOrderIds, status: statusToUpdate, storeId, createUPCsForNonPickupReady },
+                {
+                    onSuccess: () => {
+                        completedStores++;
+                        if (completedStores === totalStores) setSelectedOrders([]);
+                    }
+                }
+            );
+        });
+
+        setPendingRTOStatus(null);
+    };
+
     // ============================================================
     // EFFECTS
     // ============================================================
@@ -756,6 +796,14 @@ export default function BusinessOrdersPage() {
     };
 
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
+
+    const rtoDialogCounts = React.useMemo(() => {
+        const selectedList = orders.filter(o => selectedOrders.includes(o.id));
+        return {
+            withoutUPC: selectedList.filter(o => !o.pickupReady).length,
+            withUPC: selectedList.filter(o => o.pickupReady === true).length,
+        };
+    }, [orders, selectedOrders]);
 
     // ============================================================
     // BADGE VARIANTS
@@ -1427,7 +1475,7 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'RTO In Transit' && (
                                         <DropdownMenuItem
-                                            onClick={() => handleBulkUpdateStatus('RTO Processed')}
+                                            onClick={() => handleRTOBulkAction('RTO Processed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
                                         >
                                             {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1436,7 +1484,7 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'RTO Delivered' && (
                                         <DropdownMenuItem
-                                            onClick={() => handleBulkUpdateStatus('RTO Closed')}
+                                            onClick={() => handleRTOBulkAction('RTO Closed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
                                         >
                                             {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -2038,6 +2086,37 @@ export default function BusinessOrdersPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isRTOUPCDialogOpen} onOpenChange={setIsRTOUPCDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Create UPCs for returned orders?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Do you want to create putAway UPCs for{' '}
+                            <strong>{rtoDialogCounts.withoutUPC}</strong> orders out of{' '}
+                            <strong>{rtoDialogCounts.withUPC}</strong> orders, which do not have
+                            any existing UPC attached with them?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setPendingRTOStatus(null)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsRTOUPCDialogOpen(false);
+                                executeRTOUpdate(false);
+                            }}
+                        >
+                            No, skip UPC creation
+                        </Button>
+                        <AlertDialogAction onClick={() => executeRTOUpdate(true)}>
+                            Yes, create UPCs
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

@@ -7,10 +7,10 @@ import { UPC } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, shop, orderIds, status } = await req.json();
+        const { businessId, shop, orderIds, status, createUPCsForNonPickupReady } = await req.json();
 
-        if (!businessId || !shop || !Array.isArray(orderIds) || orderIds.length === 0 || !status) {
-            return NextResponse.json({ error: 'Business ID, Shop, a non-empty array of orderIds, and status are required' }, { status: 400 });
+        if (!businessId || !shop || !Array.isArray(orderIds) || orderIds.length === 0 || !status || typeof createUPCsForNonPickupReady !== 'boolean') {
+            return NextResponse.json({ error: 'Business ID, Shop, a non-empty array of orderIds, status and createUPCsForNonPickupReady are required' }, { status: 400 });
         }
 
         // ----- Auth -----
@@ -303,98 +303,103 @@ export async function POST(req: NextRequest) {
         // STEP 4: Create UPCs for orders without any
         // ============================================
         if (isRTOStatus && ordersWithoutUPCs.length > 0) {
-            console.log(`📦 Creating UPCs for ${ordersWithoutUPCs.length} orders without UPCs...`);
+            if (!createUPCsForNonPickupReady) {
+                // User chose to skip UPC creation for orders without existing UPCs
+                console.log(`⏭️ Skipping UPC creation for ${ordersWithoutUPCs.length} orders (user opted out)`);
+            } else {
+                console.log(`📦 Creating UPCs for ${ordersWithoutUPCs.length} orders without UPCs...`);
 
-            for (const orderId of ordersWithoutUPCs) {
-                try {
-                    // Get order details
-                    const orderDoc = await ordersColRef.doc(String(orderId)).get();
-                    if (!orderDoc.exists) continue;
+                for (const orderId of ordersWithoutUPCs) {
+                    try {
+                        // Get order details
+                        const orderDoc = await ordersColRef.doc(String(orderId)).get();
+                        if (!orderDoc.exists) continue;
 
-                    const orderData = orderDoc.data();
-                    const lineItems = orderData?.raw?.line_items || [];
+                        const orderData = orderDoc.data();
+                        const lineItems = orderData?.raw?.line_items || [];
 
-                    if (lineItems.length === 0) {
-                        console.warn(`⚠️ Order ${orderId} has no line items, skipping UPC creation`);
-                        continue;
-                    }
-
-                    const batch = db.batch();
-                    let createdCount = 0;
-
-                    for (const item of lineItems) {
-                        const productId = String(item.product_id);
-                        const variantId = String(item.variant_id);
-                        const quantity = Number(item.quantity) || 1;
-
-                        // Get product mapping to find business product
-                        const storeProductDoc = await db
-                            .doc(`accounts/${shop}/products/${productId}`)
-                            .get();
-
-                        if (!storeProductDoc.exists) {
-                            console.warn(`⚠️ Store product ${productId} not found for order ${orderId}`);
+                        if (lineItems.length === 0) {
+                            console.warn(`⚠️ Order ${orderId} has no line items, skipping UPC creation`);
                             continue;
                         }
 
-                        const storeProductData = storeProductDoc.data();
-                        const variantMapping = storeProductData?.variantMappingDetails?.[variantId]
-                            || storeProductData?.variantMappings?.[variantId];
+                        const batch = db.batch();
+                        let createdCount = 0;
 
-                        if (!variantMapping) {
-                            console.warn(`⚠️ No mapping for variant ${variantId} in order ${orderId}`);
-                            continue;
-                        }
+                        for (const item of lineItems) {
+                            const productId = String(item.product_id);
+                            const variantId = String(item.variant_id);
+                            const quantity = Number(item.quantity) || 1;
 
-                        const actualBusinessId = typeof variantMapping === 'object'
-                            ? variantMapping.businessId
-                            : null;
+                            // Get product mapping to find business product
+                            const storeProductDoc = await db
+                                .doc(`accounts/${shop}/products/${productId}`)
+                                .get();
 
-                        const businessProductSku = typeof variantMapping === 'object'
-                            ? variantMapping.businessProductSku
-                            : variantMapping;
-
-                        if (!actualBusinessId) {
-                            console.warn(`⚠️ No businessId found in variant mapping for order ${orderId}`);
-                            continue;
-                        }
-
-                        // Create UPCs for this line item (one per quantity)
-                        for (let i = 0; i < quantity; i++) {
-                            const upcRef = db.collection(`users/${actualBusinessId}/upcs`).doc();
-
-                            const upcData: UPC = {
-                                id: upcRef.id,
-                                createdAt: Timestamp.now(),
-                                updatedAt: Timestamp.now(),
-                                createdBy: result.userId!,
-                                updatedBy: result.userId!,
-                                storeId: shop,
-                                orderId: String(orderId),
-                                putAway: 'inbound', // ✅ Set to inbound for RTO
-                                productId: businessProductSku,
-                                warehouseId: null,
-                                zoneId: null,
-                                rackId: null,
-                                shelfId: null,
-                                placementId: null,
+                            if (!storeProductDoc.exists) {
+                                console.warn(`⚠️ Store product ${productId} not found for order ${orderId}`);
+                                continue;
                             }
 
-                            batch.set(upcRef, upcData);
+                            const storeProductData = storeProductDoc.data();
+                            const variantMapping = storeProductData?.variantMappingDetails?.[variantId]
+                                || storeProductData?.variantMappings?.[variantId];
 
-                            createdCount++;
+                            if (!variantMapping) {
+                                console.warn(`⚠️ No mapping for variant ${variantId} in order ${orderId}`);
+                                continue;
+                            }
+
+                            const actualBusinessId = typeof variantMapping === 'object'
+                                ? variantMapping.businessId
+                                : null;
+
+                            const businessProductSku = typeof variantMapping === 'object'
+                                ? variantMapping.businessProductSku
+                                : variantMapping;
+
+                            if (!actualBusinessId) {
+                                console.warn(`⚠️ No businessId found in variant mapping for order ${orderId}`);
+                                continue;
+                            }
+
+                            // Create UPCs for this line item (one per quantity)
+                            for (let i = 0; i < quantity; i++) {
+                                const upcRef = db.collection(`users/${actualBusinessId}/upcs`).doc();
+
+                                const upcData: UPC = {
+                                    id: upcRef.id,
+                                    createdAt: Timestamp.now(),
+                                    updatedAt: Timestamp.now(),
+                                    createdBy: result.userId!,
+                                    updatedBy: result.userId!,
+                                    storeId: shop,
+                                    orderId: String(orderId),
+                                    putAway: 'inbound', // ✅ Set to inbound for RTO
+                                    productId: businessProductSku,
+                                    warehouseId: null,
+                                    zoneId: null,
+                                    rackId: null,
+                                    shelfId: null,
+                                    placementId: null,
+                                }
+
+                                batch.set(upcRef, upcData);
+
+                                createdCount++;
+                            }
                         }
-                    }
 
-                    if (createdCount > 0) {
-                        await batch.commit();
-                        upcCreateCount += createdCount;
-                        console.log(`✅ Created ${createdCount} UPCs for order ${orderId}`);
-                    }
+                        if (createdCount > 0) {
+                            await batch.commit();
+                            upcCreateCount += createdCount;
+                            console.log(`✅ Created ${createdCount} UPCs for order ${orderId}`);
+                        }
 
-                } catch (createError) {
-                    console.error(`❌ Error creating UPCs for order ${orderId}:`, createError);
-                    // Continue with other orders
+                    } catch (createError) {
+                        console.error(`❌ Error creating UPCs for order ${orderId}:`, createError);
+                        // Continue with other orders
+                    }
                 }
             }
         }

@@ -201,6 +201,7 @@ export async function POST(req: NextRequest) {
                 updatedBy: result.userId!,
                 storeId: shop,
                 orderId: String(orderId),
+                grnRef: null,
                 putAway: 'inbound',
                 productId: businessProductSku,
                 warehouseId: null,

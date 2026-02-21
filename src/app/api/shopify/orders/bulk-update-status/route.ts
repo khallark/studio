@@ -375,6 +375,7 @@ export async function POST(req: NextRequest) {
                                     updatedBy: result.userId!,
                                     storeId: shop,
                                     orderId: String(orderId),
+                                    grnRef: null,
                                     putAway: 'inbound', // ✅ Set to inbound for RTO
                                     productId: businessProductSku,
                                     warehouseId: null,

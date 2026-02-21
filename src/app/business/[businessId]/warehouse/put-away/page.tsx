@@ -651,9 +651,8 @@ function DateGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway
 // GRN-GROUPED UPC LIST
 // ============================================================
 
-function GRNGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void }) {
+function GRNGroupedUPCList({ upcs, onPutAway, searchQuery }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void; searchQuery: string }) {
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
-    const [searchQuery, setSearchQuery] = useState('');
 
     // Search matches UPC id, product SKU, or GRN ref
     const filteredUPCs = upcs.filter(upc =>
@@ -715,16 +714,7 @@ function GRNGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway:
     return (
         <div className="space-y-4">
             {/* Toolbar */}
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by GRN reference, UPC ID, or product SKU..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                    />
-                </div>
+            <div className="flex items-center justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={toggleSelectAll}>
                     {selectedUPCs.size === filteredUPCs.length && filteredUPCs.length > 0 ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -797,6 +787,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
     onPutAway: (upcs: GroupedUPC[]) => void;
 }) {
     const [activeSubTab, setActiveSubTab] = useState('grn');
+    const [grnSearchQuery, setGrnSearchQuery] = useState('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
 
@@ -826,10 +817,38 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
 
     return (
         <div className="space-y-4">
-            {/* Date range filter — hidden on GRN sub-tab (it has its own search bar) */}
-            {activeSubTab !== 'grn' && (
-                <Card><CardContent className="p-4">
-                    <div className="flex flex-wrap items-center gap-3">
+            {/* Filter bar — swaps between GRN search and date range filter */}
+            <Card><CardContent className="p-4 min-h-[56px] flex items-center">
+                {activeSubTab === 'grn' ? (
+                    <div className="flex flex-wrap items-center gap-3 w-full">
+                        <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium">Search GRNs</span>
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by GRN reference, UPC ID, or product SKU..."
+                                value={grnSearchQuery}
+                                onChange={e => setGrnSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-sm"
+                            />
+                        </div>
+                        {grnSearchQuery && (
+                            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setGrnSearchQuery('')}>
+                                <X className="h-3.5 w-3.5 mr-1" />Clear
+                            </Button>
+                        )}
+                        {grnSearchQuery && (
+                            <span className="text-xs text-muted-foreground ml-auto">
+                                {grn.filter(upc =>
+                                    upc.id.toLowerCase().includes(grnSearchQuery.toLowerCase()) ||
+                                    upc.productId.toLowerCase().includes(grnSearchQuery.toLowerCase()) ||
+                                    (upc.grnRef && upc.grnRef.toLowerCase().includes(grnSearchQuery.toLowerCase()))
+                                ).length} UPC(s) matched
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-3 w-full">
                         <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="text-sm font-medium">Filter by date</span>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -853,8 +872,8 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
                             </span>
                         )}
                     </div>
-                </CardContent></Card>
-            )}
+                )}
+            </CardContent></Card>
 
             {/* Sub-tabs: GRN first, then RTO, DTO, Unknown */}
             <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
@@ -882,7 +901,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
                 </TabsList>
 
                 <TabsContent value="grn" className="mt-4">
-                    <GRNGroupedUPCList upcs={grn} onPutAway={onPutAway} />
+                    <GRNGroupedUPCList upcs={grn} onPutAway={onPutAway} searchQuery={grnSearchQuery} />
                 </TabsContent>
                 <TabsContent value="rto" className="mt-4">
                     <DateGroupedUPCList upcs={rto} onPutAway={onPutAway} />

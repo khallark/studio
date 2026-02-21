@@ -51,25 +51,19 @@ export async function POST(req: NextRequest) {
         for (const item of items) {
             if (!item.sku || !item.productName) {
                 return NextResponse.json(
-                    { error: 'Validation Error', message: 'Each item must have sku, and productName' },
+                    { error: 'Validation Error', message: 'Each item must have sku and productName' },
+                    { status: 400 }
+                );
+            }
+            if (typeof item.expectedQty !== 'number' || item.expectedQty < 0) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Item ${item.sku}: expectedQty must be >= 0` },
                     { status: 400 }
                 );
             }
             if (typeof item.receivedQty !== 'number' || item.receivedQty < 0) {
                 return NextResponse.json(
-                    { error: 'Validation Error', message: 'receivedQty must be >= 0' },
-                    { status: 400 }
-                );
-            }
-            if (typeof item.acceptedQty !== 'number' || item.acceptedQty < 0) {
-                return NextResponse.json(
-                    { error: 'Validation Error', message: 'acceptedQty must be >= 0' },
-                    { status: 400 }
-                );
-            }
-            if (item.acceptedQty + (item.rejectedQty || 0) > item.receivedQty) {
-                return NextResponse.json(
-                    { error: 'Validation Error', message: `For SKU ${item.sku}: acceptedQty + rejectedQty cannot exceed receivedQty` },
+                    { error: 'Validation Error', message: `Item ${item.sku}: receivedQty must be >= 0` },
                     { status: 400 }
                 );
             }
@@ -86,7 +80,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: 'Validation Error',
-                    message: `Duplicate SKUs found in GRN items: ${[...new Set(duplicates)].join(', ')}. Each product can only appear once.`,
+                    message: `Duplicate SKUs found: ${[...new Set(duplicates)].join(', ')}`,
                 },
                 { status: 400 }
             );
@@ -100,10 +94,7 @@ export async function POST(req: NextRequest) {
         const { userId } = result;
 
         if (!userId) {
-            return NextResponse.json(
-                { error: 'User not logged in' },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: 'User not logged in' }, { status: 401 });
         }
 
         if (!result.authorised) {
@@ -119,48 +110,34 @@ export async function POST(req: NextRequest) {
         const missingProducts: string[] = [];
 
         for (const item of items) {
-            const productSnap = await productsRef
-                .where('sku', '==', item.sku)
-                .limit(1)
-                .get();
-
-            if (productSnap.empty) {
-                missingProducts.push(item.sku);
-            }
+            const productSnap = await productsRef.where('sku', '==', item.sku).limit(1).get();
+            if (productSnap.empty) missingProducts.push(item.sku);
         }
 
         if (missingProducts.length > 0) {
             return NextResponse.json(
-                {
-                    error: 'Validation Error',
-                    message: `Products not found for SKUs: ${missingProducts.join(', ')}. Please ensure all products exist.`,
-                },
+                { error: 'Validation Error', message: `Products not found for SKUs: ${missingProducts.join(', ')}` },
                 { status: 400 }
             );
         }
 
         // ============================================================
         // VALIDATE PO EXISTS AND IS RECEIVABLE
+        // GRNs can be created until PO is manually closed/cancelled
         // ============================================================
 
         const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc(poId);
         const poSnap = await poRef.get();
 
         if (!poSnap.exists) {
-            return NextResponse.json(
-                { error: 'Not Found', message: 'Purchase order not found' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'Not Found', message: 'Purchase order not found' }, { status: 404 });
         }
 
         const poData = poSnap.data()! as PurchaseOrder;
 
-        if (!['confirmed', 'partially_received'].includes(poData.status)) {
+        if (['draft', 'closed', 'cancelled'].includes(poData.status)) {
             return NextResponse.json(
-                {
-                    error: 'Validation Error',
-                    message: `Cannot create GRN for a PO with status '${poData.status}'. PO must be 'confirmed' or 'partially_received'.`,
-                },
+                { error: 'Validation Error', message: `Cannot create GRN for PO with status '${poData.status}'. PO must not be draft, closed, or cancelled.` },
                 { status: 400 }
             );
         }
@@ -172,11 +149,9 @@ export async function POST(req: NextRequest) {
         const counterRef = db.collection('users').doc(businessId).collection('counters').doc('grns');
         const counterSnap = await counterRef.get();
         let nextNumber = 1;
-
         if (counterSnap.exists) {
             nextNumber = (counterSnap.data()?.lastNumber || 0) + 1;
         }
-
         await counterRef.set({ lastNumber: nextNumber }, { merge: true });
         const grnNumber = `GRN-${String(nextNumber).padStart(5, '0')}`;
 
@@ -186,27 +161,24 @@ export async function POST(req: NextRequest) {
 
         const now = Timestamp.now();
 
-        const grnItems: GRNItem[] = items.map((item: any) => ({
-            sku: item.sku,
-            productName: item.productName,
+        const grnItems: GRNItem[] = items.map((item: any) => {
+            const notReceivedQty = Math.max(0, item.expectedQty - item.receivedQty);
+            return {
+                sku: item.sku,
+                productName: item.productName,
+                expectedQty: item.expectedQty,
+                receivedQty: item.receivedQty,
+                notReceivedQty,
+                unitCost: item.unitCost || 0,
+                totalCost: Math.round((item.receivedQty * (item.unitCost || 0)) * 100) / 100,
+            };
+        });
 
-            receivedQty: item.receivedQty,
-            acceptedQty: item.acceptedQty,
-            rejectedQty: item.rejectedQty || 0,
-            rejectionReason: item.rejectionReason || null,
+        const totalExpectedQty = grnItems.reduce((s, i) => s + i.expectedQty, 0);
+        const totalReceivedQty = grnItems.reduce((s, i) => s + i.receivedQty, 0);
+        const totalNotReceivedQty = grnItems.reduce((s, i) => s + i.notReceivedQty, 0);
+        const totalReceivedValue = grnItems.reduce((s, i) => s + i.totalCost, 0);
 
-            unitCost: item.unitCost || 0,
-            totalCost: Math.round((item.acceptedQty * (item.unitCost || 0)) * 100) / 100,
-
-            putInLocations: item.putInLocations || [],
-        }));
-
-        const totalReceivedQty = grnItems.reduce((sum: number, i) => sum + i.receivedQty, 0);
-        const totalAcceptedQty = grnItems.reduce((sum: number, i) => sum + i.acceptedQty, 0);
-        const totalRejectedQty = grnItems.reduce((sum: number, i) => sum + i.rejectedQty, 0);
-        const totalAcceptedValue = grnItems.reduce((sum: number, i) => sum + i.totalCost, 0);
-
-        // Create GRN
         const grnRef = db.collection('users').doc(businessId).collection('grns').doc();
 
         const grnData: GRN = {
@@ -217,102 +189,78 @@ export async function POST(req: NextRequest) {
             poNumber: poNumber || poData.poNumber,
             warehouseId,
             warehouseName: warehouseName || '',
-
             status: 'draft',
-
-            receivedSkus: grnItems.map((item: GRNItem) => item.sku),
+            receivedSkus: grnItems.map(i => i.sku),
             items: grnItems,
-
-            totalAcceptedValue: Math.round(totalAcceptedValue * 100) / 100,
+            totalExpectedQty,
             totalReceivedQty,
-            totalAcceptedQty,
-            totalRejectedQty,
-
+            totalNotReceivedQty,
+            totalReceivedValue: Math.round(totalReceivedValue * 100) / 100,
             receivedBy: userId,
-            inspectedBy: null,
             receivedAt: now,
             createdAt: now,
             updatedAt: now,
-
             notes: notes || null,
         };
 
         // ============================================================
-        // SAVE GRN & UPDATE PO IN A BATCH
+        // SAVE GRN & UPDATE PO
         // ============================================================
 
         const batch = db.batch();
         batch.set(grnRef, grnData);
 
-        // Update PO received quantities
+        // Update PO item receivedQty
         const updatedPoItems: PurchaseOrderItem[] = [...poData.items];
         for (const grnItem of grnItems) {
-            const poItemIndex = updatedPoItems.findIndex((pi: PurchaseOrderItem) => pi.sku === grnItem.sku);
-            if (poItemIndex !== -1) {
-                updatedPoItems[poItemIndex] = {
-                    ...updatedPoItems[poItemIndex],
-                    receivedQty: (updatedPoItems[poItemIndex].receivedQty || 0) + grnItem.acceptedQty,
-                    rejectedQty: (updatedPoItems[poItemIndex].rejectedQty || 0) + grnItem.rejectedQty,
+            const idx = updatedPoItems.findIndex(pi => pi.sku === grnItem.sku);
+            if (idx !== -1) {
+                updatedPoItems[idx] = {
+                    ...updatedPoItems[idx],
+                    receivedQty: grnItem.receivedQty,
+                    notReceivedQty: Math.max(0, grnItem.expectedQty - grnItem.receivedQty),
                 };
-
-                // Determine item-level status
-                const poItem = updatedPoItems[poItemIndex];
-                if (poItem.receivedQty >= poItem.orderedQty) {
-                    poItem.status = 'fully_received';
-                } else if (poItem.receivedQty > 0) {
-                    poItem.status = 'partially_received';
+                
+                const poItem = updatedPoItems[idx];
+                if (poItem.receivedQty > 0) {
+                    if (poItem.receivedQty < poItem.expectedQty)
+                        poItem.status = 'partially_received';
+                    else
+                        poItem.status = 'fully_received';
+                } else {
+                    poItem.status = 'pending';
                 }
             }
         }
 
-        // Determine PO-level status
-        const allFullyReceived = updatedPoItems.every((pi: PurchaseOrderItem) => pi.status === 'fully_received');
-        const anyReceived = updatedPoItems.some(
-            (pi: PurchaseOrderItem) => pi.status === 'partially_received' || pi.status === 'fully_received'
-        );
-
+        // Recalculate PO status
         let newPoStatus = poData.status;
-        if (allFullyReceived) {
-            newPoStatus = 'fully_received';
-        } else if (anyReceived) {
-            newPoStatus = 'partially_received';
+        if (poData.status === 'confirmed') {
+            const anyPartiallyReceived = updatedPoItems.some(pi => pi.status === 'partially_received');
+            const allNotReceived = updatedPoItems.every(pi => pi.status === 'pending');
+            const allFullyReceived = updatedPoItems.every(pi => pi.status === 'fully_received');
+            if (anyPartiallyReceived) newPoStatus = 'partially_received';
+            else if (allFullyReceived) newPoStatus = 'draft';
+            else if (allNotReceived) newPoStatus = 'fully_received';
         }
 
-        const poUpdate: Partial<PurchaseOrder> = {
+        batch.update(poRef, {
             items: updatedPoItems,
             status: newPoStatus,
             updatedAt: now,
-        };
-
-        if (newPoStatus === 'fully_received') {
-            poUpdate.completedAt = now;
-        }
-
-        batch.update(poRef, poUpdate);
+        });
 
         await batch.commit();
 
-        // ============================================================
-        // RETURN SUCCESS RESPONSE
-        // ============================================================
-
         return NextResponse.json(
-            {
-                success: true,
-                grnId: grnRef.id,
-                grnNumber,
-                poStatus: newPoStatus,
-            },
+            { success: true, grnId: grnRef.id, grnNumber, poStatus: newPoStatus },
             { status: 200 }
         );
 
     } catch (error: any) {
         console.error('❌ GRN Create API error:', error);
         return NextResponse.json(
-            {
-                error: 'Internal Server Error',
-                message: error.message || 'An unexpected error occurred',
-            },
+            { error: 'Internal Server Error', message: error.message || 'An unexpected error occurred' },
             { status: 500 }
         );
     }

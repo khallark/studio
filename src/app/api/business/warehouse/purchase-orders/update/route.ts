@@ -227,10 +227,10 @@ export async function POST(req: NextRequest) {
             const poItems: PurchaseOrderItem[] = items.map((item: any) => ({
                 sku: item.sku,
                 productName: item.productName,
-                orderedQty: item.orderedQty,
+                expectedQty: item.expectedQty,
                 unitCost: item.unitCost,
                 receivedQty: 0,
-                rejectedQty: 0,
+                notReceivedQty: item.expectedQty,
                 status: 'pending',
             }));
 
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
             updateData.orderedSkus = poItems.map((item: PurchaseOrderItem) => item.sku);
             updateData.itemCount = poItems.length;
             updateData.totalAmount = Math.round(
-                poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.orderedQty * item.unitCost), 0) * 100
+                poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.expectedQty * item.unitCost), 0) * 100
             ) / 100;
         }
 

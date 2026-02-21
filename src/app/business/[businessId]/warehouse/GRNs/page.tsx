@@ -11,41 +11,33 @@ import {
     Plus,
     Search,
     RefreshCw,
-    Check,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
     FileText,
     Trash2,
-    Edit3,
     Eye,
-    X,
     PackageCheck,
     Ban,
-    Archive,
     ClipboardCheck,
     CheckCircle2,
     XCircle,
     ArrowUpDown,
     Filter,
     MoreHorizontal,
-    Warehouse,
-    CalendarDays,
     IndianRupee,
     Hash,
     Loader2,
     Package,
-    ShieldCheck,
     AlertTriangle,
     Link2,
-    ArrowDownToLine,
-    MapPin,
+    PackagePlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -96,48 +88,16 @@ import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
 // TYPES
 // ============================================================
 
-type SortField = 'createdAt' | 'receivedAt' | 'totalAcceptedValue' | 'grnNumber';
+type SortField = 'createdAt' | 'receivedAt' | 'totalReceivedValue' | 'grnNumber';
 type SortOrder = 'asc' | 'desc';
 
 interface GRNItemFormRow {
     sku: string;
     productName: string;
+    expectedQty: number;
     receivedQty: number;
-    acceptedQty: number;
-    rejectedQty: number;
-    rejectionReason: string | null;
+    notReceivedQty: number;
     unitCost: number;
-    maxQty: number;
-}
-
-interface WarehouseItem {
-    id: string;
-    name: string;
-    code: string;
-}
-
-interface ZoneItem {
-    id: string;
-    name: string;
-    code: string;
-    warehouseId: string;
-}
-
-interface RackItem {
-    id: string;
-    name: string;
-    code: string;
-    zoneId: string;
-    warehouseId: string;
-}
-
-interface ShelfItem {
-    id: string;
-    name: string;
-    code: string;
-    rackId: string;
-    zoneId: string;
-    warehouseId: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -153,7 +113,7 @@ const statusConfig: Record<GRNStatus, { label: string; color: string; bg: string
 };
 
 function formatDate(timestamp: Timestamp | null): string {
-    if (!timestamp) return '—';
+    if (!timestamp) return '\u2014';
     try {
         return timestamp.toDate().toLocaleDateString('en-IN', {
             day: '2-digit',
@@ -161,7 +121,7 @@ function formatDate(timestamp: Timestamp | null): string {
             year: 'numeric',
         });
     } catch {
-        return '—';
+        return '\u2014';
     }
 }
 
@@ -208,6 +168,11 @@ function useGRNs(businessId: string | null, user: User | null | undefined) {
     });
 }
 
+/**
+ * Fetches POs that can receive GRNs.
+ * GRNs can be created for POs in 'confirmed' or 'partially_received' status.
+ * PO is only closed manually by the user.
+ */
 function useReceivablePOs(businessId: string | null, user: User | null | undefined) {
     return useQuery({
         queryKey: ['receivablePOs', businessId],
@@ -229,273 +194,6 @@ function useReceivablePOs(businessId: string | null, user: User | null | undefin
         enabled: !!businessId && !!user,
         staleTime: 30 * 1000,
     });
-}
-
-// ============================================================
-// WAREHOUSE FETCHING (warehouses loaded once, zones/racks/shelves per-item)
-// ============================================================
-
-function useWarehouses(
-    open: boolean,
-    businessId: string,
-    user: User | null | undefined
-) {
-    const [warehouses, setWarehouses] = React.useState<WarehouseItem[]>([]);
-    const [isLoading, setIsLoading] = React.useState(false);
-
-    React.useEffect(() => {
-        if (!open || !businessId || !user) return;
-
-        const fetchWarehouses = async () => {
-            setIsLoading(true);
-            const idToken = await user.getIdToken();
-            const res = await fetch(
-                `/api/business/warehouse/list-warehouses?businessId=${businessId}`,
-                { headers: { Authorization: `Bearer ${idToken}` } }
-            );
-            const data = await res.json();
-            setWarehouses(data.warehouses || []);
-            setIsLoading(false);
-        };
-
-        fetchWarehouses();
-    }, [open, businessId, user]);
-
-    return { warehouses, isLoading };
-}
-
-// Per-item cascading location selector row
-function ItemLocationRow({
-    item,
-    warehouses,
-    isLoadingWarehouses,
-    businessId,
-    user,
-    location,
-    onLocationChange,
-}: {
-    item: { sku: string; productName: string; acceptedQty: number; unitCost: number };
-    warehouses: WarehouseItem[];
-    isLoadingWarehouses: boolean;
-    businessId: string;
-    user: User | null | undefined;
-    location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
-    onLocationChange: (loc: { warehouseId: string; zoneId: string; rackId: string; shelfId: string }) => void;
-}) {
-    const [zones, setZones] = React.useState<ZoneItem[]>([]);
-    const [racks, setRacks] = React.useState<RackItem[]>([]);
-    const [shelves, setShelves] = React.useState<ShelfItem[]>([]);
-
-    const [isLoadingZones, setIsLoadingZones] = React.useState(false);
-    const [isLoadingRacks, setIsLoadingRacks] = React.useState(false);
-    const [isLoadingShelves, setIsLoadingShelves] = React.useState(false);
-
-    const { warehouseId, zoneId, rackId, shelfId } = location;
-
-    // Fetch Zones when warehouse changes
-    React.useEffect(() => {
-        if (!warehouseId || !user) { setZones([]); return; }
-
-        const fetchZones = async () => {
-            setIsLoadingZones(true);
-            const idToken = await user.getIdToken();
-            const res = await fetch(
-                `/api/business/warehouse/list-zones?businessId=${businessId}&warehouseId=${warehouseId}`,
-                { headers: { Authorization: `Bearer ${idToken}` } }
-            );
-            const data = await res.json();
-            setZones(data.zones || []);
-            setIsLoadingZones(false);
-        };
-
-        fetchZones();
-    }, [warehouseId, businessId, user]);
-
-    // Fetch Racks when zone changes
-    React.useEffect(() => {
-        if (!zoneId || !user) { setRacks([]); return; }
-
-        const fetchRacks = async () => {
-            setIsLoadingRacks(true);
-            const idToken = await user.getIdToken();
-            const res = await fetch(
-                `/api/business/warehouse/list-racks?businessId=${businessId}&zoneId=${zoneId}`,
-                { headers: { Authorization: `Bearer ${idToken}` } }
-            );
-            const data = await res.json();
-            setRacks(data.racks || []);
-            setIsLoadingRacks(false);
-        };
-
-        fetchRacks();
-    }, [zoneId, businessId, user]);
-
-    // Fetch Shelves when rack changes
-    React.useEffect(() => {
-        if (!rackId || !user) { setShelves([]); return; }
-
-        const fetchShelves = async () => {
-            setIsLoadingShelves(true);
-            const idToken = await user.getIdToken();
-            const res = await fetch(
-                `/api/business/warehouse/list-shelves?businessId=${businessId}&rackId=${rackId}`,
-                { headers: { Authorization: `Bearer ${idToken}` } }
-            );
-            const data = await res.json();
-            setShelves(data.shelves || []);
-            setIsLoadingShelves(false);
-        };
-
-        fetchShelves();
-    }, [rackId, businessId, user]);
-
-    const setWarehouse = (val: string) => {
-        onLocationChange({ warehouseId: val, zoneId: '', rackId: '', shelfId: '' });
-    };
-    const setZone = (val: string) => {
-        onLocationChange({ ...location, zoneId: val, rackId: '', shelfId: '' });
-    };
-    const setRack = (val: string) => {
-        onLocationChange({ ...location, rackId: val, shelfId: '' });
-    };
-    const setShelf = (val: string) => {
-        onLocationChange({ ...location, shelfId: val });
-    };
-
-    const isComplete = warehouseId && zoneId && rackId && shelfId;
-
-    // Breadcrumb names
-    const whName = warehouses.find(w => w.id === warehouseId)?.name;
-    const znName = zones.find(z => z.id === zoneId)?.name;
-    const rkName = racks.find(r => r.id === rackId)?.name;
-    const shName = shelves.find(s => s.id === shelfId)?.name;
-
-    return (
-        <div className="p-3 border rounded-lg space-y-3 bg-muted/20">
-            {/* Product info header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="font-medium text-sm">{item.productName}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                    <Badge variant="outline" className="text-xs font-medium text-emerald-600 border-emerald-200 bg-emerald-50">
-                        {item.acceptedQty} units
-                    </Badge>
-                    <span className="text-muted-foreground">{formatCurrency(item.acceptedQty * item.unitCost)}</span>
-                </div>
-            </div>
-
-            {/* 4 cascading location selects in a grid */}
-            <div className="grid grid-cols-4 gap-2">
-                {/* Warehouse */}
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Warehouse</Label>
-                    <Select value={warehouseId} onValueChange={setWarehouse}>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Warehouse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingWarehouses ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
-                            ) : warehouses.length === 0 ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
-                            ) : (
-                                warehouses.map(w => (
-                                    <SelectItem key={w.id} value={w.id}>
-                                        {w.name} ({w.code})
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Zone */}
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Zone</Label>
-                    <Select value={zoneId} onValueChange={setZone} disabled={!warehouseId}>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Zone" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingZones ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
-                            ) : zones.length === 0 ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
-                            ) : (
-                                zones.map(z => (
-                                    <SelectItem key={z.id} value={z.id}>
-                                        {z.name} ({z.code})
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Rack */}
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Rack</Label>
-                    <Select value={rackId} onValueChange={setRack} disabled={!zoneId}>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Rack" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingRacks ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
-                            ) : racks.length === 0 ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
-                            ) : (
-                                racks.map(r => (
-                                    <SelectItem key={r.id} value={r.id}>
-                                        {r.name} ({r.code})
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Shelf */}
-                <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Shelf</Label>
-                    <Select value={shelfId} onValueChange={setShelf} disabled={!rackId}>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Shelf" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingShelves ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
-                            ) : shelves.length === 0 ? (
-                                <div className="p-2 text-center text-xs text-muted-foreground">None found</div>
-                            ) : (
-                                shelves.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                        {s.name} ({s.code})
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            {/* Location breadcrumb when complete */}
-            {isComplete && (
-                <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-md">
-                    <CheckCircle2 className="h-3 w-3 shrink-0" />
-                    <span>{whName}</span>
-                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
-                    <span>{znName}</span>
-                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
-                    <span>{rkName}</span>
-                    <ChevronDown className="h-2.5 w-2.5 -rotate-90" />
-                    <span>{shName}</span>
-                </div>
-            )}
-        </div>
-    );
 }
 
 // ============================================================
@@ -613,36 +311,27 @@ function useDeleteGRN(businessId: string | null, user: User | null | undefined) 
     });
 }
 
-function useBulkInward(businessId: string | null, user: User | null | undefined) {
+function useConfirmPutAway(businessId: string | null, user: User | null | undefined) {
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
     return useMutation({
-        mutationFn: async (data: {
-            grnId: string;
-            items: {
-                sku: string;
-                productName: string;
-                acceptedQty: number;
-                unitCost: number;
-                location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
-            }[];
-        }) => {
+        mutationFn: async (grnId: string) => {
             if (!businessId || !user) throw new Error('Invalid parameters');
 
             const idToken = await user.getIdToken();
-            const response = await fetch('/api/business/warehouse/bulk-inward-products', {
+            const response = await fetch('/api/business/warehouse/grns/confirm-put-away', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${idToken}`,
                 },
-                body: JSON.stringify({ businessId, ...data }),
+                body: JSON.stringify({ businessId, grnId }),
             });
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.message || errData.error || 'Failed to perform GRN inward');
+                throw new Error(errData.message || errData.error || 'Failed to confirm put away');
             }
 
             return response.json();
@@ -652,12 +341,12 @@ function useBulkInward(businessId: string | null, user: User | null | undefined)
             queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
             toast({
-                title: 'GRN Performed Successfully',
-                description: `${data.items?.length || 0} product(s) inwarded from ${data.grnNumber}.`,
+                title: 'Put Away Confirmed',
+                description: `${data.totalUPCsCreated} UPC(s) created from ${data.grnNumber}. GRN marked as completed.`,
             });
         },
         onError: (error: Error) => {
-            toast({ title: 'GRN Inward Failed', description: error.message, variant: 'destructive' });
+            toast({ title: 'Put Away Failed', description: error.message, variant: 'destructive' });
         },
     });
 }
@@ -685,23 +374,22 @@ function GRNFormDialog({
 
     const selectedPO = receivablePOs.find(po => po.id === selectedPOId) || null;
 
+    // When PO is selected, populate items with expected quantities.
+    // Expected = expectedQty - receivedSoFar (from PO tracking).
+    // All items shown since GRNs are allowed until PO is manually closed.
     React.useEffect(() => {
         if (selectedPO) {
-            const formItems: GRNItemFormRow[] = selectedPO.items
-                .filter(item => item.receivedQty < item.orderedQty)
-                .map(item => {
-                    const remaining = item.orderedQty - item.receivedQty;
-                    return {
-                        sku: item.sku,
-                        productName: item.productName,
-                        receivedQty: remaining,
-                        acceptedQty: remaining,
-                        rejectedQty: 0,
-                        rejectionReason: null,
-                        unitCost: item.unitCost,
-                        maxQty: remaining,
-                    };
-                });
+            const formItems: GRNItemFormRow[] = selectedPO.items.map(item => {
+                const expectedQty = Math.max(0, item.expectedQty - (item.receivedQty || 0));
+                return {
+                    sku: item.sku,
+                    productName: item.productName,
+                    expectedQty,
+                    receivedQty: expectedQty, // Default: received = expected
+                    notReceivedQty: 0,
+                    unitCost: item.unitCost,
+                };
+            });
             setItems(formItems);
         } else {
             setItems([]);
@@ -716,42 +404,41 @@ function GRNFormDialog({
         }
     }, [open]);
 
-    const updateItem = (index: number, field: keyof GRNItemFormRow, value: any) => {
+    const updateReceivedQty = (index: number, value: number) => {
         setItems(prev => prev.map((item, i) => {
             if (i !== index) return item;
-            const updated = { ...item, [field]: value };
-            if (field === 'receivedQty' || field === 'acceptedQty') {
-                const received = field === 'receivedQty' ? value : updated.receivedQty;
-                const accepted = field === 'acceptedQty' ? value : updated.acceptedQty;
-                updated.rejectedQty = Math.max(0, received - accepted);
-            }
-            return updated;
+            const receivedQty = Math.max(0, value);
+            return {
+                ...item,
+                receivedQty,
+                notReceivedQty: Math.max(0, item.expectedQty - receivedQty),
+            };
         }));
     };
 
-    const totalAcceptedValue = items.reduce((sum, i) => sum + i.acceptedQty * i.unitCost, 0);
+    const totalReceivedValue = items.reduce((sum, i) => sum + i.receivedQty * i.unitCost, 0);
 
+    // At least one item must have received > 0
     const canSubmit =
         selectedPOId &&
         items.length > 0 &&
-        items.every(i => i.receivedQty > 0 && i.acceptedQty >= 0 && i.acceptedQty <= i.receivedQty);
+        items.some(i => i.receivedQty > 0);
 
     const handleSubmit = () => {
         if (!selectedPO) return;
+        // Only send items that have received > 0
+        const itemsToSend = items.filter(i => i.receivedQty > 0);
         onSubmit({
             poId: selectedPOId,
             poNumber: selectedPO.poNumber,
             warehouseId: selectedPO.warehouseId,
             warehouseName: selectedPO.warehouseName || '',
-            items: items.map(i => ({
+            items: itemsToSend.map(i => ({
                 sku: i.sku,
                 productName: i.productName,
+                expectedQty: i.expectedQty,
                 receivedQty: i.receivedQty,
-                acceptedQty: i.acceptedQty,
-                rejectedQty: i.rejectedQty,
-                rejectionReason: i.rejectionReason,
                 unitCost: i.unitCost,
-                putInLocations: [],
             })),
             notes: notes.trim() || null,
         });
@@ -788,7 +475,7 @@ function GRNFormDialog({
                                     receivablePOs.map(po => (
                                         <SelectItem key={po.id} value={po.id}>
                                             <span className="font-mono">{po.poNumber}</span>
-                                            <span className="text-muted-foreground ml-2">— {po.supplierName}</span>
+                                            <span className="text-muted-foreground ml-2">{'\u2014'} {po.supplierName}</span>
                                         </SelectItem>
                                     ))
                                 )}
@@ -820,65 +507,68 @@ function GRNFormDialog({
                                                 <p className="font-medium text-sm">{item.productName}</p>
                                                 <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
                                             </div>
-                                            <Badge variant="outline" className="text-xs">
-                                                Max: {item.maxQty} remaining
-                                            </Badge>
+                                            {item.expectedQty === 0 && (
+                                                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                                                    Fully received on PO
+                                                </Badge>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-4 gap-3">
                                             <div className="space-y-1">
-                                                <Label className="text-xs">Received Qty</Label>
+                                                <Label className="text-xs">Expected</Label>
                                                 <Input
                                                     type="number"
-                                                    min={1}
-                                                    value={item.receivedQty}
-                                                    onChange={(e) => updateItem(index, 'receivedQty', parseInt(e.target.value) || 0)}
-                                                    className="h-8 text-sm"
+                                                    value={item.expectedQty}
+                                                    disabled
+                                                    className="h-8 text-sm bg-muted"
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-xs">Accepted Qty</Label>
+                                                <Label className="text-xs">Received <span className="text-destructive">*</span></Label>
                                                 <Input
                                                     type="number"
                                                     min={0}
-                                                    max={item.receivedQty}
-                                                    value={item.acceptedQty}
-                                                    onChange={(e) => updateItem(index, 'acceptedQty', parseInt(e.target.value) || 0)}
-                                                    className="h-8 text-sm"
+                                                    value={item.receivedQty}
+                                                    onChange={(e) => updateReceivedQty(index, parseInt(e.target.value) || 0)}
+                                                    className={cn(
+                                                        'h-8 text-sm',
+                                                        item.receivedQty > item.expectedQty && 'border-amber-400 bg-amber-50/30'
+                                                    )}
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-xs">Rejected Qty</Label>
-                                                <Input type="number" value={item.rejectedQty} disabled className="h-8 text-sm bg-muted" />
+                                                <Label className="text-xs">Not Received</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={item.notReceivedQty}
+                                                    disabled
+                                                    className="h-8 text-sm bg-muted"
+                                                />
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Unit Cost</Label>
                                                 <Input
                                                     type="number"
                                                     value={item.unitCost}
-                                                    onChange={(e) => updateItem(index, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                    className="h-8 text-sm"
+                                                    disabled
+                                                    className="h-8 text-sm bg-muted"
                                                 />
                                             </div>
                                         </div>
-                                        {item.rejectedQty > 0 && (
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Rejection Reason</Label>
-                                                <Input
-                                                    value={item.rejectionReason || ''}
-                                                    onChange={(e) => updateItem(index, 'rejectionReason', e.target.value || null)}
-                                                    placeholder="e.g. Damaged, wrong variant, expired..."
-                                                    className="h-8 text-sm"
-                                                />
-                                            </div>
+                                        {item.receivedQty > item.expectedQty && (
+                                            <p className="text-xs text-amber-600 flex items-center gap-1">
+                                                <AlertTriangle className="h-3 w-3" />
+                                                Over-received by {item.receivedQty - item.expectedQty} unit(s)
+                                            </p>
                                         )}
                                         <div className="text-xs text-muted-foreground text-right">
-                                            Accepted value: {formatCurrency(item.acceptedQty * item.unitCost)}
+                                            Received value: {formatCurrency(item.receivedQty * item.unitCost)}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                             <div className="text-right font-semibold text-sm pt-2 border-t">
-                                Total Accepted Value: {formatCurrency(totalAcceptedValue)}
+                                Total Received Value: {formatCurrency(totalReceivedValue)}
                             </div>
                         </div>
                     )}
@@ -901,181 +591,6 @@ function GRNFormDialog({
                     <Button onClick={handleSubmit} disabled={!canSubmit || isLoading}>
                         {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Create GRN
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-// ============================================================
-// PERFORM GRN DIALOG (Inward items to warehouse)
-// ============================================================
-
-function PerformGRNDialog({
-    open,
-    onOpenChange,
-    grn,
-    businessId,
-    user,
-    onConfirm,
-    isLoading,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    grn: GRN | null;
-    businessId: string;
-    user: User | null | undefined;
-    onConfirm: (data: {
-        grnId: string;
-        items: {
-            sku: string;
-            productName: string;
-            acceptedQty: number;
-            unitCost: number;
-            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
-        }[];
-    }) => void;
-    isLoading: boolean;
-}) {
-    const { warehouses, isLoading: isLoadingWarehouses } = useWarehouses(open, businessId, user);
-
-    // Per-item locations state, keyed by sku
-    const [itemLocations, setItemLocations] = React.useState<
-        Record<string, { warehouseId: string; zoneId: string; rackId: string; shelfId: string }>
-    >({});
-
-    // Reset locations when dialog opens with a new GRN
-    React.useEffect(() => {
-        if (open && grn) {
-            const initial: Record<string, { warehouseId: string; zoneId: string; rackId: string; shelfId: string }> = {};
-            grn.items.forEach(item => {
-                if (item.acceptedQty > 0) {
-                    initial[item.sku] = { warehouseId: '', zoneId: '', rackId: '', shelfId: '' };
-                }
-            });
-            setItemLocations(initial);
-        }
-    }, [open, grn]);
-
-    if (!grn) return null;
-
-    const inwardableItems = grn.items.filter(item => item.acceptedQty > 0);
-    const totalInwardQty = inwardableItems.reduce((sum, i) => sum + i.acceptedQty, 0);
-
-    const allLocationsComplete = inwardableItems.length > 0 && inwardableItems.every(item => {
-        const loc = itemLocations[item.sku];
-        return loc && loc.warehouseId && loc.zoneId && loc.rackId && loc.shelfId;
-    });
-
-    const completedCount = inwardableItems.filter(item => {
-        const loc = itemLocations[item.sku];
-        return loc && loc.warehouseId && loc.zoneId && loc.rackId && loc.shelfId;
-    }).length;
-
-    const handleLocationChange = (sku: string, loc: { warehouseId: string; zoneId: string; rackId: string; shelfId: string }) => {
-        setItemLocations(prev => ({ ...prev, [sku]: loc }));
-    };
-
-    const handleConfirm = () => {
-        onConfirm({
-            grnId: grn.id,
-            items: inwardableItems.map(item => ({
-                sku: item.sku,
-                productName: item.productName,
-                acceptedQty: item.acceptedQty,
-                unitCost: item.unitCost,
-                location: itemLocations[item.sku],
-            })),
-        });
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <div className="p-2 rounded-lg bg-emerald-500/10">
-                            <ArrowDownToLine className="h-5 w-5 text-emerald-600" />
-                        </div>
-                        Perform GRN — {grn.grnNumber}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Assign a warehouse location for each item. This will inward inventory and mark the GRN as completed.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-5 py-4">
-                    {/* GRN Info */}
-                    <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg text-sm">
-                        <div className="grid grid-cols-3 gap-3 text-blue-800">
-                            <div>PO: <span className="font-medium font-mono">{grn.poNumber}</span></div>
-                            <div>Warehouse: <span className="font-medium">{grn.warehouseName || grn.warehouseId}</span></div>
-                            <div>Items: <span className="font-medium">{inwardableItems.length} ({totalInwardQty} units)</span></div>
-                        </div>
-                    </div>
-
-                    {grn.totalRejectedQty > 0 && (
-                        <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            {grn.totalRejectedQty} unit(s) rejected — only accepted items will be inwarded.
-                        </div>
-                    )}
-
-                    {/* Per-item location assignment */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <Label className="text-base font-semibold">Assign Locations</Label>
-                            </div>
-                            <Badge variant="outline" className={cn(
-                                'text-xs',
-                                allLocationsComplete
-                                    ? 'text-emerald-600 border-emerald-200 bg-emerald-50'
-                                    : 'text-muted-foreground'
-                            )}>
-                                {completedCount}/{inwardableItems.length} assigned
-                            </Badge>
-                        </div>
-
-                        <div className="space-y-3">
-                            {inwardableItems.map((item) => (
-                                <ItemLocationRow
-                                    key={item.sku}
-                                    item={{
-                                        sku: item.sku,
-                                        productName: item.productName,
-                                        acceptedQty: item.acceptedQty,
-                                        unitCost: item.unitCost,
-                                    }}
-                                    warehouses={warehouses}
-                                    isLoadingWarehouses={isLoadingWarehouses}
-                                    businessId={businessId}
-                                    user={user}
-                                    location={itemLocations[item.sku] || { warehouseId: '', zoneId: '', rackId: '', shelfId: '' }}
-                                    onLocationChange={(loc) => handleLocationChange(item.sku, loc)}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleConfirm}
-                        disabled={!allLocationsComplete || isLoading}
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                    >
-                        {isLoading ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                            <ArrowDownToLine className="h-4 w-4 mr-2" />
-                        )}
-                        Confirm Inward ({totalInwardQty} units)
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -1128,33 +643,33 @@ function GRNDetailDialog({
                             <p className="font-medium">{formatDate(grn.receivedAt)}</p>
                         </div>
                         <div className="space-y-1">
-                            <p className="text-muted-foreground">Total Accepted Value</p>
-                            <p className="font-medium">{formatCurrency(grn.totalAcceptedValue)}</p>
+                            <p className="text-muted-foreground">Total Received Value</p>
+                            <p className="font-medium">{formatCurrency(grn.totalReceivedValue)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Received By</p>
                             <p className="font-medium">{grn.receivedBy}</p>
                         </div>
-                        {grn.inspectedBy && (
+                        {(grn as any).totalUPCsCreated > 0 && (
                             <div className="space-y-1">
-                                <p className="text-muted-foreground">Inspected By</p>
-                                <p className="font-medium">{grn.inspectedBy}</p>
+                                <p className="text-muted-foreground">UPCs Created</p>
+                                <p className="font-medium">{(grn as any).totalUPCsCreated}</p>
                             </div>
                         )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
                         <div className="p-3 bg-blue-50 rounded-lg text-center">
-                            <p className="text-xl font-bold text-blue-700">{grn.totalReceivedQty}</p>
-                            <p className="text-xs text-blue-600">Received</p>
+                            <p className="text-xl font-bold text-blue-700">{grn.totalExpectedQty}</p>
+                            <p className="text-xs text-blue-600">Expected</p>
                         </div>
                         <div className="p-3 bg-emerald-50 rounded-lg text-center">
-                            <p className="text-xl font-bold text-emerald-700">{grn.totalAcceptedQty}</p>
-                            <p className="text-xs text-emerald-600">Accepted</p>
+                            <p className="text-xl font-bold text-emerald-700">{grn.totalReceivedQty}</p>
+                            <p className="text-xs text-emerald-600">Received</p>
                         </div>
-                        <div className="p-3 bg-red-50 rounded-lg text-center">
-                            <p className="text-xl font-bold text-red-700">{grn.totalRejectedQty}</p>
-                            <p className="text-xs text-red-600">Rejected</p>
+                        <div className="p-3 bg-amber-50 rounded-lg text-center">
+                            <p className="text-xl font-bold text-amber-700">{grn.totalNotReceivedQty}</p>
+                            <p className="text-xs text-amber-600">Not Received</p>
                         </div>
                     </div>
 
@@ -1173,9 +688,9 @@ function GRNDetailDialog({
                                     <TableRow className="bg-muted/40">
                                         <TableHead className="text-xs">SKU</TableHead>
                                         <TableHead className="text-xs">Product</TableHead>
+                                        <TableHead className="text-xs text-right">Expected</TableHead>
                                         <TableHead className="text-xs text-right">Received</TableHead>
-                                        <TableHead className="text-xs text-right">Accepted</TableHead>
-                                        <TableHead className="text-xs text-right">Rejected</TableHead>
+                                        <TableHead className="text-xs text-right">Not Received</TableHead>
                                         <TableHead className="text-xs text-right">Value</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -1184,18 +699,25 @@ function GRNDetailDialog({
                                         <TableRow key={idx}>
                                             <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                             <TableCell className="text-sm">{item.productName}</TableCell>
-                                            <TableCell className="text-right text-sm">{item.receivedQty}</TableCell>
-                                            <TableCell className="text-right text-sm font-medium text-emerald-600">
-                                                {item.acceptedQty}
+                                            <TableCell className="text-right text-sm">{item.expectedQty}</TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                <span className={cn(
+                                                    'font-medium',
+                                                    item.receivedQty > item.expectedQty
+                                                        ? 'text-amber-600'
+                                                        : 'text-emerald-600'
+                                                )}>
+                                                    {item.receivedQty}
+                                                </span>
+                                                {item.receivedQty > item.expectedQty && (
+                                                    <span className="text-xs text-amber-500 ml-1">
+                                                        (+{item.receivedQty - item.expectedQty})
+                                                    </span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right text-sm">
-                                                {item.rejectedQty > 0 ? (
-                                                    <div>
-                                                        <span className="text-destructive font-medium">{item.rejectedQty}</span>
-                                                        {item.rejectionReason && (
-                                                            <p className="text-xs text-muted-foreground">{item.rejectionReason}</p>
-                                                        )}
-                                                    </div>
+                                                {item.notReceivedQty > 0 ? (
+                                                    <span className="text-amber-600 font-medium">{item.notReceivedQty}</span>
                                                 ) : (
                                                     '0'
                                                 )}
@@ -1209,29 +731,6 @@ function GRNDetailDialog({
                             </Table>
                         </div>
                     </div>
-
-                    {grn.items.some(i => i.putInLocations.length > 0) && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold text-sm">Storage Locations</h4>
-                            <div className="space-y-2">
-                                {grn.items
-                                    .filter(i => i.putInLocations.length > 0)
-                                    .map((item, idx) => (
-                                        <div key={idx} className="p-2 border rounded-lg text-sm">
-                                            <p className="font-medium mb-1">{item.sku} — {item.productName}</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {item.putInLocations.map((loc, locIdx) => (
-                                                    <Badge key={locIdx} variant="outline" className="text-xs">
-                                                        <Warehouse className="h-3 w-3 mr-1" />
-                                                        {loc.shelfName || loc.shelfId}: {loc.qty} units
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <DialogFooter>
@@ -1241,6 +740,103 @@ function GRNDetailDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+// ============================================================
+// CONFIRM PUT AWAY DIALOG
+// ============================================================
+
+function ConfirmPutAwayDialog({
+    open,
+    onOpenChange,
+    grn,
+    onConfirm,
+    isLoading,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    grn: GRN | null;
+    onConfirm: (grnId: string) => void;
+    isLoading: boolean;
+}) {
+    if (!grn) return null;
+
+    const itemsWithReceived = grn.items.filter(item => item.receivedQty > 0);
+    const totalUPCs = itemsWithReceived.reduce((sum, i) => sum + i.receivedQty, 0);
+
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent className="sm:max-w-lg">
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <PackagePlus className="h-5 w-5 text-emerald-600" />
+                        Confirm Put Away {'\u2014'} {grn.grnNumber}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                        <div className="space-y-3">
+                            <p>
+                                This will create <span className="font-semibold text-foreground">{totalUPCs} UPC(s)</span> for the
+                                received items and mark the GRN as <span className="font-semibold text-emerald-600">completed</span>.
+                            </p>
+                            <p>
+                                UPCs will be created with <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">putAway: &quot;inbound&quot;</span> status.
+                                The actual warehouse placement will be handled via the Put Away page.
+                            </p>
+
+                            <div className="border rounded-lg overflow-hidden mt-3">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/40">
+                                            <TableHead className="text-xs">Product</TableHead>
+                                            <TableHead className="text-xs text-right">Received Qty</TableHead>
+                                            <TableHead className="text-xs text-right">UPCs to Create</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {itemsWithReceived.map((item, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell className="text-sm">
+                                                    <div>
+                                                        <p className="font-medium">{item.productName}</p>
+                                                        <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right text-sm font-medium">
+                                                    {item.receivedQty}
+                                                </TableCell>
+                                                <TableCell className="text-right text-sm font-medium text-emerald-600">
+                                                    {item.receivedQty}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="text-right text-sm font-semibold pt-1">
+                                Total UPCs: {totalUPCs}
+                            </div>
+                        </div>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={() => onConfirm(grn.id)}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        disabled={isLoading || totalUPCs === 0}
+                    >
+                        {isLoading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <PackagePlus className="h-4 w-4 mr-2" />
+                        )}
+                        Confirm ({totalUPCs} UPCs)
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }
 
@@ -1264,7 +860,7 @@ export default function GRNsPage() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [viewingGRN, setViewingGRN] = useState<GRN | null>(null);
     const [deletingGRN, setDeletingGRN] = useState<GRN | null>(null);
-    const [performingGRN, setPerformingGRN] = useState<GRN | null>(null);
+    const [confirmingPutAway, setConfirmingPutAway] = useState<GRN | null>(null);
 
     // Data
     const { data: grns = [], isLoading, refetch } = useGRNs(businessId, user);
@@ -1274,7 +870,7 @@ export default function GRNsPage() {
     const createMutation = useCreateGRN(businessId, user);
     const updateMutation = useUpdateGRN(businessId, user);
     const deleteMutation = useDeleteGRN(businessId, user);
-    const bulkInwardMutation = useBulkInward(businessId, user);
+    const confirmPutAwayMutation = useConfirmPutAway(businessId, user);
 
     // Filter + Sort + Paginate
     const filteredAndSorted = useMemo(() => {
@@ -1299,7 +895,7 @@ export default function GRNsPage() {
             let aVal: any, bVal: any;
             switch (sortField) {
                 case 'grnNumber': aVal = a.grnNumber; bVal = b.grnNumber; break;
-                case 'totalAcceptedValue': aVal = a.totalAcceptedValue; bVal = b.totalAcceptedValue; break;
+                case 'totalReceivedValue': aVal = a.totalReceivedValue; bVal = b.totalReceivedValue; break;
                 case 'receivedAt':
                     aVal = a.receivedAt?.toDate?.()?.getTime?.() || 0;
                     bVal = b.receivedAt?.toDate?.()?.getTime?.() || 0;
@@ -1333,10 +929,10 @@ export default function GRNsPage() {
     const stats = useMemo(() => {
         const counts: Record<GRNStatus, number> = { draft: 0, completed: 0, cancelled: 0 };
         grns.forEach(grn => { counts[grn.status] = (counts[grn.status] || 0) + 1; });
+        const totalExpected = grns.reduce((s, g) => s + g.totalExpectedQty, 0);
         const totalReceived = grns.reduce((s, g) => s + g.totalReceivedQty, 0);
-        const totalAccepted = grns.reduce((s, g) => s + g.totalAcceptedQty, 0);
-        const totalRejected = grns.reduce((s, g) => s + g.totalRejectedQty, 0);
-        return { counts, totalReceived, totalAccepted, totalRejected };
+        const totalNotReceived = grns.reduce((s, g) => s + g.totalNotReceivedQty, 0);
+        return { counts, totalExpected, totalReceived, totalNotReceived };
     }, [grns]);
 
     // Handlers
@@ -1348,22 +944,9 @@ export default function GRNsPage() {
         updateMutation.mutate({ grnId: grn.id, status: newStatus });
     };
 
-    const handlePerformGRN = (grn: GRN) => {
-        setPerformingGRN(grn);
-    };
-
-    const handlePerformGRNConfirm = (data: {
-        grnId: string;
-        items: {
-            sku: string;
-            productName: string;
-            acceptedQty: number;
-            unitCost: number;
-            location: { warehouseId: string; zoneId: string; rackId: string; shelfId: string };
-        }[];
-    }) => {
-        bulkInwardMutation.mutate(data, {
-            onSuccess: () => setPerformingGRN(null),
+    const handleConfirmPutAway = (grnId: string) => {
+        confirmPutAwayMutation.mutate(grnId, {
+            onSuccess: () => setConfirmingPutAway(null),
         });
     };
 
@@ -1444,6 +1027,19 @@ export default function GRNsPage() {
                                 <Package className="h-4 w-4 text-blue-600" />
                             </div>
                             <div>
+                                <p className="text-xl font-bold">{stats.totalExpected}</p>
+                                <p className="text-xs text-muted-foreground">Total Expected</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-emerald-50">
+                                <PackageCheck className="h-4 w-4 text-emerald-600" />
+                            </div>
+                            <div>
                                 <p className="text-xl font-bold">{stats.totalReceived}</p>
                                 <p className="text-xs text-muted-foreground">Total Received</p>
                             </div>
@@ -1453,25 +1049,12 @@ export default function GRNsPage() {
                 <Card>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-emerald-50">
-                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                            <div className="p-2 rounded-lg bg-amber-50">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
                             </div>
                             <div>
-                                <p className="text-xl font-bold">{stats.totalAccepted}</p>
-                                <p className="text-xs text-muted-foreground">Total Accepted</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-red-50">
-                                <AlertTriangle className="h-4 w-4 text-red-600" />
-                            </div>
-                            <div>
-                                <p className="text-xl font-bold">{stats.totalRejected}</p>
-                                <p className="text-xs text-muted-foreground">Total Rejected</p>
+                                <p className="text-xl font-bold">{stats.totalNotReceived}</p>
+                                <p className="text-xs text-muted-foreground">Not Received</p>
                             </div>
                         </div>
                     </CardContent>
@@ -1523,10 +1106,10 @@ export default function GRNsPage() {
                                 <SelectItem value="createdAt-asc">Oldest First</SelectItem>
                                 <SelectItem value="receivedAt-desc">Received (Latest)</SelectItem>
                                 <SelectItem value="receivedAt-asc">Received (Earliest)</SelectItem>
-                                <SelectItem value="totalAcceptedValue-desc">Value (High → Low)</SelectItem>
-                                <SelectItem value="totalAcceptedValue-asc">Value (Low → High)</SelectItem>
-                                <SelectItem value="grnNumber-asc">GRN # (A → Z)</SelectItem>
-                                <SelectItem value="grnNumber-desc">GRN # (Z → A)</SelectItem>
+                                <SelectItem value="totalReceivedValue-desc">Value (High {'\u2192'} Low)</SelectItem>
+                                <SelectItem value="totalReceivedValue-asc">Value (Low {'\u2192'} High)</SelectItem>
+                                <SelectItem value="grnNumber-asc">GRN # (A {'\u2192'} Z)</SelectItem>
+                                <SelectItem value="grnNumber-desc">GRN # (Z {'\u2192'} A)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -1584,17 +1167,17 @@ export default function GRNsPage() {
                                             </div>
                                         </TableHead>
                                         <TableHead>Warehouse</TableHead>
+                                        <TableHead className="text-center">Expected</TableHead>
                                         <TableHead className="text-center">Received</TableHead>
-                                        <TableHead className="text-center">Accepted</TableHead>
-                                        <TableHead className="text-center">Rejected</TableHead>
+                                        <TableHead className="text-center">Not Received</TableHead>
                                         <TableHead>
                                             <button
                                                 className="flex items-center gap-1 hover:text-foreground"
-                                                onClick={() => toggleSort('totalAcceptedValue')}
+                                                onClick={() => toggleSort('totalReceivedValue')}
                                             >
                                                 <IndianRupee className="h-3.5 w-3.5" />
                                                 Value
-                                                {sortField === 'totalAcceptedValue' && (
+                                                {sortField === 'totalReceivedValue' && (
                                                     <ChevronDown className={cn('h-3 w-3 transition-transform', sortOrder === 'asc' && 'rotate-180')} />
                                                 )}
                                             </button>
@@ -1631,20 +1214,20 @@ export default function GRNsPage() {
                                                 {grn.warehouseName || grn.warehouseId}
                                             </TableCell>
                                             <TableCell className="text-center text-sm">
-                                                {grn.totalReceivedQty}
+                                                {grn.totalExpectedQty}
                                             </TableCell>
                                             <TableCell className="text-center text-sm font-medium text-emerald-600">
-                                                {grn.totalAcceptedQty}
+                                                {grn.totalReceivedQty}
                                             </TableCell>
                                             <TableCell className="text-center text-sm">
-                                                {grn.totalRejectedQty > 0 ? (
-                                                    <span className="text-destructive font-medium">{grn.totalRejectedQty}</span>
+                                                {grn.totalNotReceivedQty > 0 ? (
+                                                    <span className="text-amber-600 font-medium">{grn.totalNotReceivedQty}</span>
                                                 ) : (
                                                     '0'
                                                 )}
                                             </TableCell>
                                             <TableCell className="font-medium text-sm">
-                                                {formatCurrency(grn.totalAcceptedValue)}
+                                                {formatCurrency(grn.totalReceivedValue)}
                                             </TableCell>
                                             <TableCell>
                                                 <GRNStatusBadge status={grn.status} />
@@ -1669,10 +1252,10 @@ export default function GRNsPage() {
                                                             <>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
-                                                                    onClick={() => handlePerformGRN(grn)}
+                                                                    onClick={() => setConfirmingPutAway(grn)}
                                                                 >
-                                                                    <ArrowDownToLine className="h-4 w-4 mr-2" />
-                                                                    Perform GRN
+                                                                    <PackagePlus className="h-4 w-4 mr-2" />
+                                                                    Confirm Put Away
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
@@ -1706,7 +1289,7 @@ export default function GRNsPage() {
                         {/* Pagination */}
                         <div className="flex items-center justify-between px-4 py-3 border-t">
                             <p className="text-sm text-muted-foreground">
-                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)} of {filteredAndSorted.length}
+                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}{'\u2013'}{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSorted.length)} of {filteredAndSorted.length}
                             </p>
                             <div className="flex items-center gap-2">
                                 <Button
@@ -1771,14 +1354,12 @@ export default function GRNsPage() {
                 grn={viewingGRN}
             />
 
-            <PerformGRNDialog
-                open={!!performingGRN}
-                onOpenChange={(open) => { if (!open) setPerformingGRN(null); }}
-                grn={performingGRN}
-                businessId={businessId || ''}
-                user={user}
-                onConfirm={handlePerformGRNConfirm}
-                isLoading={bulkInwardMutation.isPending}
+            <ConfirmPutAwayDialog
+                open={!!confirmingPutAway}
+                onOpenChange={(open) => { if (!open) setConfirmingPutAway(null); }}
+                grn={confirmingPutAway}
+                onConfirm={handleConfirmPutAway}
+                isLoading={confirmPutAwayMutation.isPending}
             />
 
             {/* Delete Confirmation */}

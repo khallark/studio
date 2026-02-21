@@ -108,7 +108,7 @@ interface Product {
 interface POItemFormRow {
     sku: string;
     productName: string;
-    orderedQty: number;
+    expectedQty: number;
     unitCost: number;
 }
 
@@ -648,7 +648,7 @@ function POFormDialog({
     const [expectedDate, setExpectedDate] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<POItemFormRow[]>([
-        { sku: '', productName: '', orderedQty: 1, unitCost: 0 },
+        { sku: '', productName: '', expectedQty: 1, unitCost: 0 },
     ]);
 
     // Reset form when dialog opens
@@ -666,7 +666,7 @@ function POFormDialog({
                     editingPO.items.map(i => ({
                         sku: i.sku,
                         productName: i.productName,
-                        orderedQty: i.orderedQty,
+                        expectedQty: i.expectedQty,
                         unitCost: i.unitCost,
                     }))
                 );
@@ -678,7 +678,7 @@ function POFormDialog({
                 setCurrency('INR');
                 setExpectedDate('');
                 setNotes('');
-                setItems([{ sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+                setItems([{ sku: '', productName: '', expectedQty: 1, unitCost: 0 }]);
             }
         }
     }, [open, editingPO]);
@@ -712,7 +712,7 @@ function POFormDialog({
     };
 
     const addItem = () => {
-        setItems(prev => [...prev, { sku: '', productName: '', orderedQty: 1, unitCost: 0 }]);
+        setItems(prev => [...prev, { sku: '', productName: '', expectedQty: 1, unitCost: 0 }]);
     };
 
     const removeItem = (index: number) => {
@@ -720,7 +720,7 @@ function POFormDialog({
         setItems(prev => prev.filter((_, i) => i !== index));
     };
 
-    const totalAmount = items.reduce((sum, item) => sum + item.orderedQty * item.unitCost, 0);
+    const totalAmount = items.reduce((sum, item) => sum + item.expectedQty * item.unitCost, 0);
 
     // Collect SKUs already used in other rows (for a given row index)
     const getExistingSkusForRow = (currentIndex: number): string[] => {
@@ -742,7 +742,7 @@ function POFormDialog({
         warehouseId.trim() &&
         expectedDate &&
         !hasDuplicates &&
-        items.every(i => i.sku.trim() && i.productName && i.orderedQty > 0 && i.unitCost >= 0);
+        items.every(i => i.sku.trim() && i.productName && i.expectedQty > 0 && i.unitCost >= 0);
 
     const handleSubmit = () => {
         onSubmit({
@@ -757,7 +757,7 @@ function POFormDialog({
             items: items.map(i => ({
                 sku: i.sku.trim(),
                 productName: i.productName,
-                orderedQty: i.orderedQty,
+                expectedQty: i.expectedQty,
                 unitCost: i.unitCost,
             })),
         });
@@ -905,8 +905,8 @@ function POFormDialog({
                                             <Input
                                                 type="number"
                                                 min={1}
-                                                value={item.orderedQty}
-                                                onChange={(e) => updateItem(index, 'orderedQty', parseInt(e.target.value) || 0)}
+                                                value={item.expectedQty}
+                                                onChange={(e) => updateItem(index, 'expectedQty', parseInt(e.target.value) || 0)}
                                                 className="h-8 text-sm"
                                             />
                                         </div>
@@ -924,7 +924,7 @@ function POFormDialog({
                                     </div>
 
                                     <div className="text-xs text-muted-foreground text-right pr-8">
-                                        Subtotal: {formatCurrency(item.orderedQty * item.unitCost, currency)}
+                                        Subtotal: {formatCurrency(item.expectedQty * item.unitCost, currency)}
                                     </div>
                                 </div>
                             ))}
@@ -1054,9 +1054,8 @@ function PODetailDialog({
                                     <TableRow className="bg-muted/40">
                                         <TableHead className="text-xs">SKU</TableHead>
                                         <TableHead className="text-xs">Product</TableHead>
-                                        <TableHead className="text-xs text-right">Ordered</TableHead>
+                                        <TableHead className="text-xs text-right">Expected</TableHead>
                                         <TableHead className="text-xs text-right">Received</TableHead>
-                                        <TableHead className="text-xs text-right">Rejected</TableHead>
                                         <TableHead className="text-xs text-right">Unit Cost</TableHead>
                                         <TableHead className="text-xs">Status</TableHead>
                                     </TableRow>
@@ -1065,26 +1064,11 @@ function PODetailDialog({
                                     {po.items.map((item, idx) => (
                                         <TableRow key={idx}>
                                             <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                            <TableCell className="text-sm">
-                                                {item.productName}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">{item.orderedQty}</TableCell>
+                                            <TableCell className="text-sm">{item.productName}</TableCell>
+                                            <TableCell className="text-right text-sm">{item.expectedQty}</TableCell>
                                             <TableCell className="text-right text-sm">{item.receivedQty}</TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                {item.rejectedQty > 0 ? (
-                                                    <span className="text-destructive">{item.rejectedQty}</span>
-                                                ) : (
-                                                    '0'
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                {formatCurrency(item.unitCost, po.currency || '₹')}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs capitalize">
-                                                    {item.status.replace('_', ' ')}
-                                                </Badge>
-                                            </TableCell>
+                                            <TableCell className="text-right text-sm">{formatCurrency(item.unitCost, po.currency || '₹')}</TableCell>
+                                            <TableCell><Badge variant="outline" className="text-xs capitalize">{item.status.replace('_', ' ')}</Badge></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

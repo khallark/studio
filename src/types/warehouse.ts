@@ -312,10 +312,10 @@ export type POItemStatus = 'pending' | 'partially_received' | 'fully_received' |
 export interface PurchaseOrderItem {
     sku: string;
     productName: string;
-    orderedQty: number;
+    expectedQty: number;
     unitCost: number;
     receivedQty: number;
-    rejectedQty: number;
+    notReceivedQty: number;
     status: 'pending' | 'partially_received' | 'fully_received' | 'closed';
 }
 
@@ -366,15 +366,12 @@ export interface GRNItem {
     sku: string;
     productName: string;
 
+    expectedQty: number;
     receivedQty: number;
-    acceptedQty: number;
-    rejectedQty: number;
-    rejectionReason: string | null;
+    notReceivedQty: number;
 
     unitCost: number;
     totalCost: number;
-
-    putInLocations: GRNItemLocation[];
 }
 
 // users/{businessId}/grns/{grnId}
@@ -392,14 +389,13 @@ export interface GRN {
     receivedSkus: string[];
     items: GRNItem[];
 
-    totalAcceptedValue: number;
+    totalReceivedValue: number;
 
+    totalExpectedQty: number;
     totalReceivedQty: number;
-    totalAcceptedQty: number;
-    totalRejectedQty: number;
+    totalNotReceivedQty: number;
 
     receivedBy: string;
-    inspectedBy: string | null;
     receivedAt: Timestamp;
     createdAt: Timestamp;
     updatedAt: Timestamp;

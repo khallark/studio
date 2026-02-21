@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
                     { status: 400 }
                 );
             }
-            if (typeof item.orderedQty !== 'number' || item.orderedQty <= 0) {
+            if (typeof item.expectedQty !== 'number' || item.expectedQty <= 0) {
                 return NextResponse.json(
-                    { error: 'Validation Error', message: 'Each item must have orderedQty > 0' },
+                    { error: 'Validation Error', message: 'Each item must have expectedQty > 0' },
                     { status: 400 }
                 );
             }
@@ -203,14 +203,14 @@ export async function POST(req: NextRequest) {
         const poItems: PurchaseOrderItem[] = items.map((item: any) => ({
             sku: item.sku,
             productName: item.productName,
-            orderedQty: item.orderedQty,
+            expectedQty: item.expectedQty,
             unitCost: item.unitCost,
             receivedQty: 0,
-            rejectedQty: 0,
+            notReceivedQty: item.expectedQty,
             status: 'pending' as const,
         }));
         const orderedSkus = poItems.map((item: PurchaseOrderItem) => item.sku);
-        const totalAmount = poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.orderedQty * item.unitCost), 0);
+        const totalAmount = poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.expectedQty * item.unitCost), 0);
 
         const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc();
         

@@ -217,8 +217,8 @@ export async function POST(req: NextRequest) {
             if (idx !== -1) {
                 updatedPoItems[idx] = {
                     ...updatedPoItems[idx],
-                    receivedQty: grnItem.receivedQty,
-                    notReceivedQty: Math.max(0, grnItem.expectedQty - grnItem.receivedQty),
+                    receivedQty: updatedPoItems[idx].receivedQty + grnItem.receivedQty,
+                    notReceivedQty: Math.max(0, grnItem.expectedQty - (updatedPoItems[idx].receivedQty + grnItem.receivedQty)),
                 };
 
                 const poItem = updatedPoItems[idx];

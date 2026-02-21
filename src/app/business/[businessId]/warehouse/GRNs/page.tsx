@@ -1268,7 +1268,7 @@ export default function GRNsPage() {
                                                             </>
                                                         )}
 
-                                                        {['draft', 'cancelled'].includes(grn.status) && (
+                                                        {['cancelled'].includes(grn.status) && (
                                                             <DropdownMenuItem
                                                                 className="text-destructive focus:text-destructive"
                                                                 onClick={() => setDeletingGRN(grn)}

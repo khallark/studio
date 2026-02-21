@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
                     if (idx !== -1) {
                         updatedPoItems[idx] = {
                             ...updatedPoItems[idx],
-                            receivedQty: Math.max(0, updatedPoItems[idx].receivedQty - grnItem.receivedQty),
+                            receivedQty: updatedPoItems[idx].receivedQty - grnItem.receivedQty,
                             notReceivedQty: Math.max(
                             updatedPoItems[idx].expectedQty - (updatedPoItems[idx].receivedQty - grnItem.receivedQty),
                             0),

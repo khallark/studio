@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useBusinessContext } from '../../layout';
@@ -23,6 +23,8 @@ import {
     Store,
     FileText,
     TrendingUp,
+    CalendarDays,
+    X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -865,6 +867,330 @@ function UPCGroupCard({
 }
 
 // ============================================================
+// DATE-GROUPED UPC LIST
+// ============================================================
+
+function DateGroupedUPCList({
+    upcs,
+    onPutAway,
+}: {
+    upcs: GroupedUPC[];
+    onPutAway: (upcs: GroupedUPC[]) => void;
+}) {
+    const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredUPCs = upcs.filter(upc =>
+        upc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        upc.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        upc.productId.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    // Group by calendar date, sort dates descending, sort UPCs within each date by time ascending
+    const dateGroups = useMemo(() => {
+        const groups: Record<string, GroupedUPC[]> = {};
+
+        for (const upc of filteredUPCs) {
+            // Use ISO date string as the key so sorting is trivial
+            const dateKey = upc.updatedAt.toDate().toISOString().split('T')[0];
+            if (!groups[dateKey]) groups[dateKey] = [];
+            groups[dateKey].push(upc);
+        }
+
+        return Object.entries(groups)
+            .sort(([a], [b]) => b.localeCompare(a)) // newest date first
+            .map(([dateKey, groupUpcs]) => ({
+                dateKey,
+                dateLabel: new Date(dateKey + 'T00:00:00').toLocaleDateString('en-IN', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                }),
+                upcs: [...groupUpcs].sort(
+                    (a, b) => a.updatedAt.toMillis() - b.updatedAt.toMillis() // earliest time first within each day
+                ),
+            }));
+    }, [filteredUPCs]);
+
+    const toggleSelect = (id: string) => {
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        setSelectedUPCs(prev =>
+            prev.size === filteredUPCs.length
+                ? new Set()
+                : new Set(filteredUPCs.map(u => u.id))
+        );
+    };
+
+    const handlePutAway = () => {
+        onPutAway(upcs.filter(u => selectedUPCs.has(u.id)));
+    };
+
+    if (upcs.length === 0) {
+        return (
+            <Card>
+                <CardContent className="p-12 text-center">
+                    <PackageOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-1">No UPCs</h3>
+                    <p className="text-muted-foreground">Nothing to show in this category</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by UPC, order name, or product SKU..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                    />
+                </div>
+                <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                    {selectedUPCs.size === filteredUPCs.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                <Button size="sm" onClick={handlePutAway} disabled={selectedUPCs.size === 0}>
+                    <ArrowDownToLine className="h-4 w-4 mr-2" />
+                    Put Away ({selectedUPCs.size})
+                </Button>
+            </div>
+
+            {/* Date groups */}
+            {dateGroups.length === 0 ? (
+                <Card>
+                    <CardContent className="p-8 text-center text-muted-foreground">
+                        No UPCs match your search
+                    </CardContent>
+                </Card>
+            ) : (
+                dateGroups.map(group => (
+                    <div key={group.dateKey}>
+                        {/* Date header */}
+                        <div className="flex items-center gap-2 mb-2">
+                            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold text-muted-foreground">
+                                {group.dateLabel}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                ({group.upcs.length} UPC{group.upcs.length !== 1 ? 's' : ''})
+                            </span>
+                            <div className="flex-1 h-px bg-border" />
+                        </div>
+
+                        {/* UPC rows for this date */}
+                        <Card>
+                            <div className="divide-y">
+                                {group.upcs.map(upc => (
+                                    <div
+                                        key={upc.id}
+                                        className="p-3 hover:bg-muted/40 transition-colors flex items-center gap-3"
+                                    >
+                                        <Checkbox
+                                            checked={selectedUPCs.has(upc.id)}
+                                            onCheckedChange={() => toggleSelect(upc.id)}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <code className="text-sm font-mono font-medium">
+                                                    {upc.id}
+                                                </code>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {upc.productId}
+                                                </Badge>
+                                            </div>
+                                            {upc.orderName && (
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <FileText className="h-3 w-3" />
+                                                    <span>{upc.orderName}</span>
+                                                    {upc.storeName && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Store className="h-3 w-3" />
+                                                            <span>{upc.storeName}</span>
+                                                        </>
+                                                    )}
+                                                    {upc.orderStatus && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Badge variant="secondary" className="text-xs h-5">
+                                                                {upc.orderStatus}
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Time label on the right */}
+                                        <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                                            {upc.updatedAt.toDate().toLocaleTimeString('en-IN', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
+                ))
+            )}
+        </div>
+    );
+}
+
+// ============================================================
+// INBOUND TAB (replaces the three UPCGroupCard calls)
+// ============================================================
+
+function InboundTab({
+    grouped,
+    isLoading,
+    onPutAway,
+}: {
+    grouped: { rtoUPCs: GroupedUPC[]; dtoUPCs: GroupedUPC[]; unknownUPCs: GroupedUPC[] } | undefined;
+    isLoading: boolean;
+    onPutAway: (upcs: GroupedUPC[]) => void;
+}) {
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+
+    const applyDateFilter = (upcs: GroupedUPC[]): GroupedUPC[] => {
+        if (!dateFrom && !dateTo) return upcs;
+        return upcs.filter(upc => {
+            const d = upc.updatedAt.toDate();
+            if (dateFrom && d < new Date(dateFrom + 'T00:00:00')) return false;
+            if (dateTo && d > new Date(dateTo + 'T23:59:59')) return false;
+            return true;
+        });
+    };
+
+    const rto = applyDateFilter(grouped?.rtoUPCs ?? []);
+    const dto = applyDateFilter(grouped?.dtoUPCs ?? []);
+    const unknown = applyDateFilter(grouped?.unknownUPCs ?? []);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                    <Card key={i}>
+                        <CardHeader>
+                            <Skeleton className="h-8 w-48" />
+                        </CardHeader>
+                    </Card>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Date range filter */}
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium">Filter by date</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">From</Label>
+                                <Input
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={e => setDateFrom(e.target.value)}
+                                    className="h-8 w-40 text-sm"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">To</Label>
+                                <Input
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={e => setDateTo(e.target.value)}
+                                    className="h-8 w-40 text-sm"
+                                />
+                            </div>
+                            {(dateFrom || dateTo) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2"
+                                    onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                >
+                                    <X className="h-3.5 w-3.5 mr-1" />
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+                        {(dateFrom || dateTo) && (
+                            <span className="text-xs text-muted-foreground ml-auto">
+                                {rto.length + dto.length + unknown.length} UPC(s) in range
+                            </span>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Sub-tabs */}
+            <Tabs defaultValue="rto">
+                <TabsList className="w-full sm:w-auto">
+                    <TabsTrigger value="rto" className="gap-2">
+                        <RotateCcw className="h-4 w-4" />
+                        RTO Returns
+                        {rto.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 text-xs">
+                                {rto.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger value="dto" className="gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        DTO Returns
+                        {dto.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 text-xs">
+                                {dto.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger value="unknown" className="gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Unknown
+                        {unknown.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 text-xs">
+                                {unknown.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="rto" className="mt-4">
+                    <DateGroupedUPCList upcs={rto} onPutAway={onPutAway} />
+                </TabsContent>
+
+                <TabsContent value="dto" className="mt-4">
+                    <DateGroupedUPCList upcs={dto} onPutAway={onPutAway} />
+                </TabsContent>
+
+                <TabsContent value="unknown" className="mt-4">
+                    <DateGroupedUPCList upcs={unknown} onPutAway={onPutAway} />
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 
@@ -978,65 +1304,12 @@ export default function PutAwayPage() {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="inbound" className="space-y-4">
-                    {isLoadingGrouped ? (
-                        <div className="space-y-4">
-                            {[1, 2, 3].map(i => (
-                                <Card key={i}>
-                                    <CardHeader>
-                                        <Skeleton className="h-8 w-48" />
-                                    </CardHeader>
-                                </Card>
-                            ))}
-                        </div>
-                    ) : (
-                        <>
-                            {grouped?.rtoUPCs && grouped.rtoUPCs.length > 0 && (
-                                <UPCGroupCard
-                                    title="RTO Returns"
-                                    icon={RotateCcw}
-                                    iconColor="text-amber-600"
-                                    bgColor="bg-amber-500/10"
-                                    upcs={grouped.rtoUPCs}
-                                    onPutAway={handlePutAway}
-                                />
-                            )}
-
-                            {grouped?.dtoUPCs && grouped.dtoUPCs.length > 0 && (
-                                <UPCGroupCard
-                                    title="DTO Returns"
-                                    icon={TrendingUp}
-                                    iconColor="text-emerald-600"
-                                    bgColor="bg-emerald-500/10"
-                                    upcs={grouped.dtoUPCs}
-                                    onPutAway={handlePutAway}
-                                />
-                            )}
-
-                            {grouped?.unknownUPCs && grouped.unknownUPCs.length > 0 && (
-                                <UPCGroupCard
-                                    title="Unknown Returns"
-                                    icon={AlertCircle}
-                                    iconColor="text-rose-600"
-                                    bgColor="bg-rose-500/10"
-                                    upcs={grouped.unknownUPCs}
-                                    onPutAway={handlePutAway}
-                                />
-                            )}
-
-                            {(!grouped || (grouped.rtoUPCs.length === 0 && grouped.dtoUPCs.length === 0 && grouped.unknownUPCs.length === 0)) && (
-                                <Card>
-                                    <CardContent className="p-12 text-center">
-                                        <PackageOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                                        <h3 className="text-lg font-semibold mb-1">No Inbound UPCs</h3>
-                                        <p className="text-muted-foreground">
-                                            There are no UPCs waiting to be put away
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </>
-                    )}
+                <TabsContent value="inbound">
+                    <InboundTab
+                        grouped={grouped}
+                        isLoading={isLoadingGrouped}
+                        onPutAway={handlePutAway}
+                    />
                 </TabsContent>
 
                 <TabsContent value="outbound" className="space-y-4">

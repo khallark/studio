@@ -235,13 +235,13 @@ export async function POST(req: NextRequest) {
 
         // Recalculate PO status
         let newPoStatus = poData.status;
-        if (poData.status === 'confirmed') {
+        if (poData.status !== 'draft') {
             const anyPartiallyReceived = updatedPoItems.some(pi => pi.status === 'partially_received');
             const anyFullyReceived = updatedPoItems.some(pi => pi.status === 'fully_received');
             const allFullyReceived = updatedPoItems.every(pi => pi.status === 'fully_received');
             if (allFullyReceived) newPoStatus = 'fully_received';
             else if (anyPartiallyReceived || anyFullyReceived) newPoStatus = 'partially_received';
-            else newPoStatus = 'draft';
+            else newPoStatus = 'confirmed';
         }
 
         const poUpdatedData: Partial<PurchaseOrder> = {

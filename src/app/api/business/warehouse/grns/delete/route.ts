@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
-import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
-import { GRN, PurchaseOrder, PurchaseOrderItem } from '@/types/warehouse';
+import { GRN } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
@@ -64,64 +63,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ============================================================
-        // REVERT PO QUANTITIES IF GRN WAS DRAFT (had updated PO on creation)
-        // ============================================================
-
         const batch = db.batch();
-
-        // if (grnData.status === 'draft') {
-        //     const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc(grnData.poId);
-        //     const poSnap = await poRef.get();
-
-        //     if (poSnap.exists) {
-        //         const poData = poSnap.data()! as PurchaseOrder;
-        //         const now = Timestamp.now();
-        //         const updatedPoItems: PurchaseOrderItem[] = [...poData.items];
-
-        //         for (const grnItem of grnData.items) {
-        //             const idx = updatedPoItems.findIndex((pi: PurchaseOrderItem) => pi.sku === grnItem.sku);
-        //             if (idx !== -1) {
-        //                 updatedPoItems[idx] = {
-        //                     ...updatedPoItems[idx],
-        //                     receivedQty: Math.max(0, updatedPoItems[idx].receivedQty - grnItem.receivedQty),
-        //                     notReceivedQty: Math.max(
-        //                     updatedPoItems[idx].expectedQty - (updatedPoItems[idx].receivedQty - grnItem.receivedQty),
-        //                     0),
-        //                 };
-
-        //                 const poItem = updatedPoItems[idx];
-        //                 if (poItem.receivedQty > 0) {
-        //                     if (poItem.receivedQty < poItem.expectedQty)
-        //                         poItem.status = 'partially_received';
-        //                     else
-        //                         poItem.status = 'fully_received';
-        //                 } else {
-        //                     poItem.status = 'pending';
-        //                 }
-        //             }
-        //         }
-
-        //         // Recalculate PO status
-        //         let newPoStatus = poData.status;
-        //         if (poData.status === 'draft') {
-        //             const anyPartiallyReceived = updatedPoItems.some(pi => pi.status === 'partially_received');
-        //             const anyFullyReceived = updatedPoItems.some(pi => pi.status === 'fully_received');
-        //             const allFullyReceived = updatedPoItems.every(pi => pi.status === 'fully_received');
-        //             if (allFullyReceived) newPoStatus = 'fully_received';
-        //             else if (anyPartiallyReceived || anyFullyReceived) newPoStatus = 'partially_received';
-        //             else newPoStatus = 'confirmed';
-        //         }
-
-        //         const poUpdatedData: Partial<PurchaseOrder> = {
-        //             items: updatedPoItems,
-        //             status: newPoStatus,
-        //             updatedAt: now,
-        //         }
-
-        //         batch.update(poRef, poUpdatedData);
-        //     }
-        // }
 
         // Delete the GRN
         batch.delete(grnRef);

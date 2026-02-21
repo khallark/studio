@@ -404,10 +404,22 @@ async function handleOrderWebhook(
               let processedCount = 0;
               let skippedCount = 0;
 
-              for (const { productId, variantId } of productsAndVariantIds) {
-                // Get store product mapping
-                const storeProductRef = db.doc(`accounts/${shopDomain}/products/${productId}`);
-                const storeProductDoc = await tx.get(storeProductRef);
+              // ── PHASE 1: ALL READS ──────────────────────────────────────
+              // Read all store product docs simultaneously
+              const storeProductRefs = productsAndVariantIds.map(({ productId }) =>
+                db.doc(`accounts/${shopDomain}/products/${productId}`)
+              );
+              const storeProductDocs = await Promise.all(
+                storeProductRefs.map((ref) => tx.get(ref))
+              );
+
+              // Build the list of UPC queries from the product read results
+              type UpcQueryEntry = { businessId: string; query: FirebaseFirestore.Query };
+              const upcQueryEntries: UpcQueryEntry[] = [];
+
+              for (let i = 0; i < productsAndVariantIds.length; i++) {
+                const { productId, variantId } = productsAndVariantIds[i];
+                const storeProductDoc = storeProductDocs[i];
 
                 if (!storeProductDoc.exists) {
                   console.warn(`Product ${productId} not found, skipping`);
@@ -424,15 +436,24 @@ async function handleOrderWebhook(
                   continue;
                 }
 
-                const businessId = variantMapping.businessId;
+                upcQueryEntries.push({
+                  businessId: variantMapping.businessId,
+                  query: db
+                    .collection(`users/${variantMapping.businessId}/upcs`)
+                    .where('orderId', '==', String(orderId))
+                    .where('putAway', '==', 'outbound'),
+                });
+              }
 
-                // Query UPCs associated with this order
-                const upcQuery = db
-                  .collection(`users/${businessId}/upcs`)
-                  .where('orderId', '==', String(orderId))
-                  .where('putAway', '==', 'outbound'); // Only get outbound UPCs
+              // Execute all UPC queries — still Phase 1, no writes yet
+              const upcSnapshots = await Promise.all(
+                upcQueryEntries.map(({ query }) => tx.get(query))
+              );
 
-                const upcSnapshot = await tx.get(upcQuery);
+              // ── PHASE 2: ALL WRITES ─────────────────────────────────────
+              for (let i = 0; i < upcQueryEntries.length; i++) {
+                const { businessId } = upcQueryEntries[i];
+                const upcSnapshot = upcSnapshots[i];
 
                 if (upcSnapshot.empty) {
                   console.log(`No outbound UPCs found for order ${orderId}, business ${businessId}`);
@@ -440,19 +461,14 @@ async function handleOrderWebhook(
                   continue;
                 }
 
-                // Update each UPC back to inbound
                 for (const upcDoc of upcSnapshot.docs) {
                   const upcData = upcDoc.data() as UPC;
-
-                  // Double-check it's the right order and status
                   if (upcData.orderId === String(orderId) && upcData.putAway === 'outbound') {
-                    const updatedData: Partial<UPC> = {
+                    tx.update(upcDoc.ref, {
                       putAway: 'inbound',
                       updatedAt: Timestamp.now(),
                       updatedBy: businessId,
-                    };
-
-                    tx.update(upcDoc.ref, updatedData);
+                    } as Partial<UPC>);
                     processedCount++;
                     console.log(`Inbounded UPC ${upcDoc.id} for cancelled order ${orderId}`);
                   }

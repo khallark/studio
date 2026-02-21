@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
                     receivedQty: grnItem.receivedQty,
                     notReceivedQty: Math.max(0, grnItem.expectedQty - grnItem.receivedQty),
                 };
-                
+
                 const poItem = updatedPoItems[idx];
                 if (poItem.receivedQty > 0) {
                     if (poItem.receivedQty < poItem.expectedQty)
@@ -237,18 +237,20 @@ export async function POST(req: NextRequest) {
         let newPoStatus = poData.status;
         if (poData.status === 'confirmed') {
             const anyPartiallyReceived = updatedPoItems.some(pi => pi.status === 'partially_received');
-            const allNotReceived = updatedPoItems.every(pi => pi.status === 'pending');
+            const anyFullyReceived = updatedPoItems.some(pi => pi.status === 'fully_received');
             const allFullyReceived = updatedPoItems.every(pi => pi.status === 'fully_received');
-            if (anyPartiallyReceived) newPoStatus = 'partially_received';
-            else if (allFullyReceived) newPoStatus = 'draft';
-            else if (allNotReceived) newPoStatus = 'fully_received';
+            if (allFullyReceived) newPoStatus = 'fully_received';
+            else if (anyPartiallyReceived || anyFullyReceived) newPoStatus = 'partially_received';
+            else newPoStatus = 'draft';
         }
 
-        batch.update(poRef, {
+        const poUpdatedData: Partial<PurchaseOrder> = {
             items: updatedPoItems,
             status: newPoStatus,
             updatedAt: now,
-        });
+        }
+
+        batch.update(poRef, poUpdatedData);
 
         await batch.commit();
 

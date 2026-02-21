@@ -231,6 +231,38 @@ function useEnrichedUPCs(upcs: UPC[], businessId: string | null) {
     });
 }
 
+/**
+ * Resolves GRN doc IDs to human-readable grnNumber values.
+ * Returns a Record<grnDocId, grnNumber>.
+ */
+function useGrnNumberMap(grnRefs: string[], businessId: string | null) {
+    return useQuery({
+        queryKey: ['grnNumberMap', businessId, ...grnRefs],
+        queryFn: async () => {
+            if (!businessId || grnRefs.length === 0) return {} as Record<string, string>;
+            const map: Record<string, string> = {};
+            // Fetch in parallel, batch of unique refs
+            await Promise.all(
+                grnRefs.map(async (grnId) => {
+                    try {
+                        const snap = await getDoc(doc(db, 'users', businessId, 'grns', grnId));
+                        if (snap.exists()) {
+                            map[grnId] = snap.data().grnNumber || grnId;
+                        } else {
+                            map[grnId] = grnId; // fallback to doc ID
+                        }
+                    } catch {
+                        map[grnId] = grnId;
+                    }
+                })
+            );
+            return map;
+        },
+        enabled: !!businessId && grnRefs.length > 0,
+        staleTime: 60 * 1000,
+    });
+}
+
 // ============================================================
 // HOOKS - MUTATIONS
 // ============================================================
@@ -651,14 +683,20 @@ function DateGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway
 // GRN-GROUPED UPC LIST
 // ============================================================
 
-function GRNGroupedUPCList({ upcs, onPutAway, searchQuery }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void; searchQuery: string }) {
+function GRNGroupedUPCList({ upcs, onPutAway, searchQuery, grnNumberMap }: {
+    upcs: GroupedUPC[];
+    onPutAway: (upcs: GroupedUPC[]) => void;
+    searchQuery: string;
+    grnNumberMap: Record<string, string>;
+}) {
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
 
-    // Search matches UPC id, product SKU, or GRN ref
+    // Search matches UPC id, product SKU, GRN ref (doc ID), or resolved grnNumber
     const filteredUPCs = upcs.filter(upc =>
         upc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         upc.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (upc.grnRef && upc.grnRef.toLowerCase().includes(searchQuery.toLowerCase()))
+        (upc.grnRef && upc.grnRef.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (upc.grnRef && grnNumberMap[upc.grnRef]?.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     // Group by grnRef, sort groups by newest UPC first, sort UPCs within each group by time ascending
@@ -737,7 +775,7 @@ function GRNGroupedUPCList({ upcs, onPutAway, searchQuery }: { upcs: GroupedUPC[
                         {/* GRN header */}
                         <div className="flex items-center gap-2 mb-2">
                             <ClipboardCheck className="h-4 w-4 text-teal-600" />
-                            <span className="text-sm font-semibold text-teal-700 font-mono">{group.grnRef}</span>
+                            <span className="text-sm font-semibold text-teal-700 font-mono">{grnNumberMap[group.grnRef] || group.grnRef}</span>
                             <Badge variant="outline" className="text-xs">
                                 {group.upcs.length} UPC{group.upcs.length !== 1 ? 's' : ''}
                             </Badge>
@@ -786,6 +824,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
     isLoading: boolean;
     onPutAway: (upcs: GroupedUPC[]) => void;
 }) {
+    const { businessId } = useBusinessContext();
     const [activeSubTab, setActiveSubTab] = useState('grn');
     const [grnSearchQuery, setGrnSearchQuery] = useState('');
     const [dateFrom, setDateFrom] = useState('');
@@ -807,6 +846,22 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
     const dto = applyDateFilter(grouped?.dtoUPCs ?? []);
     const unknown = applyDateFilter(grouped?.unknownUPCs ?? []);
 
+    // Resolve grnRef doc IDs → grnNumber display values
+    const uniqueGrnRefs = useMemo(() => [...new Set(grn.map(u => u.grnRef).filter(Boolean) as string[])], [grn]);
+    const { data: grnNumberMap = {} } = useGrnNumberMap(uniqueGrnRefs, businessId);
+
+    // Count matching GRN UPCs (same logic as GRNGroupedUPCList filtering)
+    const grnSearchMatchCount = useMemo(() => {
+        if (!grnSearchQuery) return 0;
+        const q = grnSearchQuery.toLowerCase();
+        return grn.filter(upc =>
+            upc.id.toLowerCase().includes(q) ||
+            upc.productId.toLowerCase().includes(q) ||
+            (upc.grnRef && upc.grnRef.toLowerCase().includes(q)) ||
+            (upc.grnRef && grnNumberMap[upc.grnRef]?.toLowerCase().includes(q))
+        ).length;
+    }, [grn, grnSearchQuery, grnNumberMap]);
+
     if (isLoading) {
         return (
             <div className="space-y-4">
@@ -826,7 +881,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
                         <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
-                                placeholder="Search by GRN reference, UPC ID, or product SKU..."
+                                placeholder="Search by GRN number, UPC ID, or product SKU..."
                                 value={grnSearchQuery}
                                 onChange={e => setGrnSearchQuery(e.target.value)}
                                 className="pl-8 h-8 text-sm"
@@ -839,11 +894,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
                         )}
                         {grnSearchQuery && (
                             <span className="text-xs text-muted-foreground ml-auto">
-                                {grn.filter(upc =>
-                                    upc.id.toLowerCase().includes(grnSearchQuery.toLowerCase()) ||
-                                    upc.productId.toLowerCase().includes(grnSearchQuery.toLowerCase()) ||
-                                    (upc.grnRef && upc.grnRef.toLowerCase().includes(grnSearchQuery.toLowerCase()))
-                                ).length} UPC(s) matched
+                                {grnSearchMatchCount} UPC(s) matched
                             </span>
                         )}
                     </div>
@@ -901,7 +952,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
                 </TabsList>
 
                 <TabsContent value="grn" className="mt-4">
-                    <GRNGroupedUPCList upcs={grn} onPutAway={onPutAway} searchQuery={grnSearchQuery} />
+                    <GRNGroupedUPCList upcs={grn} onPutAway={onPutAway} searchQuery={grnSearchQuery} grnNumberMap={grnNumberMap} />
                 </TabsContent>
                 <TabsContent value="rto" className="mt-4">
                     <DateGroupedUPCList upcs={rto} onPutAway={onPutAway} />

@@ -796,6 +796,7 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
     isLoading: boolean;
     onPutAway: (upcs: GroupedUPC[]) => void;
 }) {
+    const [activeSubTab, setActiveSubTab] = useState('grn');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
 
@@ -809,7 +810,8 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
         });
     };
 
-    const grn = applyDateFilter(grouped?.grnUPCs ?? []);
+    // GRN UPCs are never date-filtered — they have their own search bar
+    const grn = grouped?.grnUPCs ?? [];
     const rto = applyDateFilter(grouped?.rtoUPCs ?? []);
     const dto = applyDateFilter(grouped?.dtoUPCs ?? []);
     const unknown = applyDateFilter(grouped?.unknownUPCs ?? []);
@@ -824,36 +826,38 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
 
     return (
         <div className="space-y-4">
-            {/* Date range filter */}
-            <Card><CardContent className="p-4">
-                <div className="flex flex-wrap items-center gap-3">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-medium">Filter by date</span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                            <Label className="text-xs text-muted-foreground">From</Label>
-                            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 w-40 text-sm" />
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <Label className="text-xs text-muted-foreground">To</Label>
-                            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 w-40 text-sm" />
+            {/* Date range filter — hidden on GRN sub-tab (it has its own search bar) */}
+            {activeSubTab !== 'grn' && (
+                <Card><CardContent className="p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium">Filter by date</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">From</Label>
+                                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 w-40 text-sm" />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">To</Label>
+                                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 w-40 text-sm" />
+                            </div>
+                            {(dateFrom || dateTo) && (
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                                    <X className="h-3.5 w-3.5 mr-1" />Clear
+                                </Button>
+                            )}
                         </div>
                         {(dateFrom || dateTo) && (
-                            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => { setDateFrom(''); setDateTo(''); }}>
-                                <X className="h-3.5 w-3.5 mr-1" />Clear
-                            </Button>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                                {rto.length + dto.length + unknown.length} UPC(s) in range
+                            </span>
                         )}
                     </div>
-                    {(dateFrom || dateTo) && (
-                        <span className="text-xs text-muted-foreground ml-auto">
-                            {grn.length + rto.length + dto.length + unknown.length} UPC(s) in range
-                        </span>
-                    )}
-                </div>
-            </CardContent></Card>
+                </CardContent></Card>
+            )}
 
             {/* Sub-tabs: GRN first, then RTO, DTO, Unknown */}
-            <Tabs defaultValue="grn">
+            <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
                 <TabsList className="w-full sm:w-auto">
                     <TabsTrigger value="grn" className="gap-2">
                         <ClipboardCheck className="h-4 w-4" />

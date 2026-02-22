@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
-import { PurchaseOrder, PurchaseOrderItem } from '@/types/warehouse';
+import { PurchaseOrder, PurchaseOrderItem, Warehouse } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
         if (!warehouseId || typeof warehouseId !== 'string') {
             return NextResponse.json(
                 { error: 'Validation Error', message: 'warehouseId is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!warehouseName || typeof warehouseName !== 'string') {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'warehouseName is required' },
                 { status: 400 }
             );
         }
@@ -109,13 +116,13 @@ export async function POST(req: NextRequest) {
         const result = await authUserForBusiness({ businessId, req });
         const { userId } = result;
 
-        if(!userId) {
+        if (!userId) {
             return NextResponse.json(
                 { error: 'User not logged in' },
                 { status: 401 }
             );
         }
-        
+
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
@@ -147,6 +154,36 @@ export async function POST(req: NextRequest) {
         if (partyData.type !== 'supplier' && partyData.type !== 'both') {
             return NextResponse.json(
                 { error: 'Validation Error', message: `Party "${partyData.name}" is not a supplier (type: ${partyData.type}).` },
+                { status: 400 }
+            );
+        }
+
+        // ============================================================
+        // WAREHOUSE VALIDATION
+        // ============================================================
+
+        const warehouseRef = db.collection('users').doc(businessId).collection('warehouse').doc(warehouseId);
+        const warehouseSnap = await warehouseRef.get();
+
+        if (!warehouseSnap.exists) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'Warehouse not found. Please select a valid warehouse.' },
+                { status: 400 }
+            );
+        }
+
+        const warehouseData = warehouseSnap.data()! as Warehouse;
+
+        if (warehouseData.isDeleted) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: `Warehouse "${warehouseData.name}" has been deleted. Cannot create PO for a deleted warehouse.` },
+                { status: 400 }
+            );
+        }
+
+        if (warehouseData.name !== warehouseName) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: `Warehouse name mismatch. Expected "${warehouseData.name}" but received "${warehouseName}". Please re-select the warehouse.` },
                 { status: 400 }
             );
         }
@@ -213,7 +250,7 @@ export async function POST(req: NextRequest) {
         const totalAmount = poItems.reduce((sum: number, item: PurchaseOrderItem) => sum + (item.expectedQty * item.unitCost), 0);
 
         const poRef = db.collection('users').doc(businessId).collection('purchaseOrders').doc();
-        
+
         const poData: PurchaseOrder = {
             id: poRef.id,
             poNumber,
@@ -221,7 +258,7 @@ export async function POST(req: NextRequest) {
             supplierPartyId,
             supplierName,
             warehouseId,
-            warehouseName: warehouseName || '',
+            warehouseName,
             status: 'draft' as const,
 
             orderedSkus,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
-import { POStatus, PurchaseOrder, PurchaseOrderItem } from '@/types/warehouse';
+import { POStatus, PurchaseOrder, PurchaseOrderItem, Warehouse } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const result = await authUserForBusiness({ businessId, req });
-        
+
         if (!result.authorised) {
             const { error, status: authStatus } = result;
             return NextResponse.json({ error }, { status: authStatus });
@@ -149,6 +149,38 @@ export async function POST(req: NextRequest) {
             if (partyData.type !== 'supplier' && partyData.type !== 'both') {
                 return NextResponse.json(
                     { error: 'Validation Error', message: `Party "${partyData.name}" is not a supplier (type: ${partyData.type}).` },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // ============================================================
+        // WAREHOUSE VALIDATION (if warehouse is being changed)
+        // ============================================================
+
+        if (warehouseId && (warehouseId !== existingPO.warehouseId || warehouseName !== existingPO.warehouseName)) {
+            const warehouseRef = db.collection('users').doc(businessId).collection('warehouse').doc(warehouseId);
+            const warehouseSnap = await warehouseRef.get();
+
+            if (!warehouseSnap.exists) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: 'Warehouse not found. Please select a valid warehouse.' },
+                    { status: 400 }
+                );
+            }
+
+            const warehouseData = warehouseSnap.data()! as Warehouse;
+
+            if (warehouseData.isDeleted) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Warehouse "${warehouseData.name}" has been deleted. Cannot assign a deleted warehouse.` },
+                    { status: 400 }
+                );
+            }
+
+            if (warehouseName && warehouseData.name !== warehouseName) {
+                return NextResponse.json(
+                    { error: 'Validation Error', message: `Warehouse name mismatch. Expected "${warehouseData.name}" but received "${warehouseName}". Please re-select the warehouse.` },
                     { status: 400 }
                 );
             }

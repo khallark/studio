@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
         // WAREHOUSE VALIDATION
         // ============================================================
 
-        const warehouseRef = db.collection('users').doc(businessId).collection('warehouse').doc(warehouseId);
+        const warehouseRef = db.collection('users').doc(businessId).collection('warehouses').doc(warehouseId);
         const warehouseSnap = await warehouseRef.get();
 
         if (!warehouseSnap.exists) {

@@ -212,6 +212,7 @@ function useWarehouses(businessId: string | null, user: User | null | undefined)
             if (!businessId) throw new Error('No business ID');
             const whRef = collection(db, 'users', businessId, 'warehouses');
             const snapshot = await getDocs(whRef);
+            console.log(snapshot.docs.length);
             return snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }) as WarehouseOption & { isDeleted?: boolean })
                 .filter(w => !w.isDeleted)

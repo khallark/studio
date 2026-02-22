@@ -212,19 +212,18 @@ export default function WarehouseLayout({
         },
         {
             label: 'Business Products',
-            href: `/business/${businessId}/products`,
+            href: `/business/${businessId}/warehouse/products`,
             icon: Package,
             description: 'Your product catalog',
         },
         {
             label: 'Inventory',
-            href: `/business/${businessId}/inventory`,
+            href: `/business/${businessId}/warehouse/inventory`,
             icon: Warehouse,
             description: 'Manage stock levels',
-
         },
         {
-            label: 'Overview',
+            label: 'Warehouses',
             href: `/business/${businessId}/warehouse`,
             icon: LayoutGrid,
             description: 'Warehouse structure & inventory',

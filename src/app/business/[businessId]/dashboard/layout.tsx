@@ -678,16 +678,40 @@ export default function BusinessLayout({
                   isActive={pathname.startsWith(`/business/${businessId}/warehouse`)}
                 >
                   <NavItem
-                    href={`/business/${businessId}/products`}
-                    icon={BriefcaseBusiness}
-                    label="Business Products"
-                    isActive={pathname === `/business/${businessId}/products`}
+                    href={`/business/${businessId}/warehouse/party-master`}
+                    icon={Handshake}
+                    label="Party Master"
+                    isActive={pathname === `/business/${businessId}/warehouse/party-master`}
                   />
                   <NavItem
-                    href={`/business/${businessId}/inventory`}
+                    href={`/business/${businessId}/warehouse/POs`}
+                    icon={MessageCircleReplyIcon}
+                    label="Purchase Orders"
+                    isActive={pathname === `/business/${businessId}/warehouse/POs`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/GRNs`}
+                    icon={Shirt}
+                    label="Process GRNs"
+                    isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/put-away`}
+                    icon={Truck}
+                    label="Put Away"
+                    isActive={pathname === `/business/${businessId}/warehouse/put-away`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/products`}
+                    icon={BriefcaseBusiness}
+                    label="Business Products"
+                    isActive={pathname === `/business/${businessId}/warehouse/products`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/inventory`}
                     icon={Warehouse}
                     label="Inventory"
-                    isActive={pathname === `/business/${businessId}/inventory`}
+                    isActive={pathname === `/business/${businessId}/warehouse/inventory`}
                   />
                   <NavItem
                     href={`/business/${businessId}/warehouse`}
@@ -706,30 +730,6 @@ export default function BusinessLayout({
                     icon={Logs}
                     label="Activity Logs"
                     isActive={pathname === `/business/${businessId}/warehouse/logs`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/warehouse/put-away`}
-                    icon={Truck}
-                    label="Put Away"
-                    isActive={pathname === `/business/${businessId}/warehouse/put-away`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/warehouse/party-master`}
-                    icon={Handshake}
-                    label="Party Master"
-                    isActive={pathname === `/business/${businessId}/warehouse/party-master`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/warehouse/POs`}
-                    icon={MessageCircleReplyIcon}
-                    label="Purchase Orders"
-                    isActive={pathname === `/business/${businessId}/warehouse/POs`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/warehouse/GRNs`}
-                    icon={Shirt}
-                    label="Process GRNs"
-                    isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
                   />
                 </NavSection>
               </SidebarMenuItem>

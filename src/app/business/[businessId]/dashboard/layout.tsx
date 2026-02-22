@@ -624,30 +624,6 @@ export default function BusinessLayout({
                 </NavSection>
               </SidebarMenuItem>
 
-              {/* Members Section */}
-              <SidebarMenuItem>
-                <NavSection
-                  icon={Users}
-                  label="Members"
-                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}
-                >
-                  {isSuperAdmin && (
-                    <NavItem
-                      href={`/business/${businessId}/dashboard/members/requests`}
-                      icon={Inbox}
-                      label="Requests"
-                      isActive={pathname === `/business/${businessId}/dashboard/members/requests`}
-                    />
-                  )}
-                  <NavItem
-                    href={`/business/${businessId}/dashboard/members/invite`}
-                    icon={UserPlus}
-                    label="Invite"
-                    isActive={pathname === `/business/${businessId}/dashboard/members/invite`}
-                  />
-                </NavSection>
-              </SidebarMenuItem>
-
               {/* Products Section */}
               {/* <SidebarMenuItem>
                 <NavSection
@@ -733,7 +709,32 @@ export default function BusinessLayout({
                   />
                 </NavSection>
               </SidebarMenuItem>
+
+              {/* Members Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={Users}
+                  label="Members"
+                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}
+                >
+                  {isSuperAdmin && (
+                    <NavItem
+                      href={`/business/${businessId}/dashboard/members/requests`}
+                      icon={Inbox}
+                      label="Requests"
+                      isActive={pathname === `/business/${businessId}/dashboard/members/requests`}
+                    />
+                  )}
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/members/invite`}
+                    icon={UserPlus}
+                    label="Invite"
+                    isActive={pathname === `/business/${businessId}/dashboard/members/invite`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
             </SidebarMenu>
+
 
             {/* Spacer */}
             <div className="flex-1" />

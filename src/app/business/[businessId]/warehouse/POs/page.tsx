@@ -210,7 +210,7 @@ function useWarehouses(businessId: string | null, user: User | null | undefined)
         queryKey: ['warehouses', businessId],
         queryFn: async () => {
             if (!businessId) throw new Error('No business ID');
-            const whRef = collection(db, 'users', businessId, 'warehouse');
+            const whRef = collection(db, 'users', businessId, 'warehouses');
             const snapshot = await getDocs(whRef);
             return snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }) as WarehouseOption & { isDeleted?: boolean })

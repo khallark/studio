@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { useBusinessContext } from '../../layout';
 import { db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
@@ -169,31 +169,47 @@ function useGRNs(businessId: string | null, user: User | null | undefined) {
 }
 
 /**
- * Fetches POs that can receive GRNs.
- * GRNs can be created for POs in 'confirmed' or 'partially_received' status.
+ * Real-time listener for POs that can receive GRNs.
+ * Listens to POs with status 'confirmed' or 'partially_received' via onSnapshot.
  * PO is only closed manually by the user.
  */
-function useReceivablePOs(businessId: string | null, user: User | null | undefined) {
-    return useQuery({
-        queryKey: ['receivablePOs', businessId],
-        queryFn: async () => {
-            if (!businessId) throw new Error('No business ID');
+function useReceivablePOs(businessId: string | null) {
+    const [receivablePOs, setReceivablePOs] = useState<PurchaseOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-            const posRef = collection(db, 'users', businessId, 'purchaseOrders');
-            const snapshot = await getDocs(posRef);
+    useEffect(() => {
+        if (!businessId) {
+            setReceivablePOs([]);
+            setIsLoading(false);
+            return;
+        }
 
-            const allPOs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as PurchaseOrder[];
+        const posRef = collection(db, 'users', businessId, 'purchaseOrders');
+        const q = query(
+            posRef,
+            where('status', 'in', ['confirmed', 'partially_received'])
+        );
 
-            return allPOs.filter(po =>
-                po.status === 'confirmed' || po.status === 'partially_received'
-            );
-        },
-        enabled: !!businessId && !!user,
-        staleTime: 30 * 1000,
-    });
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const pos = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })) as PurchaseOrder[];
+                setReceivablePOs(pos);
+                setIsLoading(false);
+            },
+            (error) => {
+                console.error('❌ Receivable POs listener error:', error);
+                setIsLoading(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, [businessId]);
+
+    return { data: receivablePOs, isLoading };
 }
 
 // ============================================================
@@ -227,7 +243,6 @@ function useCreateGRN(businessId: string | null, user: User | null | undefined) 
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
-            queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
             toast({ title: 'GRN Created', description: `${data.grnNumber} has been created.` });
         },
@@ -264,7 +279,6 @@ function useUpdateGRN(businessId: string | null, user: User | null | undefined) 
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
-            queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
             toast({ title: 'GRN Updated', description: 'GRN has been updated successfully.' });
         },
@@ -301,7 +315,6 @@ function useDeleteGRN(businessId: string | null, user: User | null | undefined) 
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
-            queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
             toast({ title: 'GRN Deleted', description: `${data.deletedGrnNumber} has been deleted.` });
         },
@@ -338,7 +351,6 @@ function useConfirmPutAway(businessId: string | null, user: User | null | undefi
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
-            queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders', businessId] });
             toast({
                 title: 'Put Away Confirmed',
@@ -864,7 +876,7 @@ export default function GRNsPage() {
 
     // Data
     const { data: grns = [], isLoading, refetch } = useGRNs(businessId, user);
-    const { data: receivablePOs = [] } = useReceivablePOs(businessId, user);
+    const { data: receivablePOs = [] } = useReceivablePOs(businessId);
 
     // Mutations
     const createMutation = useCreateGRN(businessId, user);
@@ -957,7 +969,6 @@ export default function GRNsPage() {
 
     const handleRefresh = () => {
         queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
-        queryClient.invalidateQueries({ queryKey: ['receivablePOs', businessId] });
         refetch();
     };
 

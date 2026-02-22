@@ -187,30 +187,6 @@ export default function WarehouseLayout({
 
     const navItems: NavItem[] = [
         {
-            label: 'Overview',
-            href: `/business/${businessId}/warehouse`,
-            icon: LayoutGrid,
-            description: 'Warehouse structure & inventory',
-        },
-        {
-            label: 'Movements',
-            href: `/business/${businessId}/warehouse/movements`,
-            icon: GitBranch,
-            description: 'Stock movement history',
-        },
-        {
-            label: 'Activity Logs',
-            href: `/business/${businessId}/warehouse/logs`,
-            icon: History,
-            description: 'All activity logs',
-        },
-        {
-            label: 'Put Away',
-            href: `/business/${businessId}/warehouse/put-away`,
-            icon: Truck,
-            description: 'Process put away UPCs',
-        },
-        {
             label: 'Party Master',
             href: `/business/${businessId}/warehouse/party-master`,
             icon: Handshake,
@@ -227,6 +203,43 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/GRNs`,
             icon: Shirt,
             description: 'Process GRNs',
+        },
+        {
+            label: 'Put Away',
+            href: `/business/${businessId}/warehouse/put-away`,
+            icon: Truck,
+            description: 'Process put away UPCs',
+        },
+        {
+            label: 'Business Products',
+            href: `/business/${businessId}/products`,
+            icon: Package,
+            description: 'Your product catalog',
+        },
+        {
+            label: 'Inventory',
+            href: `/business/${businessId}/inventory`,
+            icon: Warehouse,
+            description: 'Manage stock levels',
+
+        },
+        {
+            label: 'Overview',
+            href: `/business/${businessId}/warehouse`,
+            icon: LayoutGrid,
+            description: 'Warehouse structure & inventory',
+        },
+        {
+            label: 'Movements',
+            href: `/business/${businessId}/warehouse/movements`,
+            icon: GitBranch,
+            description: 'Stock movement history',
+        },
+        {
+            label: 'Activity Logs',
+            href: `/business/${businessId}/warehouse/logs`,
+            icon: History,
+            description: 'All activity logs',
         },
     ];
 

@@ -649,7 +649,7 @@ export default function BusinessLayout({
               </SidebarMenuItem>
 
               {/* Products Section */}
-              <SidebarMenuItem>
+              {/* <SidebarMenuItem>
                 <NavSection
                   icon={Shirt}
                   label="Products"
@@ -668,7 +668,7 @@ export default function BusinessLayout({
                     isActive={pathname === `/business/${businessId}/inventory`}
                   />
                 </NavSection>
-              </SidebarMenuItem>
+              </SidebarMenuItem> */}
 
               {/* Warehouse Section */}
               <SidebarMenuItem>
@@ -677,6 +677,18 @@ export default function BusinessLayout({
                   label="Warehouse"
                   isActive={pathname.startsWith(`/business/${businessId}/warehouse`)}
                 >
+                  <NavItem
+                    href={`/business/${businessId}/products`}
+                    icon={BriefcaseBusiness}
+                    label="Business Products"
+                    isActive={pathname === `/business/${businessId}/products`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/inventory`}
+                    icon={Warehouse}
+                    label="Inventory"
+                    isActive={pathname === `/business/${businessId}/inventory`}
+                  />
                   <NavItem
                     href={`/business/${businessId}/warehouse`}
                     icon={ListCollapse}

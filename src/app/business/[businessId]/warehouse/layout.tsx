@@ -295,7 +295,7 @@ export default function WarehouseLayout({
                     </div>
 
                     {/* Nav Items */}
-                    <div className="space-y-1.5">
+                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
                         {navItems.map((item) => {
                             const active = isActive(item.href);
                             const Icon = item.icon;

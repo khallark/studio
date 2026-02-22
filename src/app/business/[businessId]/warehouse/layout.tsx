@@ -250,7 +250,7 @@ export default function WarehouseLayout({
     };
 
     return (
-        <div className="flex">
+        <div className="flex min-h-0">
             {/* Side Menu */}
             <aside className="hidden lg:flex flex-col w-[280px] border-r bg-gradient-to-b from-background via-background to-muted/20">
                 {/* Header */}

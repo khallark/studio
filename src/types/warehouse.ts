@@ -383,6 +383,7 @@ export interface GRN {
     poNumber: string;
     warehouseId: string;
     warehouseName: string | null;
+    billNumber: string;
 
     status: 'draft' | 'completed' | 'cancelled';
 

@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
             warehouseName,
             items,
             notes,
+            billNumber,
         } = await req.json();
 
         // ============================================================
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
         if (!warehouseId || typeof warehouseId !== 'string') {
             return NextResponse.json(
                 { error: 'Validation Error', message: 'warehouseId is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!billNumber || typeof billNumber !== 'string' || !billNumber.trim()) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'billNumber is required' },
                 { status: 400 }
             );
         }
@@ -186,6 +194,7 @@ export async function POST(req: NextRequest) {
             grnNumber,
             businessId,
             poId,
+            billNumber: billNumber.trim(),
             poNumber: poNumber || poData.poNumber,
             warehouseId,
             warehouseName: warehouseName || '',

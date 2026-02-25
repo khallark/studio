@@ -381,6 +381,7 @@ function GRNFormDialog({
     receivablePOs: PurchaseOrder[];
 }) {
     const [selectedPOId, setSelectedPOId] = useState('');
+    const [billNumber, setBillNumber] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<GRNItemFormRow[]>([]);
 
@@ -413,6 +414,7 @@ function GRNFormDialog({
             setSelectedPOId('');
             setNotes('');
             setItems([]);
+            setBillNumber('');
         }
     }, [open]);
 
@@ -507,6 +509,15 @@ function GRNFormDialog({
                             </div>
                         </div>
                     )}
+
+                    <div className="space-y-2">
+                        <Label>Bill / Invoice Number</Label>
+                        <Input
+                            value={billNumber}
+                            onChange={(e) => setBillNumber(e.target.value)}
+                            placeholder="Supplier invoice or bill number..."
+                        />
+                    </div>
 
                     {items.length > 0 && (
                         <div className="space-y-3">
@@ -645,6 +656,10 @@ function GRNDetailDialog({
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Linked PO</p>
                             <p className="font-medium font-mono">{grn.poNumber}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-muted-foreground">Bill / Invoice #</p>
+                            <p className="font-medium font-mono">{grn.billNumber}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Warehouse</p>

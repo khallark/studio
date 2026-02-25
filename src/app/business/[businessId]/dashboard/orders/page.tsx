@@ -2090,12 +2090,12 @@ export default function BusinessOrdersPage() {
             <AlertDialog open={isRTOUPCDialogOpen} onOpenChange={setIsRTOUPCDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Create UPCs for returned orders?</AlertDialogTitle>
+                        <AlertDialogTitle>Reflect UPCs in Put Away?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Do you want to create putAway UPCs for{' '}
-                            <strong>{rtoDialogCounts.withoutUPC}</strong> orders out of{' '}
-                            <strong>{rtoDialogCounts.withUPC}</strong> orders, which do not have
-                            any existing UPC attached with them?
+                            Do you want the UPCs of the selected orders to reflect in put away?
+                            If yes, UPCs for orders without existing UPCs will be created as{' '}
+                            <strong>putAway: inbound</strong>, and already existing UPCs will be
+                            updated to <strong>putAway: inbound</strong>. If no, neither will happen.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -2109,10 +2109,10 @@ export default function BusinessOrdersPage() {
                                 executeRTOUpdate(false);
                             }}
                         >
-                            No, skip UPC creation
+                            No
                         </Button>
                         <AlertDialogAction onClick={() => executeRTOUpdate(true)}>
-                            Yes, create UPCs
+                            Yes
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

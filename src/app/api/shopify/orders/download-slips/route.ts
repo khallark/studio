@@ -144,6 +144,18 @@ function numberToRupeesWords(amount: number | string): string {
   return `${sign}Rupees ${rupeesWords} and ${paiseWords} Paise Only`;
 }
 
+function wrapWords(text: string, every = 4): string {
+  return text.split(' ')
+    .reduce((lines: string[][], word, i) => {
+      const groupIndex = Math.floor(i / every);
+      if (!lines[groupIndex]) lines[groupIndex] = [];
+      lines[groupIndex].push(word);
+      return lines;
+    }, [])
+    .map(group => group.join(' '))
+    .join('<br>');
+}
+
 function generateSlipHTML(
   order: any,
   sellerDetails: { name: string; gst: string; returnAddress: string }
@@ -251,7 +263,7 @@ function generateSlipHTML(
             Collectable: INR ${escapeHtml(collectableFormatted)}
           </div>
           <div class="collectable-words" style="font-size:17px;font-weight:900;margin-top:4px;">
-            (${escapeHtml(collectableInWords)})
+            (${wrapWords(collectableInWords, 4)})
           </div>
 
           <div class="date-section">

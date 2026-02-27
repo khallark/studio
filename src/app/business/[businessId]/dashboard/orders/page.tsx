@@ -1483,7 +1483,7 @@ export default function BusinessOrdersPage() {
                                             Mark RTO Processed
                                         </DropdownMenuItem>
                                     )}
-                                    {activeTab === 'RTO Delivered' && (
+                                    {activeTab === 'RTO Delivered' || activeTab === 'RTO Processed' && (
                                         <DropdownMenuItem
                                             onClick={() => handleRTOBulkAction('RTO Closed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}

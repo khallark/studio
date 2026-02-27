@@ -554,7 +554,7 @@ const GrossProfitReportDialog = ({
                         <Label htmlFor="from-date">
                             From Date <span className="text-destructive">*</span>
                         </Label>
-                        <Popover open={fromOpen} onOpenChange={setFromOpen}>
+                        <Popover open={fromOpen} onOpenChange={setFromOpen} modal={false}>
                             <PopoverTrigger asChild>
                                 <Button
                                     id="from-date"
@@ -593,7 +593,7 @@ const GrossProfitReportDialog = ({
                         <Label htmlFor="to-date">
                             To Date <span className="text-destructive">*</span>
                         </Label>
-                        <Popover open={toOpen} onOpenChange={setToOpen}>
+                        <Popover open={toOpen} onOpenChange={setToOpen} modal={false}>
                             <PopoverTrigger asChild>
                                 <Button
                                     id="to-date"

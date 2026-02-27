@@ -36,8 +36,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Table,
@@ -475,18 +474,18 @@ const GrossProfitReportDialog = ({
     businessId,
     getToken,
 }: GrossProfitReportDialogProps) => {
-    const [fromDate, setFromDate] = useState<Date | undefined>();
-    const [toDate, setToDate] = useState<Date | undefined>();
-    const [fromOpen, setFromOpen] = useState(false);
-    const [toOpen, setToOpen] = useState(false);
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [reportError, setReportError] = useState<string | null>(null);
+
+    const today = format(new Date(), 'yyyy-MM-dd');
 
     // Reset state when dialog opens/closes
     useEffect(() => {
         if (!open) {
-            setFromDate(undefined);
-            setToDate(undefined);
+            setFromDate('');
+            setToDate('');
             setReportError(null);
             setIsGenerating(false);
         }
@@ -500,8 +499,6 @@ const GrossProfitReportDialog = ({
 
         try {
             const token = await getToken();
-            const startDate = format(fromDate, 'yyyy-MM-dd');
-            const endDate = format(toDate, 'yyyy-MM-dd');
 
             const response = await fetch('/api/business/generate-gross-profit-report', {
                 method: 'POST',
@@ -509,7 +506,7 @@ const GrossProfitReportDialog = ({
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ businessId, startDate, endDate }),
+                body: JSON.stringify({ businessId, startDate: fromDate, endDate: toDate }),
             });
 
             if (!response.ok) {
@@ -522,7 +519,7 @@ const GrossProfitReportDialog = ({
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `gross-profit-report_${startDate}_${endDate}.xlsx`;
+            a.download = `gross-profit-report_${fromDate}_${toDate}.xlsx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -536,7 +533,7 @@ const GrossProfitReportDialog = ({
         }
     };
 
-    const isValid = !!fromDate && !!toDate;
+    const isValid = !!fromDate && !!toDate && fromDate <= toDate;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -554,38 +551,25 @@ const GrossProfitReportDialog = ({
                         <Label htmlFor="from-date">
                             From Date <span className="text-destructive">*</span>
                         </Label>
-                        <Popover open={fromOpen} onOpenChange={setFromOpen} modal={false}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    id="from-date"
-                                    variant="outline"
-                                    className={cn(
-                                        'w-full justify-start text-left font-normal',
-                                        !fromDate && 'text-muted-foreground'
-                                    )}
-                                    disabled={isGenerating}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {fromDate ? format(fromDate, 'dd MMM yyyy') : 'Pick a start date'}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[9999]" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={fromDate}
-                                    onSelect={(date) => {
-                                        setFromDate(date);
-                                        // Clear toDate if it's before new fromDate
-                                        if (date && toDate && toDate < date) {
-                                            setToDate(undefined);
-                                        }
-                                        setFromOpen(false);
-                                    }}
-                                    disabled={(date) => date > new Date()}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <input
+                            id="from-date"
+                            type="date"
+                            value={fromDate}
+                            max={toDate || today}
+                            onChange={(e) => {
+                                setFromDate(e.target.value);
+                                // Clear toDate if it's now before fromDate
+                                if (toDate && e.target.value > toDate) {
+                                    setToDate('');
+                                }
+                            }}
+                            disabled={isGenerating}
+                            className={cn(
+                                'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                'disabled:cursor-not-allowed disabled:opacity-50'
+                            )}
+                        />
                     </div>
 
                     {/* To Date */}
@@ -593,37 +577,28 @@ const GrossProfitReportDialog = ({
                         <Label htmlFor="to-date">
                             To Date <span className="text-destructive">*</span>
                         </Label>
-                        <Popover open={toOpen} onOpenChange={setToOpen} modal={false}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    id="to-date"
-                                    variant="outline"
-                                    className={cn(
-                                        'w-full justify-start text-left font-normal',
-                                        !toDate && 'text-muted-foreground'
-                                    )}
-                                    disabled={isGenerating}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {toDate ? format(toDate, 'dd MMM yyyy') : 'Pick an end date'}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[9999]" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={toDate}
-                                    onSelect={(date) => {
-                                        setToDate(date);
-                                        setToOpen(false);
-                                    }}
-                                    disabled={(date) =>
-                                        date > new Date() || (fromDate ? date < fromDate : false)
-                                    }
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <input
+                            id="to-date"
+                            type="date"
+                            value={toDate}
+                            min={fromDate || undefined}
+                            max={today}
+                            onChange={(e) => setToDate(e.target.value)}
+                            disabled={isGenerating}
+                            className={cn(
+                                'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                'disabled:cursor-not-allowed disabled:opacity-50'
+                            )}
+                        />
                     </div>
+
+                    {/* Validation hint */}
+                    {fromDate && toDate && fromDate > toDate && (
+                        <p className="text-xs text-destructive -mt-3">
+                            From date cannot be after To date.
+                        </p>
+                    )}
 
                     {/* Error */}
                     {reportError && (

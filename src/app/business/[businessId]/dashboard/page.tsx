@@ -24,8 +24,17 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal } from 'lucide-react';
+import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
@@ -450,6 +459,212 @@ const DataTable = ({ data }: { data: TableData }) => {
 };
 
 // ============================================================
+// GROSS PROFIT REPORT DIALOG
+// ============================================================
+
+interface GrossProfitReportDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    businessId: string;
+    getToken: () => Promise<string>;
+}
+
+const GrossProfitReportDialog = ({
+    open,
+    onOpenChange,
+    businessId,
+    getToken,
+}: GrossProfitReportDialogProps) => {
+    const [fromDate, setFromDate] = useState<Date | undefined>();
+    const [toDate, setToDate] = useState<Date | undefined>();
+    const [fromOpen, setFromOpen] = useState(false);
+    const [toOpen, setToOpen] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [reportError, setReportError] = useState<string | null>(null);
+
+    // Reset state when dialog opens/closes
+    useEffect(() => {
+        if (!open) {
+            setFromDate(undefined);
+            setToDate(undefined);
+            setReportError(null);
+            setIsGenerating(false);
+        }
+    }, [open]);
+
+    const handleGenerate = async () => {
+        if (!fromDate || !toDate) return;
+
+        setReportError(null);
+        setIsGenerating(true);
+
+        try {
+            const token = await getToken();
+            const startDate = format(fromDate, 'yyyy-MM-dd');
+            const endDate = format(toDate, 'yyyy-MM-dd');
+
+            const response = await fetch('/api/business/generate-gross-profit-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ businessId, startDate, endDate }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
+            }
+
+            // Trigger browser download
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gross-profit-report_${startDate}_${endDate}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            onOpenChange(false);
+        } catch (err: unknown) {
+            setReportError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const isValid = !!fromDate && !!toDate;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                    <DialogTitle>Download Gross Profit Report</DialogTitle>
+                    <DialogDescription>
+                        Select a date range to generate the Excel report. This may take a minute.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid gap-5 py-2">
+                    {/* From Date */}
+                    <div className="grid gap-2">
+                        <Label htmlFor="from-date">
+                            From Date <span className="text-destructive">*</span>
+                        </Label>
+                        <Popover open={fromOpen} onOpenChange={setFromOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="from-date"
+                                    variant="outline"
+                                    className={cn(
+                                        'w-full justify-start text-left font-normal',
+                                        !fromDate && 'text-muted-foreground'
+                                    )}
+                                    disabled={isGenerating}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {fromDate ? format(fromDate, 'dd MMM yyyy') : 'Pick a start date'}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={fromDate}
+                                    onSelect={(date) => {
+                                        setFromDate(date);
+                                        // Clear toDate if it's before new fromDate
+                                        if (date && toDate && toDate < date) {
+                                            setToDate(undefined);
+                                        }
+                                        setFromOpen(false);
+                                    }}
+                                    disabled={(date) => date > new Date()}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    {/* To Date */}
+                    <div className="grid gap-2">
+                        <Label htmlFor="to-date">
+                            To Date <span className="text-destructive">*</span>
+                        </Label>
+                        <Popover open={toOpen} onOpenChange={setToOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="to-date"
+                                    variant="outline"
+                                    className={cn(
+                                        'w-full justify-start text-left font-normal',
+                                        !toDate && 'text-muted-foreground'
+                                    )}
+                                    disabled={isGenerating}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {toDate ? format(toDate, 'dd MMM yyyy') : 'Pick an end date'}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={toDate}
+                                    onSelect={(date) => {
+                                        setToDate(date);
+                                        setToOpen(false);
+                                    }}
+                                    disabled={(date) =>
+                                        date > new Date() || (fromDate ? date < fromDate : false)
+                                    }
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    {/* Error */}
+                    {reportError && (
+                        <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{reportError}</span>
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                        disabled={isGenerating}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleGenerate}
+                        disabled={!isValid || isGenerating}
+                    >
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating…
+                            </>
+                        ) : (
+                            <>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                            </>
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 
@@ -474,6 +689,9 @@ export default function Dashboard() {
     const [cooldownRemaining, setCooldownRemaining] = useState(0);
     const lastQueryTimeRef = useRef<number>(0);
     const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Gross Profit Report dialog
+    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
     // ============================================================
     // COMPUTED VALUES
@@ -826,6 +1044,15 @@ export default function Dashboard() {
                         </Popover>
                     )}
 
+                    {/* Gross Profit Report Button */}
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsReportDialogOpen(true)}
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Gross Profit Report
+                    </Button>
+
                     {/* Refresh Button with Cooldown */}
                     <Button
                         variant="outline"
@@ -917,6 +1144,16 @@ export default function Dashboard() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Gross Profit Report Dialog */}
+            {businessAuth.businessId && user && (
+                <GrossProfitReportDialog
+                    open={isReportDialogOpen}
+                    onOpenChange={setIsReportDialogOpen}
+                    businessId={businessAuth.businessId}
+                    getToken={() => user.getIdToken()}
+                />
+            )}
         </main>
     );
 }

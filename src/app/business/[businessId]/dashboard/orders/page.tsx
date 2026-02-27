@@ -927,7 +927,6 @@ export default function BusinessOrdersPage() {
             case 'Pending Refunds':
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
             case 'RTO Delivered':
-            case 'RTO Processed':
                 return (
                     <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
                 );
@@ -1483,7 +1482,7 @@ export default function BusinessOrdersPage() {
                                             Mark RTO Processed
                                         </DropdownMenuItem>
                                     )}
-                                    {activeTab === 'RTO Delivered' || activeTab === 'RTO Processed' && (
+                                    {activeTab === 'RTO Delivered' && (
                                         <DropdownMenuItem
                                             onClick={() => handleRTOBulkAction('RTO Closed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}

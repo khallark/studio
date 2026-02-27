@@ -569,7 +569,7 @@ const GrossProfitReportDialog = ({
                                     {fromDate ? format(fromDate, 'dd MMM yyyy') : 'Pick a start date'}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0 z-[9999]" align="start">
                                 <Calendar
                                     mode="single"
                                     selected={fromDate}
@@ -608,7 +608,7 @@ const GrossProfitReportDialog = ({
                                     {toDate ? format(toDate, 'dd MMM yyyy') : 'Pick an end date'}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0 z-[9999]" align="start">
                                 <Calendar
                                     mode="single"
                                     selected={toDate}

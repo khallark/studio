@@ -927,6 +927,7 @@ export default function BusinessOrdersPage() {
             case 'Pending Refunds':
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
             case 'RTO Delivered':
+            case 'RTO Processed':
                 return (
                     <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
                 );

@@ -445,6 +445,7 @@ function GRNFormDialog({
         onSubmit({
             poId: selectedPOId,
             poNumber: selectedPO.poNumber,
+            billNumber: billNumber,
             warehouseId: selectedPO.warehouseId,
             warehouseName: selectedPO.warehouseName || '',
             items: itemsToSend.map(i => ({

@@ -1157,19 +1157,32 @@ export default function Dashboard() {
 
                     {/* Loading skeleton */}
                     {grossProfitData?.loading && (
-                        <div className="space-y-2">
-                            {[...Array(6)].map((_, i) => (
-                                <div key={i} className="flex gap-4">
-                                    <Skeleton className="h-5 w-32" />
-                                    <Skeleton className="h-5 w-20 ml-auto" />
-                                    <Skeleton className="h-5 w-28" />
-                                    <Skeleton className="h-5 w-20" />
-                                    <Skeleton className="h-5 w-20" />
-                                    <Skeleton className="h-5 w-20" />
-                                    <Skeleton className="h-5 w-28" />
-                                </div>
-                            ))}
-                        </div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[160px]">Type</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Taxable Amt</TableHead>
+                                    <TableHead className="text-right">IGST</TableHead>
+                                    <TableHead className="text-right">CGST</TableHead>
+                                    <TableHead className="text-right">SGST</TableHead>
+                                    <TableHead className="text-right">Net Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {[...Array(6)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     )}
 
                     {/* Results table */}

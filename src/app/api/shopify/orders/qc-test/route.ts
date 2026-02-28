@@ -86,8 +86,17 @@ export async function POST(req: NextRequest) {
     // Update line items with QC statuses
     const updatedLineItems = orderData?.raw?.line_items?.map((item: any) => ({
       ...item,
-      qc_status: qcStatuses[item.id] || null,
+      qc_status: qcStatuses[String(item.id)] ?? null,
     })) || [];
+
+    // Validate all items have a QC status
+    const missingStatuses = updatedLineItems.filter((item: any) => item.qc_status === null);
+    if (missingStatuses.length > 0) {
+      return NextResponse.json({
+        error: 'Missing QC status for some items',
+        details: `Items missing status: ${missingStatuses.map((i: any) => i.id).join(', ')}`
+      }, { status: 400 });
+    }
 
     // Update order in Firestore
     await orderRef.update({

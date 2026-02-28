@@ -24,9 +24,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
+import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker'; import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -474,14 +473,6 @@ const DataTable = ({ data }: { data: TableData }) => {
 // GROSS PROFIT REPORT DIALOG
 // ============================================================
 
-interface GrossProfitReportDialogProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    businessId: string;
-    getToken: () => Promise<string>;
-    grossProfitData: FirestoreGrossProfitData | null;  // ← new
-}
-
 const HIGHLIGHT_ROWS = new Set(['Gross Profit']);
 const NEGATIVE_ROWS = new Set(['Sale Return', 'Purchase', 'Opening Stock']);
 
@@ -508,10 +499,14 @@ export default function Dashboard() {
 
     // Gross Profit card state
     const [grossProfitData, setGrossProfitData] = useState<FirestoreGrossProfitData | null>(null);
-    const [gpFromDate, setGpFromDate] = useState('');
-    const [gpToDate, setGpToDate] = useState('');
+    const [gpDatePreset, setGpDatePreset] = useState<DateRangePreset>('today');
+    const [gpCustomDateRange, setGpCustomDateRange] = useState<DateRange | undefined>();
+    const [gpIsCalendarOpen, setGpIsCalendarOpen] = useState(false);
     const [isGpSubmitting, setIsGpSubmitting] = useState(false);
     const [gpSubmitError, setGpSubmitError] = useState<string | null>(null);
+    const [gpCooldownRemaining, setGpCooldownRemaining] = useState(0);
+    const gpLastQueryTimeRef = useRef<number>(0);
+    const gpCooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Rate limiting state
     const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -528,6 +523,17 @@ export default function Dashboard() {
             end: endOfDay(customDateRange.to || customDateRange.from),
         }
         : getDateRangeFromPreset(datePreset);
+
+    const gpCurrentDateRange = gpDatePreset === 'custom' && gpCustomDateRange?.from
+        ? {
+            start: startOfDay(gpCustomDateRange.from),
+            end: endOfDay(gpCustomDateRange.to || gpCustomDateRange.from),
+        }
+        : getDateRangeFromPreset(gpDatePreset);
+
+    // yyyy-MM-dd strings for the GP API
+    const gpStartDate = format(gpCurrentDateRange.start, 'yyyy-MM-dd');
+    const gpEndDate = format(gpCurrentDateRange.end, 'yyyy-MM-dd');
 
     const storesToFetch = selectedStores === 'all'
         ? businessAuth.stores || []
@@ -564,18 +570,35 @@ export default function Dashboard() {
         }, 1000);
     }, []);
 
+    const startGpCooldown = useCallback(() => {
+        setGpCooldownRemaining(Math.ceil(QUERY_COOLDOWN_MS / 1000));
+        if (gpCooldownIntervalRef.current) clearInterval(gpCooldownIntervalRef.current);
+        gpCooldownIntervalRef.current = setInterval(() => {
+            setGpCooldownRemaining(prev => {
+                if (prev <= 1) {
+                    clearInterval(gpCooldownIntervalRef.current!);
+                    gpCooldownIntervalRef.current = null;
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    }, []);
+
+    const canQueryGp = useCallback(() => {
+        return Date.now() - gpLastQueryTimeRef.current >= QUERY_COOLDOWN_MS;
+    }, []);
+
     const canQuery = useCallback(() => {
         const now = Date.now();
         const timeSinceLastQuery = now - lastQueryTimeRef.current;
         return timeSinceLastQuery >= QUERY_COOLDOWN_MS;
     }, []);
 
-    // Cleanup interval on unmount
     useEffect(() => {
         return () => {
-            if (cooldownIntervalRef.current) {
-                clearInterval(cooldownIntervalRef.current);
-            }
+            if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+            if (gpCooldownIntervalRef.current) clearInterval(gpCooldownIntervalRef.current);  // ← add
         };
     }, []);
 
@@ -626,6 +649,39 @@ export default function Dashboard() {
             setIsRefreshing(false);
         }
     }, [businessAuth.businessId, storesToFetch, currentDateRange, user, canQuery, startCooldown]);
+
+    const handleGenerateGrossProfit = useCallback(async (force = false) => {
+        if (!user || !businessAuth.businessId) return;
+        if (!force && !canQueryGp()) return;
+
+        gpLastQueryTimeRef.current = Date.now();
+        startGpCooldown();
+        setGpSubmitError(null);
+        setIsGpSubmitting(true);
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch('/api/business/generate-gross-profit-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    businessId: businessAuth.businessId,
+                    startDate: gpStartDate,
+                    endDate: gpEndDate,
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
+            }
+        } catch (err: unknown) {
+            setGpSubmitError(err instanceof Error ? err.message : 'Something went wrong.');
+        } finally {
+            setIsGpSubmitting(false);
+        }
+    }, [user, businessAuth.businessId, gpStartDate, gpEndDate, canQueryGp, startGpCooldown]);
 
     // ============================================================
     // FIRESTORE LISTENER
@@ -679,6 +735,16 @@ export default function Dashboard() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
+
+    useEffect(() => {
+        if (gpDatePreset === 'custom' && (!gpCustomDateRange?.from || !gpCustomDateRange?.to)) {
+            return;
+        }
+        if (businessAuth.isAuthorized && !businessAuth.loading) {
+            handleGenerateGrossProfit(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth.loading]);
 
     // ============================================================
     // SET PAGE TITLE
@@ -745,36 +811,6 @@ export default function Dashboard() {
     const handleRefresh = () => {
         if (canQuery()) {
             fetchTableData();
-        }
-    };
-
-    const handleGenerateGrossProfit = async () => {
-        if (!gpFromDate || !gpToDate || !user || !businessAuth.businessId) return;
-        setGpSubmitError(null);
-        setIsGpSubmitting(true);
-        try {
-            const token = await user.getIdToken();
-            const response = await fetch('/api/business/generate-gross-profit-report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    businessId: businessAuth.businessId,
-                    startDate: gpFromDate,
-                    endDate: gpToDate,
-                }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
-            }
-            // Firestore onSnapshot drives the rest
-        } catch (err: unknown) {
-            setGpSubmitError(err instanceof Error ? err.message : 'Something went wrong.');
-        } finally {
-            setIsGpSubmitting(false);
         }
     };
 
@@ -1005,56 +1041,86 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                     {/* Date range controls */}
-                    <div className="flex flex-wrap items-end gap-3 mb-6">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="gp-from-date">From Date</Label>
-                            <input
-                                id="gp-from-date"
-                                type="date"
-                                value={gpFromDate}
-                                max={gpToDate || format(new Date(), 'yyyy-MM-dd')}
-                                onChange={(e) => {
-                                    setGpFromDate(e.target.value);
-                                    if (gpToDate && e.target.value > gpToDate) setGpToDate('');
-                                }}
-                                disabled={isGpSubmitting || grossProfitData?.loading}
-                                className={cn(
-                                    'flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                    'disabled:cursor-not-allowed disabled:opacity-50'
-                                )}
-                            />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="gp-to-date">To Date</Label>
-                            <input
-                                id="gp-to-date"
-                                type="date"
-                                value={gpToDate}
-                                min={gpFromDate || undefined}
-                                max={format(new Date(), 'yyyy-MM-dd')}
-                                onChange={(e) => setGpToDate(e.target.value)}
-                                disabled={isGpSubmitting || grossProfitData?.loading}
-                                className={cn(
-                                    'flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                    'disabled:cursor-not-allowed disabled:opacity-50'
-                                )}
-                            />
-                        </div>
-                        <Button
-                            onClick={handleGenerateGrossProfit}
-                            disabled={!gpFromDate || !gpToDate || gpFromDate > gpToDate || isGpSubmitting || grossProfitData?.loading}
+                    <div className="flex flex-wrap items-center gap-3 mb-6">
+                        <Select
+                            value={gpDatePreset}
+                            onValueChange={(value) => {
+                                setGpDatePreset(value as DateRangePreset);
+                                if (value !== 'custom') setGpCustomDateRange(undefined);
+                            }}
+                            disabled={isGpSubmitting || grossProfitData?.loading}
                         >
-                            {(isGpSubmitting || grossProfitData?.loading) ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Generating…
-                                </>
-                            ) : (
-                                'Generate'
+                            <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Date range" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="yesterday">Yesterday</SelectItem>
+                                <SelectItem value="last7days">Last 7 Days</SelectItem>
+                                <SelectItem value="last30days">Last 30 Days</SelectItem>
+                                <SelectItem value="custom">Custom</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {gpDatePreset === 'custom' && (
+                            <Popover open={gpIsCalendarOpen} onOpenChange={setGpIsCalendarOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={isGpSubmitting || grossProfitData?.loading}
+                                        className={cn(
+                                            'w-[240px] justify-start text-left font-normal',
+                                            !gpCustomDateRange && 'text-muted-foreground'
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {gpCustomDateRange?.from ? (
+                                            gpCustomDateRange.to ? (
+                                                <>
+                                                    {format(gpCustomDateRange.from, 'dd MMM yyyy')} –{' '}
+                                                    {format(gpCustomDateRange.to, 'dd MMM yyyy')}
+                                                </>
+                                            ) : (
+                                                format(gpCustomDateRange.from, 'dd MMM yyyy')
+                                            )
+                                        ) : (
+                                            'Pick a date range'
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={gpCustomDateRange?.from}
+                                        selected={gpCustomDateRange}
+                                        onSelect={(range) => {
+                                            setGpCustomDateRange(range);
+                                            if (range?.from) setGpDatePreset('custom');
+                                        }}
+                                        numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        )}
+
+                        {/* Manual refresh */}
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleGenerateGrossProfit()}
+                            disabled={isGpSubmitting || !!grossProfitData?.loading || gpCooldownRemaining > 0}
+                            className="relative"
+                            title={gpCooldownRemaining > 0 ? `Wait ${gpCooldownRemaining}s` : 'Refresh'}
+                        >
+                            <RefreshCw className={cn('h-4 w-4', (isGpSubmitting || grossProfitData?.loading) && 'animate-spin')} />
+                            {gpCooldownRemaining > 0 && !isGpSubmitting && !grossProfitData?.loading && (
+                                <span className="absolute -top-2 -right-2 bg-muted text-muted-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center border">
+                                    {gpCooldownRemaining}
+                                </span>
                             )}
                         </Button>
+
                         {grossProfitData?.rows && !grossProfitData.loading && grossProfitData.downloadUrl && (
                             <Button
                                 variant="outline"
@@ -1072,11 +1138,6 @@ export default function Dashboard() {
                             </Button>
                         )}
                     </div>
-
-                    {/* Date validation hint */}
-                    {gpFromDate && gpToDate && gpFromDate > gpToDate && (
-                        <p className="text-xs text-destructive mb-4">From date cannot be after To date.</p>
-                    )}
 
                     {/* Submit error */}
                     {gpSubmitError && (
@@ -1159,7 +1220,7 @@ export default function Dashboard() {
                     {!grossProfitData?.rows && !grossProfitData?.loading && !grossProfitData?.error && (
                         <div className="flex items-center justify-center py-12 text-center">
                             <p className="text-muted-foreground">
-                                Select a date range and click Generate to view the report.
+                                Select a date range to view the report.
                             </p>
                         </div>
                     )}

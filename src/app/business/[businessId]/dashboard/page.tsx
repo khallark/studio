@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
-import { DateRange } from 'react-day-picker';import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker'; import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Table,
@@ -81,6 +81,27 @@ interface FirestoreTableData {
     endTime?: string;
     stores?: string[];
     data?: TableData;
+    error?: string | null;
+}
+
+// Add to your types section
+interface GrossProfitRow {
+    type: string;
+    qty: number;
+    taxable: number;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    net: number;
+}
+
+interface FirestoreGrossProfitData {
+    loading: boolean;
+    lastUpdated?: { toDate: () => Date };
+    startDate?: string;
+    endDate?: string;
+    rows?: GrossProfitRow[];
+    downloadUrl?: string;
     error?: string | null;
 }
 
@@ -466,40 +487,48 @@ interface GrossProfitReportDialogProps {
     onOpenChange: (open: boolean) => void;
     businessId: string;
     getToken: () => Promise<string>;
+    grossProfitData: FirestoreGrossProfitData | null;  // ← new
 }
+
+const HIGHLIGHT_ROWS = new Set(['Gross Profit']);
+const NEGATIVE_ROWS = new Set(['Sale Return', 'Purchase', 'Opening Stock']);
 
 const GrossProfitReportDialog = ({
     open,
     onOpenChange,
     businessId,
     getToken,
+    grossProfitData,
 }: GrossProfitReportDialogProps) => {
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [reportError, setReportError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const today = format(new Date(), 'yyyy-MM-dd');
 
-    // Reset state when dialog opens/closes
+    // Derive states from the live Firestore data
+    const isProcessing = grossProfitData?.loading ?? false;
+    const hasResults = !isProcessing && !!grossProfitData?.rows?.length;
+    const firestoreError = grossProfitData?.error;
+
+    // Reset local form state when dialog closes
     useEffect(() => {
         if (!open) {
             setFromDate('');
             setToDate('');
-            setReportError(null);
-            setIsGenerating(false);
+            setSubmitError(null);
+            setIsSubmitting(false);
         }
     }, [open]);
 
     const handleGenerate = async () => {
         if (!fromDate || !toDate) return;
-
-        setReportError(null);
-        setIsGenerating(true);
+        setSubmitError(null);
+        setIsSubmitting(true);
 
         try {
             const token = await getToken();
-
             const response = await fetch('/api/business/generate-gross-profit-report', {
                 method: 'POST',
                 headers: {
@@ -513,126 +542,206 @@ const GrossProfitReportDialog = ({
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
             }
-
-            // Trigger browser download
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `gross-profit-report_${fromDate}_${toDate}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-
-            onOpenChange(false);
+            // Done — Firestore onSnapshot will drive the rest
         } catch (err: unknown) {
-            setReportError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+            setSubmitError(err instanceof Error ? err.message : 'Something went wrong.');
         } finally {
-            setIsGenerating(false);
+            setIsSubmitting(false);
         }
     };
 
+    const handleDownload = () => {
+        if (!grossProfitData?.downloadUrl) return;
+        const a = document.createElement('a');
+        a.href = grossProfitData.downloadUrl;
+        a.download = `gross-profit-report_${grossProfitData.startDate}_${grossProfitData.endDate}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
+
     const isValid = !!fromDate && !!toDate && fromDate <= toDate;
+    // Show processing or results if Firestore has something in flight / ready
+    const showResults = isProcessing || hasResults || !!firestoreError;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[420px]">
+            <DialogContent className={cn(
+                'transition-all duration-200',
+                showResults ? 'sm:max-w-3xl' : 'sm:max-w-[420px]'
+            )}>
                 <DialogHeader>
-                    <DialogTitle>Download Gross Profit Report</DialogTitle>
+                    <DialogTitle>Gross Profit Report</DialogTitle>
                     <DialogDescription>
-                        Select a date range to generate the Excel report. This may take a minute.
+                        {showResults && grossProfitData?.startDate
+                            ? `${format(new Date(grossProfitData.startDate), 'dd MMM yyyy')} – ${format(new Date(grossProfitData.endDate!), 'dd MMM yyyy')}`
+                            : 'Select a date range to generate the report.'}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-5 py-2">
-                    {/* From Date */}
-                    <div className="grid gap-2">
-                        <Label htmlFor="from-date">
-                            From Date <span className="text-destructive">*</span>
-                        </Label>
-                        <input
-                            id="from-date"
-                            type="date"
-                            value={fromDate}
-                            max={toDate || today}
-                            onChange={(e) => {
-                                setFromDate(e.target.value);
-                                // Clear toDate if it's now before fromDate
-                                if (toDate && e.target.value > toDate) {
-                                    setToDate('');
-                                }
-                            }}
-                            disabled={isGenerating}
-                            className={cn(
-                                'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                'disabled:cursor-not-allowed disabled:opacity-50'
-                            )}
-                        />
-                    </div>
-
-                    {/* To Date */}
-                    <div className="grid gap-2">
-                        <Label htmlFor="to-date">
-                            To Date <span className="text-destructive">*</span>
-                        </Label>
-                        <input
-                            id="to-date"
-                            type="date"
-                            value={toDate}
-                            min={fromDate || undefined}
-                            max={today}
-                            onChange={(e) => setToDate(e.target.value)}
-                            disabled={isGenerating}
-                            className={cn(
-                                'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                'disabled:cursor-not-allowed disabled:opacity-50'
-                            )}
-                        />
-                    </div>
-
-                    {/* Validation hint */}
-                    {fromDate && toDate && fromDate > toDate && (
-                        <p className="text-xs text-destructive -mt-3">
-                            From date cannot be after To date.
-                        </p>
-                    )}
-
-                    {/* Error */}
-                    {reportError && (
-                        <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{reportError}</span>
+                {/* ── Date input form (hidden once a report is in flight / ready) ── */}
+                {!showResults && (
+                    <div className="grid gap-5 py-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="gp-from-date">
+                                From Date <span className="text-destructive">*</span>
+                            </Label>
+                            <input
+                                id="gp-from-date"
+                                type="date"
+                                value={fromDate}
+                                max={toDate || today}
+                                onChange={(e) => {
+                                    setFromDate(e.target.value);
+                                    if (toDate && e.target.value > toDate) setToDate('');
+                                }}
+                                disabled={isSubmitting}
+                                className={cn(
+                                    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                    'disabled:cursor-not-allowed disabled:opacity-50'
+                                )}
+                            />
                         </div>
-                    )}
-                </div>
-
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                        disabled={isGenerating}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleGenerate}
-                        disabled={!isValid || isGenerating}
-                    >
-                        {isGenerating ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generating…
-                            </>
-                        ) : (
-                            <>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
-                            </>
+                        <div className="grid gap-2">
+                            <Label htmlFor="gp-to-date">
+                                To Date <span className="text-destructive">*</span>
+                            </Label>
+                            <input
+                                id="gp-to-date"
+                                type="date"
+                                value={toDate}
+                                min={fromDate || undefined}
+                                max={today}
+                                onChange={(e) => setToDate(e.target.value)}
+                                disabled={isSubmitting}
+                                className={cn(
+                                    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                    'disabled:cursor-not-allowed disabled:opacity-50'
+                                )}
+                            />
+                        </div>
+                        {fromDate && toDate && fromDate > toDate && (
+                            <p className="text-xs text-destructive -mt-3">From date cannot be after To date.</p>
                         )}
-                    </Button>
+                        {submitError && (
+                            <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
+                                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                <span>{submitError}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Loading skeleton (Firestore loading = true) ── */}
+                {isProcessing && (
+                    <div className="space-y-2 py-4">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="flex gap-4">
+                                <Skeleton className="h-5 w-36" />
+                                {[...Array(6)].map((_, j) => (
+                                    <Skeleton key={j} className="h-5 w-24 ml-auto" />
+                                ))}
+                            </div>
+                        ))}
+                        <p className="text-xs text-muted-foreground text-center pt-2">
+                            Generating report, this may take a minute…
+                        </p>
+                    </div>
+                )}
+
+                {/* ── Firestore error ── */}
+                {!isProcessing && firestoreError && (
+                    <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span>{firestoreError}</span>
+                    </div>
+                )}
+
+                {/* ── Results table ── */}
+                {hasResults && grossProfitData?.rows && (
+                    <div className="overflow-x-auto rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[160px]">Type</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Taxable Amt</TableHead>
+                                    <TableHead className="text-right">IGST</TableHead>
+                                    <TableHead className="text-right">CGST</TableHead>
+                                    <TableHead className="text-right">SGST</TableHead>
+                                    <TableHead className="text-right">Net Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {grossProfitData.rows.map((row) => (
+                                    <TableRow
+                                        key={row.type}
+                                        className={cn(
+                                            HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
+                                            NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400'
+                                        )}
+                                    >
+                                        <TableCell className="font-medium">{row.type}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+
+                <DialogFooter className="gap-2">
+                    {showResults ? (
+                        <>
+                            {/* Let them generate a new one for a different date range */}
+                            {!isProcessing && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        // We can't clear Firestore from here, but resetting
+                                        // local form state and hiding results is enough —
+                                        // a new Generate call will overwrite grossProfitData
+                                        setFromDate('');
+                                        setToDate('');
+                                    }}
+                                >
+                                    ← New Report
+                                </Button>
+                            )}
+                            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+                                Close
+                            </Button>
+                            {hasResults && grossProfitData?.downloadUrl && (
+                                <Button onClick={handleDownload}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Excel
+                                </Button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleGenerate} disabled={!isValid || isSubmitting}>
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Submitting…
+                                    </>
+                                ) : (
+                                    'Generate Report'
+                                )}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -659,6 +768,9 @@ export default function Dashboard() {
     const [tableDataState, setTableDataState] = useState<FirestoreTableData | null>(null);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Gross Profit Table Data from firestore
+    const [grossProfitData, setGrossProfitData] = useState<FirestoreGrossProfitData | null>(null);
 
     // Rate limiting state
     const [cooldownRemaining, setCooldownRemaining] = useState(0);
@@ -795,11 +907,11 @@ export default function Dashboard() {
                     const data = snapshot.data();
                     const tableData = data?.tableData as FirestoreTableData | undefined;
 
-                    if (tableData) {
-                        setTableDataState(tableData);
-                    } else {
-                        setTableDataState(null);
-                    }
+                    if (tableData) setTableDataState(tableData);
+                    else setTableDataState(null);
+
+                    const gpData = data?.grossProfitData as FirestoreGrossProfitData | undefined;
+                    setGrossProfitData(gpData ?? null);
                 } else {
                     setTableDataState(null);
                 }
@@ -1127,6 +1239,7 @@ export default function Dashboard() {
                     onOpenChange={setIsReportDialogOpen}
                     businessId={businessAuth.businessId}
                     getToken={() => user.getIdToken()}
+                    grossProfitData={grossProfitData}   // ← pass live Firestore data
                 />
             )}
         </main>

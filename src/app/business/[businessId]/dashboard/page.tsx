@@ -24,14 +24,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
@@ -493,261 +485,6 @@ interface GrossProfitReportDialogProps {
 const HIGHLIGHT_ROWS = new Set(['Gross Profit']);
 const NEGATIVE_ROWS = new Set(['Sale Return', 'Purchase', 'Opening Stock']);
 
-const GrossProfitReportDialog = ({
-    open,
-    onOpenChange,
-    businessId,
-    getToken,
-    grossProfitData,
-}: GrossProfitReportDialogProps) => {
-    const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
-
-    const today = format(new Date(), 'yyyy-MM-dd');
-
-    // Derive states from the live Firestore data
-    const isProcessing = grossProfitData?.loading ?? false;
-    const hasResults = !isProcessing && !!grossProfitData?.rows?.length;
-    const firestoreError = grossProfitData?.error;
-
-    // Reset local form state when dialog closes
-    useEffect(() => {
-        if (!open) {
-            setFromDate('');
-            setToDate('');
-            setSubmitError(null);
-            setIsSubmitting(false);
-        }
-    }, [open]);
-
-    const handleGenerate = async () => {
-        if (!fromDate || !toDate) return;
-        setSubmitError(null);
-        setIsSubmitting(true);
-
-        try {
-            const token = await getToken();
-            const response = await fetch('/api/business/generate-gross-profit-report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ businessId, startDate: fromDate, endDate: toDate }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
-            }
-            // Done — Firestore onSnapshot will drive the rest
-        } catch (err: unknown) {
-            setSubmitError(err instanceof Error ? err.message : 'Something went wrong.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleDownload = () => {
-        if (!grossProfitData?.downloadUrl) return;
-        const a = document.createElement('a');
-        a.href = grossProfitData.downloadUrl;
-        a.download = `gross-profit-report_${grossProfitData.startDate}_${grossProfitData.endDate}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    };
-
-    const isValid = !!fromDate && !!toDate && fromDate <= toDate;
-    // Show processing or results if Firestore has something in flight / ready
-    const showResults = isProcessing || hasResults || !!firestoreError;
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className={cn(
-                'transition-all duration-200',
-                showResults ? 'sm:max-w-3xl' : 'sm:max-w-[420px]'
-            )}>
-                <DialogHeader>
-                    <DialogTitle>Gross Profit Report</DialogTitle>
-                    <DialogDescription>
-                        {showResults && grossProfitData?.startDate
-                            ? `${format(new Date(grossProfitData.startDate), 'dd MMM yyyy')} – ${format(new Date(grossProfitData.endDate!), 'dd MMM yyyy')}`
-                            : 'Select a date range to generate the report.'}
-                    </DialogDescription>
-                </DialogHeader>
-
-                {/* ── Date input form (hidden once a report is in flight / ready) ── */}
-                {!showResults && (
-                    <div className="grid gap-5 py-2">
-                        <div className="grid gap-2">
-                            <Label htmlFor="gp-from-date">
-                                From Date <span className="text-destructive">*</span>
-                            </Label>
-                            <input
-                                id="gp-from-date"
-                                type="date"
-                                value={fromDate}
-                                max={toDate || today}
-                                onChange={(e) => {
-                                    setFromDate(e.target.value);
-                                    if (toDate && e.target.value > toDate) setToDate('');
-                                }}
-                                disabled={isSubmitting}
-                                className={cn(
-                                    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                    'disabled:cursor-not-allowed disabled:opacity-50'
-                                )}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="gp-to-date">
-                                To Date <span className="text-destructive">*</span>
-                            </Label>
-                            <input
-                                id="gp-to-date"
-                                type="date"
-                                value={toDate}
-                                min={fromDate || undefined}
-                                max={today}
-                                onChange={(e) => setToDate(e.target.value)}
-                                disabled={isSubmitting}
-                                className={cn(
-                                    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
-                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                    'disabled:cursor-not-allowed disabled:opacity-50'
-                                )}
-                            />
-                        </div>
-                        {fromDate && toDate && fromDate > toDate && (
-                            <p className="text-xs text-destructive -mt-3">From date cannot be after To date.</p>
-                        )}
-                        {submitError && (
-                            <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
-                                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                <span>{submitError}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ── Loading skeleton (Firestore loading = true) ── */}
-                {isProcessing && (
-                    <div className="space-y-2 py-4">
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} className="flex gap-4">
-                                <Skeleton className="h-5 w-36" />
-                                {[...Array(6)].map((_, j) => (
-                                    <Skeleton key={j} className="h-5 w-24 ml-auto" />
-                                ))}
-                            </div>
-                        ))}
-                        <p className="text-xs text-muted-foreground text-center pt-2">
-                            Generating report, this may take a minute…
-                        </p>
-                    </div>
-                )}
-
-                {/* ── Firestore error ── */}
-                {!isProcessing && firestoreError && (
-                    <div className="flex items-start gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
-                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        <span>{firestoreError}</span>
-                    </div>
-                )}
-
-                {/* ── Results table ── */}
-                {hasResults && grossProfitData?.rows && (
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[160px]">Type</TableHead>
-                                    <TableHead className="text-right">Qty</TableHead>
-                                    <TableHead className="text-right">Taxable Amt</TableHead>
-                                    <TableHead className="text-right">IGST</TableHead>
-                                    <TableHead className="text-right">CGST</TableHead>
-                                    <TableHead className="text-right">SGST</TableHead>
-                                    <TableHead className="text-right">Net Amount</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {grossProfitData.rows.map((row) => (
-                                    <TableRow
-                                        key={row.type}
-                                        className={cn(
-                                            HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
-                                            NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400'
-                                        )}
-                                    >
-                                        <TableCell className="font-medium">{row.type}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-
-                <DialogFooter className="gap-2">
-                    {showResults ? (
-                        <>
-                            {/* Let them generate a new one for a different date range */}
-                            {!isProcessing && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        // We can't clear Firestore from here, but resetting
-                                        // local form state and hiding results is enough —
-                                        // a new Generate call will overwrite grossProfitData
-                                        setFromDate('');
-                                        setToDate('');
-                                    }}
-                                >
-                                    ← New Report
-                                </Button>
-                            )}
-                            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-                                Close
-                            </Button>
-                            {hasResults && grossProfitData?.downloadUrl && (
-                                <Button onClick={handleDownload}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Excel
-                                </Button>
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleGenerate} disabled={!isValid || isSubmitting}>
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Submitting…
-                                    </>
-                                ) : (
-                                    'Generate Report'
-                                )}
-                            </Button>
-                        </>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -769,16 +506,17 @@ export default function Dashboard() {
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Gross Profit Table Data from firestore
+    // Gross Profit card state
     const [grossProfitData, setGrossProfitData] = useState<FirestoreGrossProfitData | null>(null);
+    const [gpFromDate, setGpFromDate] = useState('');
+    const [gpToDate, setGpToDate] = useState('');
+    const [isGpSubmitting, setIsGpSubmitting] = useState(false);
+    const [gpSubmitError, setGpSubmitError] = useState<string | null>(null);
 
     // Rate limiting state
     const [cooldownRemaining, setCooldownRemaining] = useState(0);
     const lastQueryTimeRef = useRef<number>(0);
     const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Gross Profit Report dialog
-    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
     // ============================================================
     // COMPUTED VALUES
@@ -1010,6 +748,36 @@ export default function Dashboard() {
         }
     };
 
+    const handleGenerateGrossProfit = async () => {
+        if (!gpFromDate || !gpToDate || !user || !businessAuth.businessId) return;
+        setGpSubmitError(null);
+        setIsGpSubmitting(true);
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch('/api/business/generate-gross-profit-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    businessId: businessAuth.businessId,
+                    startDate: gpFromDate,
+                    endDate: gpToDate,
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error ?? `Request failed with status ${response.status}`);
+            }
+            // Firestore onSnapshot drives the rest
+        } catch (err: unknown) {
+            setGpSubmitError(err instanceof Error ? err.message : 'Something went wrong.');
+        } finally {
+            setIsGpSubmitting(false);
+        }
+    };
+
     // ============================================================
     // RENDER HELPERS
     // ============================================================
@@ -1131,15 +899,6 @@ export default function Dashboard() {
                         </Popover>
                     )}
 
-                    {/* Gross Profit Report Button */}
-                    <Button
-                        variant="outline"
-                        onClick={() => setIsReportDialogOpen(true)}
-                    >
-                        <Download className="mr-2 h-4 w-4" />
-                        Gross Profit Report
-                    </Button>
-
                     {/* Refresh Button with Cooldown */}
                     <Button
                         variant="outline"
@@ -1232,16 +991,180 @@ export default function Dashboard() {
                 </CardContent>
             </Card>
 
-            {/* Gross Profit Report Dialog */}
-            {businessAuth.businessId && user && (
-                <GrossProfitReportDialog
-                    open={isReportDialogOpen}
-                    onOpenChange={setIsReportDialogOpen}
-                    businessId={businessAuth.businessId}
-                    getToken={() => user.getIdToken()}
-                    grossProfitData={grossProfitData}   // ← pass live Firestore data
-                />
-            )}
+            {/* Gross Profit Report Card */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        <span>Gross Profit Report</span>
+                        {grossProfitData?.lastUpdated && !grossProfitData.loading && (
+                            <span className="text-xs font-normal text-muted-foreground">
+                                Last updated: {format(grossProfitData.lastUpdated.toDate(), 'dd MMM yyyy, HH:mm')}
+                            </span>
+                        )}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {/* Date range controls */}
+                    <div className="flex flex-wrap items-end gap-3 mb-6">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="gp-from-date">From Date</Label>
+                            <input
+                                id="gp-from-date"
+                                type="date"
+                                value={gpFromDate}
+                                max={gpToDate || format(new Date(), 'yyyy-MM-dd')}
+                                onChange={(e) => {
+                                    setGpFromDate(e.target.value);
+                                    if (gpToDate && e.target.value > gpToDate) setGpToDate('');
+                                }}
+                                disabled={isGpSubmitting || grossProfitData?.loading}
+                                className={cn(
+                                    'flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                    'disabled:cursor-not-allowed disabled:opacity-50'
+                                )}
+                            />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="gp-to-date">To Date</Label>
+                            <input
+                                id="gp-to-date"
+                                type="date"
+                                value={gpToDate}
+                                min={gpFromDate || undefined}
+                                max={format(new Date(), 'yyyy-MM-dd')}
+                                onChange={(e) => setGpToDate(e.target.value)}
+                                disabled={isGpSubmitting || grossProfitData?.loading}
+                                className={cn(
+                                    'flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors',
+                                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                    'disabled:cursor-not-allowed disabled:opacity-50'
+                                )}
+                            />
+                        </div>
+                        <Button
+                            onClick={handleGenerateGrossProfit}
+                            disabled={!gpFromDate || !gpToDate || gpFromDate > gpToDate || isGpSubmitting || grossProfitData?.loading}
+                        >
+                            {(isGpSubmitting || grossProfitData?.loading) ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating…
+                                </>
+                            ) : (
+                                'Generate'
+                            )}
+                        </Button>
+                        {grossProfitData?.rows && !grossProfitData.loading && grossProfitData.downloadUrl && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    const a = document.createElement('a');
+                                    a.href = grossProfitData.downloadUrl!;
+                                    a.download = `gross-profit-report_${grossProfitData.startDate}_${grossProfitData.endDate}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                }}
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Download Excel
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Date validation hint */}
+                    {gpFromDate && gpToDate && gpFromDate > gpToDate && (
+                        <p className="text-xs text-destructive mb-4">From date cannot be after To date.</p>
+                    )}
+
+                    {/* Submit error */}
+                    {gpSubmitError && (
+                        <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{gpSubmitError}</span>
+                        </div>
+                    )}
+
+                    {/* Firestore error */}
+                    {grossProfitData?.error && !grossProfitData.loading && (
+                        <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{grossProfitData.error}</span>
+                        </div>
+                    )}
+
+                    {/* Loading skeleton */}
+                    {grossProfitData?.loading && (
+                        <div className="space-y-2">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="flex gap-4">
+                                    <Skeleton className="h-5 w-32" />
+                                    <Skeleton className="h-5 w-20 ml-auto" />
+                                    <Skeleton className="h-5 w-28" />
+                                    <Skeleton className="h-5 w-20" />
+                                    <Skeleton className="h-5 w-20" />
+                                    <Skeleton className="h-5 w-20" />
+                                    <Skeleton className="h-5 w-28" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Results table */}
+                    {grossProfitData?.rows && !grossProfitData.loading && (
+                        <>
+                            <div className="text-sm text-muted-foreground mb-3">
+                                Showing data for:{' '}
+                                <span className="font-medium">
+                                    {format(new Date(grossProfitData.startDate!), 'dd MMM yyyy')} – {format(new Date(grossProfitData.endDate!), 'dd MMM yyyy')}
+                                </span>
+                            </div>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[160px]">Type</TableHead>
+                                        <TableHead className="text-right">Qty</TableHead>
+                                        <TableHead className="text-right">Taxable Amt</TableHead>
+                                        <TableHead className="text-right">IGST</TableHead>
+                                        <TableHead className="text-right">CGST</TableHead>
+                                        <TableHead className="text-right">SGST</TableHead>
+                                        <TableHead className="text-right">Net Amount</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {grossProfitData.rows.map((row) => (
+                                        <TableRow
+                                            key={row.type}
+                                            className={cn(
+                                                HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
+                                                NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400'
+                                            )}
+                                        >
+                                            <TableCell className="font-medium">{row.type}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </>
+                    )}
+
+                    {/* Empty state */}
+                    {!grossProfitData?.rows && !grossProfitData?.loading && !grossProfitData?.error && (
+                        <div className="flex items-center justify-center py-12 text-center">
+                            <p className="text-muted-foreground">
+                                Select a date range and click Generate to view the report.
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </main>
     );
 }

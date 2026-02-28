@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         );
 
         // Fire-and-forget
-        fetch(CLOUD_FUNCTION_URL, {
+        await fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ businessId, startDate, endDate }),

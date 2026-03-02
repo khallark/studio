@@ -342,9 +342,9 @@ async function handleOrderWebhook(
         }];
         console.log(`Created order ${orderId} for ${shopDomain}`);
       }
-
       tx.set(orderRef, {
         ...dataToSave,
+        lastStatusUpdate: FieldValue.serverTimestamp(),
         customStatus,
         isDeleted: false,
         createdByTopic: topic,

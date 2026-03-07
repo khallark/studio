@@ -24,7 +24,6 @@ export type CustomStatus =
   | 'DTO Refunded'
   | 'Lost'
   | 'Closed'
-  | 'RTO Processed'
   | 'RTO Closed'
   | 'Cancellation Requested'
   | 'Cancelled';

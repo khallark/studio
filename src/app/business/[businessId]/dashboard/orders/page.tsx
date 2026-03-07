@@ -155,7 +155,6 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
     { value: 'DTO Refunded', label: 'DTO Refunded', shortLabel: 'Refunded' },
     { value: 'Lost', label: 'Lost', shortLabel: 'Lost' },
     { value: 'Closed', label: 'Closed', shortLabel: 'Closed' },
-    { value: 'RTO Processed', label: 'RTO Processed', shortLabel: 'RTO-P' },
     { value: 'RTO Closed', label: 'RTO Closed', shortLabel: 'RTO-C' },
     { value: 'Cancellation Requested', label: 'Cancellation Requested', shortLabel: 'Cancel-R' },
     { value: 'Cancelled', label: 'Cancelled', shortLabel: 'Cancel' },
@@ -352,7 +351,7 @@ export default function BusinessOrdersPage() {
     const [orderForPickup, setOrderForPickup] = useState<Order | null>(null);
     // RTO UPC confirmation dialog
     const [isRTOUPCDialogOpen, setIsRTOUPCDialogOpen] = useState(false);
-    const [pendingRTOStatus, setPendingRTOStatus] = useState<'RTO Processed' | 'RTO Closed' | null>(null);
+    const [pendingRTOStatus, setPendingRTOStatus] = useState<'RTO Closed' | null>(null);
 
     // ============================================================
     // DATA FETCHING
@@ -703,7 +702,7 @@ export default function BusinessOrdersPage() {
         }
     };
 
-    const handleRTOBulkAction = (status: 'RTO Processed' | 'RTO Closed') => {
+    const handleRTOBulkAction = (status: 'RTO Closed') => {
         setPendingRTOStatus(status);
         setIsRTOUPCDialogOpen(true);
     };
@@ -851,7 +850,6 @@ export default function BusinessOrdersPage() {
             case 'Lost':
             case 'Cancelled': return 'destructive';
             case 'Closed':
-            case 'RTO Processed':
             case 'RTO Closed': return 'outline';
             default: return 'secondary';
         }
@@ -1475,11 +1473,11 @@ export default function BusinessOrdersPage() {
                                     )}
                                     {activeTab === 'RTO In Transit' && (
                                         <DropdownMenuItem
-                                            onClick={() => handleRTOBulkAction('RTO Processed')}
+                                            onClick={() => handleRTOBulkAction('RTO Closed')}
                                             disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
                                         >
                                             {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Mark RTO Processed
+                                            Mark RTO Closed
                                         </DropdownMenuItem>
                                     )}
                                     {activeTab === 'RTO Delivered' && (

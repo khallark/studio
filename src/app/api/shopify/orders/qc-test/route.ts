@@ -4,7 +4,6 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 import { UPC } from '@/types/warehouse';
-import { Order } from '@/types/order';
 
 export async function POST(req: NextRequest) {
   try {

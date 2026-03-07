@@ -183,7 +183,7 @@ function useGroupedInboundUPCs(upcs: UPC[], stores: string[], businessId: string
 
                 if (!orderDoc.exists() || !orderData) {
                     unknownUPCs.push(groupedUPC);
-                } else if (orderData.customStatus === 'RTO Processed' || orderData.customStatus === 'RTO Closed') {
+                } else if (orderData.customStatus === 'RTO Closed') {
                     rtoUPCs.push(groupedUPC);
                 } else if (orderData.customStatus === 'Pending Refunds' || orderData.customStatus === 'DTO Refunded') {
                     dtoUPCs.push(groupedUPC);

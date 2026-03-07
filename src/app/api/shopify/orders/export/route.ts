@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
           const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
           flattenedData.push({
             orderName: order.name,
+            isPickedUp: order.pickupReady ? 'Yes' : 'No',
             awb: order.awb ?? 'N/A',
             returnAwb: order.awb_reverse ?? 'N/A',
             courier: order.courierProvider ?? 'N/A',
@@ -141,6 +142,7 @@ export async function POST(req: NextRequest) {
         const paymentStatus = order.financialStatus === 'paid' ? 'Prepaid' : order.financialStatus === 'pending' ? 'COD' : order.financialStatus;
         flattenedData.push({
           orderName: order.name,
+          isPickedUp: order.pickupReady ? 'Yes' : 'No',
           awb: order.awb ?? 'N/A',
           returnAwb: order.awb_reverse ?? 'N/A',
           courier: order.courierProvider ?? 'N/A',
@@ -182,6 +184,7 @@ export async function POST(req: NextRequest) {
     // Define columns
     worksheet.columns = [
       { header: 'Order name', key: 'orderName', width: 15 },
+      { header: 'Picked Up', key: 'isPickedUp', width: 15 },
       { header: 'AWB', key: 'awb', width: 18 },
       { header: 'Return AWB', key: 'returnAwb', width: 18 },
       { header: 'Courier', key: 'courier', width: 15 },

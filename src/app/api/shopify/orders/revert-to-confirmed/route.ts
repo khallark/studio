@@ -40,19 +40,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const logEntry = {
-      status: 'Confirmed',
-      createdAt: Timestamp.now(),
-      remarks: 'Order status reverted to Confirmed by user.',
-    };
+    const rawLogs: any[] = orderData?.customStatusesLogs ?? [];
+
+    // Sort ascending by createdAt
+    const sortedLogs = [...rawLogs].sort(
+      (a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0)
+    );
+
+    const confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
+
+    if (confirmedIndex === -1) {
+      return NextResponse.json(
+        { error: 'No "Confirmed" log entry found for this order. Cannot revert status.' },
+        { status: 422 }
+      );
+    }
+
+    const confirmedLog = sortedLogs[confirmedIndex];
+    // Keep only logs up to and including the first Confirmed entry
+    const trimmedLogs = sortedLogs.slice(0, confirmedIndex + 1);
 
     await orderRef.update({
       customStatus: 'Confirmed',
       awb: FieldValue.delete(),
       courier: FieldValue.delete(),
+      courierProvider: FieldValue.delete(),
       lastUpdatedAt: FieldValue.serverTimestamp(),
-      lastStatusUpdate: FieldValue.serverTimestamp(),
-      customStatusesLogs: FieldValue.arrayUnion(logEntry),
+      lastStatusUpdate: confirmedLog.createdAt,
+      customStatusesLogs: trimmedLogs,
     });
 
     return NextResponse.json({ message: 'Order status successfully reverted to Confirmed.' });

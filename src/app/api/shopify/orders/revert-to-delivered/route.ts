@@ -40,18 +40,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const logEntry = {
-      status: 'Delivered',
-      createdAt: Timestamp.now(),
-      remarks: 'Order status reverted to Delivered by user.',
-    };
+    const rawLogs: any[] = orderData?.customStatusesLogs ?? [];
+
+    // Sort ascending by createdAt
+    const sortedLogs = [...rawLogs].sort(
+      (a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0)
+    );
+
+    const deliveredIndex = sortedLogs.findIndex((log) => log.status === 'Delivered');
+
+    if (deliveredIndex === -1) {
+      return NextResponse.json(
+        { error: 'No "Delivered" log entry found for this order. Cannot revert status.' },
+        { status: 422 }
+      );
+    }
+
+    const deliveredLog = sortedLogs[deliveredIndex];
+    // Keep only logs up to and including the first Delivered entry
+    const trimmedLogs = sortedLogs.slice(0, deliveredIndex + 1);
 
     await orderRef.update({
       customStatus: 'Delivered',
       awb_reverse: FieldValue.delete(),
+      courier_reverse: FieldValue.delete(),
+      courierReverseProvider: FieldValue.delete(),
       lastUpdatedAt: FieldValue.serverTimestamp(),
-      lastStatusUpdate: FieldValue.serverTimestamp(),
-      customStatusesLogs: FieldValue.arrayUnion(logEntry),
+      lastStatusUpdate: deliveredLog.createdAt,
+      customStatusesLogs: trimmedLogs,
     });
 
     return NextResponse.json({ message: 'Order status successfully reverted to Delivered.' });

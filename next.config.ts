@@ -418,6 +418,54 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/party/delete/route'
       },
       {
+        source: '/api/business/b2b/add-stock',
+        destination: '/api/business/b2b/add-stock/route',
+      },
+      {
+        source: '/api/business/b2b/adjust-stock',
+        destination: '/api/business/b2b/adjust-stock/route',
+      },
+      {
+        source: '/api/business/b2b/advance-lot-stage',
+        destination: '/api/business/b2b/advance-lot-stage/route',
+      },
+      {
+        source: '/api/business/b2b/cancel-lot',
+        destination: '/api/business/b2b/cancel-lot/route',
+      },
+      {
+        source: '/api/business/b2b/cancel-order',
+        destination: '/api/business/b2b/cancel-order/route',
+      },
+      {
+        source: '/api/business/b2b/confirm-order',
+        destination: '/api/business/b2b/confirm-order/route',
+      },
+      {
+        source: '/api/business/b2b/create-order',
+        destination: '/api/business/b2b/create-order/route',
+      },
+      {
+        source: '/api/business/b2b/get-order-dashboard',
+        destination: '/api/business/b2b/get-order-dashboard/route',
+      },
+      {
+        source: '/api/business/b2b/save-draft-order',
+        destination: '/api/business/b2b/save-draft-order/route',
+      },
+      {
+        source: '/api/business/b2b/set-lot-stage-blocked',
+        destination: '/api/business/b2b/set-lot-stage-blocked/route',
+      },
+      {
+        source: '/api/business/list',
+        destination: '/api/business/list/route',
+      },
+      {
+        source: '/api/business/[businessId]/auth',
+        destination: '/api/business/[businessId]/auth/route',
+      },
+      {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
       },
@@ -436,14 +484,6 @@ const nextConfig: NextConfig = {
       {
         source: '/api/shopify/orders/refund',
         destination: '/api/shopify/orders/refund/route',
-      },
-      {
-        source: '/api/business/list',
-        destination: '/api/business/list/route',
-      },
-      {
-        source: '/api/business/[businessId]/auth',
-        destination: '/api/business/[businessId]/auth/route',
       },
       {
         source: '/api/signup',

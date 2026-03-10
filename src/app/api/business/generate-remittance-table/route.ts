@@ -9,6 +9,8 @@ const CLOUD_FUNCTION_URL =
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -61,7 +63,10 @@ export async function POST(req: NextRequest) {
         // Fire-and-forget
         await fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Api-Key': ENQUEUE_FUNCTION_SECRET,
+            },
             body: JSON.stringify({ businessId, startDate, endDate }),
         }).catch((err) => {
             console.error('[generate-blue-dart-remittance-table] CF call failed:', err);

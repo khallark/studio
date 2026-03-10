@@ -575,7 +575,7 @@ export default function Dashboard() {
         setIsRemittanceSubmitting(true);
         try {
             const token = await user.getIdToken();
-            const response = await fetch('/api/business/generate-blue-dart-remittance-table', {
+            const response = await fetch('/api/business/generate-remittance-table', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({

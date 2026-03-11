@@ -17,11 +17,7 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !lotId || !cancelledBy || !reason) {
-            console.log(`${!businessId ? "businessId, " : ""}${!lotId ? "lotId, " : ""}${!cancelledBy ? "cancelledBy, " : ""}${!reason ? "reason" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!lotId ? "lotId, " : ""}${!cancelledBy ? "cancelledBy, " : ""}${!reason ? "reason" : ""} are missing.` },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "businessId, lotId, cancelledBy, reason are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -42,12 +38,10 @@ export async function POST(req: NextRequest) {
 
             const now = Timestamp.now();
 
-            tx.update(lotRef, {
-                status: "CANCELLED",
-                updatedAt: now,
-            });
+            tx.update(lotRef, { status: "CANCELLED", updatedAt: now });
 
-            const reservationsSnap = await db.collection(`users/${businessId}/material_reservations`)
+            const reservationsSnap = await db
+                .collection(`users/${businessId}/material_reservations`)
                 .where("lotId", "==", lotId)
                 .where("status", "==", "RESERVED")
                 .get();
@@ -55,11 +49,7 @@ export async function POST(req: NextRequest) {
             for (const resDoc of reservationsSnap.docs) {
                 const reservation = resDoc.data() as MaterialReservation;
 
-                tx.update(resDoc.ref, {
-                    status: "RELEASED",
-                    updatedAt: now,
-                });
-
+                tx.update(resDoc.ref, { status: "RELEASED", updatedAt: now });
                 tx.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
                     reservedStock: FieldValue.increment(-reservation.quantityRequired),
                     availableStock: FieldValue.increment(reservation.quantityRequired),
@@ -78,7 +68,9 @@ export async function POST(req: NextRequest) {
                     note: `Lot ${lot.lotNumber} cancelled — reserved stock released. Reason: ${reason}`,
                     createdBy: cancelledBy,
                     createdAt: now,
-                } satisfies Omit<MaterialTransaction, "stockBefore" | "stockAfter">);
+                    stockBefore: null,
+                    stockAfter: null,
+                } satisfies MaterialTransaction);
             }
         });
 

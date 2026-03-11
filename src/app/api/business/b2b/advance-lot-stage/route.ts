@@ -1,23 +1,24 @@
 // /api/business/b2b/advance-lot-stage
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { AdvanceLotStagePayload, computeDelayStatus } from "@/lib/b2b_helpers";
+import { computeDelayStatus } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { FinishedGood, Lot, LotStage, LotStageHistory, MaterialReservation } from "@/types/b2b";
+import { FinishedGood, Lot, LotStage, LotStageHistory, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { businessId, lotId, completedBy, note }: AdvanceLotStagePayload = body;
+        const { businessId, lotId, completedBy, note }: {
+            businessId: string;
+            lotId: string;
+            completedBy: string;
+            note?: string;
+        } = body;
 
-        if (!businessId || !lotId || !completedBy || !note) {
-            console.log(`${!businessId ? "businessId, " : ""}${!lotId ? "lotId, " : ""}${!completedBy ? "completedBy, " : ""}${!note ? "note" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!lotId ? "lotId, " : ""}${!completedBy ? "completedBy, " : ""}${!note ? "note" : ""} are missing.` },
-                { status: 400 }
-            );
+        if (!businessId || !lotId || !completedBy) {
+            return NextResponse.json({ error: "businessId, lotId, completedBy are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -38,11 +39,11 @@ export async function POST(req: NextRequest) {
             const currentIndex = lot.currentSequence - 1;
             const currentStage = lot.stages[currentIndex];
             const nextStage = lot.stages[currentIndex + 1];
-
             const now = Timestamp.now();
 
             const updatedStages = lot.stages.map((s, i) => {
-                if (i === currentIndex) return { ...s, status: "COMPLETED", actualDate: now, completedBy, note: note ?? null };
+                if (i === currentIndex)
+                    return { ...s, status: "COMPLETED", actualDate: now, completedBy, note: note ?? null };
                 if (i === currentIndex + 1) return { ...s, status: "IN_PROGRESS" };
                 return s;
             });
@@ -75,7 +76,8 @@ export async function POST(req: NextRequest) {
                 note: note ?? null,
             } satisfies LotStageHistory);
 
-            const reservationsSnap = await db.collection(`users/${businessId}/material_reservations`)
+            const reservationsSnap = await db
+                .collection(`users/${businessId}/material_reservations`)
                 .where("lotId", "==", lotId)
                 .where("consumedAtStage", "==", currentStage.stage)
                 .where("status", "==", "RESERVED")
@@ -93,6 +95,21 @@ export async function POST(req: NextRequest) {
                     totalStock: FieldValue.increment(-reservation.quantityRequired),
                     updatedAt: now,
                 });
+                const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
+                tx.set(txRef, {
+                    id: txRef.id,
+                    materialId: reservation.materialId,
+                    materialName: reservation.materialName,
+                    type: "CONSUMPTION" as MaterialTransactionType,
+                    quantity: reservation.quantityRequired,
+                    referenceId: lotId,
+                    referenceType: "LOT",
+                    note: `Consumed at stage ${currentStage.stage} — Lot ${lot.lotNumber}`,
+                    createdBy: completedBy,
+                    createdAt: now,
+                    stockBefore: null,
+                    stockAfter: null,
+                } satisfies MaterialTransaction);
             }
 
             if (isLastStage) {

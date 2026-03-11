@@ -1,6 +1,6 @@
 // /api/business/b2b/adjust-stock
 
-import { AdjustStockPayload } from "@/lib/b2b_helpers";
+import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
 import { MaterialTransaction, MaterialTransactionType, RawMaterial } from "@/types/b2b";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -9,14 +9,22 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { businessId, materialId, quantity, note, createdBy }: AdjustStockPayload = body;
+        const { businessId, materialId, quantity, note, createdBy }: {
+            businessId: string;
+            materialId: string;
+            quantity: number;
+            note: string;
+            createdBy: string;
+        } = body;
 
-        if (!businessId || !materialId || !quantity || !note || !createdBy) {
-            console.log(`${!businessId ? "businessId, " : ""}${!materialId ? "materialId, " : ""}${!quantity ? "quantity, " : ""}${!note ? "note, " : ""}${!createdBy ? "createdBy" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!materialId ? "materialId, " : ""}${!quantity ? "quantity, " : ""}${!note ? "note, " : ""}${!createdBy ? "createdBy" : ""} are missing.` },
-                { status: 400 }
-            );
+        if (!businessId || !materialId || quantity == null || !note || !createdBy) {
+            return NextResponse.json({ error: "businessId, materialId, quantity, note, createdBy are required." }, { status: 400 });
+        }
+
+        const result = await authUserForBusiness({ businessId, req });
+        if (!result.authorised) {
+            const { error, status } = result;
+            return NextResponse.json({ error }, { status });
         }
 
         if (quantity === 0) {
@@ -31,7 +39,6 @@ export async function POST(req: NextRequest) {
 
             const material = matDoc.data() as RawMaterial;
 
-            // Guard: adjustment cannot push availableStock below zero
             const projectedAvailable = material.availableStock + quantity;
             if (projectedAvailable < 0) throw new Error("adjustment_exceeds_available_stock");
 

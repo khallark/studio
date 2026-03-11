@@ -17,11 +17,7 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !orderId || !cancelledBy || !reason) {
-            console.log(`${!businessId ? "businessId, " : ""}${!orderId ? "orderId, " : ""}${!cancelledBy ? "cancelledBy, " : ""}${!reason ? "reason" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!orderId ? "orderId, " : ""}${!cancelledBy ? "cancelledBy, " : ""}${!reason ? "reason" : ""} are missing.` },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "businessId, orderId, cancelledBy, reason are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -38,22 +34,22 @@ export async function POST(req: NextRequest) {
         }
 
         const order = orderDoc.data() as Order;
+
         if (order.status === "CANCELLED") {
             return NextResponse.json({ error: "order_already_cancelled" }, { status: 400 });
         }
 
-        // DRAFT orders have no lots or reservations — just flip the status
         if (order.status === "DRAFT") {
             await orderRef.update({ status: "CANCELLED", updatedAt: Timestamp.now() });
             return NextResponse.json({ success: true, lotsCancelled: 0 }, { status: 200 });
         }
 
-        // Fetch all cancellable lots (skip already cancelled/completed)
-        const lotsSnap = await db.collection(`users/${businessId}/lots`)
+        const lotsSnap = await db
+            .collection(`users/${businessId}/lots`)
             .where("orderId", "==", orderId)
             .get();
 
-        const cancellableLots = lotsSnap.docs.filter(d => {
+        const cancellableLots = lotsSnap.docs.filter((d) => {
             const s = (d.data() as Lot).status;
             return s !== "CANCELLED" && s !== "COMPLETED";
         });
@@ -64,12 +60,10 @@ export async function POST(req: NextRequest) {
         for (const lotDoc of cancellableLots) {
             const lot = lotDoc.data() as Lot;
 
-            batch.update(lotDoc.ref, {
-                status: "CANCELLED",
-                updatedAt: now,
-            });
+            batch.update(lotDoc.ref, { status: "CANCELLED", updatedAt: now });
 
-            const reservationsSnap = await db.collection(`users/${businessId}/material_reservations`)
+            const reservationsSnap = await db
+                .collection(`users/${businessId}/material_reservations`)
                 .where("lotId", "==", lotDoc.id)
                 .where("status", "==", "RESERVED")
                 .get();
@@ -77,11 +71,7 @@ export async function POST(req: NextRequest) {
             for (const resDoc of reservationsSnap.docs) {
                 const reservation = resDoc.data() as MaterialReservation;
 
-                batch.update(resDoc.ref, {
-                    status: "RELEASED",
-                    updatedAt: now,
-                });
-
+                batch.update(resDoc.ref, { status: "RELEASED", updatedAt: now });
                 batch.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
                     reservedStock: FieldValue.increment(-reservation.quantityRequired),
                     availableStock: FieldValue.increment(reservation.quantityRequired),
@@ -100,7 +90,9 @@ export async function POST(req: NextRequest) {
                     note: `Order ${order.orderNumber} cancelled — Lot ${lot.lotNumber} reserved stock released. Reason: ${reason}`,
                     createdBy: cancelledBy,
                     createdAt: now,
-                } satisfies Omit<MaterialTransaction, "stockBefore" | "stockAfter">);
+                    stockBefore: null,
+                    stockAfter: null,
+                } satisfies MaterialTransaction);
             }
         }
 

@@ -1,7 +1,6 @@
 // /api/business/b2b/add-stock
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { AddStockPayload } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { MaterialTransaction, MaterialTransactionType, RawMaterial } from "@/types/b2b";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -10,14 +9,17 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { businessId, materialId, quantity, referenceId, note, createdBy }: AddStockPayload = body;
+        const { businessId, materialId, quantity, referenceId, note, createdBy }: {
+            businessId: string;
+            materialId: string;
+            quantity: number;
+            referenceId: string;
+            note?: string;
+            createdBy: string;
+        } = body;
 
         if (!businessId || !materialId || !quantity || !referenceId || !createdBy) {
-            console.log(`${!businessId ? "businessId, " : ""}${!materialId ? "materialId, " : ""}${!quantity ? "quantity, " : ""}${!referenceId ? "referenceId, " : ""}${!createdBy ? "createdBy" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!materialId ? "materialId, " : ""}${!quantity ? "quantity, " : ""}${!referenceId ? "referenceId, " : ""}${!createdBy ? "createdBy" : ""} are missing.` },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "businessId, materialId, quantity, referenceId, createdBy are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });

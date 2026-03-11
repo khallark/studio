@@ -1,26 +1,29 @@
 // /api/business/b2b/create-order
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { buildLotsAndReservations, checkStockShortfalls, CreateOrderPayload, generateOrderNumber } from "@/lib/b2b_helpers";
+import { buildLotsAndReservations, checkStockShortfalls, generateOrderNumber } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { Order } from "@/types/b2b";
+import { DraftLotInput, MaterialTransaction, MaterialTransactionType, Order } from "@/types/b2b";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const {
-            businessId, buyerId, buyerName, buyerContact,
-            shipDate, deliveryAddress, note, createdBy, lots,
-        }: CreateOrderPayload = body;
+        const { businessId, buyerId, buyerName, buyerContact, shipDate, deliveryAddress, note, createdBy, lots }: {
+            businessId: string;
+            buyerId: string;
+            buyerName: string;
+            buyerContact: string;
+            shipDate: string;
+            deliveryAddress: string;
+            note?: string;
+            createdBy: string;
+            lots: DraftLotInput[];
+        } = body;
 
         if (!businessId || !buyerId || !buyerName || !buyerContact || !shipDate || !deliveryAddress || !createdBy || !lots) {
-            console.log(`${!businessId ? "businessId, " : ""}${!buyerId ? "buyerId, " : ""}${!buyerName ? "buyerName, " : ""}${!buyerContact ? "buyerContact, " : ""}${!shipDate ? "shipDate, " : ""}${!deliveryAddress ? "deliveryAddress, " : ""}${!createdBy ? "createdBy, " : ""}${!lots ? "lots" : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!buyerId ? "buyerId, " : ""}${!buyerName ? "buyerName, " : ""}${!buyerContact ? "buyerContact, " : ""}${!shipDate ? "shipDate, " : ""}${!deliveryAddress ? "deliveryAddress, " : ""}${!createdBy ? "createdBy, " : ""}${!lots ? "lots" : ""} are missing.` },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "businessId, buyerId, buyerName, buyerContact, shipDate, deliveryAddress, createdBy, lots are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
         const { lotDocs, reservationDocs } = await buildLotsAndReservations(
             businessId, orderId, orderNumber,
             buyerId, buyerName, shipTimestamp,
-            createdBy, lots
+            createdBy, lots,
         );
 
         const shortfalls = await checkStockShortfalls(businessId, reservationDocs);
@@ -83,6 +86,21 @@ export async function POST(req: NextRequest) {
                 availableStock: FieldValue.increment(-reservation.quantityRequired),
                 updatedAt: Timestamp.now(),
             });
+            const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
+            batch.set(txRef, {
+                id: txRef.id,
+                materialId: reservation.materialId,
+                materialName: reservation.materialName,
+                type: "RESERVATION" as MaterialTransactionType,
+                quantity: reservation.quantityRequired,
+                referenceId: orderId,
+                referenceType: "LOT",
+                note: `Stock reserved for Lot ${reservation.lotNumber} (Order ${orderNumber})`,
+                createdBy,
+                createdAt: Timestamp.now(),
+                stockBefore: null,
+                stockAfter: null,
+            } satisfies MaterialTransaction);
         }
 
         await batch.commit();

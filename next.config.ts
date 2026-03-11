@@ -446,8 +446,36 @@ const nextConfig: NextConfig = {
         destination: '/api/business/b2b/confirm-order/route',
       },
       {
+        source: '/api/business/b2b/create-bom-entry',
+        destination: '/api/business/b2b/create-bom-entry/route',
+      },
+      {
+        source: '/api/business/b2b/create-buyer',
+        destination: '/api/business/b2b/create-buyer/route',
+      },
+      {
         source: '/api/business/b2b/create-order',
         destination: '/api/business/b2b/create-order/route',
+      },
+      {
+        source: '/api/business/b2b/create-product',
+        destination: '/api/business/b2b/create-product/route',
+      },
+      {
+        source: '/api/business/b2b/create-raw-material',
+        destination: '/api/business/b2b/create-raw-material/route',
+      },
+      {
+        source: '/api/business/b2b/create-stage-config',
+        destination: '/api/business/b2b/create-stage-config/route',
+      },
+      {
+        source: '/api/business/b2b/deactivate-bom-entry',
+        destination: '/api/business/b2b/deactivate-bom-entry/route',
+      },
+      {
+        source: '/api/business/b2b/dispatch-finished-good',
+        destination: '/api/business/b2b/dispatch-finished-good/route',
       },
       {
         source: '/api/business/b2b/get-order-dashboard',
@@ -460,6 +488,26 @@ const nextConfig: NextConfig = {
       {
         source: '/api/business/b2b/set-lot-stage-blocked',
         destination: '/api/business/b2b/set-lot-stage-blocked/route',
+      },
+      {
+        source: '/api/business/b2b/update-bom-entry',
+        destination: '/api/business/b2b/update-bom-entry/route',
+      },
+      {
+        source: '/api/business/b2b/update-buyer',
+        destination: '/api/business/b2b/update-buyer/route',
+      },
+      {
+        source: '/api/business/b2b/update-product',
+        destination: '/api/business/b2b/update-product/route',
+      },
+      {
+        source: '/api/business/b2b/update-raw-material',
+        destination: '/api/business/b2b/update-raw-material/route',
+      },
+      {
+        source: '/api/business/b2b/update-stage-config',
+        destination: '/api/business/b2b/update-stage-config/route',
       },
       {
         source: '/api/business/list',

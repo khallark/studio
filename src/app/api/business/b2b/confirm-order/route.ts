@@ -1,24 +1,24 @@
-// /api/business/b2b/save-draft-order
+// /api/business/b2b/confirm-order
 
-import { authUserForBusiness } from '@/lib/authoriseUser';
-import { buildLotsAndReservations, checkStockShortfalls, ConfirmOrderPayload } from '@/lib/b2b_helpers';
-import { db } from '@/lib/firebase-admin';
-import { Order } from '@/types/b2b';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { NextRequest, NextResponse } from 'next/server';
-
+import { authUserForBusiness } from "@/lib/authoriseUser";
+import { buildLotsAndReservations, checkStockShortfalls } from "@/lib/b2b_helpers";
+import { db } from "@/lib/firebase-admin";
+import { DraftLotInput, MaterialTransaction, MaterialTransactionType, Order } from "@/types/b2b";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { businessId, orderId, confirmedBy, lots: incomingLots }: ConfirmOrderPayload = body;
+        const { businessId, orderId, confirmedBy, lots: incomingLots }: {
+            businessId: string;
+            orderId: string;
+            confirmedBy: string;
+            lots?: DraftLotInput[];
+        } = body;
 
-        if (!businessId || !orderId || !confirmedBy || !incomingLots) {
-            console.log(`${!businessId ? "businessId, " : ""}${!orderId ? "orderId, " : ""}${!confirmedBy ? "confirmedBy, " : ""}${!incomingLots ? "incomingLots," : ""} are missing.`);
-            return NextResponse.json(
-                { error: `${!businessId ? "businessId, " : ""}${!orderId ? "orderId, " : ""}${!confirmedBy ? "confirmedBy, " : ""}${!incomingLots ? "incomingLots," : ""} are missing.` },
-                { status: 400 }
-            );
+        if (!businessId || !orderId || !confirmedBy) {
+            return NextResponse.json({ error: "businessId, orderId, confirmedBy are required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -49,19 +49,17 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "no_lots_defined" }, { status: 400 });
         }
 
-        // Flip to CONFIRMED immediately so the UI reflects the in-progress state
         await orderRef.update({ status: "CONFIRMED", updatedAt: Timestamp.now() });
 
         const { lotDocs, reservationDocs } = await buildLotsAndReservations(
             businessId, orderId, order.orderNumber,
             order.buyerId, order.buyerName, order.shipDate,
-            confirmedBy, lotInputs
+            confirmedBy, lotInputs,
         );
 
         const shortfalls = await checkStockShortfalls(businessId, reservationDocs);
 
         if (shortfalls.length > 0) {
-            // Roll back to DRAFT — order remains editable
             await orderRef.update({ status: "DRAFT", updatedAt: Timestamp.now() });
             return NextResponse.json({
                 error: "insufficient_stock",
@@ -82,9 +80,23 @@ export async function POST(req: NextRequest) {
                 availableStock: FieldValue.increment(-reservation.quantityRequired),
                 updatedAt: Timestamp.now(),
             });
+            const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
+            batch.set(txRef, {
+                id: txRef.id,
+                materialId: reservation.materialId,
+                materialName: reservation.materialName,
+                type: "RESERVATION" as MaterialTransactionType,
+                quantity: reservation.quantityRequired,
+                referenceId: orderId,
+                referenceType: "LOT",
+                note: `Stock reserved for Lot ${reservation.lotNumber} (Order ${order.orderNumber})`,
+                createdBy: confirmedBy,
+                createdAt: Timestamp.now(),
+                stockBefore: null,
+                stockAfter: null,
+            } satisfies MaterialTransaction);
         }
 
-        // Lots created — clear draftLots, flip to IN_PRODUCTION
         batch.update(orderRef, {
             status: "IN_PRODUCTION",
             draftLots: null,

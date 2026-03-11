@@ -3,7 +3,7 @@
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
 import { Lot, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -50,11 +50,6 @@ export async function POST(req: NextRequest) {
                 const reservation = resDoc.data() as MaterialReservation;
 
                 tx.update(resDoc.ref, { status: "RELEASED", updatedAt: now });
-                tx.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
-                    reservedStock: FieldValue.increment(-reservation.quantityRequired),
-                    availableStock: FieldValue.increment(reservation.quantityRequired),
-                    updatedAt: now,
-                });
 
                 const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
                 tx.set(txRef, {

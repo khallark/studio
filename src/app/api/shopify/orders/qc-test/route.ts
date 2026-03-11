@@ -88,12 +88,15 @@ export async function POST(req: NextRequest) {
       qc_status: qcStatuses[String(item.id)] ?? null,
     })) || [];
 
-    // Validate all items have a QC status
-    const missingStatuses = updatedLineItems.filter((item: any) => item.qc_status === null);
-    if (missingStatuses.length > 0) {
+    // Strict check: every line item must have a qc_status that is a non-null, non-undefined string
+    const invalidItems = updatedLineItems.filter(
+      (item: any) => typeof item.qc_status !== 'string' || item.qc_status.trim() === ''
+    );
+
+    if (invalidItems.length > 0) {
       return NextResponse.json({
-        error: 'Missing QC status for some items',
-        details: `Items missing status: ${missingStatuses.map((i: any) => i.id).join(', ')}`
+        error: 'Missing or invalid QC status for some items',
+        details: `All line items must have a valid QC status string. Invalid items: ${invalidItems.map((i: any) => i.id).join(', ')}`
       }, { status: 400 });
     }
 

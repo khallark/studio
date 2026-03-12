@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
             .collection('users')
             .doc(businessId)
             .collection('products')
-            .limit(500) // Limit to prevent memory issues
+            // .limit(500) // Limit to prevent memory issues
             .get();
 
         const matchingProducts: BusinessProduct[] = [];

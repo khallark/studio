@@ -67,7 +67,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
   const initialize = useCallback(() => {
     const initialStatuses: Record<string | number, QcStatus | null> = {};
     order.raw.line_items.forEach(item => {
-      initialStatuses[item.id] = item.qc_status || null;
+      initialStatuses[String(item.id)] = item.qc_status || null;
     });
     setQcStatuses(initialStatuses);
     setRecordedVideo(null);
@@ -176,7 +176,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
   }, [isRecording]);
 
   const handleStatusChange = (itemId: string | number, status: QcStatus) => {
-    setQcStatuses(prev => ({ ...prev, [itemId]: status }));
+    setQcStatuses(prev => ({ ...prev, [String(itemId)]: status }));
   };
 
   const startRecording = () => {
@@ -390,8 +390,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
                         {item.title} (Qty: {item.quantity})
                       </Label>
                       <Select
-                        value={qcStatuses[item.id] || ''}
-                        onValueChange={(value: QcStatus) => handleStatusChange(item.id, value)}
+                        value={qcStatuses[String(item.id)] || ''}
+                        onValueChange={(value: QcStatus) => handleStatusChange(String(item.id), value)}
                       >
                         <SelectTrigger id={`qc-status-${item.id}`}>
                           <SelectValue placeholder="Select status..." />

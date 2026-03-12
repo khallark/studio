@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     // ============================================
     let upcUpdateCount = 0;
     let upcCreateCount = 0;
-    const qcPassItems = updatedLineItems.filter((item: any) => qcStatuses[item.id] === 'QC Pass');
+    const qcPassItems = updatedLineItems.filter((item: any) => qcStatuses[String(item.id)] === 'QC Pass');
 
     if (qcPassItems.length > 0) {
       console.log(`🔄 Processing UPCs for ${qcPassItems.length} QC Pass items...`);

@@ -1828,7 +1828,7 @@ export default function InventoryPage() {
 
             {/* Adjustment Dialog */}
             <AdjustmentDialog
-                open={adjustmentDialogOpen}
+                open={false}
                 onOpenChange={setAdjustmentDialogOpen}
                 product={selectedProduct}
                 type={adjustmentType}

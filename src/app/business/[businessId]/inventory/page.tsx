@@ -1210,11 +1210,11 @@ export default function InventoryPage() {
         }
     };
 
-    const handleOpenAdjustment = (product: InventoryProduct, type: AdjustmentType) => {
-        setSelectedProduct(product);
-        setAdjustmentType(type);
-        setAdjustmentDialogOpen(true);
-    };
+    // const handleOpenAdjustment = (product: InventoryProduct, type: AdjustmentType) => {
+    //     setSelectedProduct(product);
+    //     setAdjustmentType(type);
+    //     setAdjustmentDialogOpen(true);
+    // };
 
     // ============================================================
     // LOADING / AUTH STATES
@@ -1718,7 +1718,7 @@ export default function InventoryPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-8 gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
-                                                                onClick={() => handleOpenAdjustment(product, 'deduction')}
+                                                                // onClick={() => handleOpenAdjustment(product, 'deduction')}
                                                             >
                                                                 <Minus className="h-3 w-3" />
                                                                 {inv.deduction}

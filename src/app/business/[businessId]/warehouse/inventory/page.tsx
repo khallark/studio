@@ -1707,7 +1707,7 @@ export default function InventoryPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-8 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
-                                                                onClick={() => handleOpenAdjustment(product, 'inward')}
+                                                                // onClick={() => handleOpenAdjustment(product, 'inward')}
                                                             >
                                                                 <Plus className="h-3 w-3" />
                                                                 {inv.inwardAddition}
@@ -1718,7 +1718,7 @@ export default function InventoryPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-8 gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
-                                                                onClick={() => handleOpenAdjustment(product, 'deduction')}
+                                                                // onClick={() => handleOpenAdjustment(product, 'deduction')}
                                                             >
                                                                 <Minus className="h-3 w-3" />
                                                                 {inv.deduction}

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (reorderLevel < 0) {
-            return NextResponse.json({ error: "reorder_level_must_be_non_negative" }, { status: 400 });
+            return NextResponse.json({ error: "reorderLevel must be zero or greater." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -34,23 +34,25 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
-        // Guard: duplicate SKU
-        const existing = await db
-            .collection(`users/${businessId}/raw_materials`)
-            .where("sku", "==", sku.trim().toUpperCase())
-            .limit(1)
-            .get();
-        if (!existing.empty) {
-            return NextResponse.json({ error: "sku_already_exists", message: `A raw material with SKU ${sku} already exists.` }, { status: 400 });
+        // SKU is the document ID — normalized to uppercase
+        const materialId = sku.trim().toUpperCase();
+
+        // Check for duplicate by reading the doc directly (one read, no query)
+        const materialRef = db.doc(`users/${businessId}/raw_materials/${materialId}`);
+        const existingDoc = await materialRef.get();
+        if (existingDoc.exists) {
+            return NextResponse.json({
+                error: "sku_already_exists",
+                message: `A raw material with SKU "${materialId}" already exists.`,
+            }, { status: 400 });
         }
 
-        const materialId = db.collection(`users/${businessId}/raw_materials`).doc().id;
         const now = Timestamp.now();
 
-        await db.doc(`users/${businessId}/raw_materials/${materialId}`).set({
+        await materialRef.set({
             id: materialId,
             name,
-            sku: sku.trim().toUpperCase(),
+            sku: materialId,
             unit,
             category,
             totalStock: 0,

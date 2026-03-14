@@ -19,8 +19,12 @@ export async function POST(req: NextRequest) {
             createdBy: string;
         } = body;
 
-        if (!businessId || !name || !sku || !category || !defaultStages?.length || !createdBy) {
+        if (!businessId || !name || !sku || !category || !defaultStages || !createdBy) {
             return NextResponse.json({ error: "businessId, name, sku, category, defaultStages, createdBy are required." }, { status: 400 });
+        }
+
+        if (!Array.isArray(defaultStages) || defaultStages.length === 0) {
+            return NextResponse.json({ error: "At least one default stage is required." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -29,23 +33,25 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
-        // Guard: duplicate SKU
-        const existing = await db
-            .collection(`users/${businessId}/b2bProducts`)
-            .where("sku", "==", sku.trim().toUpperCase())
-            .limit(1)
-            .get();
-        if (!existing.empty) {
-            return NextResponse.json({ error: "sku_already_exists", message: `A product with SKU ${sku} already exists.` }, { status: 400 });
+        // SKU is the document ID — normalized to uppercase
+        const productId = sku.trim().toUpperCase();
+
+        // Check for duplicate by attempting to read the doc directly (one read, no query)
+        const productRef = db.doc(`users/${businessId}/b2bProducts/${productId}`);
+        const existingDoc = await productRef.get();
+        if (existingDoc.exists) {
+            return NextResponse.json({
+                error: "sku_already_exists",
+                message: `A product with SKU "${productId}" already exists.`,
+            }, { status: 400 });
         }
 
-        const productId = db.collection(`users/${businessId}/b2bProducts`).doc().id;
         const now = Timestamp.now();
 
-        await db.doc(`users/${businessId}/b2bProducts/${productId}`).set({
+        await productRef.set({
             id: productId,
             name,
-            sku: sku.trim().toUpperCase(),
+            sku: productId,
             category,
             description: description ?? null,
             defaultStages,

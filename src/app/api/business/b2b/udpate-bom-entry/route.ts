@@ -2,7 +2,7 @@
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
-import { StageName } from "@/types/b2b";
+import { BOMEntry, StageName } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,6 +32,18 @@ export async function POST(req: NextRequest) {
 
         if (!bomDoc.exists) {
             return NextResponse.json({ error: "bom_entry_not_found" }, { status: 404 });
+        }
+
+        // Guard: cannot update an inactive entry
+        if (!(bomDoc.data() as BOMEntry).isActive) {
+            return NextResponse.json({ error: "bom_entry_inactive", message: "Cannot update an inactive BOM entry. Reactivate it first by creating a new entry." }, { status: 400 });
+        }
+
+        if (quantityPerPiece !== undefined && quantityPerPiece <= 0) {
+            return NextResponse.json({ error: "quantity_per_piece_must_be_positive" }, { status: 400 });
+        }
+        if (wastagePercent !== undefined && (wastagePercent < 0 || wastagePercent > 100)) {
+            return NextResponse.json({ error: "wastage_percent_must_be_between_0_and_100" }, { status: 400 });
         }
 
         const updates: Record<string, unknown> = { updatedAt: Timestamp.now() };

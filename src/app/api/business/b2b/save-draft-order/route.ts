@@ -3,7 +3,7 @@
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { generateOrderNumber } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { DraftLotInput, Order } from "@/types/b2b";
+import { Buyer, DraftLotInput, Order, Product } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -25,11 +25,44 @@ export async function POST(req: NextRequest) {
         if (!businessId || !buyerId || !buyerName || !buyerContact || !shipDate || !deliveryAddress || !createdBy || !lots) {
             return NextResponse.json({ error: "businessId, buyerId, buyerName, buyerContact, shipDate, deliveryAddress, createdBy, lots are required." }, { status: 400 });
         }
+        if (!lots.length) {
+            return NextResponse.json({ error: "at_least_one_lot_required" }, { status: 400 });
+        }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
+        }
+
+        // Validate buyer existence and active status
+        const buyerDoc = await db.doc(`users/${businessId}/buyers/${buyerId}`).get();
+        if (!buyerDoc.exists) {
+            return NextResponse.json({ error: "buyer_not_found" }, { status: 404 });
+        }
+        if (!(buyerDoc.data() as Buyer).isActive) {
+            return NextResponse.json({ error: "buyer_inactive", message: "Cannot create an order for an inactive buyer." }, { status: 400 });
+        }
+
+        // Validate each lot's product existence, active status, stages non-empty, quantity > 0
+        for (const lot of lots) {
+            if (!lot.productId) {
+                return NextResponse.json({ error: "lot_missing_product", message: "Each lot must have a productId." }, { status: 400 });
+            }
+            if (!lot.quantity || lot.quantity <= 0) {
+                return NextResponse.json({ error: "lot_invalid_quantity", message: "Each lot must have a quantity greater than 0." }, { status: 400 });
+            }
+            if (!lot.stages?.length) {
+                return NextResponse.json({ error: "lot_missing_stages", message: "Each lot must have at least one stage." }, { status: 400 });
+            }
+
+            const productDoc = await db.doc(`users/${businessId}/b2bProducts/${lot.productId}`).get();
+            if (!productDoc.exists) {
+                return NextResponse.json({ error: "product_not_found", message: `Product ${lot.productId} does not exist.` }, { status: 404 });
+            }
+            if (!(productDoc.data() as Product).isActive) {
+                return NextResponse.json({ error: "product_inactive", message: `Product ${lot.productName} is inactive.` }, { status: 400 });
+            }
         }
 
         const orderNumber = await generateOrderNumber(businessId);

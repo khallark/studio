@@ -38,6 +38,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        if ("reorderLevel" in fields) {
+            const level = Number(fields.reorderLevel);
+            if (isNaN(level) || level < 0) {
+                return NextResponse.json({ error: "reorderLevel must be zero or greater." }, { status: 400 });
+            }
+        }
+
         const updates = Object.fromEntries(
             Object.entries(fields).filter(([, v]) => v !== undefined),
         );

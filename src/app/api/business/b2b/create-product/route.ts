@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
             createdBy: string;
         } = body;
 
-        if (!businessId || !name || !sku || !category || !defaultStages || !createdBy) {
+        if (!businessId || !name || !sku || !category || !defaultStages?.length || !createdBy) {
             return NextResponse.json({ error: "businessId, name, sku, category, defaultStages, createdBy are required." }, { status: 400 });
         }
 
@@ -29,13 +29,23 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
+        // Guard: duplicate SKU
+        const existing = await db
+            .collection(`users/${businessId}/b2bProducts`)
+            .where("sku", "==", sku.trim().toUpperCase())
+            .limit(1)
+            .get();
+        if (!existing.empty) {
+            return NextResponse.json({ error: "sku_already_exists", message: `A product with SKU ${sku} already exists.` }, { status: 400 });
+        }
+
         const productId = db.collection(`users/${businessId}/b2bProducts`).doc().id;
         const now = Timestamp.now();
 
         await db.doc(`users/${businessId}/b2bProducts/${productId}`).set({
             id: productId,
             name,
-            sku,
+            sku: sku.trim().toUpperCase(),
             category,
             description: description ?? null,
             defaultStages,

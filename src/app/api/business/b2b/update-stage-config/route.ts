@@ -26,11 +26,26 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "stage_config_not_found" }, { status: 404 });
         }
 
+        // name is not updatable — it is referenced as a string on every lot
         if ("name" in fields) {
             return NextResponse.json({
                 error: "name_not_updatable",
                 message: "Stage name cannot be changed as it is referenced by existing lots.",
             }, { status: 400 });
+        }
+
+        if ("defaultDurationDays" in fields) {
+            const days = Number(fields.defaultDurationDays);
+            if (isNaN(days) || days <= 0) {
+                return NextResponse.json({ error: "defaultDurationDays must be greater than zero." }, { status: 400 });
+            }
+        }
+
+        if ("sortOrder" in fields) {
+            const order = Number(fields.sortOrder);
+            if (isNaN(order) || order < 1) {
+                return NextResponse.json({ error: "sortOrder must be a positive integer." }, { status: 400 });
+            }
         }
 
         const updates = Object.fromEntries(

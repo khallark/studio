@@ -29,6 +29,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
+        // Guard: duplicate stage name
+        const existing = await db
+            .collection(`users/${businessId}/production_stage_config`)
+            .where("name", "==", name)
+            .limit(1)
+            .get();
+        if (!existing.empty) {
+            return NextResponse.json({ error: "stage_name_already_exists", message: `A stage config for ${name} already exists.` }, { status: 400 });
+        }
+
         const stageId = db.collection(`users/${businessId}/production_stage_config`).doc().id;
 
         await db.doc(`users/${businessId}/production_stage_config/${stageId}`).set({

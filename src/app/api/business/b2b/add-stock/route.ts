@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
             createdBy: string;
         } = body;
 
-        if (!businessId || !materialId || !quantity || !referenceId || !createdBy) {
+        if (!businessId || !materialId || quantity == null || !referenceId || !createdBy) {
             return NextResponse.json({ error: "businessId, materialId, quantity, referenceId, createdBy are required." }, { status: 400 });
         }
 
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
             if (!matDoc.exists) throw new Error("material_not_found");
 
             const material = matDoc.data() as RawMaterial;
+            if (!material.isActive) throw new Error("material_inactive");
+
             const stockBefore = material.totalStock;
             const stockAfter = stockBefore + quantity;
             const now = Timestamp.now();
@@ -72,6 +74,8 @@ export async function POST(req: NextRequest) {
         const message = (error as Error).message;
         if (message === "material_not_found") {
             return NextResponse.json({ error: "material_not_found" }, { status: 404 });
+        } else if (message === "material_inactive") {
+            return NextResponse.json({ error: "material_inactive", message: "Cannot add stock to an inactive material." }, { status: 400 });
         } else {
             console.error("addStock error:", error);
             return NextResponse.json({ error: "internal", message }, { status: 500 });

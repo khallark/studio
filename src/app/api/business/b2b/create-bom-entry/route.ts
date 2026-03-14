@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
         if (!businessId || !productId || !materialId || quantityPerPiece == null || !consumedAtStage || wastagePercent == null) {
             return NextResponse.json({ error: "businessId, productId, materialId, quantityPerPiece, consumedAtStage, wastagePercent are required." }, { status: 400 });
         }
+        if (quantityPerPiece <= 0) {
+            return NextResponse.json({ error: "quantity_per_piece_must_be_positive" }, { status: 400 });
+        }
+        if (wastagePercent < 0 || wastagePercent > 100) {
+            return NextResponse.json({ error: "wastage_percent_must_be_between_0_and_100" }, { status: 400 });
+        }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
@@ -43,13 +49,20 @@ export async function POST(req: NextRequest) {
         const product = productDoc.data() as Product;
         const material = materialDoc.data() as RawMaterial;
 
+        if (!product.isActive) {
+            return NextResponse.json({ error: "product_inactive", message: "Cannot add BOM entry for an inactive product." }, { status: 400 });
+        }
+        if (!material.isActive) {
+            return NextResponse.json({ error: "material_inactive", message: "Cannot add BOM entry for an inactive raw material." }, { status: 400 });
+        }
+
+        // Guard: duplicate active entry
         const existingSnap = await db
             .collection(`users/${businessId}/bom`)
             .where("productId", "==", productId)
             .where("materialId", "==", materialId)
             .where("isActive", "==", true)
             .get();
-
         if (!existingSnap.empty) {
             return NextResponse.json({
                 error: "bom_entry_already_exists",

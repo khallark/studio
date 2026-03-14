@@ -24,10 +24,24 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "businessId, name, sku, unit, category, reorderLevel, createdBy are required." }, { status: 400 });
         }
 
+        if (reorderLevel < 0) {
+            return NextResponse.json({ error: "reorder_level_must_be_non_negative" }, { status: 400 });
+        }
+
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
             const { error, status } = result;
             return NextResponse.json({ error }, { status });
+        }
+
+        // Guard: duplicate SKU
+        const existing = await db
+            .collection(`users/${businessId}/raw_materials`)
+            .where("sku", "==", sku.trim().toUpperCase())
+            .limit(1)
+            .get();
+        if (!existing.empty) {
+            return NextResponse.json({ error: "sku_already_exists", message: `A raw material with SKU ${sku} already exists.` }, { status: 400 });
         }
 
         const materialId = db.collection(`users/${businessId}/raw_materials`).doc().id;
@@ -36,7 +50,7 @@ export async function POST(req: NextRequest) {
         await db.doc(`users/${businessId}/raw_materials/${materialId}`).set({
             id: materialId,
             name,
-            sku,
+            sku: sku.trim().toUpperCase(),
             unit,
             category,
             totalStock: 0,

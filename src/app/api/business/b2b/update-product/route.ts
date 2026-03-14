@@ -27,6 +27,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "product_not_found" }, { status: 404 });
         }
 
+        if ("defaultStages" in fields) {
+            if (!Array.isArray(fields.defaultStages) || fields.defaultStages.length === 0) {
+                return NextResponse.json({ error: "defaultStages must be a non-empty array." }, { status: 400 });
+            }
+        }
+
+        // SKU cannot be changed — it is referenced by lots, BOM entries, and finished goods
+        if ("sku" in fields) {
+            return NextResponse.json({
+                error: "sku_not_updatable",
+                message: "SKU cannot be changed as it is referenced by existing lots and BOM entries.",
+            }, { status: 400 });
+        }
+
         const updates = Object.fromEntries(
             Object.entries(fields).filter(([, v]) => v !== undefined),
         );

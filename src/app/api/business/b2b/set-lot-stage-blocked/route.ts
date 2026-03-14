@@ -34,7 +34,24 @@ export async function POST(req: NextRequest) {
         }
 
         const lot = lotDoc.data() as Lot;
+
+        if (lot.status !== "ACTIVE") {
+            return NextResponse.json({
+                error: "lot_not_active",
+                message: `Cannot block/unblock a lot with status ${lot.status}. Only ACTIVE lots can be modified.`,
+            }, { status: 400 });
+        }
+
         const currentIndex = lot.currentSequence - 1;
+        const currentStage = lot.stages[currentIndex];
+
+        // Idempotency guard: already in the desired state
+        if (blocked && currentStage.status === "BLOCKED") {
+            return NextResponse.json({ error: "already_blocked", message: "This stage is already blocked." }, { status: 400 });
+        }
+        if (!blocked && currentStage.status === "IN_PROGRESS") {
+            return NextResponse.json({ error: "already_unblocked", message: "This stage is already in progress." }, { status: 400 });
+        }
 
         const updatedStages = lot.stages.map((s, i) => {
             if (i === currentIndex)

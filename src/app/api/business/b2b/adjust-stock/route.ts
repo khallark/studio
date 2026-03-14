@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
             if (!matDoc.exists) throw new Error("material_not_found");
 
             const material = matDoc.data() as RawMaterial;
+            if (!material.isActive) throw new Error("material_inactive");
 
             const projectedAvailable = material.availableStock + quantity;
             if (projectedAvailable < 0) throw new Error("adjustment_exceeds_available_stock");
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest) {
         const message = (error as Error).message;
         if (message === "material_not_found") {
             return NextResponse.json({ error: "material_not_found" }, { status: 404 });
+        } else if (message === "material_inactive") {
+            return NextResponse.json({ error: "material_inactive", message: "Cannot adjust stock for an inactive material." }, { status: 400 });
         } else if (message === "adjustment_exceeds_available_stock") {
             return NextResponse.json({ error: "adjustment_exceeds_available_stock" }, { status: 400 });
         } else {

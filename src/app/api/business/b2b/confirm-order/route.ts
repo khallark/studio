@@ -3,8 +3,8 @@
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { buildLotsAndReservations, checkStockShortfalls } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { DraftLotInput, MaterialTransaction, MaterialTransactionType, Order } from "@/types/b2b";
-import { Timestamp } from "firebase-admin/firestore";
+import { Buyer, DraftLotInput, MaterialTransaction, MaterialTransactionType, Order, Product } from "@/types/b2b";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -49,6 +49,47 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "no_lots_defined" }, { status: 400 });
         }
 
+        // Validate buyer is still active at confirm time
+        const buyerDoc = await db.doc(`users/${businessId}/buyers/${order.buyerId}`).get();
+        if (!buyerDoc.exists) {
+            return NextResponse.json({ error: "buyer_not_found" }, { status: 404 });
+        }
+        if (!(buyerDoc.data() as Buyer).isActive) {
+            return NextResponse.json({ error: "buyer_inactive", message: "Cannot confirm an order for an inactive buyer." }, { status: 400 });
+        }
+
+        // Validate each lot: product exists + active, quantity > 0, stages non-empty, BOM exists
+        for (const lot of lotInputs) {
+            if (!lot.quantity || lot.quantity <= 0) {
+                return NextResponse.json({ error: "lot_invalid_quantity", message: "Each lot must have a quantity greater than 0." }, { status: 400 });
+            }
+            if (!lot.stages?.length) {
+                return NextResponse.json({ error: "lot_missing_stages", message: "Each lot must have at least one stage." }, { status: 400 });
+            }
+
+            const productDoc = await db.doc(`users/${businessId}/b2bProducts/${lot.productId}`).get();
+            if (!productDoc.exists) {
+                return NextResponse.json({ error: "product_not_found", message: `Product ${lot.productId} does not exist.` }, { status: 404 });
+            }
+            if (!(productDoc.data() as Product).isActive) {
+                return NextResponse.json({ error: "product_inactive", message: `Product "${lot.productName}" is inactive.` }, { status: 400 });
+            }
+
+            // BOM must exist — block if no active BOM entries
+            const bomSnap = await db
+                .collection(`users/${businessId}/bom`)
+                .where("productId", "==", lot.productId)
+                .where("isActive", "==", true)
+                .limit(1)
+                .get();
+            if (bomSnap.empty) {
+                return NextResponse.json({
+                    error: "no_bom_for_product",
+                    message: `Product "${lot.productName}" has no active BOM entries. Add at least one BOM entry before confirming this order.`,
+                }, { status: 400 });
+            }
+        }
+
         await orderRef.update({ status: "CONFIRMED", updatedAt: Timestamp.now() });
 
         const { lotDocs, reservationDocs } = await buildLotsAndReservations(
@@ -75,6 +116,11 @@ export async function POST(req: NextRequest) {
 
         for (const reservation of reservationDocs) {
             batch.set(db.doc(`users/${businessId}/material_reservations/${reservation.id}`), reservation);
+            batch.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
+                reservedStock: FieldValue.increment(reservation.quantityRequired),
+                availableStock: FieldValue.increment(-reservation.quantityRequired),
+                updatedAt: Timestamp.now(),
+            });
             const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
             batch.set(txRef, {
                 id: txRef.id,

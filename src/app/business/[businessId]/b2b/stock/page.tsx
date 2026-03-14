@@ -392,8 +392,8 @@ export default function StockPage() {
                                                 {isOut && <p className="text-[10px] text-red-600 mt-0.5">Out of stock</p>}
                                                 {isLow && <p className="text-[10px] text-amber-600 mt-0.5">Below reorder ({mat.reorderLevel})</p>}
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <TableCell onClick={e => e.stopPropagation()}>
+                                                <div className="flex items-center gap-1">
                                                     <Button
                                                         variant="outline" size="sm"
                                                         className="h-7 text-xs px-2 gap-1"

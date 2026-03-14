@@ -11,12 +11,19 @@ import { RawMaterial, MaterialTransaction, MaterialReservation } from '@/types/b
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Dialog, DialogContent, DialogHeader,
+    DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
 import {
     Table, TableBody, TableCell, TableHead,
     TableHeader, TableRow,
@@ -28,23 +35,69 @@ import {
 } from 'lucide-react';
 
 const TX_TYPE_CONFIG: Record<string, { label: string; icon: any; color: string; sign: string }> = {
-    PURCHASE:    { label: 'Purchase',    icon: ArrowUpCircle,   color: 'text-emerald-600', sign: '+' },
-    RESERVATION: { label: 'Reserved',   icon: Lock,            color: 'text-blue-600',    sign: '-' },
-    CONSUMPTION: { label: 'Consumed',   icon: ArrowDownCircle, color: 'text-red-600',     sign: '-' },
-    RETURN:      { label: 'Return',     icon: RotateCcw,       color: 'text-amber-600',   sign: '+' },
-    ADJUSTMENT:  { label: 'Adjustment', icon: MinusCircle,     color: 'text-purple-600',  sign: ''  },
+    PURCHASE: { label: 'Purchase', icon: ArrowUpCircle, color: 'text-emerald-600', sign: '+' },
+    RESERVATION: { label: 'Reserved', icon: Lock, color: 'text-blue-600', sign: '-' },
+    CONSUMPTION: { label: 'Consumed', icon: ArrowDownCircle, color: 'text-red-600', sign: '-' },
+    RETURN: { label: 'Return', icon: RotateCcw, color: 'text-amber-600', sign: '+' },
+    ADJUSTMENT: { label: 'Adjustment', icon: MinusCircle, color: 'text-purple-600', sign: '' },
 };
 
 export default function MaterialDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { businessId, isAuthorized, loading: authLoading } = useBusinessContext();
+    const { businessId, isAuthorized, loading: authLoading, user } = useBusinessContext();
     const materialId = params.materialId as string;
 
-    const [material, setMaterial]         = useState<RawMaterial | null>(null);
+    const [material, setMaterial] = useState<RawMaterial | null>(null);
     const [transactions, setTransactions] = useState<MaterialTransaction[]>([]);
     const [reservations, setReservations] = useState<MaterialReservation[]>([]);
-    const [loading, setLoading]           = useState(true);
+    const [loading, setLoading] = useState(true);
+
+    // Stock dialogs
+    const [addOpen, setAddOpen] = useState(false);
+    const [adjustOpen, setAdjustOpen] = useState(false);
+    const [qty, setQty] = useState('');
+    const [refId, setRefId] = useState('');
+    const [note, setNote] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const resetStockForm = () => { setQty(''); setRefId(''); setNote(''); };
+
+    const handleStockSubmit = async (adjust: boolean) => {
+        if (!material || !user) return;
+        const quantity = parseFloat(qty);
+        if (isNaN(quantity) || quantity === 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
+        if (!adjust && quantity <= 0) { toast({ title: 'Quantity must be positive', variant: 'destructive' }); return; }
+        if (!adjust && !refId.trim()) { toast({ title: 'Reference ID required', variant: 'destructive' }); return; }
+        if (adjust && !note.trim()) { toast({ title: 'Note required for adjustments', variant: 'destructive' }); return; }
+
+        setIsSubmitting(true);
+        try {
+            const token = await user.getIdToken();
+            const endpoint = adjust ? '/api/business/b2b/adjust-stock' : '/api/business/b2b/add-stock';
+            const payload: Record<string, unknown> = {
+                businessId, materialId, quantity,
+                createdBy: user.displayName || user.email || 'Unknown',
+            };
+            if (!adjust) payload.referenceId = refId.trim();
+            payload.note = note.trim() || null;
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Failed');
+            toast({ title: adjust ? 'Stock Adjusted' : 'Stock Added' });
+            adjust ? setAdjustOpen(false) : setAddOpen(false);
+            resetStockForm();
+        } catch (err) {
+            toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     useEffect(() => {
         if (!isAuthorized || !businessId || !materialId) return;
@@ -69,13 +122,13 @@ export default function MaterialDetailPage() {
 
     const healthColor = !material ? 'bg-muted'
         : material.availableStock <= 0 ? 'bg-red-500'
-        : material.availableStock <= material.reorderLevel ? 'bg-amber-500'
-        : 'bg-emerald-500';
+            : material.availableStock <= material.reorderLevel ? 'bg-amber-500'
+                : 'bg-emerald-500';
 
     if (authLoading || loading) return (
         <div className="p-6 space-y-4">
             <Skeleton className="h-8 w-48" />
-            <div className="grid grid-cols-3 gap-4">{[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
+            <div className="grid grid-cols-3 gap-4">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
             <Skeleton className="h-64 rounded-xl" />
         </div>
     );
@@ -96,15 +149,23 @@ export default function MaterialDetailPage() {
                         <p className="text-xs text-muted-foreground font-mono">{material.sku} · {material.category} · {material.unit}</p>
                     </div>
                 </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => { resetStockForm(); setAddOpen(true); }}>
+                        <TrendingUp className="h-4 w-4" /> Add Stock
+                    </Button>
+                    <Button variant="ghost" size="sm" className="gap-2" onClick={() => { resetStockForm(); setAdjustOpen(true); }}>
+                        <TrendingDown className="h-4 w-4" /> Adjust
+                    </Button>
+                </div>
             </motion.div>
 
             <div className="p-4 md:p-6 space-y-6">
                 {/* Stock Cards */}
                 <div className="grid grid-cols-3 gap-4">
                     {[
-                        { label: 'Total Stock',     value: material.totalStock,     unit: material.unit, color: 'text-foreground'   },
-                        { label: 'Reserved',        value: material.reservedStock,  unit: material.unit, color: 'text-blue-600'     },
-                        { label: 'Available',       value: material.availableStock, unit: material.unit, color: material.availableStock <= 0 ? 'text-red-600' : material.availableStock <= material.reorderLevel ? 'text-amber-600' : 'text-emerald-600' },
+                        { label: 'Total Stock', value: material.totalStock, unit: material.unit, color: 'text-foreground' },
+                        { label: 'Reserved', value: material.reservedStock, unit: material.unit, color: 'text-blue-600' },
+                        { label: 'Available', value: material.availableStock, unit: material.unit, color: material.availableStock <= 0 ? 'text-red-600' : material.availableStock <= material.reorderLevel ? 'text-amber-600' : 'text-emerald-600' },
                     ].map(card => (
                         <Card key={card.label} className="border-border/50">
                             <CardContent className="p-4">

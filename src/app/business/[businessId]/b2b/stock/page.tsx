@@ -50,7 +50,7 @@ function stockHealthBg(mat: RawMaterial): string {
 }
 
 const rowVariants = {
-    hidden: { opacity: 0, y: 8 },
+    hidden:  { opacity: 0, y: 8 },
     visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.03, duration: 0.2 } }),
 };
 
@@ -68,9 +68,9 @@ interface AddStockDialogProps {
 }
 
 function StockDialog({ open, onClose, material, businessId, user, adjust = false }: AddStockDialogProps) {
-    const [quantity, setQuantity] = useState('');
-    const [referenceId, setRef] = useState('');
-    const [note, setNote] = useState('');
+    const [quantity, setQuantity]   = useState('');
+    const [referenceId, setRef]     = useState('');
+    const [note, setNote]           = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -185,13 +185,59 @@ export default function StockPage() {
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
 
     const [materials, setMaterials] = useState<RawMaterial[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
+    const [loading, setLoading]     = useState(true);
+    const [search, setSearch]       = useState('');
     const [sortField, setSortField] = useState<keyof RawMaterial>('name');
-    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc');
 
-    const [addStockTarget, setAddStockTarget] = useState<RawMaterial | null>(null);
+    const [addStockTarget, setAddStockTarget]       = useState<RawMaterial | null>(null);
     const [adjustStockTarget, setAdjustStockTarget] = useState<RawMaterial | null>(null);
+
+    // Create raw material
+    const [createOpen, setCreateOpen]   = useState(false);
+    const [isCreating, setIsCreating]   = useState(false);
+    const [createForm, setCreateForm]   = useState({
+        name: '', sku: '', unit: '', category: '', reorderLevel: '', supplierName: '',
+    });
+
+    const handleCreate = async () => {
+        if (!user) return;
+        const { name, sku, unit, category, reorderLevel, supplierName } = createForm;
+        if (!name.trim() || !sku.trim() || !unit.trim() || !category.trim() || !reorderLevel) {
+            toast({ title: 'Fill all required fields', variant: 'destructive' }); return;
+        }
+        const level = parseFloat(reorderLevel);
+        if (isNaN(level) || level < 0) {
+            toast({ title: 'Invalid reorder level', variant: 'destructive' }); return;
+        }
+        setIsCreating(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/business/b2b/create-raw-material', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    businessId,
+                    name: name.trim(),
+                    sku: sku.trim().toUpperCase(),
+                    unit: unit.trim(),
+                    category: category.trim(),
+                    reorderLevel: level,
+                    supplierName: supplierName.trim() || undefined,
+                    createdBy: user.displayName || user.email || 'Unknown',
+                }),
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Failed');
+            toast({ title: 'Raw Material Created', description: name });
+            setCreateOpen(false);
+            setCreateForm({ name: '', sku: '', unit: '', category: '', reorderLevel: '', supplierName: '' });
+        } catch (err) {
+            toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' });
+        } finally {
+            setIsCreating(false);
+        }
+    };
 
     // ── Firestore listener ──────────────────────────────────────────────────
     useEffect(() => {
@@ -256,13 +302,16 @@ export default function StockPage() {
                             <p className="text-xs text-muted-foreground">{materials.length} materials tracked</p>
                         </div>
                     </div>
+                    <Button onClick={() => setCreateOpen(true)} className="gap-2 shadow-sm shadow-primary/20">
+                        <Plus className="h-4 w-4" /> Add Material
+                    </Button>
                 </div>
 
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
-                        { label: 'Low Stock', value: lowStockCount, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
-                        { label: 'Out of Stock', value: outOfStockCount, color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
+                        { label: 'Low Stock',    value: lowStockCount,  color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
+                        { label: 'Out of Stock', value: outOfStockCount, color: 'text-red-600',   bg: 'bg-red-50 border-red-200'   },
                         { label: 'Total Reserved', value: `${totalReserved.toFixed(0)} units`, color: 'text-primary', bg: 'bg-primary/5 border-primary/20' },
                     ].map(stat => (
                         <Card key={stat.label} className={cn('border', stat.bg)}>
@@ -419,7 +468,59 @@ export default function StockPage() {
                 )}
             </div>
 
-            {/* Dialogs */}
+            {/* Create Raw Material Dialog */}
+            <Dialog open={createOpen} onOpenChange={o => !o && setCreateOpen(false)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <PackagePlus className="h-5 w-5 text-primary" />
+                            Add Raw Material
+                        </DialogTitle>
+                        <DialogDescription>Stock starts at zero. Use Add Stock after creation.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-4 py-2">
+                        <div className="col-span-2 space-y-2">
+                            <Label className="text-xs">Material Name <span className="text-destructive">*</span></Label>
+                            <Input placeholder="e.g. White Cotton Fabric"
+                                value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">SKU <span className="text-destructive">*</span></Label>
+                            <Input placeholder="e.g. FAB-WHT-001" className="font-mono"
+                                value={createForm.sku} onChange={e => setCreateForm(f => ({ ...f, sku: e.target.value.toUpperCase() }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Unit <span className="text-destructive">*</span></Label>
+                            <Input placeholder="e.g. metres, kg, pieces"
+                                value={createForm.unit} onChange={e => setCreateForm(f => ({ ...f, unit: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Category <span className="text-destructive">*</span></Label>
+                            <Input placeholder="e.g. Fabric, Thread, Trim"
+                                value={createForm.category} onChange={e => setCreateForm(f => ({ ...f, category: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Reorder Level <span className="text-destructive">*</span></Label>
+                            <Input type="number" min="0" placeholder="e.g. 100"
+                                value={createForm.reorderLevel} onChange={e => setCreateForm(f => ({ ...f, reorderLevel: e.target.value }))} />
+                        </div>
+                        <div className="col-span-2 space-y-2">
+                            <Label className="text-xs">Supplier Name</Label>
+                            <Input placeholder="e.g. Sharma Textiles (optional)"
+                                value={createForm.supplierName} onChange={e => setCreateForm(f => ({ ...f, supplierName: e.target.value }))} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreate} disabled={isCreating} className="gap-2">
+                            {isCreating && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Add Material
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add / Adjust Stock Dialogs */}
             <StockDialog
                 open={!!addStockTarget}
                 onClose={() => setAddStockTarget(null)}

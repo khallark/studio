@@ -3,7 +3,7 @@
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { computeDelayStatus } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { FinishedGood, Lot, LotStage, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
+import { Lot, LotStage, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -94,34 +94,6 @@ export async function POST(req: NextRequest) {
                     stockBefore: null,
                     stockAfter: null,
                 } satisfies MaterialTransaction);
-            }
-
-            if (isLastStage) {
-                const fgRef = db.collection(`users/${businessId}/finished_goods`).doc();
-                tx.set(fgRef, {
-                    id: fgRef.id,
-                    lotId,
-                    lotNumber: lot.lotNumber,
-                    orderId: lot.orderId,
-                    orderNumber: lot.orderNumber,
-                    buyerId: lot.buyerId,
-                    buyerName: lot.buyerName,
-                    productId: lot.productId,
-                    productName: lot.productName,
-                    productSku: lot.productSku,
-                    color: lot.color,
-                    size: lot.size ?? null,
-                    quantity: lot.quantity,
-                    cartonCount: null,
-                    totalWeightKg: null,
-                    packedAt: now,
-                    dispatchedAt: null,
-                    isDispatched: false,
-                    courierName: null,
-                    awb: null,
-                    createdAt: now,
-                    updatedAt: now,
-                } satisfies FinishedGood);
             }
         });
 

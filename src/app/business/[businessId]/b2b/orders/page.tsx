@@ -342,7 +342,7 @@ export default function B2BOrdersPage() {
                                                         View Detail
                                                     </DropdownMenuItem>
                                                     {order.status === 'DRAFT' && (
-                                                        <DropdownMenuItem onClick={() => router.push(`/business/${businessId}/b2b/orders/${order.id}/confirm`)}>
+                                                        <DropdownMenuItem onClick={() => router.push(`/business/${businessId}/b2b/orders/${order.id}`)}>
                                                             Confirm Order
                                                         </DropdownMenuItem>
                                                     )}

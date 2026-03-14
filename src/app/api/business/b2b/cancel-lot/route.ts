@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
             const now = Timestamp.now();
 
-            tx.update(lotRef, { status: "CANCELLED", updatedAt: now });
+            tx.update(lotRef, { status: "CANCELLED", isDelayed: false, delayDays: 0, updatedAt: now });
 
             const reservationsSnap = await db
                 .collection(`users/${businessId}/material_reservations`)

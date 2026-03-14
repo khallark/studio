@@ -112,14 +112,13 @@ export async function POST(req: NextRequest) {
             totalLots: lotDocs.length,
             totalQuantity: lotDocs.reduce((s, l) => s + l.quantity, 0),
             lotsCompleted: 0,
-            lotsInProduction: lotDocs.length,
             lotsDelayed: 0,
             status: "IN_PRODUCTION",
             note: note ?? null,
             createdBy,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
-        } satisfies Order);
+        } satisfies Partial<Order>);
 
         for (const lot of lotDocs) {
             batch.set(db.doc(`users/${businessId}/lots/${lot.id}`), lot);

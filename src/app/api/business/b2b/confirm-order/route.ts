@@ -4,7 +4,7 @@ import { authUserForBusiness } from "@/lib/authoriseUser";
 import { buildLotsAndReservations, checkStockShortfalls } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { Buyer, DraftLotInput, MaterialTransaction, MaterialTransactionType, Order, Product } from "@/types/b2b";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -116,11 +116,6 @@ export async function POST(req: NextRequest) {
 
         for (const reservation of reservationDocs) {
             batch.set(db.doc(`users/${businessId}/material_reservations/${reservation.id}`), reservation);
-            batch.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
-                reservedStock: FieldValue.increment(reservation.quantityRequired),
-                availableStock: FieldValue.increment(-reservation.quantityRequired),
-                updatedAt: Timestamp.now(),
-            });
             const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
             batch.set(txRef, {
                 id: txRef.id,

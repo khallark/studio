@@ -3,8 +3,8 @@
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { computeDelayStatus } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
-import { FinishedGood, Lot, LotStage, LotStageHistory, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FinishedGood, Lot, LotStage, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
+import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -65,21 +65,6 @@ export async function POST(req: NextRequest) {
                 updatedAt: now,
             });
 
-            const historyRef = db.collection(`users/${businessId}/lot_stage_history`).doc();
-            tx.set(historyRef, {
-                id: historyRef.id,
-                lotId,
-                lotNumber: lot.lotNumber,
-                orderId: lot.orderId,
-                fromStage: currentStage.stage,
-                toStage: nextStage?.stage ?? currentStage.stage,
-                fromSequence: lot.currentSequence,
-                toSequence: isLastStage ? lot.currentSequence : lot.currentSequence + 1,
-                movedBy: completedBy,
-                movedAt: now,
-                note: note ?? null,
-            } satisfies LotStageHistory);
-
             const reservationsSnap = await db
                 .collection(`users/${businessId}/material_reservations`)
                 .where("lotId", "==", lotId)
@@ -92,11 +77,6 @@ export async function POST(req: NextRequest) {
                 tx.update(resDoc.ref, {
                     quantityConsumed: reservation.quantityRequired,
                     status: "CONSUMED",
-                    updatedAt: now,
-                });
-                tx.update(db.doc(`users/${businessId}/raw_materials/${reservation.materialId}`), {
-                    reservedStock: FieldValue.increment(-reservation.quantityRequired),
-                    totalStock: FieldValue.increment(-reservation.quantityRequired),
                     updatedAt: now,
                 });
                 const txRef = db.collection(`users/${businessId}/material_transactions`).doc();

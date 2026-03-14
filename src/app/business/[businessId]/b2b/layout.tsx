@@ -21,14 +21,15 @@ import {
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const NAV_ITEMS = [
-    { href: 'orders',    label: 'Orders',        icon: ClipboardList },
-    { href: 'kanban',    label: 'Kanban',         icon: LayoutGrid   },
-    { href: 'stock',     label: 'Stock',          icon: Boxes        },
-    { href: 'dispatch',  label: 'Dispatch Queue', icon: Truck        },
-    { href: 'buyers',    label: 'Buyers',         icon: Users        },
-    { href: 'products',  label: 'Products',       icon: Package      },
-    { href: 'bom',       label: 'BOM',            icon: Layers       },
-    { href: 'stages',    label: 'Stages',         icon: Settings2    },
+    { href: 'orders', label: 'Orders', icon: ClipboardList },
+    { href: 'kanban', label: 'Kanban', icon: LayoutGrid },
+    { href: 'lots', label: 'Lots', icon: Layers },
+    { href: 'stock', label: 'Stock', icon: Boxes },
+    { href: 'dispatch', label: 'Dispatch Queue', icon: Truck },
+    { href: 'buyers', label: 'Buyers', icon: Users },
+    { href: 'products', label: 'Products', icon: Package },
+    { href: 'bom', label: 'BOM', icon: Layers },
+    { href: 'stages', label: 'Stages', icon: Settings2 },
 ];
 
 export default function B2BLayout({ children }: { children: React.ReactNode }) {

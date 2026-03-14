@@ -901,8 +901,6 @@ export default function BusinessOrdersPage() {
                         <DropdownMenuItem onClick={() => handleDispatch([order.id])}>Dispatch</DropdownMenuItem>
                     </>
                 );
-            case 'Dispatched':
-                return <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>;
             case 'Delivered':
                 return <DropdownMenuItem onClick={() => { setOrderForReturn(order); setIsReturnDialogOpen(true); }}>Book Return</DropdownMenuItem>;
             case 'DTO Requested':

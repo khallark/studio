@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 
 interface ProductForm { name: string; sku: string; category: string; description: string; defaultStages: StageName[]; }
-const emptyForm = (): ProductForm => ({ name: '', sku: '', category: '', description: '', defaultStages: ['CUTTING','STITCHING','FINISHING','PACKING'] });
+const emptyForm = (): ProductForm => ({ name: '', sku: '', category: '', description: '', defaultStages: [] });
 
 export default function B2BProductsPage() {
     const router = useRouter();

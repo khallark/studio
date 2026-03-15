@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useBusinessContext } from '../../../../layout';
 import { db } from '@/lib/firebase';
 import { doc, collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { Buyer, Product, Order, DraftLotInput, StageName } from '@/types/b2b';
+import { Buyer, Product, ProductionStageConfig, Order, DraftLotInput, StageName } from '@/types/b2b';
 import { motion } from 'framer-motion';
 import { format, addDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -37,12 +37,6 @@ import {
 // ─────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────
-
-const ALL_STAGES: StageName[] = [
-    'DESIGN', 'FRAMING', 'SAMPLING', 'CUTTING',
-    'PRINTING', 'EMBROIDERY', 'STITCHING',
-    'WASHING', 'FINISHING', 'PACKING',
-];
 
 interface LotForm {
     productId: string;
@@ -85,10 +79,10 @@ function emptyLot(): LotForm {
         productId: '', productName: '', productSku: '',
         color: '', size: '', quantity: '',
         stages: [
-            { stage: 'CUTTING',   plannedDate: format(addDays(new Date(), 7),  'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
+            { stage: 'CUTTING', plannedDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
             { stage: 'STITCHING', plannedDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
             { stage: 'FINISHING', plannedDate: format(addDays(new Date(), 18), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
-            { stage: 'PACKING',   plannedDate: format(addDays(new Date(), 21), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
+            { stage: 'PACKING', plannedDate: format(addDays(new Date(), 21), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
         ],
         expanded: true,
     };
@@ -99,27 +93,28 @@ function emptyLot(): LotForm {
 // ─────────────────────────────────────────────
 
 export default function EditDraftOrderPage() {
-    const params  = useParams();
-    const router  = useRouter();
+    const params = useParams();
+    const router = useRouter();
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
     const orderId = params.orderId as string;
 
     // Master data
-    const [buyers, setBuyers]     = useState<Buyer[]>([]);
+    const [buyers, setBuyers] = useState<Buyer[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [stageConfigs, setStageConfigs] = useState<ProductionStageConfig[]>([]);
 
     // Form state — initialized from the draft order
     const [orderLoading, setOrderLoading] = useState(true);
-    const [buyerId, setBuyerId]               = useState('');
-    const [buyerName, setBuyerName]           = useState('');
-    const [buyerContact, setBuyerContact]     = useState('');
-    const [shipDate, setShipDate]             = useState<Date | undefined>(undefined);
-    const [shipCalOpen, setShipCalOpen]       = useState(false);
+    const [buyerId, setBuyerId] = useState('');
+    const [buyerName, setBuyerName] = useState('');
+    const [buyerContact, setBuyerContact] = useState('');
+    const [shipDate, setShipDate] = useState<Date | undefined>(undefined);
+    const [shipCalOpen, setShipCalOpen] = useState(false);
     const [deliveryAddress, setDeliveryAddress] = useState('');
-    const [note, setNote]                     = useState('');
-    const [lots, setLots]                     = useState<LotForm[]>([]);
+    const [note, setNote] = useState('');
+    const [lots, setLots] = useState<LotForm[]>([]);
 
-    const [isSaving, setIsSaving]       = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
 
     // ── Load master data ────────────────────────────────────────────────────
@@ -133,7 +128,11 @@ export default function EditDraftOrderPage() {
             query(collection(db, 'users', businessId, 'b2bProducts'), orderBy('name')),
             snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)))
         );
-        return () => { u1(); u2(); };
+        const u3 = onSnapshot(
+            query(collection(db, 'users', businessId, 'production_stage_config'), orderBy('sortOrder')),
+            snap => setStageConfigs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionStageConfig)))
+        );
+        return () => { u1(); u2(); u3(); };
     }, [businessId, isAuthorized]);
 
     // ── Load the existing draft order ────────────────────────────────────────
@@ -183,28 +182,31 @@ export default function EditDraftOrderPage() {
     const handleProductChange = (lotIdx: number, productId: string) => {
         const product = products.find(p => p.id === productId);
         if (!product) return;
-        setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
-            ...l,
-            productId,
-            productName: product.name,
-            productSku: product.sku,
-            stages: product.defaultStages.map((stage, si) => ({
-                stage,
-                plannedDate: format(addDays(new Date(), (si + 1) * 7), 'yyyy-MM-dd'),
+        let cumulativeDays = 0;
+        const stages = product.defaultStages.map(stageName => {
+            const config = stageConfigs.find(sc => sc.name === stageName);
+            cumulativeDays += config?.defaultDurationDays ?? 7;
+            return {
+                stage: stageName,
+                plannedDate: format(addDays(new Date(), cumulativeDays), 'yyyy-MM-dd'),
                 isOutsourced: false,
-                outsourceVendorName: null,
-            })),
+                outsourceVendorName: null as string | null,
+            };
+        });
+        setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
+            ...l, productId, productName: product.name, productSku: product.sku, stages,
         }));
     };
 
     const addStageToLot = (lotIdx: number) => {
+        const firstConfig = stageConfigs[0];
         setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
             ...l,
             stages: [...l.stages, {
-                stage: 'FINISHING' as StageName,
-                plannedDate: format(addDays(new Date(), 21), 'yyyy-MM-dd'),
+                stage: (firstConfig?.name ?? 'CUTTING') as StageName,
+                plannedDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
                 isOutsourced: false,
-                outsourceVendorName: null,
+                outsourceVendorName: null as string | null,
             }],
         }));
     };
@@ -241,8 +243,8 @@ export default function EditDraftOrderPage() {
 
     // ── Validation ───────────────────────────────────────────────────────────
     const validate = (): boolean => {
-        if (!buyerId)                { toast({ title: 'Select a buyer', variant: 'destructive' }); return false; }
-        if (!shipDate)               { toast({ title: 'Select a ship date', variant: 'destructive' }); return false; }
+        if (!buyerId) { toast({ title: 'Select a buyer', variant: 'destructive' }); return false; }
+        if (!shipDate) { toast({ title: 'Select a ship date', variant: 'destructive' }); return false; }
         if (!deliveryAddress.trim()) { toast({ title: 'Enter a delivery address', variant: 'destructive' }); return false; }
         if (lots.some(l => !l.productId || !l.color || !l.quantity || Number(l.quantity) <= 0)) {
             toast({ title: 'All lots need product, color, and quantity', variant: 'destructive' }); return false;
@@ -438,7 +440,7 @@ export default function EditDraftOrderPage() {
                         </h2>
                         <Button
                             variant="outline" size="sm"
-                            onClick={() => setLots(prev => [...prev, emptyLot()])}
+                            onClick={() => setLots(prev => [...prev, { productId: '', productName: '', productSku: '', color: '', size: '', quantity: '', stages: stageConfigs.map((sc, i) => ({ stage: sc.name as StageName, plannedDate: format(addDays(new Date(), stageConfigs.slice(0, i + 1).reduce((s, c) => s + c.defaultDurationDays, 0)), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null as string | null })), expanded: true }])}
                             className="gap-2"
                         >
                             <Plus className="h-3.5 w-3.5" /> Add Lot
@@ -561,8 +563,8 @@ export default function EditDraftOrderPage() {
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {ALL_STAGES.map(s => (
-                                                                    <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                                                                {stageConfigs.map(s => (
+                                                                    <SelectItem key={s.name} value={s.name} className="text-xs">{s.label}</SelectItem>
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>

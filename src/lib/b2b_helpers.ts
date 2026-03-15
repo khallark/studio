@@ -1,4 +1,4 @@
-import { BOMEntry, DraftLotInput, Lot, LotStage, MaterialReservation, RawMaterial } from "@/types/b2b";
+import { BOMEntry, DraftLotInput, Lot, LotStage, MaterialReservation, ProductionStageConfig, RawMaterial } from "@/types/b2b";
 import { db } from "./firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -155,6 +155,37 @@ export async function checkStockShortfalls(
   }
 
   return shortfalls;
+}
+
+export async function getConfiguredStageNames(businessId: string): Promise<Set<string>> {
+    const snap = await db
+        .collection(`users/${businessId}/production_stage_config`)
+        .get();
+    return new Set(snap.docs.map(d => (d.data() as ProductionStageConfig).name));
+}
+
+export function validateStageName(
+    stage: string,
+    configured: Set<string>,
+    context?: string,
+): string | null {
+    if (!configured.has(stage)) {
+        const label = context ? `${context}: ` : "";
+        return `${label}Stage "${stage}" is not configured for this business. Add it in Stage Config before using it.`;
+    }
+    return null;
+}
+ 
+export function validateStageNames(
+    stages: string[],
+    configured: Set<string>,
+    context?: string,
+): string | null {
+    for (const stage of stages) {
+        const err = validateStageName(stage, configured, context);
+        if (err) return err;
+    }
+    return null;
 }
 
 export interface SaveDraftOrderPayload {

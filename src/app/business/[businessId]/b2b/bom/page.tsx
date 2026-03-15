@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useBusinessContext } from '../../layout';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { BOMEntry, Product, RawMaterial, StageName } from '@/types/b2b';
+import { BOMEntry, Product, ProductionStageConfig, RawMaterial, StageName } from '@/types/b2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -42,8 +42,6 @@ import {
     MoreHorizontal, Pencil, Trash2, Package, Boxes,
 } from 'lucide-react';
 
-const ALL_STAGES: StageName[] = ['DESIGN','FRAMING','SAMPLING','CUTTING','PRINTING','EMBROIDERY','STITCHING','WASHING','FINISHING','PACKING'];
-
 interface BOMForm { productId: string; materialId: string; quantityPerPiece: string; wastagePercent: string; consumedAtStage: StageName; }
 const emptyForm = (): BOMForm => ({ productId: '', materialId: '', quantityPerPiece: '', wastagePercent: '5', consumedAtStage: 'CUTTING' });
 
@@ -51,6 +49,7 @@ export default function BOMPage() {
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
 
     const [entries, setEntries]   = useState<BOMEntry[]>([]);
+    const [stageConfigs, setStageConfigs] = useState<ProductionStageConfig[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [materials, setMaterials] = useState<RawMaterial[]>([]);
     const [loading, setLoading]   = useState(true);
@@ -73,7 +72,9 @@ export default function BOMPage() {
             setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product))));
         const q3 = onSnapshot(query(collection(db, 'users', businessId, 'raw_materials'), orderBy('name')), snap =>
             setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterial))));
-        return () => { q1(); q2(); q3(); };
+        const q4 = onSnapshot(query(collection(db, 'users', businessId, 'production_stage_config'), orderBy('sortOrder')), snap =>
+            setStageConfigs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionStageConfig))));
+        return () => { q1(); q2(); q3(); q4(); };
     }, [businessId, isAuthorized]);
 
     const filtered = useMemo(() => entries.filter(e => {
@@ -315,7 +316,7 @@ export default function BOMPage() {
                             <Label className="text-xs">Consumed at Stage <span className="text-destructive">*</span></Label>
                             <Select value={form.consumedAtStage} onValueChange={v => setForm(f => ({ ...f, consumedAtStage: v as StageName }))}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>{ALL_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                <SelectContent>{stageConfigs.map(s => <SelectItem key={s.name} value={s.name}>{s.label}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                     </div>

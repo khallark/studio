@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useBusinessContext } from '../../layout';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { Product, StageName } from '@/types/b2b';
+import { Product, ProductionStageConfig, StageName } from '@/types/b2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -37,8 +37,6 @@ import {
     MoreHorizontal, Pencil, Layers, ChevronRight,
 } from 'lucide-react';
 
-const ALL_STAGES: StageName[] = ['DESIGN','FRAMING','SAMPLING','CUTTING','PRINTING','EMBROIDERY','STITCHING','WASHING','FINISHING','PACKING'];
-
 interface ProductForm { name: string; sku: string; category: string; description: string; defaultStages: StageName[]; }
 const emptyForm = (): ProductForm => ({ name: '', sku: '', category: '', description: '', defaultStages: ['CUTTING','STITCHING','FINISHING','PACKING'] });
 
@@ -47,6 +45,7 @@ export default function B2BProductsPage() {
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
 
     const [products, setProducts] = useState<Product[]>([]);
+    const [stageConfigs, setStageConfigs] = useState<ProductionStageConfig[]>([]);
     const [loading, setLoading]   = useState(true);
     const [search, setSearch]     = useState('');
 
@@ -58,11 +57,15 @@ export default function B2BProductsPage() {
     useEffect(() => {
         if (!isAuthorized || !businessId) return;
         const q = query(collection(db, 'users', businessId, 'b2bProducts'), orderBy('name'));
-        const unsub = onSnapshot(q, snap => {
+        const unsub1 = onSnapshot(q, snap => {
             setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
             setLoading(false);
         });
-        return () => unsub();
+        const unsub2 = onSnapshot(
+            query(collection(db, 'users', businessId, 'production_stage_config'), orderBy('sortOrder')),
+            snap => setStageConfigs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionStageConfig)))
+        );
+        return () => { unsub1(); unsub2(); };
     }, [businessId, isAuthorized]);
 
     const filtered = useMemo(() => products.filter(p =>
@@ -264,19 +267,20 @@ export default function B2BProductsPage() {
                         <div className="space-y-2">
                             <Label className="text-xs">Default Stage Pipeline <span className="text-destructive">*</span></Label>
                             <div className="flex flex-wrap gap-2">
-                                {ALL_STAGES.map(stage => (
+                                {stageConfigs.map(sc => (
                                     <button
-                                        key={stage}
+                                        key={sc.name}
                                         type="button"
-                                        onClick={() => toggleStage(stage)}
+                                        onClick={() => toggleStage(sc.name as StageName)}
                                         className={cn(
                                             'px-2.5 py-1 text-xs rounded-full border transition-all',
-                                            form.defaultStages.includes(stage)
+                                            form.defaultStages.includes(sc.name as StageName)
                                                 ? 'bg-primary text-primary-foreground border-primary'
                                                 : 'bg-background text-muted-foreground border-border hover:border-primary/50'
                                         )}
+                                        title={sc.name}
                                     >
-                                        {stage}
+                                        {sc.label}
                                     </button>
                                 ))}
                             </div>

@@ -1,7 +1,7 @@
 // /api/business/b2b/confirm-order
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { buildLotsAndReservations, checkStockShortfalls } from "@/lib/b2b_helpers";
+import { buildLotsAndReservations, checkStockShortfalls, getConfiguredStageNames, validateStageNames } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { Buyer, DraftLotInput, MaterialTransaction, MaterialTransactionType, Order, Product } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
@@ -49,7 +49,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "no_lots_defined" }, { status: 400 });
         }
 
-        // Validate buyer is still active at confirm time
         const buyerDoc = await db.doc(`users/${businessId}/buyers/${order.buyerId}`).get();
         if (!buyerDoc.exists) {
             return NextResponse.json({ error: "buyer_not_found" }, { status: 404 });
@@ -58,7 +57,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "buyer_inactive", message: "Cannot confirm an order for an inactive buyer." }, { status: 400 });
         }
 
-        // Validate each lot: product exists + active, quantity > 0, stages non-empty, BOM exists
+        // Fetch configured stages once — reused across all lot validations
+        const configuredStages = await getConfiguredStageNames(businessId);
+        if (configuredStages.size === 0) {
+            return NextResponse.json({ error: "no_stages_configured", message: "No production stages have been configured for this business." }, { status: 400 });
+        }
+
         for (const lot of lotInputs) {
             if (!lot.quantity || lot.quantity <= 0) {
                 return NextResponse.json({ error: "lot_invalid_quantity", message: "Each lot must have a quantity greater than 0." }, { status: 400 });
@@ -75,7 +79,12 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: "product_inactive", message: `Product "${lot.productName}" is inactive.` }, { status: 400 });
             }
 
-            // BOM must exist — block if no active BOM entries
+            const lotStageNames = lot.stages.map(s => s.stage);
+            const stageError = validateStageNames(lotStageNames, configuredStages, `Lot "${lot.productName}"`);
+            if (stageError) {
+                return NextResponse.json({ error: "invalid_stage", message: stageError }, { status: 400 });
+            }
+
             const bomSnap = await db
                 .collection(`users/${businessId}/bom`)
                 .where("productId", "==", lot.productId)

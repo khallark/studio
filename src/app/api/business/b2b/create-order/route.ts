@@ -1,7 +1,7 @@
 // /api/business/b2b/create-order
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { buildLotsAndReservations, checkStockShortfalls, generateOrderNumber } from "@/lib/b2b_helpers";
+import { buildLotsAndReservations, checkStockShortfalls, generateOrderNumber, getConfiguredStageNames, validateStageNames } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { Buyer, DraftLotInput, MaterialTransaction, MaterialTransactionType, Order, Product } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
-        // Validate buyer
         const buyerDoc = await db.doc(`users/${businessId}/buyers/${buyerId}`).get();
         if (!buyerDoc.exists) {
             return NextResponse.json({ error: "buyer_not_found" }, { status: 404 });
@@ -44,7 +43,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "buyer_inactive", message: "Cannot create an order for an inactive buyer." }, { status: 400 });
         }
 
-        // Validate each lot: product exists + active, quantity > 0, stages non-empty, BOM exists
+        // Fetch configured stages once — reused across all lot validations
+        const configuredStages = await getConfiguredStageNames(businessId);
+        if (configuredStages.size === 0) {
+            return NextResponse.json({ error: "no_stages_configured", message: "No production stages have been configured for this business. Add stages in Stage Config first." }, { status: 400 });
+        }
+
         for (const lot of lots) {
             if (!lot.productId) {
                 return NextResponse.json({ error: "lot_missing_product", message: "Each lot must have a productId." }, { status: 400 });
@@ -61,10 +65,15 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: "product_not_found", message: `Product ${lot.productId} does not exist.` }, { status: 404 });
             }
             if (!(productDoc.data() as Product).isActive) {
-                return NextResponse.json({ error: "product_inactive", message: `Product ${lot.productName} is inactive.` }, { status: 400 });
+                return NextResponse.json({ error: "product_inactive", message: `Product "${lot.productName}" is inactive.` }, { status: 400 });
             }
 
-            // BOM must exist — block order creation if no active BOM entries for this product
+            const lotStageNames = lot.stages.map(s => s.stage);
+            const stageError = validateStageNames(lotStageNames, configuredStages, `Lot "${lot.productName}"`);
+            if (stageError) {
+                return NextResponse.json({ error: "invalid_stage", message: stageError }, { status: 400 });
+            }
+
             const bomSnap = await db
                 .collection(`users/${businessId}/bom`)
                 .where("productId", "==", lot.productId)
@@ -112,13 +121,14 @@ export async function POST(req: NextRequest) {
             totalLots: lotDocs.length,
             totalQuantity: lotDocs.reduce((s, l) => s + l.quantity, 0),
             lotsCompleted: 0,
+            lotsInProduction: lotDocs.length,
             lotsDelayed: 0,
             status: "IN_PRODUCTION",
             note: note ?? null,
             createdBy,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
-        } satisfies Partial<Order>);
+        } satisfies Order);
 
         for (const lot of lotDocs) {
             batch.set(db.doc(`users/${businessId}/lots/${lot.id}`), lot);

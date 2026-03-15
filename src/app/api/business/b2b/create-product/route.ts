@@ -1,6 +1,7 @@
 // /api/business/b2b/create-product
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
+import { getConfiguredStageNames, validateStageNames } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { Product, StageName } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
@@ -33,17 +34,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
-        // SKU is the document ID — normalized to uppercase
+        // Validate all stage names exist in this business's stage config
+        const configuredStages = await getConfiguredStageNames(businessId);
+        if (configuredStages.size === 0) {
+            return NextResponse.json({ error: "no_stages_configured", message: "No production stages have been configured for this business. Add stages in Stage Config first." }, { status: 400 });
+        }
+        const stageError = validateStageNames(defaultStages, configuredStages, "defaultStages");
+        if (stageError) {
+            return NextResponse.json({ error: "invalid_stage", message: stageError }, { status: 400 });
+        }
+
         const productId = sku.trim().toUpperCase();
 
-        // Check for duplicate by attempting to read the doc directly (one read, no query)
         const productRef = db.doc(`users/${businessId}/b2bProducts/${productId}`);
         const existingDoc = await productRef.get();
         if (existingDoc.exists) {
-            return NextResponse.json({
-                error: "sku_already_exists",
-                message: `A product with SKU "${productId}" already exists.`,
-            }, { status: 400 });
+            return NextResponse.json({ error: "sku_already_exists", message: `A product with SKU "${productId}" already exists.` }, { status: 400 });
         }
 
         const now = Timestamp.now();

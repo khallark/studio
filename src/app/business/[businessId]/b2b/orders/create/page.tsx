@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useBusinessContext } from '../../../layout';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { Buyer, Product, DraftLotInput, StageName } from '@/types/b2b';
+import { Buyer, Product, ProductionStageConfig, DraftLotInput, StageName } from '@/types/b2b';
 import { motion } from 'framer-motion';
 import { format, addDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -37,12 +37,6 @@ import {
 // CONSTANTS
 // ─────────────────────────────────────────────
 
-const ALL_STAGES: StageName[] = [
-    'DESIGN', 'FRAMING', 'SAMPLING', 'CUTTING',
-    'PRINTING', 'EMBROIDERY', 'STITCHING',
-    'WASHING', 'FINISHING', 'PACKING',
-];
-
 interface LotForm {
     productId: string;
     productName: string;
@@ -54,15 +48,24 @@ interface LotForm {
     expanded: boolean;
 }
 
-function emptyLot(): LotForm {
+function emptyLot(stageConfigs: ProductionStageConfig[] = []): LotForm {
+    // Build default stages from stageConfigs with cumulative planned dates
+    let cumulativeDays = 0;
+    const stages = stageConfigs.map(sc => {
+        cumulativeDays += sc.defaultDurationDays;
+        return {
+            stage: sc.name as StageName,
+            plannedDate: format(addDays(new Date(), cumulativeDays), 'yyyy-MM-dd'),
+            isOutsourced: false,
+            outsourceVendorName: null as string | null,
+        };
+    });
     return {
         productId: '', productName: '', productSku: '',
         color: '', size: '', quantity: '',
-        stages: [
-            { stage: 'CUTTING',   plannedDate: format(addDays(new Date(), 7),  'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
-            { stage: 'STITCHING', plannedDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
-            { stage: 'FINISHING', plannedDate: format(addDays(new Date(), 18), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
-            { stage: 'PACKING',   plannedDate: format(addDays(new Date(), 21), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
+        stages: stages.length > 0 ? stages : [
+            // Fallback if no stage configs yet — user will see a warning
+            { stage: 'CUTTING' as StageName, plannedDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), isOutsourced: false, outsourceVendorName: null },
         ],
         expanded: true,
     };
@@ -76,20 +79,21 @@ export default function CreateOrderPage() {
     const router = useRouter();
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
 
-    const [buyers, setBuyers]     = useState<Buyer[]>([]);
+    const [buyers, setBuyers] = useState<Buyer[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [stageConfigs, setStageConfigs] = useState<ProductionStageConfig[]>([]);
 
     // Form state
-    const [buyerId, setBuyerId]               = useState('');
-    const [buyerName, setBuyerName]           = useState('');
-    const [buyerContact, setBuyerContact]     = useState('');
-    const [shipDate, setShipDate]             = useState<Date | undefined>(addDays(new Date(), 30));
-    const [shipCalOpen, setShipCalOpen]       = useState(false);
+    const [buyerId, setBuyerId] = useState('');
+    const [buyerName, setBuyerName] = useState('');
+    const [buyerContact, setBuyerContact] = useState('');
+    const [shipDate, setShipDate] = useState<Date | undefined>(addDays(new Date(), 30));
+    const [shipCalOpen, setShipCalOpen] = useState(false);
     const [deliveryAddress, setDeliveryAddress] = useState('');
-    const [note, setNote]                     = useState('');
-    const [lots, setLots]                     = useState<LotForm[]>([emptyLot()]);
-    const [isDraft, setIsDraft]               = useState(false);
-    const [isSubmitting, setIsSubmitting]     = useState(false);
+    const [note, setNote] = useState('');
+    const [lots, setLots] = useState<LotForm[]>([]);
+    const [isDraft, setIsDraft] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ── Firestore listeners ─────────────────────────────────────────────────
     useEffect(() => {
@@ -103,7 +107,16 @@ export default function CreateOrderPage() {
             query(collection(db, 'users', businessId, 'b2bProducts'), orderBy('name')),
             snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)))
         );
-        return () => { unsub1(); unsub2(); };
+        const unsub3 = onSnapshot(
+            query(collection(db, 'users', businessId, 'production_stage_config'), orderBy('sortOrder')),
+            snap => {
+                const configs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionStageConfig));
+                setStageConfigs(configs);
+                // Seed initial lot once configs load
+                setLots(prev => prev.length === 0 ? [emptyLot(configs)] : prev);
+            }
+        );
+        return () => { unsub1(); unsub2(); unsub3(); };
     }, [businessId, isAuthorized]);
 
     // ── Buyer select ────────────────────────────────────────────────────────
@@ -119,28 +132,32 @@ export default function CreateOrderPage() {
     const handleProductChange = (lotIdx: number, productId: string) => {
         const product = products.find(p => p.id === productId);
         if (!product) return;
-        setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
-            ...l,
-            productId,
-            productName: product.name,
-            productSku: product.sku,
-            stages: product.defaultStages.map((stage, si) => ({
-                stage,
-                plannedDate: format(addDays(new Date(), (si + 1) * 7), 'yyyy-MM-dd'),
+        // Build planned dates using defaultDurationDays from stageConfigs
+        let cumulativeDays = 0;
+        const stages = product.defaultStages.map(stageName => {
+            const config = stageConfigs.find(sc => sc.name === stageName);
+            cumulativeDays += config?.defaultDurationDays ?? 7;
+            return {
+                stage: stageName,
+                plannedDate: format(addDays(new Date(), cumulativeDays), 'yyyy-MM-dd'),
                 isOutsourced: false,
-                outsourceVendorName: null,
-            })),
+                outsourceVendorName: null as string | null,
+            };
+        });
+        setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
+            ...l, productId, productName: product.name, productSku: product.sku, stages,
         }));
     };
 
     const addStageToLot = (lotIdx: number) => {
+        const firstConfig = stageConfigs[0];
         setLots(prev => prev.map((l, i) => i !== lotIdx ? l : {
             ...l,
             stages: [...l.stages, {
-                stage: 'FINISHING' as StageName,
-                plannedDate: format(addDays(new Date(), 21), 'yyyy-MM-dd'),
+                stage: (firstConfig?.name ?? 'CUTTING') as StageName,
+                plannedDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
                 isOutsourced: false,
-                outsourceVendorName: null,
+                outsourceVendorName: null as string | null,
             }],
         }));
     };
@@ -325,6 +342,13 @@ export default function CreateOrderPage() {
                     </Card>
                 </motion.div>
 
+                {/* Warn if no stage configs */}
+                {stageConfigs.length === 0 && (
+                    <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-700 dark:text-amber-400">
+                        No production stages configured yet. Go to <strong>Stages</strong> to add stages before creating orders.
+                    </div>
+                )}
+
                 {/* Lots */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -332,7 +356,7 @@ export default function CreateOrderPage() {
                             Lots
                             <Badge variant="secondary" className="ml-2">{lots.length}</Badge>
                         </h2>
-                        <Button variant="outline" size="sm" onClick={() => setLots(prev => [...prev, emptyLot()])} className="gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setLots(prev => [...prev, emptyLot(stageConfigs)])} className="gap-2">
                             <Plus className="h-3.5 w-3.5" />
                             Add Lot
                         </Button>
@@ -448,7 +472,7 @@ export default function CreateOrderPage() {
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {ALL_STAGES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                                                                {stageConfigs.map(s => <SelectItem key={s.name} value={s.name} className="text-xs">{s.label}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                         <Input

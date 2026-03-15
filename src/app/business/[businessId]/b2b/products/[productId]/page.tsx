@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useBusinessContext } from '../../../layout';
 import { db } from '@/lib/firebase';
 import { doc, collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
-import { Product, BOMEntry, RawMaterial, StageName } from '@/types/b2b';
+import { Product, BOMEntry, ProductionStageConfig, RawMaterial, StageName } from '@/types/b2b';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -51,12 +51,6 @@ import {
 // CONSTANTS
 // ─────────────────────────────────────────────
 
-const ALL_STAGES: StageName[] = [
-    'DESIGN', 'FRAMING', 'SAMPLING', 'CUTTING',
-    'PRINTING', 'EMBROIDERY', 'STITCHING',
-    'WASHING', 'FINISHING', 'PACKING',
-];
-
 interface BOMForm {
     materialId: string;
     quantityPerPiece: string;
@@ -81,15 +75,16 @@ export default function ProductDetailPage() {
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
     const productId = params.productId as string;
 
-    const [product, setProduct]       = useState<Product | null>(null);
+    const [product, setProduct] = useState<Product | null>(null);
     const [bomEntries, setBomEntries] = useState<BOMEntry[]>([]);
-    const [materials, setMaterials]   = useState<RawMaterial[]>([]);
-    const [loading, setLoading]       = useState(true);
+    const [materials, setMaterials] = useState<RawMaterial[]>([]);
+    const [stageConfigs, setStageConfigs] = useState<ProductionStageConfig[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // BOM dialog
-    const [bomDialogOpen, setBomDialogOpen]   = useState(false);
-    const [editingBOM, setEditingBOM]         = useState<BOMEntry | null>(null);
-    const [bomForm, setBomForm]               = useState<BOMForm>(emptyBOMForm());
+    const [bomDialogOpen, setBomDialogOpen] = useState(false);
+    const [editingBOM, setEditingBOM] = useState<BOMEntry | null>(null);
+    const [bomForm, setBomForm] = useState<BOMForm>(emptyBOMForm());
     const [isSubmittingBOM, setIsSubmittingBOM] = useState(false);
 
     // Deactivate BOM
@@ -118,8 +113,12 @@ export default function ProductDetailPage() {
             query(collection(db, 'users', businessId, 'raw_materials'), orderBy('name')),
             snap => setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterial)))
         );
+        const unsub4 = onSnapshot(
+            query(collection(db, 'users', businessId, 'production_stage_config'), orderBy('sortOrder')),
+            snap => setStageConfigs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionStageConfig)))
+        );
 
-        return () => { unsub1(); unsub2(); unsub3(); };
+        return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
     }, [businessId, isAuthorized, productId]);
 
     // ── BOM handlers ─────────────────────────────────────────────────────────
@@ -551,8 +550,8 @@ export default function ProductDetailPage() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {ALL_STAGES.map(s => (
-                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    {stageConfigs.map(s => (
+                                        <SelectItem key={s.name} value={s.name}>{s.label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

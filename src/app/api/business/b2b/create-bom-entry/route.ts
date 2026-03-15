@@ -2,6 +2,7 @@
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
+import { getConfiguredStageNames, validateStageName } from "@/lib/b2b_helpers";
 import { BOMEntry, Product, RawMaterial, StageName } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
@@ -34,6 +35,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
+        // Validate consumedAtStage exists in this business's stage config
+        const configuredStages = await getConfiguredStageNames(businessId);
+        const stageError = validateStageName(consumedAtStage, configuredStages, "consumedAtStage");
+        if (stageError) {
+            return NextResponse.json({ error: "invalid_stage", message: stageError }, { status: 400 });
+        }
+
         const [productDoc, materialDoc] = await Promise.all([
             db.doc(`users/${businessId}/b2bProducts/${productId}`).get(),
             db.doc(`users/${businessId}/raw_materials/${materialId}`).get(),
@@ -56,7 +64,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "material_inactive", message: "Cannot add BOM entry for an inactive raw material." }, { status: 400 });
         }
 
-        // Guard: duplicate active entry
         const existingSnap = await db
             .collection(`users/${businessId}/bom`)
             .where("productId", "==", productId)

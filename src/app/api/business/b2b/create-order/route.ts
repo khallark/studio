@@ -1,7 +1,7 @@
 // /api/business/b2b/create-order
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
-import { buildLotsAndReservations, checkStockShortfalls, generateOrderNumber, getConfiguredStageNames, validateStageNames } from "@/lib/b2b_helpers";
+import { buildLotsAndReservations, calculateMaterialRequirements, checkStockShortfalls, generateOrderNumber, getConfiguredStageNames, validateStageNames } from "@/lib/b2b_helpers";
 import { db } from "@/lib/firebase-admin";
 import { Buyer, DraftLotInput, MaterialTransaction, MaterialTransactionType, Order, Product } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
@@ -88,6 +88,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        const requirements = await calculateMaterialRequirements(businessId, lots);
+        const shortfalls = await checkStockShortfalls(businessId, requirements);
+        if (shortfalls.length > 0) {
+            return NextResponse.json({
+                error: "insufficient_stock",
+                message: `Insufficient raw material stock: ${shortfalls.join(", ")}`,
+            }, { status: 400 });
+        }
+        
         const orderNumber = await generateOrderNumber(businessId);
         const orderId = db.collection(`users/${businessId}/orders`).doc().id;
         const shipTimestamp = Timestamp.fromDate(new Date(shipDate));
@@ -97,14 +106,6 @@ export async function POST(req: NextRequest) {
             buyerId, buyerName, shipTimestamp,
             createdBy, lots,
         );
-
-        const shortfalls = await checkStockShortfalls(businessId, reservationDocs);
-        if (shortfalls.length > 0) {
-            return NextResponse.json({
-                error: "insufficient_stock",
-                message: `Insufficient raw material stock: ${shortfalls.join(", ")}`,
-            }, { status: 400 });
-        }
 
         const batch = db.batch();
 

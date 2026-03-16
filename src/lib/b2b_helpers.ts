@@ -6,6 +6,31 @@ import { Timestamp } from "firebase-admin/firestore";
 // HELPERS
 // ============================================================================
 
+export async function calculateMaterialRequirements(
+    businessId: string,
+    lotInputs: DraftLotInput[],
+): Promise<{ materialId: string; materialName: string; materialUnit: string; quantityRequired: number }[]> {
+    const requirements = [];
+    for (const lotInput of lotInputs) {
+        const bomSnap = await db
+            .collection(`users/${businessId}/bom`)
+            .where("productId", "==", lotInput.productId)
+            .where("isActive", "==", true)
+            .get();
+        for (const bomDoc of bomSnap.docs) {
+            const bom = bomDoc.data() as BOMEntry;
+            const qtyRequired = lotInput.quantity * bom.quantityPerPiece * (1 + bom.wastagePercent / 100);
+            requirements.push({
+                materialId: bom.materialId,
+                materialName: bom.materialName,
+                materialUnit: bom.materialUnit,
+                quantityRequired: Math.ceil(qtyRequired * 100) / 100,
+            });
+        }
+    }
+    return requirements;
+}
+
 export async function generateLotNumber(businessId: string): Promise<string> {
   const counterRef = db.doc(`users/${businessId}/counters/lots`);
   const result = await db.runTransaction(async (tx) => {
@@ -137,10 +162,10 @@ export async function buildLotsAndReservations(
 // Shared stock check — used by both createOrder and confirmOrder
 export async function checkStockShortfalls(
   businessId: string,
-  reservationDocs: MaterialReservation[]
+  requirements: { materialId: string; materialName: string; materialUnit: string; quantityRequired: number }[],
 ): Promise<string[]> {
   const materialTotals: Record<string, number> = {};
-  for (const r of reservationDocs) {
+  for (const r of requirements) {
     materialTotals[r.materialId] = (materialTotals[r.materialId] ?? 0) + r.quantityRequired;
   }
 

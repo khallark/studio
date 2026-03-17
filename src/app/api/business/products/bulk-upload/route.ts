@@ -135,12 +135,12 @@ function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number):
     }
 
     // Validate category if provided
-    if (row['Category']) {
-        const category = row['Category'].toString().trim();
-        if (category && !VALID_CATEGORIES.includes(category)) {
-            return { valid: false, error: `Row ${rowIndex}: Invalid category "${category}". Valid options: ${VALID_CATEGORIES.join(', ')}` };
-        }
-    }
+    // if (row['Category']) {
+    //     const category = row['Category'].toString().trim();
+    //     if (category && !VALID_CATEGORIES.includes(category)) {
+    //         return { valid: false, error: `Row ${rowIndex}: Invalid category "${category}". Valid options: ${VALID_CATEGORIES.join(', ')}` };
+    //     }
+    // }
 
     // Validate price if provided
     if (row['Price'] !== undefined && row['Price'] !== null && row['Price'] !== '') {

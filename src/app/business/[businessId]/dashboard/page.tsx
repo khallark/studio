@@ -624,7 +624,7 @@ export default function Dashboard() {
                                                 ) : null}
                                                 {row.type === 'Closing Stock' && row.lostQty ? (
                                                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                                        − Lost ({formatNumber(row.lostQty)})
+                                                        + Lost ({formatNumber(row.lostQty)})
                                                     </span>
                                                 ) : null}
                                             </TableCell>

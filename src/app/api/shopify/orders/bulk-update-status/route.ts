@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
             'Confirmed',
             'Closed',
             'RTO Closed',
+            'Lost',
         ];
         if (!validStatuses.includes(status)) {
             return NextResponse.json({ error: 'Invalid status provided' }, { status: 400 });
@@ -166,6 +167,8 @@ export async function POST(req: NextRequest) {
                                 return "This order was received by the customer and manually closed";
                             case "RTO Closed":
                                 return "This order was returned and received by the owner and manually closed";
+                            case "Lost":
+                                return "This order was marked as lost";
                             default:
                                 return "";
                         }

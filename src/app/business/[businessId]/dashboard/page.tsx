@@ -32,7 +32,7 @@ interface FirestoreTableData {
     startTime?: string; endTime?: string; stores?: string[];
     data?: TableData; error?: string | null;
 }
-interface GrossProfitRow { type: string; qty: number; taxable: number; igst: number; cgst: number; sgst: number; net: number; }
+interface GrossProfitRow { type: string; qty: number; taxable: number; igst: number; cgst: number; sgst: number; net: number; lostQty?: number; }
 interface FirestoreGrossProfitData {
     loading: boolean; lastUpdated?: { toDate: () => Date };
     startDate?: string; endDate?: string; rows?: GrossProfitRow[];
@@ -422,7 +422,6 @@ export default function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth.loading]);
 
-    // Re-trigger when date range or courier changes (only if range is complete)
     useEffect(() => {
         if (!remittanceDateRange?.from || !remittanceDateRange?.to) return;
         if (businessAuth.isAuthorized && !businessAuth.loading) handleGenerateRemittance(true);
@@ -586,15 +585,58 @@ export default function Dashboard() {
                     {gpSubmitError && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{gpSubmitError}</span></div>}
                     {grossProfitData?.error && !grossProfitData.loading && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{grossProfitData.error}</span></div>}
                     {grossProfitData?.loading && (
-                        <Table><TableHeader><TableRow><TableHead className="w-[160px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead></TableRow></TableHeader>
+                        <Table><TableHeader><TableRow><TableHead className="w-[200px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead></TableRow></TableHeader>
                             <TableBody>{[...Array(6)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-28" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell></TableRow>))}</TableBody>
                         </Table>
                     )}
                     {grossProfitData?.rows && !grossProfitData.loading && (
                         <>
-                            <div className="text-sm text-muted-foreground mb-3">Showing data for: <span className="font-medium">{format(new Date(grossProfitData.startDate!), 'dd MMM yyyy')} – {format(new Date(grossProfitData.endDate!), 'dd MMM yyyy')}</span></div>
-                            <Table><TableHeader><TableRow><TableHead className="w-[160px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead></TableRow></TableHeader>
-                                <TableBody>{grossProfitData.rows.map((row) => (<TableRow key={row.type} className={cn(HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800', NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400')}><TableCell className="font-medium">{row.type}</TableCell><TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell></TableRow>))}</TableBody>
+                            <div className="text-sm text-muted-foreground mb-3">
+                                Showing data for: <span className="font-medium">{format(new Date(grossProfitData.startDate!), 'dd MMM yyyy')} – {format(new Date(grossProfitData.endDate!), 'dd MMM yyyy')}</span>
+                            </div>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[200px]">Type</TableHead>
+                                        <TableHead className="text-right">Qty</TableHead>
+                                        <TableHead className="text-right">Taxable Amt</TableHead>
+                                        <TableHead className="text-right">IGST</TableHead>
+                                        <TableHead className="text-right">CGST</TableHead>
+                                        <TableHead className="text-right">SGST</TableHead>
+                                        <TableHead className="text-right">Net Amount</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {grossProfitData.rows.map((row) => (
+                                        <TableRow
+                                            key={row.type}
+                                            className={cn(
+                                                HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
+                                                NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400',
+                                            )}
+                                        >
+                                            <TableCell className="font-medium">
+                                                <span>{row.type}</span>
+                                                {row.type === 'Sale Return' && row.lostQty ? (
+                                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                                        + Lost ({formatNumber(row.lostQty)})
+                                                    </span>
+                                                ) : null}
+                                                {row.type === 'Closing Stock' && row.lostQty ? (
+                                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                                        − Lost ({formatNumber(row.lostQty)})
+                                                    </span>
+                                                ) : null}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
                             </Table>
                         </>
                     )}
@@ -615,23 +657,14 @@ export default function Dashboard() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {/* Controls */}
                     <div className="flex flex-wrap items-center gap-3 mb-6">
-
-                        {/* Courier selector */}
-                        <Select
-                            value={remittanceCourier}
-                            onValueChange={(v) => setRemittanceCourier(v as RemittanceCourier)}
-                            disabled={isRemittanceLoading}
-                        >
+                        <Select value={remittanceCourier} onValueChange={(v) => setRemittanceCourier(v as RemittanceCourier)} disabled={isRemittanceLoading}>
                             <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Blue Dart">Blue Dart</SelectItem>
                                 <SelectItem value="Delhivery">Delhivery</SelectItem>
                             </SelectContent>
                         </Select>
-
-                        {/* Date range picker */}
                         <Popover open={remittanceCalendarOpen} onOpenChange={setRemittanceCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" disabled={isRemittanceLoading} className={cn('w-[260px] justify-start text-left font-normal', !remittanceDateRange && 'text-muted-foreground')}>
@@ -649,15 +682,12 @@ export default function Dashboard() {
                                     numberOfMonths={2} />
                             </PopoverContent>
                         </Popover>
-
-                        {/* Refresh */}
                         <Button variant="outline" size="icon" onClick={() => handleGenerateRemittance()} disabled={isRemittanceRefreshDisabled} className="relative"
                             title={!remittanceStartDate ? 'Select a date range first' : remittanceCooldown.remaining > 0 ? `Wait ${remittanceCooldown.remaining}s` : 'Refresh'}>
                             <RefreshCw className={cn('h-4 w-4', isRemittanceLoading && 'animate-spin')} />
                             {remittanceCooldown.remaining > 0 && !isRemittanceLoading && <span className="absolute -top-2 -right-2 bg-muted text-muted-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center border">{remittanceCooldown.remaining}</span>}
                         </Button>
                     </div>
-
                     {remittanceSubmitError && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{remittanceSubmitError}</span></div>}
                     {activeRemittanceData?.error && !activeRemittanceData.loading && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{activeRemittanceData.error}</span></div>}
                     {activeRemittanceData?.loading && <RemittanceTableSkeleton />}

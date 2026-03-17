@@ -924,7 +924,24 @@ export default function BusinessOrdersPage() {
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
             case 'RTO Delivered':
                 return (
-                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
+                    <>
+                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
+                        <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId, createUPCsForNonPickupReady: false })}
+                        >
+                            Mark as Lost
+                        </DropdownMenuItem>
+                    </>
+                );
+            case 'RTO In Transit':
+                return (
+                    <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId, createUPCsForNonPickupReady: false })}
+                    >
+                        Mark as Lost
+                    </DropdownMenuItem>
                 );
             case 'Closed':
                 return (

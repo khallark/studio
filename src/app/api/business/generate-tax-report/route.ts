@@ -11,7 +11,7 @@ const ENQUEUE_FUNCTION_SECRET = process.env.ENQUEUE_FUNCTION_SECRET!;
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, storeId, startDate, endDate } = await req.json();
+        const { businessId, storeIds, startDate, endDate } = await req.json();
 
         if (!businessId || typeof businessId !== 'string') {
             return NextResponse.json(
@@ -38,9 +38,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Validate inputs
-        if (!storeId || typeof storeId !== 'string') {
+        if (!storeIds || !Array.isArray(storeIds)) {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'storeId is required and must be a string' },
+                { error: 'Validation Error', message: 'storeId is required and must be a string[]' },
                 { status: 400 }
             );
         }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         }
 
         const stores = businessDoc?.data()?.stores;
-        if (stores && Array.isArray(stores) && !stores.includes(storeId)) {
+        if (stores && Array.isArray(stores) && !storeIds.every(store => stores.includes(store))) {
             return NextResponse.json(
                 { error: 'Validation Error', message: 'the business is not authorized to access this store' },
                 { status: 403 }
@@ -96,7 +96,6 @@ export async function POST(req: NextRequest) {
 
         console.log('🚀 Calling Cloud Function:', {
             url: CLOUD_FUNCTION_URL,
-            storeId,
             startDate,
             endDate
         });
@@ -115,7 +114,7 @@ export async function POST(req: NextRequest) {
                         businessId,
                         startDate,
                         endDate,
-                        storeId,
+                        storeIds,
                     }),
                 }),
                 new Promise<Response>((_, reject) =>

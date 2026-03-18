@@ -32,7 +32,7 @@ interface FirestoreTableData {
     startTime?: string; endTime?: string; stores?: string[];
     data?: TableData; error?: string | null;
 }
-interface GrossProfitRow { type: string; qty: number; taxable: number; igst: number; cgst: number; sgst: number; net: number; lostQty?: number; }
+interface GrossProfitRow { type: string; qty: number; taxable: number; igst: number; cgst: number; sgst: number; net: number; }
 interface FirestoreGrossProfitData {
     loading: boolean; lastUpdated?: { toDate: () => Date };
     startDate?: string; endDate?: string; rows?: GrossProfitRow[];
@@ -47,7 +47,6 @@ interface FirestoreRemittanceData {
     loading: boolean; lastUpdated?: { toDate: () => Date };
     startDate?: string; endDate?: string; data?: RemittanceTableData; error?: string | null;
 }
-// Shape stored under users/{id}/remittanceTable
 interface FirestoreRemittanceRoot {
     blueDart?: FirestoreRemittanceData;
     delhivery?: FirestoreRemittanceData;
@@ -82,6 +81,13 @@ const COURIER_FS_KEY: Record<RemittanceCourier, 'blueDart' | 'delhivery'> = {
     'Blue Dart': 'blueDart',
     'Delhivery': 'delhivery',
 };
+
+// ============================================================
+// GROSS PROFIT ROW CLASSIFICATION
+// ============================================================
+const HIGHLIGHT_ROWS = new Set(['Gross Profit']);
+const NEGATIVE_ROWS = new Set(['Sale Return', 'Purchase', 'Opening Stock']);
+const isLostRow = (type: string) => type.startsWith('Lost (');
 
 // ============================================================
 // HELPERS
@@ -282,12 +288,6 @@ const RemittanceDataTable = ({ data, courier }: { data: RemittanceTableData; cou
 );
 
 // ============================================================
-// GROSS PROFIT CONSTANTS
-// ============================================================
-const HIGHLIGHT_ROWS = new Set(['Gross Profit']);
-const NEGATIVE_ROWS = new Set(['Sale Return', 'Purchase', 'Opening Stock']);
-
-// ============================================================
 // MAIN COMPONENT
 // ============================================================
 
@@ -338,7 +338,6 @@ export default function Dashboard() {
     const remittanceStartDate = remittanceDateRange?.from ? format(remittanceDateRange.from, 'yyyy-MM-dd') : null;
     const remittanceEndDate = remittanceDateRange?.to ? format(remittanceDateRange.to, 'yyyy-MM-dd') : remittanceStartDate;
 
-    // Active courier's Firestore slice
     const activeRemittanceData = remittanceRoot[COURIER_FS_KEY[remittanceCourier]] ?? null;
 
     // ── API calls ─────────────────────────────────────────────────────────────
@@ -586,7 +585,7 @@ export default function Dashboard() {
                     {grossProfitData?.error && !grossProfitData.loading && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{grossProfitData.error}</span></div>}
                     {grossProfitData?.loading && (
                         <Table><TableHeader><TableRow><TableHead className="w-[200px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead></TableRow></TableHeader>
-                            <TableBody>{[...Array(6)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-28" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell></TableRow>))}</TableBody>
+                            <TableBody>{[...Array(7)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-28" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell></TableRow>))}</TableBody>
                         </Table>
                     )}
                     {grossProfitData?.rows && !grossProfitData.loading && (
@@ -607,35 +606,28 @@ export default function Dashboard() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {grossProfitData.rows.map((row) => (
-                                        <TableRow
-                                            key={row.type}
-                                            className={cn(
-                                                HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
-                                                NEGATIVE_ROWS.has(row.type) && 'text-red-600 dark:text-red-400',
-                                            )}
-                                        >
-                                            <TableCell className="font-medium">
-                                                <span>{row.type}</span>
-                                                {row.type === 'Sale Return' && row.lostQty ? (
-                                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                                        + Lost ({formatNumber(row.lostQty)})
-                                                    </span>
-                                                ) : null}
-                                                {row.type === 'Closing Stock' && row.lostQty ? (
-                                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                                        + Lost ({formatNumber(row.lostQty)})
-                                                    </span>
-                                                ) : null}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">{formatNumber(row.qty)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {grossProfitData.rows.map((row) => {
+                                        const lost = isLostRow(row.type);
+                                        return (
+                                            <TableRow
+                                                key={row.type}
+                                                className={cn(
+                                                    HIGHLIGHT_ROWS.has(row.type) && 'bg-green-50/60 dark:bg-green-950/20 font-semibold border-t-2 border-green-200 dark:border-green-800',
+                                                    (NEGATIVE_ROWS.has(row.type) || lost) && 'text-red-600 dark:text-red-400',
+                                                )}
+                                            >
+                                                <TableCell className="font-medium">{row.type}</TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {lost ? '–' : formatNumber(row.qty)}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">{formatCurrency(row.taxable)}</TableCell>
+                                                <TableCell className="text-right font-mono">{formatCurrency(row.igst)}</TableCell>
+                                                <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
+                                                <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
+                                                <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </>

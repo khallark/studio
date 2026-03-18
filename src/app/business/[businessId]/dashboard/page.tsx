@@ -323,6 +323,7 @@ export default function Dashboard() {
 
     // ── Gross Profit row download states ─────────────────────────────────────
     const [isTaxReportDownloading, setIsTaxReportDownloading] = useState(false);
+    const [isPurchaseDownloading, setIsPurchaseDownloading] = useState(false);
     const [isOpeningStockDownloading, setIsOpeningStockDownloading] = useState(false);
     const [isClosingStockDownloading, setIsClosingStockDownloading] = useState(false);
 
@@ -432,6 +433,28 @@ export default function Dashboard() {
             setIsTaxReportDownloading(false);
         }
     }, [user, businessAuth.businessId, businessAuth.stores, grossProfitData?.startDate, grossProfitData?.endDate]);
+
+    const handlePurchaseDownload = useCallback(async () => {
+        if (!businessAuth.businessId) return;
+        setIsPurchaseDownloading(true);
+        try {
+            const res = await fetch('https://asia-south1-orderflow-jnig7.cloudfunctions.net/purchaseReport', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ businessId: businessAuth.businessId, startDate: gpStartDate, endDate: gpEndDate }),
+            });
+            if (!res.ok) throw new Error('Failed to generate purchase report');
+            const { downloadUrl } = await res.json();
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `purchase-report_${gpStartDate}_to_${gpEndDate}.xlsx`;
+            document.body.appendChild(a); a.click(); a.remove();
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to download purchase report.', variant: 'destructive' });
+        } finally {
+            setIsPurchaseDownloading(false);
+        }
+    }, [businessAuth.businessId, gpStartDate, gpEndDate]);
 
     const handleOpeningStockDownload = useCallback(async () => {
         if (!businessAuth.businessId || !grossProfitData?.startDate) return;
@@ -698,6 +721,7 @@ export default function Dashboard() {
                                     {grossProfitData.rows.map((row) => {
                                         const lost = isLostRow(row.type);
                                         const isSale = row.type === 'Sale';
+                                        const isPurchase = row.type === 'Purchase';
                                         const isOpeningStock = row.type === 'Opening Stock';
                                         const isClosingStock = row.type === 'Closing Stock';
 
@@ -731,6 +755,19 @@ export default function Dashboard() {
                                                             {isTaxReportDownloading
                                                                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                                 : <Download className="h-3.5 w-3.5" />}
+                                                        </Button>
+                                                    )}
+                                                    {isPurchase && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6 shrink-0"
+                                                            title="Download Purchase Report"
+                                                            disabled={isPurchaseDownloading}
+                                                            onClick={handlePurchaseDownload}>
+                                                            {isPurchaseDownloading
+                                                                ? <RefreshCw className="h-3 w-3 animate-spin" />
+                                                                : <Download className="h-3 w-3" />}
                                                         </Button>
                                                     )}
                                                     {isOpeningStock && (

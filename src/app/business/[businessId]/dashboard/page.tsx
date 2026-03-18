@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download } from 'lucide-react';
+import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from '@/hooks/use-toast';
 
 // ============================================================
 // TYPES
@@ -60,6 +61,7 @@ type RemittanceCourier = 'Blue Dart' | 'Delhivery';
 // ============================================================
 
 const QUERY_COOLDOWN_MS = 3000;
+const SNAPSHOT_FUNCTION_URL = 'https://asia-south1-orderflow-jnig7.cloudfunctions.net/inventorySnapshotOfADate';
 
 const STATUS_LABELS: Record<string, string> = {
     "New": "New", "Confirmed": "Confirmed", "Ready To Dispatch": "Ready To Dispatch",
@@ -129,6 +131,11 @@ function downloadAwbCsv(awbs: string[], remittanceDate: string, courier: string)
     a.download = `${courier.replace(' ', '-')}-AWBs_${remittanceDate}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
+}
+function subtractOneDay(dateStr: string): string {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
 }
 
 function useCooldown() {
@@ -314,6 +321,11 @@ export default function Dashboard() {
     const [gpSubmitError, setGpSubmitError] = useState<string | null>(null);
     const gpCooldown = useCooldown();
 
+    // ── Gross Profit row download states ─────────────────────────────────────
+    const [isTaxReportDownloading, setIsTaxReportDownloading] = useState(false);
+    const [isOpeningStockDownloading, setIsOpeningStockDownloading] = useState(false);
+    const [isClosingStockDownloading, setIsClosingStockDownloading] = useState(false);
+
     // ── Remittance ───────────────────────────────────────────────────────────
     const [remittanceRoot, setRemittanceRoot] = useState<FirestoreRemittanceRoot>({});
     const [remittanceCourier, setRemittanceCourier] = useState<RemittanceCourier>('Blue Dart');
@@ -389,6 +401,79 @@ export default function Dashboard() {
         } catch (err: unknown) { setRemittanceSubmitError(err instanceof Error ? err.message : 'Something went wrong.'); }
         finally { setIsRemittanceSubmitting(false); }
     }, [user, businessAuth.businessId, remittanceStartDate, remittanceEndDate, remittanceCourier, remittanceCooldown]);
+
+    // ── Gross Profit row download handlers ────────────────────────────────────
+
+    const handleTaxReportDownload = useCallback(async () => {
+        if (!user || !businessAuth.businessId || !grossProfitData?.startDate || !grossProfitData?.endDate) return;
+        const storeId = businessAuth.stores?.[0];
+        if (!storeId) return;
+        setIsTaxReportDownloading(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/business/generate-tax-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    businessId: businessAuth.businessId,
+                    storeId,
+                    startDate: grossProfitData.startDate,
+                    endDate: grossProfitData.endDate,
+                }),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message ?? `Status ${res.status}`); }
+            toast({ title: 'Tax Report Queued', description: 'The report will be sent to you on WhatsApp shortly.' });
+        } catch (err: unknown) {
+            toast({ title: 'Error', description: err instanceof Error ? err.message : 'Something went wrong.', variant: 'destructive' });
+        } finally {
+            setIsTaxReportDownloading(false);
+        }
+    }, [user, businessAuth.businessId, businessAuth.stores, grossProfitData?.startDate, grossProfitData?.endDate]);
+
+    const handleOpeningStockDownload = useCallback(async () => {
+        if (!businessAuth.businessId || !grossProfitData?.startDate) return;
+        setIsOpeningStockDownloading(true);
+        try {
+            const openingDate = subtractOneDay(grossProfitData.startDate);
+            const res = await fetch(SNAPSHOT_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ businessId: businessAuth.businessId, date: openingDate }),
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const { downloadUrl } = await res.json();
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `opening-stock_${openingDate}.xlsx`;
+            document.body.appendChild(a); a.click(); a.remove();
+        } catch (err: unknown) {
+            toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to download opening stock.', variant: 'destructive' });
+        } finally {
+            setIsOpeningStockDownloading(false);
+        }
+    }, [businessAuth.businessId, grossProfitData?.startDate]);
+
+    const handleClosingStockDownload = useCallback(async () => {
+        if (!businessAuth.businessId || !grossProfitData?.endDate) return;
+        setIsClosingStockDownloading(true);
+        try {
+            const res = await fetch(SNAPSHOT_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ businessId: businessAuth.businessId, date: grossProfitData.endDate }),
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const { downloadUrl } = await res.json();
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `closing-stock_${grossProfitData.endDate}.xlsx`;
+            document.body.appendChild(a); a.click(); a.remove();
+        } catch (err: unknown) {
+            toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to download closing stock.', variant: 'destructive' });
+        } finally {
+            setIsClosingStockDownloading(false);
+        }
+    }, [businessAuth.businessId, grossProfitData?.endDate]);
 
     // ── Firestore listener ────────────────────────────────────────────────────
     useEffect(() => {
@@ -584,8 +669,8 @@ export default function Dashboard() {
                     {gpSubmitError && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{gpSubmitError}</span></div>}
                     {grossProfitData?.error && !grossProfitData.loading && <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{grossProfitData.error}</span></div>}
                     {grossProfitData?.loading && (
-                        <Table><TableHeader><TableRow><TableHead className="w-[200px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead></TableRow></TableHeader>
-                            <TableBody>{[...Array(7)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-28" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell></TableRow>))}</TableBody>
+                        <Table><TableHeader><TableRow><TableHead className="w-[200px]">Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Taxable Amt</TableHead><TableHead className="text-right">IGST</TableHead><TableHead className="text-right">CGST</TableHead><TableHead className="text-right">SGST</TableHead><TableHead className="text-right">Net Amount</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
+                            <TableBody>{[...Array(7)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-28" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-12 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell><TableCell /></TableRow>))}</TableBody>
                         </Table>
                     )}
                     {grossProfitData?.rows && !grossProfitData.loading && (
@@ -603,11 +688,16 @@ export default function Dashboard() {
                                         <TableHead className="text-right">CGST</TableHead>
                                         <TableHead className="text-right">SGST</TableHead>
                                         <TableHead className="text-right">Net Amount</TableHead>
+                                        <TableHead className="w-10" />
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {grossProfitData.rows.map((row) => {
                                         const lost = isLostRow(row.type);
+                                        const isSale = row.type === 'Sale';
+                                        const isOpeningStock = row.type === 'Opening Stock';
+                                        const isClosingStock = row.type === 'Closing Stock';
+
                                         return (
                                             <TableRow
                                                 key={row.type}
@@ -625,6 +715,50 @@ export default function Dashboard() {
                                                 <TableCell className="text-right font-mono">{formatCurrency(row.cgst)}</TableCell>
                                                 <TableCell className="text-right font-mono">{formatCurrency(row.sgst)}</TableCell>
                                                 <TableCell className="text-right font-mono">{formatCurrency(row.net)}</TableCell>
+                                                <TableCell>
+                                                    {isSale && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                            title="Download Tax Report (Sale + Sale Return) — will be sent on WhatsApp"
+                                                            disabled={isTaxReportDownloading}
+                                                            onClick={handleTaxReportDownload}
+                                                        >
+                                                            {isTaxReportDownloading
+                                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                : <Download className="h-3.5 w-3.5" />}
+                                                        </Button>
+                                                    )}
+                                                    {isOpeningStock && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                            title="Download Opening Stock Excel"
+                                                            disabled={isOpeningStockDownloading}
+                                                            onClick={handleOpeningStockDownload}
+                                                        >
+                                                            {isOpeningStockDownloading
+                                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                : <Download className="h-3.5 w-3.5" />}
+                                                        </Button>
+                                                    )}
+                                                    {isClosingStock && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                            title="Download Closing Stock Excel"
+                                                            disabled={isClosingStockDownloading}
+                                                            onClick={handleClosingStockDownload}
+                                                        >
+                                                            {isClosingStockDownloading
+                                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                : <Download className="h-3.5 w-3.5" />}
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}

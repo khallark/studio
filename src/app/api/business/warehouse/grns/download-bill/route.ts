@@ -84,7 +84,7 @@ function buildInvoiceHTML(payload: {
 
     // ── Billed To (Business) ─────────────────────────────────────────────────
     const bizAddr = biz?.companyAddress ?? biz?.address ?? null;
-    const toName  = biz?.companyName ?? biz?.businessName ?? '—';
+    const toName  = biz?.companyName ?? biz?.businessName ?? 'Majime Technologies';
     const toLines = [
         bizAddr?.address ?? bizAddr?.line1,
         [bizAddr?.city, bizAddr?.state].filter(Boolean).join(', '),

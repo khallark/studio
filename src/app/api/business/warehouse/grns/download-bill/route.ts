@@ -77,6 +77,10 @@ function buildInvoiceHTML(payload: {
     ].filter((l): l is string => !!l);
     const fromGstin = party?.gstin ?? '';
     const fromPan = party?.pan ?? '';
+    const fromAccountName = party?.bankDetails?.accountName;
+    const fromAccountNumber = party?.bankDetails?.accountNumber;
+    const fromIfsc = party?.bankDetails?.ifsc;
+    const fromBank = party?.bankDetails?.bankName;
 
     // ── Billed To (Business) ─────────────────────────────────────────────────
     const bizAddr = biz?.companyAddress ?? biz?.address ?? null;
@@ -452,10 +456,10 @@ function buildInvoiceHTML(payload: {
 
         <div class="bank-box">
             <div class="bank-title">Bank Details</div>
-            <div class="bank-row"><span class="bank-lbl">Account Name</span>   <span class="bank-val">—</span></div>
-            <div class="bank-row"><span class="bank-lbl">Account Number</span> <span class="bank-val">—</span></div>
-            <div class="bank-row"><span class="bank-lbl">IFSC</span>           <span class="bank-val">—</span></div>
-            <div class="bank-row"><span class="bank-lbl">Bank</span>           <span class="bank-val">—</span></div>
+            <div class="bank-row"><span class="bank-lbl">Account Name</span>   <span class="bank-val">${fromAccountName || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">Account Number</span> <span class="bank-val">${fromAccountNumber || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">IFSC</span>           <span class="bank-val">${fromIfsc || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">Bank</span>           <span class="bank-val">${fromBank || '—'}</span></div>
         </div>
 
         <div class="totals-box">
@@ -575,7 +579,7 @@ export async function POST(req: NextRequest) {
             status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${grn.grnNumber}-bill.pdf"`,
+                'Content-Disposition': `attachment; filename="${grn.billNumber}.pdf"`,
             },
         });
 

@@ -585,13 +585,13 @@ function GRNFormDialog({
                                                 Over-received by {item.receivedQty - item.expectedQty} unit(s)
                                             </p>
                                         )}
-                                        <div className="text-xs text-muted-foreground text-right">
+                                        <div className="text-xs text-muted-foreground text-right font-mono">
                                             Received value: {formatCurrency(item.receivedQty * item.unitCost)}
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="text-right font-semibold text-sm pt-2 border-t">
+                            <div className="text-right font-semibold text-sm pt-2 border-t font-mono">
                                 Total Received Value: {formatCurrency(totalReceivedValue)}
                             </div>
                         </div>
@@ -672,7 +672,7 @@ function GRNDetailDialog({
                         </div>
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Total Received Value</p>
-                            <p className="font-medium">{formatCurrency(grn.totalReceivedValue)}</p>
+                            <p className="font-medium font-mono">{formatCurrency(grn.totalReceivedValue)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-muted-foreground">Received By</p>
@@ -750,7 +750,7 @@ function GRNDetailDialog({
                                                     '0'
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-right text-sm">
+                                            <TableCell className="text-right text-sm font-mono">
                                                 {formatCurrency(item.totalCost)}
                                             </TableCell>
                                         </TableRow>
@@ -1253,7 +1253,7 @@ export default function GRNsPage() {
                                                     '0'
                                                 )}
                                             </TableCell>
-                                            <TableCell className="font-medium text-sm">
+                                            <TableCell className="font-medium text-sm font-mono">
                                                 {formatCurrency(grn.totalReceivedValue)}
                                             </TableCell>
                                             <TableCell>

@@ -84,7 +84,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Timestamp } from 'firebase-admin/firestore';
 import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
-import { downloadGRNBill } from '@/components/generateGrnPdf';
 
 // ============================================================
 // TYPES
@@ -992,15 +991,51 @@ export default function GRNsPage() {
     };
 
     const handleDownloadBill = async (grn: GRN) => {
-        if (!businessId || !user) return;
+        if (!businessId || !user || downloadingBillId) return;
+
         setDownloadingBillId(grn.id);
+
+        const loadingToast = toast({
+            title: 'Generating PDF…',
+            description: `Building bill for ${grn.grnNumber}`,
+            duration: 60_000,
+        });
+
         try {
-            await downloadGRNBill(grn, businessId, user);
-        } catch (err) {
-            console.error('Failed to generate bill PDF:', err);
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/business/warehouse/grns/download-bill', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ businessId, grnId: grn.id }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error ?? `Server error ${res.status}`);
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${grn.grnNumber}-bill.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            loadingToast.dismiss();
             toast({
-                title: 'Failed to generate PDF',
-                description: 'Could not fetch required data.',
+                title: 'PDF Downloaded',
+                description: `${grn.grnNumber}-bill.pdf saved successfully.`,
+            });
+
+        } catch (err: any) {
+            loadingToast.dismiss();
+            toast({
+                title: 'Download Failed',
+                description: err?.message ?? 'Could not generate the bill PDF.',
                 variant: 'destructive',
             });
         } finally {
@@ -1294,7 +1329,6 @@ export default function GRNsPage() {
                                                             <Eye className="h-4 w-4 mr-2" />
                                                             View Details
                                                         </DropdownMenuItem>
-
                                                         <DropdownMenuItem
                                                             onClick={() => handleDownloadBill(grn)}
                                                             disabled={downloadingBillId === grn.id}

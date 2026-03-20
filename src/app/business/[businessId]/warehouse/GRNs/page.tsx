@@ -875,7 +875,7 @@ function ConfirmPutAwayDialog({
 
 export default function GRNsPage() {
     const { businessId, user } = useBusinessContext();
-    const { toast } = useToast();
+    const { toast, dismiss } = useToast();
     const queryClient = useQueryClient();
 
     // State
@@ -995,10 +995,10 @@ export default function GRNsPage() {
 
         setDownloadingBillId(grn.id);
 
-        const loadingToast = toast({
+        const { id: loadingToastId } = toast({
             title: 'Generating PDF…',
             description: `Building bill for ${grn.grnNumber}`,
-            duration: 60_000,
+            duration: 60_000, // stays until we dismiss it
         });
 
         try {
@@ -1017,22 +1017,24 @@ export default function GRNsPage() {
                 throw new Error(err.error ?? `Server error ${res.status}`);
             }
 
+            // Trigger browser download
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${grn.grnNumber}-bill.pdf`;
+            a.download = `${grn.billNumber || grn.grnNumber}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
 
-            loadingToast.dismiss();
+            // Dismiss loading toast, show success
+            dismiss(loadingToastId);
             toast({
                 title: 'PDF Downloaded',
                 description: `${grn.grnNumber}-bill.pdf saved successfully.`,
             });
 
         } catch (err: any) {
-            loadingToast.dismiss();
+            dismiss(loadingToastId);
             toast({
                 title: 'Download Failed',
                 description: err?.message ?? 'Could not generate the bill PDF.',

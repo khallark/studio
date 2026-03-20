@@ -4,6 +4,7 @@ import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import ExcelJS from 'exceljs';
+import { Product } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -14,6 +15,8 @@ interface ProductRow {
     'SKU'?: string;
     'Weight'?: number | string;
     'Category'?: string;
+    'HSN'?: string;
+    'Tax Rate'?: number | string;
     'Description'?: string;
     'Price'?: number | string;
     'Stock'?: number | string;
@@ -55,17 +58,16 @@ function validateFileStructure(data: ProductRow[], mode: 'add' | 'update'): Vali
         return { isValid: false, errors: ['File is empty or has no valid data rows'] };
     }
 
-    // Check for required columns based on mode
     const firstRow = data[0];
     const columns = Object.keys(firstRow);
 
     const requiredColumns = ['SKU'];
     if (mode === 'add') {
-        requiredColumns.push('Product Name', 'Weight');
+        requiredColumns.push('Product Name', 'Weight', 'HSN', 'Tax Rate');
     }
 
     for (const col of requiredColumns) {
-        if (!columns.some(c => c.toLowerCase().trim() === col.toLowerCase())) {
+        if (!columns.some((c) => c.toLowerCase().trim() === col.toLowerCase())) {
             errors.push(`Missing required column: ${col}`);
         }
     }
@@ -83,7 +85,6 @@ function normalizeColumnNames(row: any): ProductRow {
     for (const [key, value] of Object.entries(row)) {
         const normalizedKey = key.trim();
 
-        // Map common variations to standard names
         if (/^product\s*name$/i.test(normalizedKey)) {
             normalized['Product Name'] = value as string;
         } else if (/^sku$/i.test(normalizedKey)) {
@@ -92,6 +93,10 @@ function normalizeColumnNames(row: any): ProductRow {
             normalized['Weight'] = value as number;
         } else if (/^category$/i.test(normalizedKey)) {
             normalized['Category'] = value as string;
+        } else if (/^hsn(\s*code)?$/i.test(normalizedKey)) {
+            normalized['HSN'] = value as string;
+        } else if (/^tax\s*rate(\s*\(%\))?$/i.test(normalizedKey) || /^gst(\s*rate)?(\s*\(%\))?$/i.test(normalizedKey)) {
+            normalized['Tax Rate'] = value as number;
         } else if (/^description$/i.test(normalizedKey)) {
             normalized['Description'] = value as string;
         } else if (/^price(\s*\(₹\))?$/i.test(normalizedKey)) {
@@ -106,7 +111,11 @@ function normalizeColumnNames(row: any): ProductRow {
     return normalized;
 }
 
-function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number): { valid: boolean; error?: string } {
+function validateRow(
+    row: ProductRow,
+    mode: 'add' | 'update',
+    rowIndex: number
+): { valid: boolean; error?: string } {
     const sku = row['SKU']?.toString().trim();
 
     if (!sku) {
@@ -115,7 +124,9 @@ function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number):
 
     if (mode === 'add') {
         const name = row['Product Name']?.toString().trim();
-        const weight = parseFloat(row['Weight']?.toString() || '0');
+        const weight = parseFloat(row['Weight']?.toString() ?? '0');
+        const hsn = row['HSN']?.toString().trim();
+        const taxRateRaw = row['Tax Rate'];
 
         if (!name) {
             return { valid: false, error: `Row ${rowIndex}: Product Name is required for adding new products` };
@@ -124,9 +135,22 @@ function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number):
         if (!weight || weight <= 0) {
             return { valid: false, error: `Row ${rowIndex}: Weight must be greater than 0` };
         }
+
+        if (!hsn) {
+            return { valid: false, error: `Row ${rowIndex}: HSN code is required for adding new products` };
+        }
+
+        if (taxRateRaw === undefined || taxRateRaw === null || taxRateRaw === '') {
+            return { valid: false, error: `Row ${rowIndex}: Tax Rate is required for adding new products` };
+        }
+
+        const taxRate = parseFloat(taxRateRaw.toString());
+        if (isNaN(taxRate) || taxRate < 0) {
+            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be a non-negative number` };
+        }
     }
 
-    // Validate weight if provided (for update mode too)
+    // Validate weight if provided in update mode too
     if (row['Weight'] !== undefined && row['Weight'] !== null && row['Weight'] !== '') {
         const weight = parseFloat(row['Weight'].toString());
         if (isNaN(weight) || weight <= 0) {
@@ -134,15 +158,14 @@ function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number):
         }
     }
 
-    // Validate category if provided
-    // if (row['Category']) {
-    //     const category = row['Category'].toString().trim();
-    //     if (category && !VALID_CATEGORIES.includes(category)) {
-    //         return { valid: false, error: `Row ${rowIndex}: Invalid category "${category}". Valid options: ${VALID_CATEGORIES.join(', ')}` };
-    //     }
-    // }
+    // Validate Tax Rate if provided in update mode
+    if (row['Tax Rate'] !== undefined && row['Tax Rate'] !== null && row['Tax Rate'] !== '') {
+        const taxRate = parseFloat(row['Tax Rate'].toString());
+        if (isNaN(taxRate) || taxRate < 0) {
+            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be a non-negative number` };
+        }
+    }
 
-    // Validate price if provided
     if (row['Price'] !== undefined && row['Price'] !== null && row['Price'] !== '') {
         const price = parseFloat(row['Price'].toString());
         if (isNaN(price) || price < 0) {
@@ -150,7 +173,6 @@ function validateRow(row: ProductRow, mode: 'add' | 'update', rowIndex: number):
         }
     }
 
-    // Validate stock if provided
     if (row['Stock'] !== undefined && row['Stock'] !== null && row['Stock'] !== '') {
         const stock = parseInt(row['Stock'].toString());
         if (isNaN(stock) || stock < 0) {
@@ -175,12 +197,10 @@ async function parseExcelFile(buffer: ArrayBuffer): Promise<ProductRow[]> {
 
     worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) {
-            // First row is headers
             row.eachCell((cell, colNumber) => {
-                headers[colNumber] = cell.value?.toString() || '';
+                headers[colNumber] = cell.value?.toString() ?? '';
             });
         } else {
-            // Data rows
             const rowData: any = {};
             row.eachCell((cell, colNumber) => {
                 const header = headers[colNumber];
@@ -189,7 +209,6 @@ async function parseExcelFile(buffer: ArrayBuffer): Promise<ProductRow[]> {
                 }
             });
 
-            // Only add non-empty rows
             if (Object.keys(rowData).length > 0) {
                 rows.push(normalizeColumnNames(rowData));
             }
@@ -201,17 +220,17 @@ async function parseExcelFile(buffer: ArrayBuffer): Promise<ProductRow[]> {
 
 async function parseCsvFile(buffer: ArrayBuffer): Promise<ProductRow[]> {
     const text = new TextDecoder().decode(buffer);
-    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
 
     if (lines.length < 2) {
         throw new Error('CSV file must have at least a header row and one data row');
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
     const rows: ProductRow[] = [];
 
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
         const rowData: any = {};
 
         headers.forEach((header, index) => {
@@ -232,12 +251,13 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Results');
 
-    // Define columns
     worksheet.columns = [
         { header: 'Product Name', key: 'Product Name', width: 25 },
         { header: 'SKU', key: 'SKU', width: 15 },
         { header: 'Weight', key: 'Weight', width: 10 },
         { header: 'Category', key: 'Category', width: 18 },
+        { header: 'HSN', key: 'HSN', width: 12 },
+        { header: 'Tax Rate', key: 'Tax Rate', width: 10 },
         { header: 'Description', key: 'Description', width: 30 },
         { header: 'Price', key: 'Price', width: 10 },
         { header: 'Stock', key: 'Stock', width: 10 },
@@ -245,7 +265,6 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
         { header: 'Message', key: 'Message', width: 40 },
     ];
 
-    // Style header row
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
         type: 'pattern',
@@ -253,37 +272,22 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
         fgColor: { argb: 'FFE0E0E0' },
     };
 
-    // Add data rows with conditional styling
-    results.forEach((result, index) => {
+    results.forEach((result) => {
         const row = worksheet.addRow(result);
 
-        // Color code based on status
         const statusCell = row.getCell('Status');
         if (result.Status === 'Success') {
-            statusCell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFD4EDDA' },
-            };
+            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
             statusCell.font = { color: { argb: 'FF155724' } };
         } else if (result.Status === 'Error') {
-            statusCell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFF8D7DA' },
-            };
+            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
             statusCell.font = { color: { argb: 'FF721C24' } };
         } else if (result.Status === 'Skipped') {
-            statusCell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFFFF3CD' },
-            };
+            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
             statusCell.font = { color: { argb: 'FF856404' } };
         }
     });
 
-    // Generate buffer
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
 }
@@ -328,7 +332,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Validate file type
         const fileName = file.name.toLowerCase();
         if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
             return NextResponse.json(
@@ -362,14 +365,13 @@ export async function POST(req: NextRequest) {
             data = await parseExcelFile(arrayBuffer);
         }
 
-        // Validate file structure
         const structureValidation = validateFileStructure(data, mode);
         if (!structureValidation.isValid) {
             return NextResponse.json(
                 {
                     error: 'Validation Error',
                     message: 'Invalid file structure',
-                    details: structureValidation.errors
+                    details: structureValidation.errors,
                 },
                 { status: 400 }
             );
@@ -383,7 +385,7 @@ export async function POST(req: NextRequest) {
         const existingProductsSnap = await productsRef?.get();
         const existingSkus = new Set<string>();
 
-        existingProductsSnap?.docs.forEach(doc => {
+        existingProductsSnap?.docs.forEach((doc) => {
             existingSkus.add(doc.id.toUpperCase());
         });
 
@@ -394,32 +396,30 @@ export async function POST(req: NextRequest) {
         const results: ProcessedRow[] = [];
         let batch = db.batch();
         let batchCount = 0;
-        const MAX_BATCH_SIZE = 450; // Firestore limit is 500, keep some buffer
+        const MAX_BATCH_SIZE = 450;
 
         let successCount = 0;
         let errorCount = 0;
         let skippedCount = 0;
 
         const userData = userDoc?.data();
-        const userEmail = userData?.email || userData?.primaryContact?.email || null;
+        const userEmail = userData?.email ?? userData?.primaryContact?.email ?? null;
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
-            const rowIndex = i + 2; // +2 because row 1 is header, and we're 0-indexed
+            const rowIndex = i + 2; // +2: row 1 is header, data is 0-indexed
 
-            // Skip completely empty rows
             const sku = row['SKU']?.toString().trim().toUpperCase();
             if (!sku && !row['Product Name']) {
                 continue;
             }
 
-            // Validate row
             const validation = validateRow(row, mode, rowIndex);
             if (!validation.valid) {
                 results.push({
                     ...row,
                     Status: 'Error',
-                    Message: validation.error || 'Validation failed',
+                    Message: validation.error ?? 'Validation failed',
                 });
                 errorCount++;
                 continue;
@@ -429,7 +429,6 @@ export async function POST(req: NextRequest) {
             const productRef = productsRef?.doc(skuUpper);
 
             if (mode === 'add') {
-                // ADD MODE: Skip if SKU already exists
                 if (existingSkus.has(skuUpper)) {
                     results.push({
                         ...row,
@@ -440,21 +439,31 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
-                // Parse stock value for inventory initialization
-                const stockValue = row['Stock'] !== undefined && row['Stock'] !== ''
-                    ? parseInt(row['Stock'].toString())
-                    : 0;
+                const stockValue =
+                    row['Stock'] !== undefined && row['Stock'] !== ''
+                        ? parseInt(row['Stock'].toString())
+                        : 0;
 
-                // Create new product with inventory data
-                const productData: any = {
-                    name: row['Product Name']?.toString().trim(),
+                // Build the new product document typed as Omit<Product, 'id'>
+                const productData: Omit<Product, 'id'> = {
+                    name: row['Product Name']!.toString().trim(),
                     sku: skuUpper,
-                    weight: parseFloat(row['Weight']?.toString() || '0'),
-                    category: row['Category']?.toString().trim() || 'Other',
-                    createdBy: userId,
+                    weight: parseFloat(row['Weight']?.toString() ?? '0'),
+                    category: row['Category']?.toString().trim() ?? 'Other',
+                    hsn: row['HSN']!.toString().trim().toUpperCase(),
+                    taxRate: parseFloat(row['Tax Rate']!.toString()),
+                    description: row['Description'] ? row['Description'].toString().trim() : null,
+                    price: row['Price'] !== undefined && row['Price'] !== ''
+                        ? parseFloat(row['Price'].toString())
+                        : null,
+                    stock: stockValue > 0 ? stockValue : null,
+                    status: null,
+                    mappedVariants: null,
+                    createdBy: userId ?? null,
                     createdAt: Timestamp.now(),
+                    updatedBy: null,
                     updatedAt: Timestamp.now(),
-                    // Initialize inventory data
+                    inShelfQuantity: 0,
                     inventory: {
                         openingStock: stockValue,
                         inwardAddition: 0,
@@ -465,31 +474,21 @@ export async function POST(req: NextRequest) {
                     },
                 };
 
-                if (row['Description']) {
-                    productData.description = row['Description'].toString().trim();
-                }
-                if (row['Price'] !== undefined && row['Price'] !== '') {
-                    productData.price = parseFloat(row['Price'].toString());
-                }
-                if (stockValue > 0) {
-                    productData.stock = stockValue;
-                }
-
                 batch.set(productRef!, productData);
                 batchCount++;
 
-                // Also create a log entry
-                const logRef = productRef!.collection('logs').doc();
                 const logChanges = [
                     { field: 'name', fieldLabel: 'Product Name', oldValue: null, newValue: productData.name },
                     { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
                     { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
+                    { field: 'hsn', fieldLabel: 'HSN Code', oldValue: null, newValue: productData.hsn },
+                    { field: 'taxRate', fieldLabel: 'GST Rate', oldValue: null, newValue: productData.taxRate },
+                    ...(stockValue > 0
+                        ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }]
+                        : []),
                 ];
 
-                if (stockValue > 0) {
-                    logChanges.push({ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue });
-                }
-
+                const logRef = productRef!.collection('logs').doc();
                 batch.set(logRef, {
                     action: 'created',
                     changes: logChanges,
@@ -500,7 +499,7 @@ export async function POST(req: NextRequest) {
                 });
                 batchCount++;
 
-                existingSkus.add(skuUpper); // Track for subsequent rows
+                existingSkus.add(skuUpper);
                 results.push({
                     ...row,
                     Status: 'Success',
@@ -509,7 +508,7 @@ export async function POST(req: NextRequest) {
                 successCount++;
 
             } else {
-                // UPDATE MODE: Skip if SKU doesn't exist
+                // UPDATE MODE
                 if (!existingSkus.has(skuUpper)) {
                     results.push({
                         ...row,
@@ -520,9 +519,10 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
-                // Build update object with only provided fields
-                const updateData: any = {
-                    updatedBy: userId,
+                // Only update fields that are explicitly present in the row.
+                // Typed as Partial<Product> since we write a subset of fields.
+                const updateData: Partial<Product> & { updatedBy: string | null; updatedAt: Timestamp } = {
+                    updatedBy: userId ?? null,
                     updatedAt: Timestamp.now(),
                 };
                 const changes: any[] = [];
@@ -539,27 +539,34 @@ export async function POST(req: NextRequest) {
                     updateData.category = row['Category'].toString().trim();
                     changes.push({ field: 'category', fieldLabel: 'Category', oldValue: '(previous)', newValue: updateData.category });
                 }
+                if (row['HSN']) {
+                    updateData.hsn = row['HSN'].toString().trim().toUpperCase();
+                    changes.push({ field: 'hsn', fieldLabel: 'HSN Code', oldValue: '(previous)', newValue: updateData.hsn });
+                }
+                if (row['Tax Rate'] !== undefined && row['Tax Rate'] !== '') {
+                    updateData.taxRate = parseFloat(row['Tax Rate'].toString());
+                    changes.push({ field: 'taxRate', fieldLabel: 'GST Rate', oldValue: '(previous)', newValue: updateData.taxRate });
+                }
                 if (row['Description'] !== undefined) {
-                    updateData.description = row['Description']?.toString().trim() || null;
+                    updateData.description = row['Description']?.toString().trim() ?? null;
                     changes.push({ field: 'description', fieldLabel: 'Description', oldValue: '(previous)', newValue: updateData.description });
                 }
                 if (row['Price'] !== undefined && row['Price'] !== '') {
                     updateData.price = parseFloat(row['Price'].toString());
                     changes.push({ field: 'price', fieldLabel: 'Price', oldValue: '(previous)', newValue: updateData.price });
                 }
-                // Note: Stock updates in update mode don't affect inventory.openingStock
-                // Use the inventory adjustment API for stock changes
+                // Note: Stock updates in update mode don't affect inventory.openingStock.
+                // Use the inventory adjustment API for stock changes.
                 if (row['Stock'] !== undefined && row['Stock'] !== '') {
                     updateData.stock = parseInt(row['Stock'].toString());
                     changes.push({ field: 'stock', fieldLabel: 'Stock', oldValue: '(previous)', newValue: updateData.stock });
                 }
 
-                // Only update if there are actual changes
-                if (Object.keys(updateData).length > 2) { // More than just updatedBy and updatedAt
+                // Only write if there's something beyond the bookkeeping fields
+                if (Object.keys(updateData).length > 2) {
                     batch.update(productRef!, updateData);
                     batchCount++;
 
-                    // Create log entry
                     const logRef = productRef!.collection('logs').doc();
                     batch.set(logRef, {
                         action: 'updated',
@@ -587,7 +594,6 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            // Commit batch if approaching limit
             if (batchCount >= MAX_BATCH_SIZE) {
                 await batch.commit();
                 batch = db.batch();
@@ -595,7 +601,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Commit remaining operations
         if (batchCount > 0) {
             await batch.commit();
         }
@@ -606,10 +611,6 @@ export async function POST(req: NextRequest) {
 
         const resultBuffer = await generateResultExcel(results);
         const resultBase64 = resultBuffer.toString('base64');
-
-        // ============================================================
-        // RETURN RESPONSE
-        // ============================================================
 
         return NextResponse.json({
             success: true,

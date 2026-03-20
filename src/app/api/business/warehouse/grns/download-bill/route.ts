@@ -42,9 +42,9 @@ function fmtCurrency(amount: number): string {
 
 // ─── HTML generator ───────────────────────────────────────────────────────────
 
-const GST_RATE    = 0.05;   // hardcoded 5%
+const GST_RATE = 0.05;   // hardcoded 5%
 const GST_RATE_PC = '5%';
-const HOME_STATE  = 'punjab'; // business residing state — intra-state check
+const HOME_STATE = 'punjab'; // business residing state — intra-state check
 
 function n2(n: number): string {
     return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -65,8 +65,8 @@ function buildInvoiceHTML(payload: {
     const { grn, po, party, biz } = payload;
 
     // ── Billed From (Supplier / Party) ────────────────────────────────────────
-    const fromName  = party?.name ?? po?.supplierName ?? '—';
-    const fromAddr  = party?.address;
+    const fromName = party?.name ?? po?.supplierName ?? '—';
+    const fromAddr = party?.address;
     const fromLines = [
         fromAddr?.line1,
         fromAddr?.line2,
@@ -75,16 +75,16 @@ function buildInvoiceHTML(payload: {
             ? `${fromAddr.country} - ${fromAddr.pincode}`
             : (fromAddr?.country || fromAddr?.pincode || ''),
     ].filter((l): l is string => !!l);
-    const fromGstin         = party?.gstin ?? '';
-    const fromPan           = party?.pan   ?? '';
-    const fromAccountName   = party?.bankDetails?.accountName   ?? '';
+    const fromGstin = party?.gstin ?? '';
+    const fromPan = party?.pan ?? '';
+    const fromAccountName = party?.bankDetails?.accountName ?? '';
     const fromAccountNumber = party?.bankDetails?.accountNumber ?? '';
-    const fromIfsc          = party?.bankDetails?.ifsc          ?? '';
-    const fromBank          = party?.bankDetails?.bankName      ?? '';
+    const fromIfsc = party?.bankDetails?.ifsc ?? '';
+    const fromBank = party?.bankDetails?.bankName ?? '';
 
     // ── Billed To (Business) ─────────────────────────────────────────────────
     const bizAddr = biz?.companyAddress ?? biz?.address ?? null;
-    const toName  = biz?.companyName ?? biz?.businessName ?? 'Majime Technologies';
+    const toName = biz?.companyName ?? biz?.businessName ?? 'Majime Technologies';
     const toLines = [
         bizAddr?.address ?? bizAddr?.line1,
         [bizAddr?.city, bizAddr?.state].filter(Boolean).join(', '),
@@ -106,25 +106,25 @@ function buildInvoiceHTML(payload: {
 
     const computedItems = items.map((item: any) => {
         const taxableAmt = item.receivedQty * item.unitCost;
-        const cgst  = taxableAmt * cgstRate;
-        const sgst  = taxableAmt * sgstRate;
-        const igst  = taxableAmt * igstRate;
+        const cgst = taxableAmt * cgstRate;
+        const sgst = taxableAmt * sgstRate;
+        const igst = taxableAmt * igstRate;
         const total = taxableAmt + cgst + sgst + igst;
         return { ...item, taxableAmt, cgst, sgst, igst, total };
     });
 
     // ── Grand totals ──────────────────────────────────────────────────────────
     const totalTaxable = computedItems.reduce((s: number, i: any) => s + i.taxableAmt, 0);
-    const totalCGST    = computedItems.reduce((s: number, i: any) => s + i.cgst, 0);
-    const totalSGST    = computedItems.reduce((s: number, i: any) => s + i.sgst, 0);
-    const totalIGST    = computedItems.reduce((s: number, i: any) => s + i.igst, 0);
-    const grandTotal   = totalTaxable + totalCGST + totalSGST + totalIGST;
+    const totalCGST = computedItems.reduce((s: number, i: any) => s + i.cgst, 0);
+    const totalSGST = computedItems.reduce((s: number, i: any) => s + i.sgst, 0);
+    const totalIGST = computedItems.reduce((s: number, i: any) => s + i.igst, 0);
+    const grandTotal = totalTaxable + totalCGST + totalSGST + totalIGST;
 
     // ── Status pill ───────────────────────────────────────────────────────────
     const statusStyles: Record<string, string> = {
         completed: 'background:#059669;',
         cancelled: 'background:#DC2626;',
-        draft:     'background:#64748B;',
+        draft: 'background:#64748B;',
     };
     const pillStyle = statusStyles[grn.status] ?? statusStyles.draft;
     const pillLabel = (grn.status ?? 'draft').toUpperCase();
@@ -136,7 +136,7 @@ function buildInvoiceHTML(payload: {
             <div class="addr-name">${escapeHtml(name)}</div>
             ${lines.map(l => `<div class="addr-line">${escapeHtml(l)}</div>`).join('')}
             ${gstin ? `<div class="addr-meta"><b>GSTIN:</b> ${escapeHtml(gstin)}</div>` : ''}
-            ${pan   ? `<div class="addr-meta"><b>PAN:</b> ${escapeHtml(pan)}</div>`   : ''}
+            ${pan ? `<div class="addr-meta"><b>PAN:</b> ${escapeHtml(pan)}</div>` : ''}
         </div>
     `;
 
@@ -162,7 +162,7 @@ function buildInvoiceHTML(payload: {
     // ── Totals box rows ───────────────────────────────────────────────────────
     // Only show tax rows that are non-zero to keep it clean
     const totalsRows = [
-        { label: 'Amount',     value: n2(totalTaxable), grand: false },
+        { label: 'Amount', value: n2(totalTaxable), grand: false },
         ...(totalCGST > 0 ? [{ label: `+ CGST (${(cgstRate * 100).toFixed(1)}%)`, value: n2(totalCGST), grand: false }] : []),
         ...(totalSGST > 0 ? [{ label: `+ SGST (${(sgstRate * 100).toFixed(1)}%)`, value: n2(totalSGST), grand: false }] : []),
         ...(totalIGST > 0 ? [{ label: `+ IGST (${(igstRate * 100).toFixed(1)}%)`, value: n2(totalIGST), grand: false }] : []),
@@ -459,10 +459,10 @@ function buildInvoiceHTML(payload: {
 
         <div class="bank-box">
             <div class="bank-title">Bank Details</div>
-            <div class="bank-row"><span class="bank-lbl">Account Name</span>   <span class="bank-val">${fromAccountName   || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">Account Name</span>   <span class="bank-val">${fromAccountName || '—'}</span></div>
             <div class="bank-row"><span class="bank-lbl">Account Number</span> <span class="bank-val">${fromAccountNumber || '—'}</span></div>
-            <div class="bank-row"><span class="bank-lbl">IFSC</span>           <span class="bank-val">${fromIfsc          || '—'}</span></div>
-            <div class="bank-row"><span class="bank-lbl">Bank</span>           <span class="bank-val">${fromBank          || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">IFSC</span>           <span class="bank-val">${fromIfsc || '—'}</span></div>
+            <div class="bank-row"><span class="bank-lbl">Bank</span>           <span class="bank-val">${fromBank || '—'}</span></div>
         </div>
 
         <div class="totals-box">
@@ -541,7 +541,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify user belongs to this business
-        const bizRef  = db.doc(`users/${businessId}`);
+        const bizRef = db.doc(`users/${businessId}`);
         const bizSnap = await bizRef.get();
         if (!bizSnap.exists) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
@@ -575,7 +575,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Build & render ────────────────────────────────────────────────────
-        const html   = buildInvoiceHTML({ grn, po, party, biz: bizData });
+        const html = buildInvoiceHTML({ grn, po, party, biz: bizData });
         const pdfBuf = await renderPDF(html);
 
         return new NextResponse(new Uint8Array(pdfBuf), {

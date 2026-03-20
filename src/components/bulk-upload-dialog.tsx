@@ -95,7 +95,6 @@ export function BulkUploadDialog({
     const [uploadProgress, setUploadProgress] = useState(0);
     const [result, setResult] = useState<UploadResult | null>(null);
 
-    // Reset state when dialog closes
     const handleOpenChange = (open: boolean) => {
         if (!open) {
             setFile(null);
@@ -106,30 +105,36 @@ export function BulkUploadDialog({
         onOpenChange(open);
     };
 
-    // File handling
-    const handleFileSelect = useCallback((selectedFile: File) => {
-        const fileName = selectedFile.name.toLowerCase();
-        if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
-            toast({
-                title: 'Invalid File Type',
-                description: 'Please upload an Excel (.xlsx, .xls) or CSV (.csv) file',
-                variant: 'destructive',
-            });
-            return;
-        }
-        setFile(selectedFile);
-        setResult(null);
-    }, [toast]);
+    const handleFileSelect = useCallback(
+        (selectedFile: File) => {
+            const fileName = selectedFile.name.toLowerCase();
+            if (
+                !fileName.endsWith('.xlsx') &&
+                !fileName.endsWith('.xls') &&
+                !fileName.endsWith('.csv')
+            ) {
+                toast({
+                    title: 'Invalid File Type',
+                    description: 'Please upload an Excel (.xlsx, .xls) or CSV (.csv) file',
+                    variant: 'destructive',
+                });
+                return;
+            }
+            setFile(selectedFile);
+            setResult(null);
+        },
+        [toast]
+    );
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile) {
-            handleFileSelect(droppedFile);
-        }
-    }, [handleFileSelect]);
+    const handleDrop = useCallback(
+        (e: React.DragEvent) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const droppedFile = e.dataTransfer.files[0];
+            if (droppedFile) handleFileSelect(droppedFile);
+        },
+        [handleFileSelect]
+    );
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -159,9 +164,7 @@ export function BulkUploadDialog({
 
             const response = await fetch('/api/business/products/bulk-upload', {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                },
+                headers: { Authorization: `Bearer ${idToken}` },
                 body: formData,
             });
 
@@ -184,7 +187,6 @@ export function BulkUploadDialog({
                 title: 'Upload Complete',
                 description: `${data.summary.success} products ${mode === 'add' ? 'added' : 'updated'} successfully`,
             });
-
         } catch (error) {
             toast({
                 title: 'Upload Failed',
@@ -197,7 +199,6 @@ export function BulkUploadDialog({
         }
     };
 
-    // Download result file
     const handleDownloadResult = () => {
         if (!result?.resultFile) return;
 
@@ -208,7 +209,7 @@ export function BulkUploadDialog({
         }
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: result.resultFile.mimeType });
-        
+
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = result.resultFile.name;
@@ -217,25 +218,24 @@ export function BulkUploadDialog({
         document.body.removeChild(link);
     };
 
-    // Download template
     const handleDownloadTemplate = async () => {
         const ExcelJS = (await import('exceljs')).default;
-        
+
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Products');
 
-        // Define columns
         worksheet.columns = [
             { header: 'Product Name', key: 'productName', width: 25 },
             { header: 'SKU', key: 'sku', width: 15 },
             { header: 'Weight', key: 'weight', width: 10 },
             { header: 'Category', key: 'category', width: 20 },
+            { header: 'HSN', key: 'hsn', width: 12 },
+            { header: 'Tax Rate', key: 'taxRate', width: 10 },
             { header: 'Description', key: 'description', width: 35 },
             { header: 'Price', key: 'price', width: 10 },
             { header: 'Stock', key: 'stock', width: 10 },
         ];
 
-        // Style header row
         worksheet.getRow(1).font = { bold: true };
         worksheet.getRow(1).fill = {
             type: 'pattern',
@@ -243,14 +243,44 @@ export function BulkUploadDialog({
             fgColor: { argb: 'FFE0E0E0' },
         };
 
-        // Add sample data
-        worksheet.addRow({ productName: 'Cotton T-Shirt', sku: 'TSH-001', weight: 250, category: 'Apparel', description: 'Comfortable cotton t-shirt', price: 499, stock: 100 });
-        worksheet.addRow({ productName: 'Denim Jeans', sku: 'JNS-002', weight: 450, category: 'Apparel', description: 'Classic denim jeans', price: 1299, stock: 50 });
-        worksheet.addRow({ productName: 'Running Shoes', sku: 'SHO-003', weight: 350, category: 'Footwear', description: 'Lightweight running shoes', price: 2499, stock: 30 });
+        worksheet.addRow({
+            productName: 'Cotton T-Shirt',
+            sku: 'TSH-001',
+            weight: 250,
+            category: 'Apparel',
+            hsn: '6109',
+            taxRate: 5,
+            description: 'Comfortable cotton t-shirt',
+            price: 499,
+            stock: 100,
+        });
+        worksheet.addRow({
+            productName: 'Denim Jeans',
+            sku: 'JNS-002',
+            weight: 450,
+            category: 'Apparel',
+            hsn: '6203',
+            taxRate: 12,
+            description: 'Classic denim jeans',
+            price: 1299,
+            stock: 50,
+        });
+        worksheet.addRow({
+            productName: 'Running Shoes',
+            sku: 'SHO-003',
+            weight: 350,
+            category: 'Footwear',
+            hsn: '6404',
+            taxRate: 18,
+            description: 'Lightweight running shoes',
+            price: 2499,
+            stock: 30,
+        });
 
-        // Generate and download
         const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const blob = new Blob([buffer], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = 'product-upload-template.xlsx';
@@ -328,7 +358,7 @@ export function BulkUploadDialog({
                                 Download Template
                             </Button>
                         </div>
-                        
+
                         <div className="text-sm text-muted-foreground space-y-2">
                             <p className="font-medium text-foreground">Required Columns:</p>
                             <ul className="list-disc list-inside space-y-1 ml-2">
@@ -346,10 +376,18 @@ export function BulkUploadDialog({
                                             <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Weight</code>
                                             {' '}- Weight in grams (must be {'>'} 0)
                                         </li>
+                                        <li>
+                                            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">HSN</code>
+                                            {' '}- HSN code for GST classification
+                                        </li>
+                                        <li>
+                                            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Tax Rate</code>
+                                            {' '}- GST rate percentage (e.g. 0, 5, 12, 18, 28)
+                                        </li>
                                     </>
                                 )}
                             </ul>
-                            
+
                             <p className="font-medium text-foreground pt-2">Optional Columns:</p>
                             <ul className="list-disc list-inside space-y-1 ml-2">
                                 {mode === 'update' && (
@@ -359,6 +397,12 @@ export function BulkUploadDialog({
                                         </li>
                                         <li>
                                             <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Weight</code>
+                                        </li>
+                                        <li>
+                                            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">HSN</code>
+                                        </li>
+                                        <li>
+                                            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Tax Rate</code>
                                         </li>
                                     </>
                                 )}
@@ -381,7 +425,7 @@ export function BulkUploadDialog({
                             </ul>
 
                             <p className="text-xs pt-2 text-muted-foreground/70">
-                                Valid Categories: Apparel, Accessories, Footwear, Electronics, Home & Living, Beauty & Personal Care, Sports & Outdoors, Books & Stationery, Food & Beverages, Other
+                                Valid Categories: Apparel, Accessories, Footwear, Electronics, Home &amp; Living, Beauty &amp; Personal Care, Sports &amp; Outdoors, Books &amp; Stationery, Food &amp; Beverages, Other
                             </p>
                         </div>
                     </div>
@@ -398,8 +442,8 @@ export function BulkUploadDialog({
                                 isDragging
                                     ? 'border-primary bg-primary/5 scale-[1.02]'
                                     : file
-                                    ? 'border-emerald-500/50 bg-emerald-500/5'
-                                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                                        ? 'border-emerald-500/50 bg-emerald-500/5'
+                                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
                             )}
                         >
                             <input
@@ -494,15 +538,16 @@ export function BulkUploadDialog({
                             animate={{ opacity: 1, y: 0 }}
                             className="space-y-4"
                         >
-                            {/* Summary */}
                             <div className="rounded-xl border bg-gradient-to-br from-background to-muted/30 p-5">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className={cn(
-                                        'p-2 rounded-lg',
-                                        result.summary.errors > 0 
-                                            ? 'bg-amber-500/10'
-                                            : 'bg-emerald-500/10'
-                                    )}>
+                                    <div
+                                        className={cn(
+                                            'p-2 rounded-lg',
+                                            result.summary.errors > 0
+                                                ? 'bg-amber-500/10'
+                                                : 'bg-emerald-500/10'
+                                        )}
+                                    >
                                         {result.summary.errors > 0 ? (
                                             <AlertTriangle className="h-5 w-5 text-amber-600" />
                                         ) : (
@@ -539,7 +584,6 @@ export function BulkUploadDialog({
                                 </div>
                             </div>
 
-                            {/* Download Result File */}
                             {result.resultFile && (
                                 <Button
                                     onClick={handleDownloadResult}
@@ -551,7 +595,6 @@ export function BulkUploadDialog({
                                 </Button>
                             )}
 
-                            {/* Upload Another */}
                             <Button
                                 onClick={() => {
                                     setFile(null);

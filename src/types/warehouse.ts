@@ -1,6 +1,55 @@
 // /types/warehouse.ts
 
 import { Timestamp } from "firebase-admin/firestore";
+ 
+// user/{businessId}/products/{productId}
+export interface Product {
+    /** Firestore document ID — same value as `sku`. */
+    id: string;
+    name: string;
+    sku: string;
+    weight: number;
+    category: string;
+ 
+    /** HSN (Harmonised System of Nomenclature) code — mandatory for GST compliance. */
+    hsn: string;
+    /** GST tax rate percentage, e.g. 5, 12, 18, 28. */
+    taxRate: number;
+ 
+    // Optional fields stored as explicit null rather than undefined so that
+    // Firestore serialisation is predictable and type-narrowing is simple.
+    description: string | null;
+    price: number | null;
+    stock: number | null;
+    status: 'active' | 'draft' | 'archived' | null;
+    mappedVariants: MappedVariant[] | null;
+ 
+    createdBy: string | null;
+    createdAt: Timestamp;
+    updatedBy: string | null;
+    updatedAt: Timestamp | null;
+ 
+    // Inventory counters initialised on creation.
+    inShelfQuantity: number;
+    inventory: {
+        openingStock: number;
+        inwardAddition: number;
+        deduction: number;
+        autoAddition: number;
+        autoDeduction: number;
+        blockedStock: number;
+    } | null;
+}
+
+export interface MappedVariant {
+    storeId: string;
+    productId: string;
+    productTitle: string;
+    variantId: number;
+    variantTitle: string;
+    variantSku: string;
+    mappedAt: string;
+}
 
 // users/{businessId}/warehouses/{warehouseId}
 export interface Warehouse {

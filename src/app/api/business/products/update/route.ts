@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
+import { Product } from '@/types/warehouse';
 
 // ============================================================
 // TYPES
@@ -19,7 +20,7 @@ interface ProductLog {
     action: 'created' | 'updated' | 'deleted';
     changes: ChangeLogEntry[];
     performedBy: string;
-    performedByEmail?: string;
+    performedByEmail: string | null;
     performedAt: Timestamp;
     metadata?: {
         userAgent?: string;
@@ -32,6 +33,8 @@ const FIELD_LABELS: Record<string, string> = {
     name: 'Product Name',
     weight: 'Weight',
     category: 'Category',
+    hsn: 'HSN Code',
+    taxRate: 'GST Rate',
     description: 'Description',
     price: 'Price',
     stock: 'Stock',
@@ -42,22 +45,28 @@ const FIELD_LABELS: Record<string, string> = {
 // HELPER FUNCTIONS
 // ============================================================
 
-function getChanges(oldData: Record<string, any>, newData: Record<string, any>): ChangeLogEntry[] {
+function getChanges(
+    oldData: Record<string, any>,
+    newData: Record<string, any>
+): ChangeLogEntry[] {
     const changes: ChangeLogEntry[] = [];
-    const fieldsToTrack = ['name', 'weight', 'category', 'description', 'price', 'stock', 'status'];
+    const fieldsToTrack: Array<keyof Omit<Product, 'id' | 'sku' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy' | 'mappedVariants' | 'inventory' | 'inShelfQuantity'>> = [
+        'name', 'weight', 'category', 'hsn', 'taxRate',
+        'description', 'price', 'stock', 'status',
+    ];
 
     for (const field of fieldsToTrack) {
         const oldValue = oldData[field];
         const newValue = newData[field];
 
-        // Normalize values for comparison (treat null, undefined, and '' as equivalent)
+        // Normalise: treat null, undefined and '' as equivalent for comparison
         const normalizedOld = oldValue === undefined || oldValue === '' ? null : oldValue;
         const normalizedNew = newValue === undefined || newValue === '' ? null : newValue;
 
         if (normalizedOld !== normalizedNew) {
             changes.push({
                 field,
-                fieldLabel: FIELD_LABELS[field] || field,
+                fieldLabel: FIELD_LABELS[field] ?? field,
                 oldValue: normalizedOld,
                 newValue: normalizedNew,
             });
@@ -68,18 +77,11 @@ function getChanges(oldData: Record<string, any>, newData: Record<string, any>):
 }
 
 function formatValueForLog(value: any, field: string): string {
-    if (value === null || value === undefined) {
-        return '—';
-    }
-    if (field === 'weight') {
-        return `${value}g`;
-    }
-    if (field === 'price') {
-        return `₹${value}`;
-    }
-    if (field === 'stock') {
-        return `${value} units`;
-    }
+    if (value === null || value === undefined) return '—';
+    if (field === 'weight') return `${value}g`;
+    if (field === 'price') return `₹${value}`;
+    if (field === 'stock') return `${value} units`;
+    if (field === 'taxRate') return `${value}%`;
     return String(value);
 }
 
@@ -89,7 +91,11 @@ function formatValueForLog(value: any, field: string): string {
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, sku, product } = await req.json();
+        const {
+            businessId,
+            sku,
+            product,
+        }: { businessId: string; sku: string; product: Partial<Product> } = await req.json();
 
         // ============================================================
         // VALIDATION
@@ -132,15 +138,14 @@ export async function POST(req: NextRequest) {
         // CORE LOGIC
         // ============================================================
 
-        const { name, weight, category }: {
-            name?: string;
-            weight?: number;
-            category?: string;
-        } = product;
+        const { name, weight, category, hsn, taxRate } = product;
 
-        if (!name || !weight || !category) {
+        if (!name || !weight || !category || !hsn || taxRate === undefined || taxRate === null) {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'Missing required fields: name, weight, or category' },
+                {
+                    error: 'Validation Error',
+                    message: 'Missing required fields: name, weight, category, hsn, or taxRate',
+                },
                 { status: 400 }
             );
         }
@@ -155,27 +160,32 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Get existing data for comparison
-        const existingData = productDoc.data() || {};
+        const existingData = productDoc.data() ?? {};
 
-        // Build update object
-        const updateData: Record<string, any> = {
-            name: product.name,
-            weight: product.weight,
-            category: product.category,
-            updatedBy: userId || 'unknown',
+        // Build the update payload — typed as Partial<Product> since we only
+        // write fields that are explicitly provided.
+        const updateData: Partial<Product> & { updatedBy: string; updatedAt: Timestamp } = {
+            name: product.name!,
+            weight: product.weight!,
+            category: product.category!,
+            hsn: product.hsn!,
+            taxRate: product.taxRate!,
+            updatedBy: userId ?? 'unknown',
             updatedAt: Timestamp.now(),
         };
 
-        // Optional fields
+        // Optional fields — always write them (even as null) so the doc stays in sync
         if (product.description !== undefined) {
-            updateData.description = product.description || null;
+            updateData.description = product.description ?? null;
         }
         if (product.price !== undefined) {
-            updateData.price = product.price || null;
+            updateData.price = product.price ?? null;
         }
         if (product.stock !== undefined) {
-            updateData.stock = product.stock !== null ? parseInt(product.stock) : null;
+            updateData.stock = product.stock !== null ? Number(product.stock) : null;
+        }
+        if (product.status !== undefined) {
+            updateData.status = product.status ?? null;
         }
 
         // ============================================================
@@ -184,13 +194,12 @@ export async function POST(req: NextRequest) {
 
         const changes = getChanges(existingData, updateData);
 
-        // If no actual changes, return early
         if (changes.length === 0) {
             return NextResponse.json(
                 {
                     success: true,
                     message: 'No changes detected.',
-                    product: { sku, ...existingData },
+                    product: { id: sku, ...existingData } as Product,
                     changes: [],
                 },
                 { status: 200 }
@@ -202,16 +211,16 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const userData = userDoc?.data();
-        const userEmail = userData?.email || userData?.primaryContact?.email || null;
+        const userEmail = userData?.email ?? userData?.primaryContact?.email ?? null;
 
         const logEntry: ProductLog = {
             action: 'updated',
             changes,
-            performedBy: userId || 'unknown',
+            performedBy: userId ?? 'unknown',
             performedByEmail: userEmail,
             performedAt: Timestamp.now(),
             metadata: {
-                userAgent: req.headers.get('user-agent') || undefined,
+                userAgent: req.headers.get('user-agent') ?? undefined,
             },
         };
 
@@ -221,10 +230,8 @@ export async function POST(req: NextRequest) {
 
         const batch = db.batch();
 
-        // Update the product
         batch.update(productRef!, updateData);
 
-        // Create the log entry
         const logRef = productRef!.collection('logs').doc();
         batch.set(logRef, logEntry);
 
@@ -238,8 +245,8 @@ export async function POST(req: NextRequest) {
             {
                 success: true,
                 message: 'Product updated successfully.',
-                product: { sku, ...updateData },
-                changes: changes.map(c => ({
+                product: { id: sku, ...updateData } as Product,
+                changes: changes.map((c) => ({
                     ...c,
                     oldValueFormatted: formatValueForLog(c.oldValue, c.field),
                     newValueFormatted: formatValueForLog(c.newValue, c.field),

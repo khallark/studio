@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
+import { Product } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
-        const { businessId, product } = await req.json();
+        const { businessId, product }: { businessId: string; product: Partial<Product> } =
+            await req.json();
 
         // ============================================================
         // VALIDATION
@@ -42,16 +44,14 @@ export async function POST(req: NextRequest) {
         // CORE LOGIC
         // ============================================================
 
-        const { name, sku, weight, category }: {
-            name?: string;
-            sku?: string;
-            weight?: number;
-            category?: string;
-        } = product;
+        const { name, sku, weight, category, hsn, taxRate } = product;
 
-        if (!name || !sku || !weight || !category) {
+        if (!name || !sku || !weight || !category || !hsn || taxRate === undefined || taxRate === null) {
             return NextResponse.json(
-                { error: 'Validation Error', message: 'Missing required fields: name, sku, weight, or category' },
+                {
+                    error: 'Validation Error',
+                    message: 'Missing required fields: name, sku, weight, category, hsn, or taxRate',
+                },
                 { status: 400 }
             );
         }
@@ -67,23 +67,30 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse stock value for inventory initialization
-        const stockValue = product.stock !== undefined && product.stock !== null && product.stock !== ''
-            ? parseInt(product.stock)
-            : 0;
+        const stockValue =
+            product.stock !== undefined && product.stock !== null
+                ? Number(product.stock)
+                : 0;
 
-        // Build product data with inventory
-        const productData = {
-            name: product.name,
-            sku: product.sku,
-            weight: product.weight,
-            category: product.category,
-            description: product.description || null,
-            price: product.price || null,
+        // Build the full product document — typed as Omit<Product, 'id'> since the
+        // document ID (sku) is set as the Firestore doc key, not inside the data.
+        const productData: Omit<Product, 'id'> = {
+            name: product.name!,
+            sku: product.sku!,
+            weight: product.weight!,
+            category: product.category!,
+            hsn: product.hsn!,
+            taxRate: product.taxRate!,
+            description: product.description ?? null,
+            price: product.price ?? null,
             stock: stockValue || null,
-            createdBy: userId || 'unknown',
+            status: null,
+            mappedVariants: null,
+            createdBy: userId ?? 'unknown',
             createdAt: Timestamp.now(),
+            updatedBy: null,
+            updatedAt: null,
             inShelfQuantity: 0,
-            // Initialize inventory data
             inventory: {
                 openingStock: stockValue,
                 inwardAddition: 0,
@@ -99,7 +106,7 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const userData = userDoc?.data();
-        const userEmail = userData?.email || userData?.primaryContact?.email || null;
+        const userEmail = userData?.email ?? userData?.primaryContact?.email ?? null;
 
         const logEntry = {
             action: 'created',
@@ -108,15 +115,23 @@ export async function POST(req: NextRequest) {
                 { field: 'sku', fieldLabel: 'SKU', oldValue: null, newValue: productData.sku },
                 { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
                 { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
-                ...(productData.description ? [{ field: 'description', fieldLabel: 'Description', oldValue: null, newValue: productData.description }] : []),
-                ...(productData.price ? [{ field: 'price', fieldLabel: 'Price', oldValue: null, newValue: productData.price }] : []),
-                ...(stockValue > 0 ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }] : []),
+                { field: 'hsn', fieldLabel: 'HSN Code', oldValue: null, newValue: productData.hsn },
+                { field: 'taxRate', fieldLabel: 'GST Rate', oldValue: null, newValue: productData.taxRate },
+                ...(productData.description
+                    ? [{ field: 'description', fieldLabel: 'Description', oldValue: null, newValue: productData.description }]
+                    : []),
+                ...(productData.price
+                    ? [{ field: 'price', fieldLabel: 'Price', oldValue: null, newValue: productData.price }]
+                    : []),
+                ...(stockValue > 0
+                    ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }]
+                    : []),
             ],
-            performedBy: userId || 'unknown',
+            performedBy: userId ?? 'unknown',
             performedByEmail: userEmail,
             performedAt: Timestamp.now(),
             metadata: {
-                userAgent: req.headers.get('user-agent') || undefined,
+                userAgent: req.headers.get('user-agent') ?? undefined,
             },
         };
 
@@ -126,10 +141,8 @@ export async function POST(req: NextRequest) {
 
         const batch = db.batch();
 
-        // Create the product
         batch.set(productRef!, productData);
 
-        // Create the initial log entry
         const logRef = productRef!.collection('logs').doc();
         batch.set(logRef, logEntry);
 
@@ -143,7 +156,7 @@ export async function POST(req: NextRequest) {
             {
                 success: true,
                 message: 'Product created successfully.',
-                product: productData,
+                product: { id: sku, ...productData } as Product,
                 logId: logRef.id,
             },
             { status: 201 }

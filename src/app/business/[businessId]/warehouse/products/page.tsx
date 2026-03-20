@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useBusinessContext } from '../../layout';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import {
     Table,
     TableBody,
@@ -88,46 +88,28 @@ import {
     Link2Off,
     Unlink,
     AlertTriangle,
+    Receipt,
+    Percent,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductActivityLog } from '@/components/product-activity-log';
 import { ProductMappingsDialog } from '@/components/product-mappings-dialog';
 import { BulkUploadDialog } from '@/components/bulk-upload-dialog';
-import Link from 'next/link';
+import { Product } from '@/types/warehouse';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // ============================================================
 // TYPES
 // ============================================================
-
-interface Product {
-    id: string; // SKU
-    name: string;
-    sku: string;
-    weight: number;
-    category: string;
-    createdBy?: string;
-    createdAt?: Timestamp;
-    description?: string;
-    price?: number;
-    stock?: number;
-    status?: 'active' | 'draft' | 'archived';
-    mappedVariants?: Array<{
-        storeId: string;
-        productId: string;
-        productTitle: string;
-        variantId: number;
-        variantTitle: string;
-        variantSku: string;
-        mappedAt: string;
-    }>;
-}
 
 interface ProductFormData {
     name: string;
     sku: string;
     weight: string;
     category: string;
+    hsn: string;
+    taxRate: string;
     description: string;
     price: string;
     stock: string;
@@ -146,11 +128,15 @@ const CATEGORIES = [
     'Other',
 ];
 
+const TAX_RATES = [0, 5, 12, 18, 28];
+
 const initialFormData: ProductFormData = {
     name: '',
     sku: '',
     weight: '',
     category: '',
+    hsn: '',
+    taxRate: '',
     description: '',
     price: '',
     stock: '',
@@ -288,33 +274,31 @@ export default function ProductsPage() {
     const filteredProducts = useMemo(() => {
         let result = [...products];
 
-        // Search filter
         if (debouncedSearch) {
             const search = debouncedSearch.toLowerCase();
             result = result.filter(
                 (p) =>
                     p.name.toLowerCase().includes(search) ||
                     p.sku.toLowerCase().includes(search) ||
-                    p.category?.toLowerCase().includes(search)
+                    p.category?.toLowerCase().includes(search) ||
+                    p.hsn?.toLowerCase().includes(search)
             );
         }
 
-        // Category filter
         if (categoryFilter !== 'all') {
             result = result.filter((p) => p.category === categoryFilter);
         }
 
-        // Sort
         result.sort((a, b) => {
             let aVal: any = a[sortField];
             let bVal: any = b[sortField];
 
             if (sortField === 'createdAt') {
-                aVal = aVal?.toMillis?.() || 0;
-                bVal = bVal?.toMillis?.() || 0;
+                aVal = (aVal as Timestamp)?.toMillis?.() ?? 0;
+                bVal = (bVal as Timestamp)?.toMillis?.() ?? 0;
             } else if (typeof aVal === 'string') {
                 aVal = aVal.toLowerCase();
-                bVal = bVal?.toLowerCase() || '';
+                bVal = (bVal as string)?.toLowerCase() ?? '';
             }
 
             if (sortDirection === 'asc') {
@@ -341,12 +325,10 @@ export default function ProductsPage() {
         return counts;
     }, [products]);
 
-    // Count products with mappings
     const mappedProductsCount = useMemo(() => {
         return products.filter((p) => p.mappedVariants && p.mappedVariants.length > 0).length;
     }, [products]);
 
-    // Count total mappings in selected products
     const selectedMappingsCount = useMemo(() => {
         let count = 0;
         selectedProducts.forEach((sku) => {
@@ -358,18 +340,15 @@ export default function ProductsPage() {
         return count;
     }, [selectedProducts, products]);
 
-    // Count total mappings across all products
     const totalMappingsCount = useMemo(() => {
-        return products.reduce((sum, p) => sum + (p.mappedVariants?.length || 0), 0);
+        return products.reduce((sum, p) => sum + (p.mappedVariants?.length ?? 0), 0);
     }, [products]);
 
-    // Check if all visible products are selected
     const allVisibleSelected = useMemo(() => {
         if (paginatedProducts.length === 0) return false;
         return paginatedProducts.every((p) => selectedProducts.has(p.sku));
     }, [paginatedProducts, selectedProducts]);
 
-    // Check if some visible products are selected
     const someVisibleSelected = useMemo(() => {
         if (paginatedProducts.length === 0) return false;
         return paginatedProducts.some((p) => selectedProducts.has(p.sku)) && !allVisibleSelected;
@@ -422,9 +401,11 @@ export default function ProductsPage() {
                 sku: product.sku,
                 weight: product.weight.toString(),
                 category: product.category,
-                description: product.description || '',
-                price: product.price?.toString() || '',
-                stock: product.stock?.toString() || '',
+                hsn: product.hsn,
+                taxRate: product.taxRate.toString(),
+                description: product.description ?? '',
+                price: product.price?.toString() ?? '',
+                stock: product.stock?.toString() ?? '',
             });
         } else {
             setEditingProduct(null);
@@ -455,6 +436,10 @@ export default function ProductsPage() {
             errors.weight = 'Valid weight is required';
         }
         if (!formData.category) errors.category = 'Category is required';
+        if (!formData.hsn.trim()) errors.hsn = 'HSN code is required';
+        if (formData.taxRate === '' || isNaN(parseFloat(formData.taxRate))) {
+            errors.taxRate = 'Tax rate is required';
+        }
 
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
@@ -479,18 +464,20 @@ export default function ProductsPage() {
             const idToken = await user.getIdToken();
             const isEditing = !!editingProduct;
 
-            const productPayload = {
+            // Build payload as Partial<Product> — id is excluded intentionally
+            const productPayload: Partial<Product> = {
                 name: formData.name.trim(),
                 sku: formData.sku.trim().toUpperCase(),
                 weight: parseFloat(formData.weight),
                 category: formData.category,
+                hsn: formData.hsn.trim().toUpperCase(),
+                taxRate: parseFloat(formData.taxRate),
                 description: formData.description.trim() || null,
                 price: formData.price ? parseFloat(formData.price) : null,
                 stock: formData.stock ? parseInt(formData.stock) : null,
             };
 
             if (isEditing) {
-                // Update existing product
                 const response = await fetch('/api/business/products/update', {
                     method: 'POST',
                     headers: {
@@ -507,7 +494,6 @@ export default function ProductsPage() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message || 'Failed to update product');
 
-                // Show changes in toast if any
                 if (result.changes && result.changes.length > 0) {
                     const changesSummary = result.changes
                         .slice(0, 3)
@@ -524,7 +510,6 @@ export default function ProductsPage() {
                     });
                 }
             } else {
-                // Create new product
                 const response = await fetch('/api/business/products/create', {
                     method: 'POST',
                     headers: {
@@ -640,7 +625,7 @@ export default function ProductsPage() {
         }
     };
 
-    const formatDate = (timestamp?: Timestamp) => {
+    const formatDate = (timestamp: Timestamp | null) => {
         if (!timestamp) return '—';
         return timestamp.toDate().toLocaleDateString('en-IN', {
             day: 'numeric',
@@ -696,7 +681,6 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    {/* Bulk Upload Button */}
                     <Button
                         variant="outline"
                         onClick={() => setBulkUploadDialogOpen(true)}
@@ -706,7 +690,6 @@ export default function ProductsPage() {
                         Bulk Upload
                     </Button>
 
-                    {/* Product Mappings Button */}
                     <Button
                         variant="outline"
                         onClick={() => setMappingsDialogOpen(true)}
@@ -756,7 +739,6 @@ export default function ProductsPage() {
                             </div>
 
                             <div className="flex items-center gap-2">
-                                {/* Remove Mappings Button */}
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -874,11 +856,10 @@ export default function ProductsPage() {
                     {/* Filters */}
                     <CardHeader className="pb-4 border-b bg-muted/30">
                         <div className="flex flex-col sm:flex-row gap-4">
-                            {/* Search */}
                             <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search products by name, SKU, or category..."
+                                    placeholder="Search products by name, SKU, HSN, or category..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="pl-10 bg-background border-0 ring-1 ring-border/50 focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -895,7 +876,6 @@ export default function ProductsPage() {
                                 )}
                             </div>
 
-                            {/* Category Filter */}
                             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                                 <SelectTrigger className="w-full sm:w-[200px] bg-background border-0 ring-1 ring-border/50">
                                     <SelectValue placeholder="All Categories" />
@@ -1022,6 +1002,7 @@ export default function ProductsPage() {
                                                 <ArrowUpDown className="h-3 w-3" />
                                             </Button>
                                         </TableHead>
+                                        <TableHead>HSN / Tax</TableHead>
                                         <TableHead className="text-right">
                                             <Button
                                                 variant="ghost"
@@ -1111,6 +1092,16 @@ export default function ProductsPage() {
                                                     >
                                                         {product.category}
                                                     </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-0.5">
+                                                        <code className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">
+                                                            {product.hsn}
+                                                        </code>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {product.taxRate}% GST
+                                                        </p>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium tabular-nums">
                                                     {product.weight}
@@ -1232,7 +1223,7 @@ export default function ProductsPage() {
 
             {/* Add/Edit Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
                     <form onSubmit={handleSubmit}>
                         <DialogHeader>
                             <div className="flex items-center gap-3">
@@ -1351,6 +1342,61 @@ export default function ProductsPage() {
                                 {formErrors.category && (
                                     <p className="text-xs text-destructive">{formErrors.category}</p>
                                 )}
+                            </div>
+
+                            {/* HSN & Tax Rate */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="hsn" className="text-sm font-medium">
+                                        HSN Code <span className="text-destructive">*</span>
+                                    </Label>
+                                    <div className="relative">
+                                        <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            id="hsn"
+                                            value={formData.hsn}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    hsn: e.target.value.toUpperCase(),
+                                                })
+                                            }
+                                            placeholder="6109"
+                                            className={cn('pl-10', formErrors.hsn && 'border-destructive')}
+                                        />
+                                    </div>
+                                    {formErrors.hsn && (
+                                        <p className="text-xs text-destructive">{formErrors.hsn}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="taxRate" className="text-sm font-medium">
+                                        GST Rate (%) <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select
+                                        value={formData.taxRate}
+                                        onValueChange={(value) =>
+                                            setFormData({ ...formData, taxRate: value })
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            className={cn(formErrors.taxRate && 'border-destructive')}
+                                        >
+                                            <SelectValue placeholder="Select rate" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {TAX_RATES.map((rate) => (
+                                                <SelectItem key={rate} value={rate.toString()}>
+                                                    {rate}%
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {formErrors.taxRate && (
+                                        <p className="text-xs text-destructive">{formErrors.taxRate}</p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Description */}
@@ -1557,9 +1603,7 @@ export default function ProductsPage() {
                     onOpenChange={(open) => {
                         setActivityLogOpen(open);
                         if (!open) {
-                            // Force cleanup of any lingering pointer-events
                             document.body.style.pointerEvents = '';
-                            // Clear the product after animation completes
                             setTimeout(() => setActivityLogProduct(null), 300);
                         }
                     }}

@@ -1,302 +1,505 @@
 /**
- * generateGRNPdf.ts
- * Client-side GRN bill PDF generator — uses jsPDF + jspdf-autotable.
+ * generateGRNBillPdf.ts
+ * Generates a bill-style PDF for a GRN, closely matching the Majime invoice reference.
+ * Client-side only — jsPDF + jspdf-autotable.
+ *
  * Install: npm install jspdf jspdf-autotable
+ *
+ * Usage:
+ *   import { downloadGRNBill } from '@/lib/generateGRNBillPdf';
+ *   await downloadGRNBill(grn, businessId, user);
  */
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { User } from 'firebase/auth';
 import { GRN } from '@/types/warehouse';
+import { Party, PurchaseOrder } from '@/types/warehouse';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const PURPLE   = '#6B46C1';
-const PURPLE_R = 107; const PURPLE_G = 70; const PURPLE_B = 193;
-const PURPLE_LIGHT_R = 237; const PURPLE_LIGHT_G = 233; const PURPLE_LIGHT_B = 254;
-const DARK_R   = 30;  const DARK_G   = 30;  const DARK_B   = 30;
-const GREY_R   = 100; const GREY_G   = 100; const GREY_B   = 100;
-const GREEN_R  = 5;   const GREEN_G  = 150; const GREEN_B  = 105;
-const AMBER_R  = 180; const AMBER_G  = 83;  const AMBER_B  = 9;
-const RED_R    = 220; const RED_G    = 38;  const RED_B    = 38;
-const SLATE_R  = 100; const SLATE_G  = 116; const SLATE_B  = 139;
-const BG_R     = 249; const BG_G     = 250; const BG_B     = 251;
-const BORDER_R = 220; const BORDER_G = 220; const BORDER_B = 220;
+// ─── Palette (matches reference invoice) ────────────────────────────────────
+const C = {
+    purple: [107, 70, 193] as [number, number, number], // #6B46C1
+    purpleLight: [237, 233, 254] as [number, number, number], // #EDE9FE  (table header bg)
+    dark: [30, 30, 30] as [number, number, number],
+    grey: [100, 100, 100] as [number, number, number],
+    greyLight: [160, 160, 160] as [number, number, number],
+    border: [220, 220, 220] as [number, number, number],
+    bg: [249, 250, 251] as [number, number, number],
+    white: [255, 255, 255] as [number, number, number],
+    green: [5, 150, 105] as [number, number, number],
+    red: [220, 38, 38] as [number, number, number],
+    slate: [100, 116, 139] as [number, number, number],
+};
 
-const ML = 14; // margin left
-const MR = 14; // margin right
-const PW = 210; // A4 width mm
-const CW = PW - ML - MR; // content width
+// ─── Page geometry ───────────────────────────────────────────────────────────
+const PW = 210;  // A4 width mm
+const PH = 297;  // A4 height mm
+const ML = 14;   // margin left
+const MR = 14;   // margin right
+const CW = PW - ML - MR; // 182mm content width
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(timestamp: any): string {
-    if (!timestamp) return '—';
+/** jsPDF doesn't support ₹ in built-in fonts — use Rs. */
+function rs(amount: number): string {
+    return 'Rs. ' + amount.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+function fmt(ts: any): string {
+    if (!ts) return '—';
     try {
-        const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const d = ts.toDate ? ts.toDate() : new Date(ts);
         return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch { return '—'; }
 }
 
-function fmtCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency', currency: 'INR', minimumFractionDigits: 2,
-    }).format(amount);
+function statusLabel(s: string) {
+    return { draft: 'DRAFT', completed: 'COMPLETED', cancelled: 'CANCELLED' }[s] ?? s.toUpperCase();
+}
+function statusColor(s: string): [number, number, number] {
+    if (s === 'completed') return C.green;
+    if (s === 'cancelled') return C.red;
+    return C.slate;
 }
 
-function statusRGB(status: string): [number, number, number] {
-    if (status === 'completed') return [GREEN_R, GREEN_G, GREEN_B];
-    if (status === 'cancelled') return [RED_R, RED_G, RED_B];
-    return [SLATE_R, SLATE_G, SLATE_B]; // draft
-}
-
-function statusLabel(status: string): string {
-    return { draft: 'DRAFT', completed: 'COMPLETED', cancelled: 'CANCELLED' }[status] ?? status.toUpperCase();
-}
-
-// Draw a thin horizontal rule
-function rule(doc: jsPDF, y: number, r = BORDER_R, g = BORDER_G, b = BORDER_B) {
-    doc.setDrawColor(r, g, b);
+/** Draw a horizontal rule */
+function rule(doc: jsPDF, y: number, color = C.border) {
+    doc.setDrawColor(...color);
     doc.setLineWidth(0.3);
     doc.line(ML, y, PW - MR, y);
 }
 
-// Filled rounded rect helper
-function filledRoundRect(
-    doc: jsPDF,
-    x: number, y: number, w: number, h: number,
-    r: number,
-    fillR: number, fillG: number, fillB: number,
-) {
-    doc.setFillColor(fillR, fillG, fillB);
+/** Outlined rounded rect */
+function outlineRect(doc: jsPDF, x: number, y: number, w: number, h: number, r = 2, color = C.border) {
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(x, y, w, h, r, r, 'S');
+}
+
+/** Filled rounded rect */
+function fillRect(doc: jsPDF, x: number, y: number, w: number, h: number, r = 2, fill: [number, number, number] = C.bg) {
+    doc.setFillColor(...fill);
     doc.roundedRect(x, y, w, h, r, r, 'F');
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+/** Safe text — clips to maxW with ellipsis */
+function safeText(doc: jsPDF, text: string, x: number, y: number, maxW: number, align: 'left' | 'right' = 'left') {
+    const safe = doc.splitTextToSize(String(text ?? '—'), maxW)[0] ?? '';
+    doc.text(safe, x, y, { align });
+}
 
-export function downloadGRNPdf(grn: GRN): void {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-    let y = 14;
-
-    // ── HEADER ROW: Logo left | "Goods Receipt Note" right ──────────────────
-    // Purple logo block
-    filledRoundRect(doc, ML, y, 32, 10, 2, PURPLE_R, PURPLE_G, PURPLE_B);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(255, 255, 255);
-    doc.text('MAJIME', ML + 16, y + 6.5, { align: 'center' });
-
-    // Title
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(DARK_R, DARK_G, DARK_B);
-    doc.text('Goods Receipt Note', PW - MR, y + 4, { align: 'right' });
-
-    // Status pill
-    y += 13;
-    const sc = statusRGB(grn.status);
-    const sl = statusLabel(grn.status);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    const pillW = doc.getTextWidth(sl) + 7;
-    const pillX = PW - MR - pillW;
-    doc.setFillColor(sc[0], sc[1], sc[2]);
-    doc.roundedRect(pillX, y - 4, pillW, 5.5, 1.5, 1.5, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text(sl, pillX + pillW / 2, y, { align: 'center' });
-
-    // GRN number sub-line
+/** Render a label+value line pair, returns new y after the pair */
+function labelValue(
+    doc: jsPDF,
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    maxW: number,
+): number {
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.grey);
+    safeText(doc, label, x, y, maxW);
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(GREY_R, GREY_G, GREY_B);
-    doc.text(grn.grnNumber, PW - MR, y + 5.5, { align: 'right' });
+    doc.setTextColor(...C.purple);
+    safeText(doc, value, x, y + 4, maxW);
+    return y + 9;
+}
 
-    y += 8;
-    rule(doc, y, PURPLE_R, PURPLE_G, PURPLE_B);
-    doc.setLineWidth(0.3);
-    doc.setDrawColor(PURPLE_R, PURPLE_G, PURPLE_B);
-    doc.line(ML, y + 0.6, PW - MR, y + 0.6); // double-line effect
+// ─── Address block renderer (returns final y) ────────────────────────────────
+function renderAddressBlock(
+    doc: jsPDF,
+    title: string,
+    name: string,
+    lines: string[],   // address lines
+    gstin: string,
+    pan: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+): void {
+    fillRect(doc, x, y, w, h, 2, C.bg);
+    outlineRect(doc, x, y, w, h, 2, C.border);
 
-    // ── TWO-COLUMN META BLOCK ─────────────────────────────────────────────────
-    y += 6;
-    const col1X = ML;
-    const col2X = ML + CW / 2 + 4;
-    const colW  = CW / 2 - 4;
+    let cy = y + 6;
+    const ix = x + 4;
+    const iw = w - 8;
 
-    // Light bg card for meta
-    filledRoundRect(doc, ML, y, CW, 34, 2, BG_R, BG_G, BG_B);
-    doc.setDrawColor(BORDER_R, BORDER_G, BORDER_B);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(ML, y, CW, 34, 2, 2, 'S');
-
-    const metaLabelStyle = () => {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(GREY_R, GREY_G, GREY_B);
-    };
-    const metaValueStyle = () => {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(DARK_R, DARK_G, DARK_B);
-    };
-
-    const metaRows: Array<[string, string, string, string]> = [
-        ['Linked PO',       grn.poNumber,                          'Bill / Invoice #', grn.billNumber || '—'],
-        ['Warehouse',       grn.warehouseName || grn.warehouseId,  'Received By',      grn.receivedBy || '—'],
-        ['Created At',      fmt(grn.createdAt),                    'Received At',      fmt(grn.receivedAt)],
-        ['Received Value',  fmtCurrency(grn.totalReceivedValue),   'UPCs Created',     String((grn as any).totalUPCsCreated ?? '—')],
-    ];
-
-    let ry = y + 6;
-    for (const [l1, v1, l2, v2] of metaRows) {
-        metaLabelStyle();
-        doc.text(l1, col1X + 4, ry);
-        doc.text(l2, col2X, ry);
-        ry += 4;
-        metaValueStyle();
-        doc.text(v1, col1X + 4, ry);
-        doc.text(v2, col2X, ry);
-        ry += 5;
-    }
-
-    // ── QUANTITY SUMMARY PILLS ────────────────────────────────────────────────
-    y += 38;
-    const pillH = 14;
-    const pillTW = (CW - 8) / 3;
-
-    const pills: Array<{ label: string; value: number; r: number; g: number; b: number; fr: number; fg: number; fb: number }> = [
-        { label: 'Total Expected',     value: grn.totalExpectedQty,    r: 37,  g: 99,  b: 235,  fr: 239, fg: 246, fb: 255 },
-        { label: 'Total Received',     value: grn.totalReceivedQty,    r: GREEN_R, g: GREEN_G, b: GREEN_B, fr: 236, fg: 253, fb: 245 },
-        { label: 'Not Received',       value: grn.totalNotReceivedQty, r: AMBER_R, g: AMBER_G, b: AMBER_B, fr: 255, fg: 251, fb: 235 },
-    ];
-
-    pills.forEach((p, i) => {
-        const px = ML + i * (pillTW + 4);
-        filledRoundRect(doc, px, y, pillTW, pillH, 2, p.fr, p.fg, p.fb);
-        doc.setDrawColor(p.r, p.g, p.b);
-        doc.setLineWidth(0.2);
-        doc.roundedRect(px, y, pillTW, pillH, 2, 2, 'S');
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.setTextColor(p.r, p.g, p.b);
-        doc.text(String(p.value), px + pillTW / 2, y + 7, { align: 'center' });
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(p.r, p.g, p.b);
-        doc.text(p.label, px + pillTW / 2, y + 12, { align: 'center' });
-    });
-
-    // ── NOTES ─────────────────────────────────────────────────────────────────
-    y += pillH + 6;
-    if (grn.notes) {
-        filledRoundRect(doc, ML, y, CW, 11, 2, BG_R, BG_G, BG_B);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
-        doc.setTextColor(GREY_R, GREY_G, GREY_B);
-        doc.text('Notes', ML + 3, y + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(DARK_R, DARK_G, DARK_B);
-        // Truncate long notes to fit single row
-        const notesText = doc.splitTextToSize(grn.notes, CW - 6)[0];
-        doc.text(notesText, ML + 3, y + 9);
-        y += 15;
-    }
-
-    // ── LINE ITEMS TABLE ──────────────────────────────────────────────────────
-    y += 2;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(DARK_R, DARK_G, DARK_B);
-    doc.text(`Line Items (${grn.items.length})`, ML, y);
-    y += 4;
+    doc.setTextColor(...C.purple);
+    safeText(doc, title, ix, cy, iw);
+    cy += 5;
 
-    autoTable(doc, {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...C.dark);
+    safeText(doc, name, ix, cy, iw);
+    cy += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.dark);
+    for (const line of lines) {
+        if (!line) continue;
+        const wrapped = doc.splitTextToSize(line, iw);
+        for (const wl of wrapped) {
+            doc.text(wl, ix, cy);
+            cy += 4;
+        }
+    }
+
+    cy += 1;
+    const metaLines: Array<[string, string]> = [];
+    if (gstin) metaLines.push(['GSTIN:', gstin]);
+    if (pan) metaLines.push(['PAN:', pan]);
+
+    for (const [lbl, val] of metaLines) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...C.grey);
+        doc.text(lbl, ix, cy);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.dark);
+        safeText(doc, val, ix + doc.getTextWidth(lbl) + 2, cy, iw - doc.getTextWidth(lbl) - 2);
+        cy += 4.5;
+    }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export async function downloadGRNBill(
+    grn: GRN,
+    businessId: string,
+    user: User,
+): Promise<void> {
+    // ── 1. Fetch PO ──────────────────────────────────────────────────────────
+    const idToken = await user.getIdToken();
+    const poSnap = await getDoc(doc(db, 'users', businessId, 'purchaseOrders', grn.poId));
+    const po = poSnap.exists() ? (poSnap.data() as PurchaseOrder) : null;
+
+    // ── 2. Fetch Party (supplier) ────────────────────────────────────────────
+    let party: Party | null = null;
+    if (po?.supplierPartyId) {
+        const partySnap = await getDoc(doc(db, 'users', businessId, 'parties', po.supplierPartyId));
+        if (partySnap.exists()) party = partySnap.data() as Party;
+    }
+
+    // ── 3. Fetch Business doc ────────────────────────────────────────────────
+    const bizSnap = await getDoc(doc(db, 'users', businessId));
+    const biz = bizSnap.exists() ? bizSnap.data() : null;
+    const bizAddr = biz?.companyAddress ?? biz?.address ?? null;
+
+    // ── 4. Build data ────────────────────────────────────────────────────────
+
+    // Billed From — party/supplier
+    const fromName = party?.name ?? po?.supplierName ?? '—';
+    const fromAddr = party?.address;
+    const fromLines = [
+        fromAddr?.line1,
+        fromAddr?.line2,
+        [fromAddr?.city, fromAddr?.state].filter(Boolean).join(', '),
+        [fromAddr?.country, fromAddr?.pincode].filter(Boolean).join(' - '),
+    ].filter(Boolean) as string[];
+    const fromGstin = party?.gstin ?? '';
+    const fromPan = party?.pan ?? '';
+
+    // Billed To — business
+    const toName = biz?.companyName ?? biz?.businessName ?? '—';
+    const toLines = [
+        bizAddr?.address ?? bizAddr?.line1,
+        [bizAddr?.city, bizAddr?.state].filter(Boolean).join(', '),
+        [bizAddr?.country, bizAddr?.pincode].filter(Boolean).join(' - '),
+    ].filter(Boolean) as string[];
+    const toGstin = ''; // left blank intentionally
+    const toPan = '';
+
+    // Items — only received qty
+    const items = grn.items.filter(i => i.receivedQty > 0);
+    const subtotal = items.reduce((s, i) => s + i.receivedQty * i.unitCost, 0);
+
+    // ── 5. Build PDF ─────────────────────────────────────────────────────────
+    const doc2 = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let y = 14;
+
+    // ════════════════════════════════════════════════════════════════
+    // SECTION A — HEADER (mirrors reference: title left, logo right)
+    // ════════════════════════════════════════════════════════════════
+
+    // "GRN Receipt" title
+    doc2.setFont('helvetica', 'bold');
+    doc2.setFontSize(22);
+    doc2.setTextColor(...C.purple);
+    doc2.text('GRN Receipt', ML, y + 5);
+
+    // Status pill next to title
+    const sc = statusColor(grn.status);
+    const sl = statusLabel(grn.status);
+    doc2.setFont('helvetica', 'bold');
+    doc2.setFontSize(7.5);
+    const pillW = Math.max(doc2.getTextWidth(sl) + 6, 20);
+    const pillX = ML + doc2.getTextWidth('GRN Receipt') + 4;
+    doc2.setFillColor(...sc);
+    doc2.roundedRect(pillX, y, pillW, 6, 1.5, 1.5, 'F');
+    doc2.setTextColor(255, 255, 255);
+    doc2.text(sl, pillX + pillW / 2, y + 4, { align: 'center' });
+
+    // MAJIME wordmark — top right (triangle logo approximated with text)
+    doc2.setFont('helvetica', 'bold');
+    doc2.setFontSize(16);
+    doc2.setTextColor(...C.dark);
+    doc2.text('MAJIME', PW - MR, y + 3, { align: 'right' });
+    // decorative underline in purple
+    const mw = doc2.getTextWidth('MAJIME');
+    doc2.setDrawColor(...C.purple);
+    doc2.setLineWidth(0.6);
+    doc2.line(PW - MR - mw, y + 5, PW - MR, y + 5);
+
+    // Invoice No & Date lines
+    y += 12;
+    doc2.setFont('helvetica', 'normal');
+    doc2.setFontSize(8.5);
+    doc2.setTextColor(...C.grey);
+    doc2.text('GRN No #', ML, y);
+    doc2.setFont('helvetica', 'bold');
+    doc2.setTextColor(...C.dark);
+    doc2.text(grn.grnNumber, ML + 22, y);
+
+    y += 5;
+    doc2.setFont('helvetica', 'normal');
+    doc2.setTextColor(...C.grey);
+    doc2.text('GRN Date', ML, y);
+    doc2.setFont('helvetica', 'bold');
+    doc2.setTextColor(...C.dark);
+    doc2.text(fmt(grn.receivedAt ?? grn.createdAt), ML + 22, y);
+
+    if (grn.billNumber) {
+        y += 5;
+        doc2.setFont('helvetica', 'normal');
+        doc2.setTextColor(...C.grey);
+        doc2.text('Bill / Invoice #', ML, y);
+        doc2.setFont('helvetica', 'bold');
+        doc2.setTextColor(...C.dark);
+        safeText(doc2, grn.billNumber, ML + 30, y, 60);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // SECTION B — BILLED BY / BILLED TO (two equal columns)
+    // ════════════════════════════════════════════════════════════════
+    y += 10;
+    const boxW = (CW - 6) / 2; // ~88mm each, 6mm gap
+    const boxH = 46;
+    const boxY = y;
+
+    renderAddressBlock(doc2, 'Billed By', fromName, fromLines, fromGstin, fromPan,
+        ML, boxY, boxW, boxH);
+    renderAddressBlock(doc2, 'Billed To', toName, toLines, toGstin, toPan,
+        ML + boxW + 6, boxY, boxW, boxH);
+
+    // ════════════════════════════════════════════════════════════════
+    // SECTION C — SUPPLY INFO BAR (thin, centred, like reference)
+    // ════════════════════════════════════════════════════════════════
+    y = boxY + boxH + 5;
+    doc2.setFont('helvetica', 'normal');
+    doc2.setFontSize(8);
+    doc2.setTextColor(...C.grey);
+    const supplyLeft = `Linked PO: ${grn.poNumber}`;
+    const supplyRight = `Warehouse: ${grn.warehouseName ?? grn.warehouseId}`;
+    doc2.text(supplyLeft, ML, y);
+    safeText(doc2, supplyRight, PW - MR, y, 80, 'right');
+
+    // ════════════════════════════════════════════════════════════════
+    // SECTION D — ITEMS TABLE
+    // Column widths must sum to CW = 182mm:
+    //   # (6) | Item (94) | Qty (16) | Rate (30) | Amount (36) = 182 ✓
+    // ════════════════════════════════════════════════════════════════
+    y += 5;
+
+    autoTable(doc2, {
         startY: y,
         margin: { left: ML, right: MR },
-        head: [['SKU', 'Product', 'Expected', 'Received', 'Not Received', 'Value (INR)']],
-        body: grn.items.map(item => [
-            item.sku,
-            item.productName,
-            item.expectedQty,
-            item.receivedQty,
-            item.notReceivedQty,
-            fmtCurrency(item.totalCost),
+        tableWidth: CW,
+        head: [['#', 'Item', 'Qty.', 'Rate (Rs.)', 'Amount (Rs.)']],
+        body: items.map((item, i) => [
+            String(i + 1) + '.',
+            `${item.productName}\n${item.sku}`,
+            String(item.receivedQty),
+            item.unitCost.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
+            (item.receivedQty * item.unitCost).toLocaleString('en-IN', { minimumFractionDigits: 2 }),
         ]),
         headStyles: {
-            fillColor: [PURPLE_LIGHT_R, PURPLE_LIGHT_G, PURPLE_LIGHT_B],
-            textColor: [PURPLE_R, PURPLE_G, PURPLE_B],
+            fillColor: C.purpleLight,
+            textColor: C.purple,
             fontStyle: 'bold',
-            fontSize: 8,
-            halign: 'left',
+            fontSize: 8.5,
+            cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
         },
         columnStyles: {
-            0: { cellWidth: 28, fontSize: 7.5, fontStyle: 'normal', font: 'courier' },
-            1: { cellWidth: 'auto', fontSize: 8 },
-            2: { cellWidth: 20, halign: 'center', fontSize: 8 },
-            3: { cellWidth: 20, halign: 'center', fontSize: 8, fontStyle: 'bold',
-                 textColor: [GREEN_R, GREEN_G, GREEN_B] },
-            4: { cellWidth: 24, halign: 'center', fontSize: 8 },
-            5: { cellWidth: 30, halign: 'right', fontSize: 8, font: 'courier' },
+            0: { cellWidth: 8, halign: 'left', fontSize: 8, fontStyle: 'normal' },
+            1: { cellWidth: 92, halign: 'left', fontSize: 8, fontStyle: 'normal' },
+            2: { cellWidth: 16, halign: 'center', fontSize: 8, fontStyle: 'normal' },
+            3: { cellWidth: 32, halign: 'right', fontSize: 8, fontStyle: 'normal', font: 'courier' },
+            4: { cellWidth: 34, halign: 'right', fontSize: 8, fontStyle: 'bold', font: 'courier' },
         },
-        alternateRowStyles: { fillColor: [BG_R, BG_G, BG_B] },
-        bodyStyles: { textColor: [DARK_R, DARK_G, DARK_B] },
-        tableLineColor: [BORDER_R, BORDER_G, BORDER_B],
+        bodyStyles: {
+            textColor: C.dark,
+            cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+        },
+        alternateRowStyles: { fillColor: C.bg },
+        tableLineColor: C.border,
         tableLineWidth: 0.2,
+        // Subtle SKU text colour
         didParseCell(data) {
-            // Colour "Not Received" column amber when > 0
-            if (data.section === 'body' && data.column.index === 4) {
-                const val = Number(data.cell.raw);
-                if (val > 0) data.cell.styles.textColor = [AMBER_R, AMBER_G, AMBER_B];
+            if (data.section === 'body' && data.column.index === 1) {
+                // SKU is the second line — rendered inside same cell via \n
+                data.cell.styles.fontSize = 8;
+            }
+        },
+        didDrawCell(data) {
+            // Draw SKU in grey below product name (same cell, manual second line)
+            if (data.section === 'body' && data.column.index === 1) {
+                const raw = String(data.cell.raw ?? '');
+                const parts = raw.split('\n');
+                if (parts.length > 1) {
+                    doc2.setFont('courier', 'normal');
+                    doc2.setFontSize(7);
+                    doc2.setTextColor(...C.grey);
+                    doc2.text(
+                        parts[1],
+                        data.cell.x + 3,
+                        data.cell.y + data.cell.height - 3.5,
+                    );
+                }
             }
         },
     });
 
-    // ── TOTALS BOX (bottom-right, matching reference invoice) ─────────────────
-    const afterTable = (doc as any).lastAutoTable.finalY + 6;
-    const boxW = 72;
-    const boxX = PW - MR - boxW;
-    let by = afterTable;
+    // ════════════════════════════════════════════════════════════════
+    // SECTION E — BANK DETAILS (left) + TOTALS (right)
+    //   Mirrors reference invoice exactly.
+    // ════════════════════════════════════════════════════════════════
+    const afterTableY = (doc2 as any).lastAutoTable.finalY + 6;
+    y = afterTableY;
 
-    filledRoundRect(doc, boxX, by, boxW, 28, 2, BG_R, BG_G, BG_B);
-    doc.setDrawColor(BORDER_R, BORDER_G, BORDER_B);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(boxX, by, boxW, 28, 2, 2, 'S');
+    // Guard: if we're too close to page bottom, add page
+    if (y > PH - 80) {
+        doc2.addPage();
+        y = 16;
+    }
 
-    const totRow = (label: string, value: string, bold = false, large = false) => {
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setFontSize(large ? 9.5 : 8.5);
-        doc.setTextColor(bold ? DARK_R : GREY_R, bold ? DARK_G : GREY_G, bold ? DARK_B : GREY_B);
-        doc.text(label, boxX + 4, by);
-        doc.setFont('courier', bold ? 'bold' : 'normal');
-        doc.text(value, boxX + boxW - 4, by, { align: 'right' });
-        by += large ? 7 : 6;
+    const bankW = 78;
+    const totW = 72;
+    const totX = PW - MR - totW;
+    const bankH = 36;
+
+    // Bank details box (left) — fields present, values blank
+    fillRect(doc2, ML, y, bankW, bankH, 2, C.bg);
+    outlineRect(doc2, ML, y, bankW, bankH, 2, C.border);
+
+    doc2.setFont('helvetica', 'bold');
+    doc2.setFontSize(8.5);
+    doc2.setTextColor(...C.purple);
+    doc2.text('Bank Details', ML + 4, y + 6);
+
+    const bankFields: Array<[string, string]> = [
+        ['Account Name', ''],
+        ['Account Number', ''],
+        ['IFSC', ''],
+        ['Bank', ''],
+    ];
+    let by = y + 12;
+    for (const [lbl, val] of bankFields) {
+        doc2.setFont('helvetica', 'bold');
+        doc2.setFontSize(7.5);
+        doc2.setTextColor(...C.grey);
+        doc2.text(lbl, ML + 4, by);
+        doc2.setFont('helvetica', 'normal');
+        doc2.setFontSize(7.5);
+        doc2.setTextColor(...C.dark);
+        doc2.text(val || '—', ML + 34, by);
+        by += 5;
+    }
+
+    // Totals box (right) — Amount + Total (INR)
+    const totH = 28;
+    fillRect(doc2, totX, y, totW, totH, 2, C.bg);
+    outlineRect(doc2, totX, y, totW, totH, 2, C.border);
+
+    let ty = y + 7;
+
+    const totRow = (label: string, value: string, bold = false, large = false, topBorder = false) => {
+        if (topBorder) {
+            doc2.setDrawColor(...C.border);
+            doc2.setLineWidth(0.2);
+            doc2.line(totX + 2, ty - 2.5, totX + totW - 2, ty - 2.5);
+        }
+        doc2.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc2.setFontSize(large ? 9.5 : 8);
+        doc2.setTextColor(bold ? C.dark[0] : C.grey[0], bold ? C.dark[1] : C.grey[1], bold ? C.dark[2] : C.grey[2]);
+        doc2.text(label, totX + 4, ty);
+
+        doc2.setFont('courier', bold ? 'bold' : 'normal');
+        doc2.setFontSize(large ? 9.5 : 8);
+        safeText(doc2, value, totX + totW - 4, ty, totW - 20, 'right');
+        ty += large ? 7 : 5.5;
     };
 
-    by += 5;
-    totRow('Total Expected Qty',  String(grn.totalExpectedQty));
-    totRow('Total Received Qty',  String(grn.totalReceivedQty));
+    totRow('Amount', subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }));
+    totRow('Total (INR)', rs(subtotal), true, true, true);
 
-    // Divider inside box
-    doc.setDrawColor(BORDER_R, BORDER_G, BORDER_B);
-    doc.setLineWidth(0.2);
-    doc.line(boxX + 2, by, boxX + boxW - 2, by);
-    by += 4;
+    // ════════════════════════════════════════════════════════════════
+    // SECTION F — TERMS AND CONDITIONS
+    // ════════════════════════════════════════════════════════════════
+    y = Math.max(y + bankH, y + totH) + 8;
 
-    totRow('Total (INR)', fmtCurrency(grn.totalReceivedValue), true, true);
+    if (y > PH - 45) {
+        doc2.addPage();
+        y = 16;
+    }
 
-    // ── FOOTER ────────────────────────────────────────────────────────────────
-    const footerY = 287;
-    rule(doc, footerY, BORDER_R, BORDER_G, BORDER_B);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(GREY_R, GREY_G, GREY_B);
-    doc.text('This is a system-generated document. No signature is required.', ML, footerY + 4);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(PURPLE_R, PURPLE_G, PURPLE_B);
-    doc.text('Majime', PW - MR, footerY + 4, { align: 'right' });
+    doc2.setFont('helvetica', 'bold');
+    doc2.setFontSize(9);
+    doc2.setTextColor(...C.purple);
+    doc2.text('Terms and Conditions', ML, y);
+    y += 5;
 
-    // ── SAVE ─────────────────────────────────────────────────────────────────
-    doc.save(`${grn.grnNumber}.pdf`);
+    const terms = [
+        'Payment is due within 30 days from the date of this GRN receipt.',
+        'All disputes must be raised within 7 days of receipt of goods.',
+        'Goods once received and accepted cannot be returned without prior written approval.',
+    ];
+    doc2.setFont('helvetica', 'normal');
+    doc2.setFontSize(8);
+    doc2.setTextColor(...C.dark);
+    terms.forEach((t, i) => {
+        const lines = doc2.splitTextToSize(`${i + 1}. ${t}`, CW);
+        lines.forEach((line: string) => {
+            doc2.text(line, ML, y);
+            y += 4.5;
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════
+    // SECTION G — FOOTER (pinned near bottom)
+    // ════════════════════════════════════════════════════════════════
+    const footerY = PH - 8;
+    rule(doc2, footerY - 3, C.border);
+    doc2.setFont('helvetica', 'normal');
+    doc2.setFontSize(7);
+    doc2.setTextColor(...C.grey);
+    doc2.text('This is an electronically generated document, no signature is required.', ML, footerY);
+    doc2.setFont('helvetica', 'bold');
+    doc2.setTextColor(...C.purple);
+    doc2.text('Powered by Majime', PW - MR, footerY, { align: 'right' });
+
+    // ── Save ──────────────────────────────────────────────────────────────────
+    doc2.save(`${grn.grnNumber}-bill.pdf`);
 }

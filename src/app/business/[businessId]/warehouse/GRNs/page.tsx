@@ -84,7 +84,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Timestamp } from 'firebase-admin/firestore';
 import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
-import { downloadGRNPdf } from '@/components/generateGrnPdf';
+import { downloadGRNBill } from '@/components/generateGrnPdf';
 
 // ============================================================
 // TYPES
@@ -891,6 +891,7 @@ export default function GRNsPage() {
     const [viewingGRN, setViewingGRN] = useState<GRN | null>(null);
     const [deletingGRN, setDeletingGRN] = useState<GRN | null>(null);
     const [confirmingPutAway, setConfirmingPutAway] = useState<GRN | null>(null);
+    const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
 
     // Data
     const { data: grns = [], isLoading, refetch } = useGRNs(businessId, user);
@@ -988,6 +989,23 @@ export default function GRNsPage() {
     const handleRefresh = () => {
         queryClient.invalidateQueries({ queryKey: ['grns', businessId] });
         refetch();
+    };
+
+    const handleDownloadBill = async (grn: GRN) => {
+        if (!businessId || !user) return;
+        setDownloadingBillId(grn.id);
+        try {
+            await downloadGRNBill(grn, businessId, user);
+        } catch (err) {
+            console.error('Failed to generate bill PDF:', err);
+            toast({
+                title: 'Failed to generate PDF',
+                description: 'Could not fetch required data.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDownloadingBillId(null);
+        }
     };
 
     const toggleSort = (field: SortField) => {
@@ -1276,10 +1294,19 @@ export default function GRNsPage() {
                                                             <Eye className="h-4 w-4 mr-2" />
                                                             View Details
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => downloadGRNPdf(grn)}>
-                                                            <Download className="h-4 w-4 mr-2" />
+
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleDownloadBill(grn)}
+                                                            disabled={downloadingBillId === grn.id}
+                                                        >
+                                                            {downloadingBillId === grn.id ? (
+                                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                            ) : (
+                                                                <Download className="h-4 w-4 mr-2" />
+                                                            )}
                                                             Download Bill PDF
                                                         </DropdownMenuItem>
+
                                                         {grn.status === 'draft' && (
                                                             <>
                                                                 <DropdownMenuSeparator />

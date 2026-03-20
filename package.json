@@ -52,6 +52,8 @@
     "genkit": "^1.14.1",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.475.0",
     "nanoid": "^5.1.6",
     "next": "^15.5.7",

@@ -32,6 +32,7 @@ import {
     AlertTriangle,
     Link2,
     PackagePlus,
+    Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Timestamp } from 'firebase-admin/firestore';
 import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
+import { downloadGRNPdf } from '@/components/generateGrnPdf';
 
 // ============================================================
 // TYPES
@@ -1274,7 +1276,10 @@ export default function GRNsPage() {
                                                             <Eye className="h-4 w-4 mr-2" />
                                                             View Details
                                                         </DropdownMenuItem>
-
+                                                        <DropdownMenuItem onClick={() => downloadGRNPdf(grn)}>
+                                                            <Download className="h-4 w-4 mr-2" />
+                                                            Download Bill PDF
+                                                        </DropdownMenuItem>
                                                         {grn.status === 'draft' && (
                                                             <>
                                                                 <DropdownMenuSeparator />

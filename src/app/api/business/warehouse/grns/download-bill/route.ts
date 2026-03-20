@@ -42,6 +42,20 @@ function fmtCurrency(amount: number): string {
 
 // ─── HTML generator ───────────────────────────────────────────────────────────
 
+const GST_RATE = 0.05;   // hardcoded 5%
+const GST_RATE_PC = '5%';
+const HOME_STATE = 'punjab'; // business residing state — intra-state check
+
+function n2(n: number): string {
+    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Returns true when the supplier is from Punjab (intra-state supply). */
+function isIntraState(party: Party | null): boolean {
+    const state = (party?.address?.state ?? '').trim().toLowerCase();
+    return state === HOME_STATE || state === 'pb';
+}
+
 function buildInvoiceHTML(payload: {
     grn: GRN;
     po: PurchaseOrder | null;
@@ -51,8 +65,8 @@ function buildInvoiceHTML(payload: {
     const { grn, po, party, biz } = payload;
 
     // ── Billed From (Supplier / Party) ────────────────────────────────────────
-    const fromName  = party?.name ?? po?.supplierName ?? '—';
-    const fromAddr  = party?.address;
+    const fromName = party?.name ?? po?.supplierName ?? '—';
+    const fromAddr = party?.address;
     const fromLines = [
         fromAddr?.line1,
         fromAddr?.line2,
@@ -62,11 +76,11 @@ function buildInvoiceHTML(payload: {
             : (fromAddr?.country || fromAddr?.pincode || ''),
     ].filter((l): l is string => !!l);
     const fromGstin = party?.gstin ?? '';
-    const fromPan   = party?.pan   ?? '';
+    const fromPan = party?.pan ?? '';
 
     // ── Billed To (Business) ─────────────────────────────────────────────────
     const bizAddr = biz?.companyAddress ?? biz?.address ?? null;
-    const toName  = biz?.companyName ?? biz?.businessName ?? '—';
+    const toName = biz?.companyName ?? biz?.businessName ?? '—';
     const toLines = [
         bizAddr?.address ?? bizAddr?.line1,
         [bizAddr?.city, bizAddr?.state].filter(Boolean).join(', '),
@@ -75,15 +89,38 @@ function buildInvoiceHTML(payload: {
             : (bizAddr?.country || bizAddr?.pincode || ''),
     ].filter((l): l is string => !!l);
 
-    // ── Items (received qty > 0 only) ─────────────────────────────────────────
+    // ── GST type ──────────────────────────────────────────────────────────────
+    // Intra-state (Punjab → Punjab): CGST 2.5% + SGST 2.5%, IGST 0
+    // Inter-state (any other state): IGST 5%, CGST 0, SGST 0
+    const intra = isIntraState(party);
+    const cgstRate = intra ? GST_RATE / 2 : 0;
+    const sgstRate = intra ? GST_RATE / 2 : 0;
+    const igstRate = intra ? 0 : GST_RATE;
+
+    // ── Items (received qty > 0 only) + per-line tax ──────────────────────────
     const items = (grn.items ?? []).filter((i: any) => i.receivedQty > 0);
-    const subtotal = items.reduce((s: number, i: any) => s + i.receivedQty * i.unitCost, 0);
+
+    const computedItems = items.map((item: any) => {
+        const taxableAmt = item.receivedQty * item.unitCost;
+        const cgst = taxableAmt * cgstRate;
+        const sgst = taxableAmt * sgstRate;
+        const igst = taxableAmt * igstRate;
+        const total = taxableAmt + cgst + sgst + igst;
+        return { ...item, taxableAmt, cgst, sgst, igst, total };
+    });
+
+    // ── Grand totals ──────────────────────────────────────────────────────────
+    const totalTaxable = computedItems.reduce((s: number, i: any) => s + i.taxableAmt, 0);
+    const totalCGST = computedItems.reduce((s: number, i: any) => s + i.cgst, 0);
+    const totalSGST = computedItems.reduce((s: number, i: any) => s + i.sgst, 0);
+    const totalIGST = computedItems.reduce((s: number, i: any) => s + i.igst, 0);
+    const grandTotal = totalTaxable + totalCGST + totalSGST + totalIGST;
 
     // ── Status pill ───────────────────────────────────────────────────────────
     const statusStyles: Record<string, string> = {
         completed: 'background:#059669;',
         cancelled: 'background:#DC2626;',
-        draft:     'background:#64748B;',
+        draft: 'background:#64748B;',
     };
     const pillStyle = statusStyles[grn.status] ?? statusStyles.draft;
     const pillLabel = (grn.status ?? 'draft').toUpperCase();
@@ -95,22 +132,42 @@ function buildInvoiceHTML(payload: {
             <div class="addr-name">${escapeHtml(name)}</div>
             ${lines.map(l => `<div class="addr-line">${escapeHtml(l)}</div>`).join('')}
             ${gstin ? `<div class="addr-meta"><b>GSTIN:</b> ${escapeHtml(gstin)}</div>` : ''}
-            ${pan   ? `<div class="addr-meta"><b>PAN:</b> ${escapeHtml(pan)}</div>`   : ''}
+            ${pan ? `<div class="addr-meta"><b>PAN:</b> ${escapeHtml(pan)}</div>` : ''}
         </div>
     `;
 
     // ── Items table rows ──────────────────────────────────────────────────────
-    const itemRows = items.map((item: any, i: number) => `
+    const itemRows = computedItems.map((item: any, i: number) => `
         <tr class="${i % 2 === 1 ? 'row-alt' : ''}">
-            <td>${i + 1}.</td>
-            <td>
+            <td class="c-idx">${i + 1}.</td>
+            <td class="c-item">
                 <span class="item-name">${escapeHtml(item.productName)}</span>
                 <span class="item-sku">${escapeHtml(item.sku)}</span>
             </td>
-            <td class="num">${item.receivedQty}</td>
-            <td class="num mono">${Number(item.unitCost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-            <td class="num mono bold">${(item.receivedQty * item.unitCost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td class="c-gst num">${GST_RATE_PC}</td>
+            <td class="c-qty num">${item.receivedQty}</td>
+            <td class="c-rate num mono">${n2(item.unitCost)}</td>
+            <td class="c-amt num mono">${n2(item.taxableAmt)}</td>
+            <td class="c-tax num mono">${n2(item.cgst)}</td>
+            <td class="c-tax num mono">${n2(item.sgst)}</td>
+            <td class="c-tax num mono">${n2(item.igst)}</td>
+            <td class="c-total num mono bold">${n2(item.total)}</td>
         </tr>
+    `).join('');
+
+    // ── Totals box rows ───────────────────────────────────────────────────────
+    // Only show tax rows that are non-zero to keep it clean
+    const totalsRows = [
+        { label: 'Amount', value: n2(totalTaxable), grand: false },
+        ...(totalCGST > 0 ? [{ label: `+ CGST (${(cgstRate * 100).toFixed(1)}%)`, value: n2(totalCGST), grand: false }] : []),
+        ...(totalSGST > 0 ? [{ label: `+ SGST (${(sgstRate * 100).toFixed(1)}%)`, value: n2(totalSGST), grand: false }] : []),
+        ...(totalIGST > 0 ? [{ label: `+ IGST (${(igstRate * 100).toFixed(1)}%)`, value: n2(totalIGST), grand: false }] : []),
+        { label: 'Total (INR)', value: fmtCurrency(grandTotal), grand: true },
+    ].map(r => `
+        <div class="tot-row${r.grand ? ' grand' : ''}">
+            <span class="tot-lbl">${r.label}</span>
+            <span class="tot-val">${r.value}</span>
+        </div>
     `).join('');
 
     return `<!DOCTYPE html>
@@ -153,9 +210,7 @@ function buildInvoiceHTML(payload: {
         align-self: center;
         ${pillStyle}
     }
-    .logo {
-        text-align: right;
-    }
+    .logo { text-align: right; }
     .logo-text {
         font-size: 20px;
         font-weight: 800;
@@ -169,22 +224,15 @@ function buildInvoiceHTML(payload: {
         margin-top: 3px;
     }
 
-    /* ── Sub-header (GRN No, Date) ── */
-    .subheader {
-        margin-top: 12px;
-        margin-bottom: 16px;
-    }
+    /* ── Sub-header ── */
+    .subheader { margin-top: 12px; margin-bottom: 16px; }
     .subheader table { border-collapse: collapse; }
     .subheader td { padding: 2px 6px 2px 0; font-size: 12px; }
     .subheader .lbl { color: #888; font-weight: 400; white-space: nowrap; }
     .subheader .val { font-weight: 700; color: #1e1e1e; }
 
     /* ── Address boxes ── */
-    .addr-row {
-        display: flex;
-        gap: 14px;
-        margin-bottom: 12px;
-    }
+    .addr-row { display: flex; gap: 14px; margin-bottom: 12px; }
     .addr-box {
         flex: 1;
         background: #F9FAFB;
@@ -193,29 +241,10 @@ function buildInvoiceHTML(payload: {
         padding: 12px 14px;
         min-height: 110px;
     }
-    .addr-title {
-        font-size: 12px;
-        font-weight: 700;
-        color: #6B46C1;
-        margin-bottom: 5px;
-    }
-    .addr-name {
-        font-size: 13px;
-        font-weight: 700;
-        color: #1e1e1e;
-        margin-bottom: 4px;
-    }
-    .addr-line {
-        font-size: 11.5px;
-        color: #333;
-        line-height: 1.5;
-    }
-    .addr-meta {
-        font-size: 11px;
-        color: #555;
-        margin-top: 4px;
-        line-height: 1.5;
-    }
+    .addr-title { font-size: 12px; font-weight: 700; color: #6B46C1; margin-bottom: 5px; }
+    .addr-name  { font-size: 13px; font-weight: 700; color: #1e1e1e; margin-bottom: 4px; }
+    .addr-line  { font-size: 11.5px; color: #333; line-height: 1.5; }
+    .addr-meta  { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.5; }
 
     /* ── Supply info bar ── */
     .supply-bar {
@@ -233,33 +262,46 @@ function buildInvoiceHTML(payload: {
         width: 100%;
         border-collapse: collapse;
         margin-top: 6px;
-        font-size: 12px;
+        font-size: 11px;   /* slightly smaller to fit 10 cols on A4 */
+        table-layout: fixed;
     }
-    .items-table thead tr {
-        background: #EDE9FE;
-    }
+    .items-table thead tr { background: #EDE9FE; }
     .items-table thead th {
         color: #6B46C1;
         font-weight: 700;
-        font-size: 11.5px;
-        padding: 8px 8px;
+        font-size: 10.5px;
+        padding: 7px 5px;
         text-align: left;
         border-bottom: 1.5px solid #c4b5fd;
+        overflow: hidden;
+        white-space: nowrap;
     }
     .items-table thead th.num { text-align: right; }
+
+    /* fixed column widths — must total 100% of the ~511px content area */
+    .c-idx  { width: 24px; }
+    .c-item { width: auto; }   /* flex remainder */
+    .c-gst  { width: 44px; }
+    .c-qty  { width: 34px; }
+    .c-rate { width: 68px; }
+    .c-amt  { width: 68px; }
+    .c-tax  { width: 62px; }   /* CGST / SGST / IGST — 3 cols */
+    .c-total{ width: 72px; }
+
     .items-table tbody td {
-        padding: 8px 8px;
+        padding: 7px 5px;
         vertical-align: top;
         border-bottom: 1px solid #eee;
+        overflow: hidden;
     }
-    .items-table tbody td.num { text-align: right; }
+    .items-table tbody td.num  { text-align: right; }
     .items-table tbody td.mono { font-family: 'Courier New', Courier, monospace; }
     .items-table tbody td.bold { font-weight: 700; }
     .row-alt { background: #F9FAFB; }
-    .item-name { display: block; font-weight: 600; }
-    .item-sku  { display: block; font-size: 10.5px; color: #888; font-family: 'Courier New', Courier, monospace; margin-top: 2px; }
+    .item-name { display: block; font-weight: 600; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-sku  { display: block; font-size: 10px; color: #888; font-family: 'Courier New', Courier, monospace; margin-top: 2px; }
 
-    /* ── Bottom section: bank + totals ── */
+    /* ── Bottom: bank + totals ── */
     .bottom-row {
         display: flex;
         justify-content: space-between;
@@ -272,15 +314,10 @@ function buildInvoiceHTML(payload: {
         border: 1px solid #e0e0e0;
         border-radius: 6px;
         padding: 12px 14px;
-        width: 220px;
+        width: 210px;
         flex-shrink: 0;
     }
-    .bank-title {
-        font-size: 12px;
-        font-weight: 700;
-        color: #6B46C1;
-        margin-bottom: 8px;
-    }
+    .bank-title { font-size: 12px; font-weight: 700; color: #6B46C1; margin-bottom: 8px; }
     .bank-row {
         display: flex;
         justify-content: space-between;
@@ -297,7 +334,7 @@ function buildInvoiceHTML(payload: {
         border: 1px solid #e0e0e0;
         border-radius: 6px;
         padding: 12px 16px;
-        width: 210px;
+        width: 220px;
         flex-shrink: 0;
         align-self: flex-start;
     }
@@ -309,31 +346,17 @@ function buildInvoiceHTML(payload: {
         border-bottom: 1px solid #eee;
     }
     .tot-row:last-child { border-bottom: none; }
-    .tot-lbl { color: #888; }
-    .tot-val { font-family: 'Courier New', Courier, monospace; font-weight: 600; }
-    .tot-row.grand { margin-top: 4px; padding-top: 6px; border-top: 1.5px solid #d0d0d0; }
+    .tot-lbl { color: #888; white-space: nowrap; }
+    .tot-val { font-family: 'Courier New', Courier, monospace; font-weight: 600; text-align: right; margin-left: 8px; }
+    .tot-row.grand { margin-top: 2px; padding-top: 6px; border-top: 1.5px solid #d0d0d0; }
     .tot-row.grand .tot-lbl { font-weight: 700; color: #1e1e1e; font-size: 13px; }
     .tot-row.grand .tot-val { font-weight: 800; font-size: 13px; color: #1e1e1e; }
 
     /* ── Terms ── */
-    .terms {
-        margin-top: 24px;
-        padding-top: 12px;
-        border-top: 1px solid #e0e0e0;
-    }
-    .terms-title {
-        font-size: 12px;
-        font-weight: 700;
-        color: #6B46C1;
-        margin-bottom: 6px;
-    }
+    .terms { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e0e0e0; }
+    .terms-title { font-size: 12px; font-weight: 700; color: #6B46C1; margin-bottom: 6px; }
     .terms ol { padding-left: 16px; }
-    .terms li {
-        font-size: 11.5px;
-        color: #444;
-        line-height: 1.6;
-        margin-bottom: 2px;
-    }
+    .terms li { font-size: 11.5px; color: #444; line-height: 1.6; margin-bottom: 2px; }
 
     /* ── Footer ── */
     .footer {
@@ -380,6 +403,14 @@ function buildInvoiceHTML(payload: {
                 <td class="lbl">Bill / Invoice #</td>
                 <td class="val">${escapeHtml(grn.billNumber)}</td>
             </tr>` : ''}
+            <tr>
+                <td class="lbl">Place of Supply</td>
+                <td class="val">Punjab (03)</td>
+            </tr>
+            <tr>
+                <td class="lbl">Supply Type</td>
+                <td class="val">${intra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}</td>
+            </tr>
         </table>
     </div>
 
@@ -399,11 +430,16 @@ function buildInvoiceHTML(payload: {
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width:28px">#</th>
-                <th>Item</th>
-                <th class="num" style="width:50px">Qty.</th>
-                <th class="num" style="width:90px">Rate (Rs.)</th>
-                <th class="num" style="width:100px">Amount (Rs.)</th>
+                <th class="c-idx">#</th>
+                <th class="c-item">Item</th>
+                <th class="c-gst num">GST Rate</th>
+                <th class="c-qty num">Qty.</th>
+                <th class="c-rate num">Rate</th>
+                <th class="c-amt num">Amount</th>
+                <th class="c-tax num">CGST</th>
+                <th class="c-tax num">SGST</th>
+                <th class="c-tax num">IGST</th>
+                <th class="c-total num">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -423,14 +459,7 @@ function buildInvoiceHTML(payload: {
         </div>
 
         <div class="totals-box">
-            <div class="tot-row">
-                <span class="tot-lbl">Amount</span>
-                <span class="tot-val">${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div class="tot-row grand">
-                <span class="tot-lbl">Total (INR)</span>
-                <span class="tot-val">${fmtCurrency(subtotal)}</span>
-            </div>
+            ${totalsRows}
         </div>
 
     </div>
@@ -505,7 +534,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify user belongs to this business
-        const bizRef  = db.doc(`users/${businessId}`);
+        const bizRef = db.doc(`users/${businessId}`);
         const bizSnap = await bizRef.get();
         if (!bizSnap.exists) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
@@ -539,7 +568,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Build & render ────────────────────────────────────────────────────
-        const html   = buildInvoiceHTML({ grn, po, party, biz: bizData });
+        const html = buildInvoiceHTML({ grn, po, party, biz: bizData });
         const pdfBuf = await renderPDF(html);
 
         return new NextResponse(new Uint8Array(pdfBuf), {

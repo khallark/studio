@@ -424,7 +424,7 @@ function buildInvoiceHTML(payload: {
     <!-- ── BILLED BY / BILLED TO ── -->
     <div class="addr-row">
         ${addrBlock('Billed By', fromName, fromLines, fromGstin, fromPan)}
-        ${addrBlock('Billed To', toName, toLines, '', '')}
+        ${addrBlock('Billed To', toName, toLines, '03AAQCM9385B1Z8', 'AAQCM9385B')}
     </div>
 
     <!-- ── SUPPLY INFO BAR ── -->

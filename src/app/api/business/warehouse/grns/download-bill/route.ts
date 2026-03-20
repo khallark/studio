@@ -13,6 +13,9 @@ const chromiumConfig = chromium as typeof chromium & {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const FALLBACK_TAX_RATE = 0.05; // 5% — used when product doc has no taxRate
+const HOME_STATE = 'punjab';    // business residing state — intra-state check
+
 function escapeHtml(text: string | null | undefined): string {
     if (!text) return '';
     return String(text)
@@ -40,12 +43,6 @@ function fmtCurrency(amount: number): string {
     });
 }
 
-// ─── HTML generator ───────────────────────────────────────────────────────────
-
-const GST_RATE = 0.05;   // hardcoded 5%
-const GST_RATE_PC = '5%';
-const HOME_STATE = 'punjab'; // business residing state — intra-state check
-
 function n2(n: number): string {
     return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -56,13 +53,27 @@ function isIntraState(party: Party | null): boolean {
     return state === HOME_STATE || state === 'pb';
 }
 
+/**
+ * Resolves the GST rate (as a decimal fraction) for a given SKU.
+ * Falls back to FALLBACK_TAX_RATE if the product doc is missing or has no taxRate.
+ */
+function resolveItemTaxRate(sku: string, productTaxRates: Map<string, number>): number {
+    const rate = productTaxRates.get(sku.toUpperCase());
+    if (typeof rate === 'number' && rate >= 0) return rate / 100;
+    return FALLBACK_TAX_RATE;
+}
+
+// ─── HTML generator ───────────────────────────────────────────────────────────
+
 function buildInvoiceHTML(payload: {
     grn: GRN;
     po: PurchaseOrder | null;
     party: Party | null;
     biz: any;
+    /** Map of UPPER-CASED sku → taxRate percentage (e.g. 18 for 18%). */
+    productTaxRates: Map<string, number>;
 }): string {
-    const { grn, po, party, biz } = payload;
+    const { grn, po, party, biz, productTaxRates } = payload;
 
     // ── Billed From (Supplier / Party) ────────────────────────────────────────
     const fromName = party?.name ?? po?.supplierName ?? '—';
@@ -93,38 +104,50 @@ function buildInvoiceHTML(payload: {
             : (bizAddr?.country || bizAddr?.pincode || ''),
     ].filter((l): l is string => !!l);
 
-    // ── GST type ──────────────────────────────────────────────────────────────
-    // Intra-state (Punjab → Punjab): CGST 2.5% + SGST 2.5%, IGST 0
-    // Inter-state (any other state): IGST 5%, CGST 0, SGST 0
+    // ── Intra vs inter state ──────────────────────────────────────────────────
     const intra = isIntraState(party);
-    const cgstRate = intra ? GST_RATE / 2 : 0;
-    const sgstRate = intra ? GST_RATE / 2 : 0;
-    const igstRate = intra ? 0 : GST_RATE;
 
-    // ── Items (received qty > 0 only) + per-line tax ──────────────────────────
+    // ── Items (received qty > 0 only) with per-item tax ───────────────────────
     const items = (grn.items ?? []).filter((i: any) => i.receivedQty > 0);
 
     const computedItems = items.map((item: any) => {
+        const gstRate  = resolveItemTaxRate(item.sku, productTaxRates);
+        const cgstRate = intra ? gstRate / 2 : 0;
+        const sgstRate = intra ? gstRate / 2 : 0;
+        const igstRate = intra ? 0 : gstRate;
+
         const taxableAmt = item.receivedQty * item.unitCost;
         const cgst = taxableAmt * cgstRate;
         const sgst = taxableAmt * sgstRate;
         const igst = taxableAmt * igstRate;
         const total = taxableAmt + cgst + sgst + igst;
-        return { ...item, taxableAmt, cgst, sgst, igst, total };
+
+        return {
+            ...item,
+            gstRate,      // decimal, e.g. 0.18
+            cgstRate,
+            sgstRate,
+            igstRate,
+            taxableAmt,
+            cgst,
+            sgst,
+            igst,
+            total,
+        };
     });
 
     // ── Grand totals ──────────────────────────────────────────────────────────
     const totalTaxable = computedItems.reduce((s: number, i: any) => s + i.taxableAmt, 0);
-    const totalCGST = computedItems.reduce((s: number, i: any) => s + i.cgst, 0);
-    const totalSGST = computedItems.reduce((s: number, i: any) => s + i.sgst, 0);
-    const totalIGST = computedItems.reduce((s: number, i: any) => s + i.igst, 0);
-    const grandTotal = totalTaxable + totalCGST + totalSGST + totalIGST;
+    const totalCGST    = computedItems.reduce((s: number, i: any) => s + i.cgst, 0);
+    const totalSGST    = computedItems.reduce((s: number, i: any) => s + i.sgst, 0);
+    const totalIGST    = computedItems.reduce((s: number, i: any) => s + i.igst, 0);
+    const grandTotal   = totalTaxable + totalCGST + totalSGST + totalIGST;
 
     // ── Status pill ───────────────────────────────────────────────────────────
     const statusStyles: Record<string, string> = {
         completed: 'background:#059669;',
         cancelled: 'background:#DC2626;',
-        draft: 'background:#64748B;',
+        draft:     'background:#64748B;',
     };
     const pillStyle = statusStyles[grn.status] ?? statusStyles.draft;
     const pillLabel = (grn.status ?? 'draft').toUpperCase();
@@ -136,19 +159,21 @@ function buildInvoiceHTML(payload: {
             <div class="addr-name">${escapeHtml(name)}</div>
             ${lines.map(l => `<div class="addr-line">${escapeHtml(l)}</div>`).join('')}
             ${gstin ? `<div class="addr-meta"><b>GSTIN:</b> ${escapeHtml(gstin)}</div>` : ''}
-            ${pan ? `<div class="addr-meta"><b>PAN:</b> ${escapeHtml(pan)}</div>` : ''}
+            ${pan   ? `<div class="addr-meta"><b>PAN:</b>   ${escapeHtml(pan)}</div>`   : ''}
         </div>
     `;
 
     // ── Items table rows ──────────────────────────────────────────────────────
-    const itemRows = computedItems.map((item: any, i: number) => `
+    const itemRows = computedItems.map((item: any, i: number) => {
+        const gstPc = `${(item.gstRate * 100).toFixed(0)}%`;
+        return `
         <tr class="${i % 2 === 1 ? 'row-alt' : ''}">
             <td class="c-idx">${i + 1}.</td>
             <td class="c-item">
                 <span class="item-name">${escapeHtml(item.productName)}</span>
                 <span class="item-sku">${escapeHtml(item.sku)}</span>
             </td>
-            <td class="c-gst num">${GST_RATE_PC}</td>
+            <td class="c-gst num">${gstPc}</td>
             <td class="c-qty num">${item.receivedQty}</td>
             <td class="c-rate num mono">${n2(item.unitCost)}</td>
             <td class="c-amt num mono">${n2(item.taxableAmt)}</td>
@@ -157,16 +182,15 @@ function buildInvoiceHTML(payload: {
             <td class="c-tax num mono">${n2(item.igst)}</td>
             <td class="c-total num mono bold">${n2(item.total)}</td>
         </tr>
-    `).join('');
+    `}).join('');
 
-    // ── Totals box rows ───────────────────────────────────────────────────────
-    // Only show tax rows that are non-zero to keep it clean
+    // ── Totals box rows — only show non-zero tax lines ────────────────────────
     const totalsRows = [
-        { label: 'Amount', value: n2(totalTaxable), grand: false },
-        ...(totalCGST > 0 ? [{ label: `+ CGST (${(cgstRate * 100).toFixed(1)}%)`, value: n2(totalCGST), grand: false }] : []),
-        ...(totalSGST > 0 ? [{ label: `+ SGST (${(sgstRate * 100).toFixed(1)}%)`, value: n2(totalSGST), grand: false }] : []),
-        ...(totalIGST > 0 ? [{ label: `+ IGST (${(igstRate * 100).toFixed(1)}%)`, value: n2(totalIGST), grand: false }] : []),
-        { label: 'Total (INR)', value: fmtCurrency(grandTotal), grand: true },
+        { label: 'Amount',       value: n2(totalTaxable),        grand: false },
+        ...(totalCGST > 0 ? [{ label: '+ CGST', value: n2(totalCGST), grand: false }] : []),
+        ...(totalSGST > 0 ? [{ label: '+ SGST', value: n2(totalSGST), grand: false }] : []),
+        ...(totalIGST > 0 ? [{ label: '+ IGST', value: n2(totalIGST), grand: false }] : []),
+        { label: 'Total (INR)',  value: fmtCurrency(grandTotal),  grand: true  },
     ].map(r => `
         <div class="tot-row${r.grand ? ' grand' : ''}">
             <span class="tot-lbl">${r.label}</span>
@@ -266,7 +290,7 @@ function buildInvoiceHTML(payload: {
         width: 100%;
         border-collapse: collapse;
         margin-top: 6px;
-        font-size: 11px;   /* slightly smaller to fit 10 cols on A4 */
+        font-size: 11px;
         table-layout: fixed;
     }
     .items-table thead tr { background: #EDE9FE; }
@@ -282,14 +306,13 @@ function buildInvoiceHTML(payload: {
     }
     .items-table thead th.num { text-align: right; }
 
-    /* fixed column widths — must total 100% of the ~511px content area */
     .c-idx  { width: 24px; }
-    .c-item { width: auto; }   /* flex remainder */
+    .c-item { width: auto; }
     .c-gst  { width: 44px; }
     .c-qty  { width: 34px; }
     .c-rate { width: 68px; }
     .c-amt  { width: 68px; }
-    .c-tax  { width: 62px; }   /* CGST / SGST / IGST — 3 cols */
+    .c-tax  { width: 62px; }
     .c-total{ width: 72px; }
 
     .items-table tbody td {
@@ -574,8 +597,43 @@ export async function POST(req: NextRequest) {
             if (partySnap.exists) party = { id: partySnap.id, ...partySnap.data() } as Party;
         }
 
+        // ── Fetch product tax rates for all unique SKUs in the GRN ───────────
+        // Product doc IDs are the SKU (upper-cased). We do a single getAll()
+        // to avoid N sequential reads — Firestore admin SDK supports batch gets.
+        const productTaxRates = new Map<string, number>();
+
+        const grnItems: any[] = grn.items ?? [];
+        const uniqueSkus = [
+            ...new Set(
+                grnItems
+                    .filter((i) => i.receivedQty > 0 && i.sku)
+                    .map((i) => (i.sku as string).toUpperCase())
+            ),
+        ];
+
+        if (uniqueSkus.length > 0) {
+            const productRefs = uniqueSkus.map((sku) =>
+                db.doc(`users/${businessId}/products/${sku}`)
+            );
+            const productSnaps = await db.getAll(...productRefs);
+
+            productSnaps.forEach((snap, idx) => {
+                const sku = uniqueSkus[idx];
+                if (snap.exists) {
+                    const data = snap.data()!;
+                    // taxRate is stored as a percentage number (e.g. 18),
+                    // not as a decimal fraction. Fall back to 5 (%) if absent.
+                    const rate = typeof data.taxRate === 'number' ? data.taxRate : null;
+                    productTaxRates.set(sku, rate ?? FALLBACK_TAX_RATE * 100);
+                } else {
+                    // Product doc missing — fall back to 5%
+                    productTaxRates.set(sku, FALLBACK_TAX_RATE * 100);
+                }
+            });
+        }
+
         // ── Build & render ────────────────────────────────────────────────────
-        const html = buildInvoiceHTML({ grn, po, party, biz: bizData });
+        const html = buildInvoiceHTML({ grn, po, party, biz: bizData, productTaxRates });
         const pdfBuf = await renderPDF(html);
 
         return new NextResponse(new Uint8Array(pdfBuf), {

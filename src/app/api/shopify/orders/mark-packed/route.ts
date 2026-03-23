@@ -58,20 +58,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Guard: already packed
-        if (orderData.isPacked) {
-            return NextResponse.json(
-                { error: 'Order is already marked as packed' },
-                { status: 400 }
-            );
-        }
-
+        const timestamp = Timestamp.now();
+        
         // Update the order doc
         await orderRef.update({
-            isPacked: true,
-            packedAt: FieldValue.serverTimestamp(),
-            packingVidUrls: FieldValue.arrayUnion(packingVidUrl),
-            updatedAt: FieldValue.serverTimestamp(),
+            packingVidUrls: FieldValue.arrayUnion({
+                packingVidUrl,
+                packedAt: timestamp
+            }),
+            packedAt: timestamp
         });
 
         return NextResponse.json({

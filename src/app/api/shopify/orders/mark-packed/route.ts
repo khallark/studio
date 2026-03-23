@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
                 packingVidUrl,
                 packedAt: timestamp
             }),
-            packedAt: timestamp
+            lastPackedAt: timestamp
         });
 
         return NextResponse.json({

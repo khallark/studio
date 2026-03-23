@@ -131,6 +131,7 @@ import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
+import { StartPackagingDialog } from '@/components/start-packaging-dialog';
 
 // ============================================================
 // STATUS TABS CONFIGURATION
@@ -352,6 +353,7 @@ export default function BusinessOrdersPage() {
     // RTO UPC confirmation dialog
     const [isRTOUPCDialogOpen, setIsRTOUPCDialogOpen] = useState(false);
     const [pendingRTOStatus, setPendingRTOStatus] = useState<'RTO Closed' | null>(null);
+    const [isStartPackagingOpen, setIsStartPackagingOpen] = useState(false);
 
     // ============================================================
     // DATA FETCHING
@@ -1088,6 +1090,15 @@ export default function BusinessOrdersPage() {
                                             >
                                                 <AlignLeft className="h-4 w-4 mr-2" />
                                                 AWB Bulk Select
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'Ready To Dispatch' && (
+                                            <DropdownMenuItem
+                                                onClick={() => setIsStartPackagingOpen(true)}
+                                                disabled={isAnyOperationInProgress}
+                                            >
+                                                <Package className="h-4 w-4 mr-2" />
+                                                Start Packaging
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
@@ -1873,6 +1884,17 @@ export default function BusinessOrdersPage() {
                         refetchOrders();
                         queryClient.invalidateQueries({ queryKey: ['availabilityCounts', businessId] });
                     }}
+                />
+            )}
+
+            {/* Start Packaging Dialog */}
+            {isStartPackagingOpen && user && (
+                <StartPackagingDialog
+                    isOpen={isStartPackagingOpen}
+                    onClose={() => setIsStartPackagingOpen(false)}
+                    orders={orders.filter(o => o.customStatus === 'Ready To Dispatch')}
+                    businessId={businessId}
+                    user={user}
                 />
             )}
 

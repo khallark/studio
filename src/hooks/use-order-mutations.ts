@@ -811,3 +811,67 @@ export function useProcessRefund(
     },
   });
 }
+
+// ============================================================
+// MUTATION 13: MARK ORDER PACKED
+// Add this to /hooks/use-order-mutations.ts
+// ============================================================
+
+export function useMarkOrderPacked(
+  businessId: string | null,
+  user: User | null | undefined
+) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      orderId,
+      storeId,
+      packingVidUrl,
+    }: {
+      orderId: string;
+      storeId: string;
+      packingVidUrl: string;
+    }) => {
+      if (!storeId || !user || !orderId) {
+        throw new Error('Missing required fields');
+      }
+
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/mark-packed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, shop: storeId, orderId, packingVidUrl }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || result.details || 'Failed to mark order as packed');
+      }
+
+      return response.json();
+    },
+
+    onSuccess: () => {
+      // Only invalidate Ready To Dispatch orders
+      queryClient.invalidateQueries({
+        queryKey: ['orders', businessId],
+        // Optionally filter by status if your query key includes it:
+        // predicate: (query) => query.queryKey.includes('Ready To Dispatch'),
+      });
+      queryClient.invalidateQueries({ queryKey: ['orderCounts', businessId] });
+    },
+
+    onError: (error: Error) => {
+      toast({
+        title: 'Mark Packed Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}

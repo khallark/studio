@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/export/route',
       },
       {
+        source: '/api/shopify/orders/mark-packed',
+        destination: './api/shopify/orders/mark-packed/route',
+      },
+      {
         source: '/api/shopify/account/update-address',
         destination: '/api/shopify/account/update-address/route',
       },

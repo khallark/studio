@@ -74,6 +74,9 @@ export function StartPackagingDialog({
 
     // ---- Camera / recording ----
     const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const animFrameRef = useRef<number>(0);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const [streamReady, setStreamReady] = useState(false);
@@ -96,32 +99,31 @@ export function StartPackagingDialog({
     const startCamera = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    frameRate: { ideal: 15 },
-                    facingMode: { ideal: 'environment' },
-                },
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 }, facingMode: { ideal: 'environment' } },
                 audio: true,
             });
+            streamRef.current = stream;
             setHasCameraPermission(true);
             setStreamReady(true);
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
+            if (videoRef.current) videoRef.current.srcObject = stream;
         } catch {
             setHasCameraPermission(false);
         }
     }, []);
 
     const stopCameraStream = useCallback(() => {
-        if (videoRef.current?.srcObject) {
-            (videoRef.current.srcObject as MediaStream)
-                .getTracks()
-                .forEach((t) => t.stop());
-            videoRef.current.srcObject = null;
+        // Stop MediaRecorder first if still running
+        if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
         }
+        // Stop all tracks via the stored ref — reliable even after unmount
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
+        }
+        if (videoRef.current) videoRef.current.srcObject = null;
         setStreamReady(false);
+        setIsRecording(false);
     }, []);
 
     // Start camera when dialog opens
@@ -188,8 +190,49 @@ export function StartPackagingDialog({
     // -------------------------------------------------------
 
     const startRecording = () => {
-        if (!videoRef.current?.srcObject) return;
-        const stream = videoRef.current.srcObject as MediaStream;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || !streamRef.current) return;
+
+        const ctx = canvas.getContext('2d')!;
+
+        // Draw loop — video frame + timestamp burned in
+        const drawFrame = () => {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const now = new Date();
+            const stamp = now.toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false,
+            });
+
+            const padding = 6;
+            const fontSize = 13;
+            ctx.font = `${fontSize}px monospace`;
+            const textWidth = ctx.measureText(stamp).width;
+
+            // Semi-transparent background pill
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.beginPath();
+            ctx.roundRect(8, 8, textWidth + padding * 2, fontSize + padding * 2, 4);
+            ctx.fill();
+
+            // Timestamp text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(stamp, 8 + padding, 8 + padding + fontSize - 2);
+
+            animFrameRef.current = requestAnimationFrame(drawFrame);
+        };
+        drawFrame();
+
+        // Record the canvas stream, not the raw camera stream
+        const canvasStream = canvas.captureStream(15); // 15 fps
+
+        // Carry over the audio track from the real stream
+        const audioTrack = streamRef.current.getAudioTracks()[0];
+        if (audioTrack) canvasStream.addTrack(audioTrack);
+
         chunksRef.current = [];
 
         const options = [
@@ -201,20 +244,17 @@ export function StartPackagingDialog({
         let recorder: MediaRecorder | null = null;
         for (const opt of options) {
             try {
-                if (!opt.mimeType || MediaRecorder.isTypeSupported(opt.mimeType)) {
-                    recorder = new MediaRecorder(stream, opt as any);
+                if (!opt.mimeType || MediaRecorder.isTypeSupported((opt as any).mimeType)) {
+                    recorder = new MediaRecorder(canvasStream, opt as any);
                     break;
                 }
-            } catch {
-                /* try next */
-            }
+            } catch { /* try next */ }
         }
-        if (!recorder) recorder = new MediaRecorder(stream);
+        if (!recorder) recorder = new MediaRecorder(canvasStream);
 
-        recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) chunksRef.current.push(e.data);
-        };
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.onstop = () => {
+            cancelAnimationFrame(animFrameRef.current); // Stop the draw loop
             const blob = new Blob(chunksRef.current, { type: 'video/webm' });
             setRecordedBlob(blob);
         };
@@ -321,7 +361,7 @@ export function StartPackagingDialog({
     };
 
     const handleClose = () => {
-        if (isRecording) stopRecording();
+        stopCameraStream();
         onClose();
     };
 
@@ -494,6 +534,8 @@ export function StartPackagingDialog({
                                         muted
                                         playsInline
                                     />
+                                    {/* Hidden canvas — same dimensions, used for recording */}
+                                    <canvas ref={canvasRef} width={640} height={480} className="hidden" />
                                     {isRecording && (
                                         <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                                             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />

@@ -245,7 +245,7 @@ export function StartPackagingDialog({
             const token = await auth.currentUser?.getIdToken();
             if (!token) throw new Error('Authentication required');
 
-            const fileName = `${matchedOrder.id}_${Date.now()}.webm`;
+            const fileName = `${matchedOrder.id}-[${new Date().toDateString()}].webm`;
             const filePath = `packaged_orders/${matchedOrder.storeId}/${fileName}`;
             const videoRef2 = storageRef(storage, filePath);
 

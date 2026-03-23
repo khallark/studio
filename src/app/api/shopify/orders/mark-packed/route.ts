@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         await orderRef.update({
             isPacked: true,
             packedAt: FieldValue.serverTimestamp(),
-            packingVidUrl,
+            packingVidUrls: FieldValue.arrayUnion(packingVidUrl),
             updatedAt: FieldValue.serverTimestamp(),
         });
 

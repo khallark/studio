@@ -332,6 +332,7 @@ export default function BusinessOrdersPage() {
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
     const [packedFilter, setPackedFilter] = useState<'all' | 'packed' | 'unpacked'>('all');
+    const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'cod'>('all');
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -381,6 +382,7 @@ export default function BusinessOrdersPage() {
             rtoInTransitFilter,
             storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
             packedFilter,
+            paymentTypeFilter,
         }
     );
 
@@ -971,6 +973,7 @@ export default function BusinessOrdersPage() {
         rtoInTransitFilter !== 'all',
         invertSearch,
         packedFilter !== 'all',
+        paymentTypeFilter !== 'all',
     ].filter(Boolean).length;
 
     // ============================================================
@@ -1154,6 +1157,21 @@ export default function BusinessOrdersPage() {
                                     </SheetHeader>
 
                                     <div className="py-6 space-y-6">
+                                        {/* Payment Filter */}
+                                        <div className="space-y-3">
+                                            <Label className="text-sm font-medium">Payment Type</Label>
+                                            <Select value={paymentTypeFilter} onValueChange={(v) => setPaymentTypeFilter(v as any)}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All</SelectItem>
+                                                    <SelectItem value="prepaid">Prepaid</SelectItem>
+                                                    <SelectItem value="cod">COD</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
                                         {/* Store Filter */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">Stores</Label>

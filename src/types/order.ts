@@ -138,6 +138,7 @@ export interface UseOrdersFilters {
   courierFilter?: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
   availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';
+  paymentTypeFilter?: 'all' | 'prepaid' | 'cod';
   vendorName?: string;
   invertSearch?: boolean;
   storeFilter?: string[]; // ✅ NEW: Array of store IDs to filter by

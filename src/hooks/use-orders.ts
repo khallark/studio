@@ -501,6 +501,19 @@ export function useOrders(
                 }
             }
 
+            // Payment type filter (global)
+            if (filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all') {
+                if (filters.paymentTypeFilter === 'cod') {
+                    filteredOrders = filteredOrders.filter(
+                        (order) => order.financialStatus === 'pending'
+                    );
+                } else if (filters.paymentTypeFilter === 'prepaid') {
+                    filteredOrders = filteredOrders.filter(
+                        (order) => order.financialStatus !== 'pending'
+                    );
+                }
+            }
+
             // ============================================================
             // CLIENT-SIDE PAGINATION
             // ============================================================

@@ -65,6 +65,7 @@ export interface Order {
   booked_return_images?: string[];
   returnItemsVariantIds?: (string | number)[];
   vendorName?: string;
+  lastPackedAt?: Timestamp;
   vendors: string[];
   unboxing_video_path?: string;
   pickupReady?: boolean;
@@ -133,6 +134,7 @@ export interface UseOrdersFilters {
     from: Date;
     to?: Date;
   };
+  packedFilter?: 'all' | 'packed' | 'unpacked';
   courierFilter?: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
   availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
   rtoInTransitFilter?: 'all' | 're-attempt' | 'refused' | 'no-reply';

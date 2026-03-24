@@ -331,6 +331,7 @@ export default function BusinessOrdersPage() {
     const [courierFilter, setCourierFilter] = useState<'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
+    const [packedFilter, setPackedFilter] = useState<'all' | 'packed' | 'unpacked'>('all');
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -379,6 +380,7 @@ export default function BusinessOrdersPage() {
             availabilityFilter,
             rtoInTransitFilter,
             storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
+            packedFilter,
         }
     );
 
@@ -757,6 +759,7 @@ export default function BusinessOrdersPage() {
     useEffect(() => {
         setCurrentPage(1);
         setSelectedOrders([]);
+        setPackedFilter('all');
     }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
 
     useEffect(() => {
@@ -967,6 +970,7 @@ export default function BusinessOrdersPage() {
         availabilityFilter !== 'all',
         rtoInTransitFilter !== 'all',
         invertSearch,
+        packedFilter !== 'all',
     ].filter(Boolean).length;
 
     // ============================================================
@@ -1242,6 +1246,23 @@ export default function BusinessOrdersPage() {
                                                         <SelectItem value="Delhivery">Delhivery</SelectItem>
                                                         <SelectItem value="Shiprocket">Shiprocket</SelectItem>
                                                         <SelectItem value="Xpressbees">Xpressbees</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+
+                                        {/* Packed Filter */}
+                                        {activeTab === 'Ready To Dispatch' && (
+                                            <div className="space-y-3">
+                                                <Label className="text-sm font-medium">Packed Status</Label>
+                                                <Select value={packedFilter} onValueChange={(v) => setPackedFilter(v as any)}>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">All Orders</SelectItem>
+                                                        <SelectItem value="packed">Packed</SelectItem>
+                                                        <SelectItem value="unpacked">Not Packed</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

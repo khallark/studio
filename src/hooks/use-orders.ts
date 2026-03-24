@@ -96,7 +96,7 @@ export function useOrders(
                 if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
                         q = query(q, where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
-                        
+
                         // ✅ FIX: Force client-side status filtering for OWR
                         if (activeTab === 'All Orders') {
                             needsClientSideStatusFilter = true;
@@ -327,7 +327,7 @@ export function useOrders(
                                     ? variantMapping.businessId
                                     : variantMapping;
 
-                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
+                                if (mappedBusinessId !== businessId) return false // unmapped for this business account
 
                                 businessProductIds.push([
                                     String(businessProductSku),
@@ -381,13 +381,13 @@ export function useOrders(
                                 const businessProductSku = typeof variantMapping === 'object'
                                     ? variantMapping.businessProductSku
                                     : variantMapping;
-                                
+
                                 // Extract business id
                                 const mappedBusinessId = typeof variantMapping === 'object'
                                     ? variantMapping.businessId
                                     : variantMapping;
 
-                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
+                                if (mappedBusinessId !== businessId) return false // unmapped for this business account
 
                                 businessProductIds.push([
                                     String(businessProductSku),
@@ -437,7 +437,7 @@ export function useOrders(
                                     ? variantMapping.businessId
                                     : variantMapping;
 
-                                if(mappedBusinessId !== businessId) return false // unmapped for this business account
+                                if (mappedBusinessId !== businessId) return false // unmapped for this business account
                             }
 
                             return false;
@@ -489,6 +489,15 @@ export function useOrders(
                             (!order.tags_rtoInTransit.includes('Re-attempt') &&
                                 !order.tags_rtoInTransit.includes('Refused'))
                     );
+                }
+            }
+
+            // Packed filter (Ready To Dispatch tab only)
+            if (activeTab === 'Ready To Dispatch' && filters.packedFilter && filters.packedFilter !== 'all') {
+                if (filters.packedFilter === 'packed') {
+                    filteredOrders = filteredOrders.filter((order) => !!order.lastPackedAt);
+                } else if (filters.packedFilter === 'unpacked') {
+                    filteredOrders = filteredOrders.filter((order) => !order.lastPackedAt);
                 }
             }
 

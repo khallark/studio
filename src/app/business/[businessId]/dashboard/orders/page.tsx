@@ -80,6 +80,8 @@ import {
     ShoppingBag,
     Shirt,
     AlignLeft,
+    Video,
+    ExternalLink,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -2103,6 +2105,52 @@ export default function BusinessOrdersPage() {
                                                 </span>
                                             </div>
                                         </div>
+
+                                        {/* Packing Videos */}
+                                        {viewingOrder.packingVidUrls && viewingOrder.packingVidUrls.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-semibold mb-2">
+                                                    Packing Videos ({viewingOrder.packingVidUrls.length})
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {viewingOrder.packingVidUrls.map((entry: { packingVidUrl: string; packedAt: any }, i: number) => {
+                                                        const packedDate = entry.packedAt?.toDate?.()
+                                                            ? entry.packedAt.toDate().toLocaleString('en-IN', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true,
+                                                            })
+                                                            : 'Unknown time';
+
+                                                        return (
+                                                            <a
+                                                                key={i}
+                                                                href={entry.packingVidUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center justify-between gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                                                            >
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <Video className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-xs font-medium truncate">
+                                                                            Packing Video {i + 1}
+                                                                        </p>
+                                                                        <p className="text-[10px] text-muted-foreground truncate">
+                                                                            {packedDate}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                                            </a>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* History */}

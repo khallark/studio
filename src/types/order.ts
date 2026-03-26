@@ -65,6 +65,7 @@ export interface Order {
   booked_return_images?: string[];
   returnItemsVariantIds?: (string | number)[];
   vendorName?: string;
+  packingVidUrls?: any[];
   lastPackedAt?: Timestamp;
   vendors: string[];
   unboxing_video_path?: string;

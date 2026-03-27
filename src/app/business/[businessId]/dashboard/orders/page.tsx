@@ -335,6 +335,7 @@ export default function BusinessOrdersPage() {
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
     const [packedFilter, setPackedFilter] = useState<'all' | 'packed' | 'unpacked'>('all');
     const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'cod'>('all');
+    const [stateFilter, setStateFilter] = useState<string>('all');
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -383,6 +384,7 @@ export default function BusinessOrdersPage() {
             availabilityFilter,
             rtoInTransitFilter,
             storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
+            stateFilter: stateFilter === 'all' ? undefined : stateFilter,
             packedFilter,
             paymentTypeFilter,
         }
@@ -390,6 +392,7 @@ export default function BusinessOrdersPage() {
 
     const orders = ordersData?.orders || [];
     const totalFilteredCount = ordersData?.totalCount || 0;
+    const availableProvinces = ordersData?.availableProvinces || [];
 
     const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
     const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores, vendorName);
@@ -976,6 +979,7 @@ export default function BusinessOrdersPage() {
         invertSearch,
         packedFilter !== 'all',
         paymentTypeFilter !== 'all',
+        stateFilter !== 'all',
     ].filter(Boolean).length;
 
     // ============================================================
@@ -1172,6 +1176,34 @@ export default function BusinessOrdersPage() {
                                                     <SelectItem value="cod">COD</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                        </div>
+
+                                        {/* State Filter */}
+                                        <div className="space-y-3">
+                                            <Label className="text-sm font-medium">State</Label>
+                                            <Select value={stateFilter} onValueChange={setStateFilter}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="All States" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All States</SelectItem>
+                                                    {availableProvinces.map((province) => (
+                                                        <SelectItem key={province} value={province}>
+                                                            {province}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {stateFilter !== 'all' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setStateFilter('all')}
+                                                    className="w-full"
+                                                >
+                                                    Clear State Filter
+                                                </Button>
+                                            )}
                                         </div>
 
                                         {/* Store Filter */}

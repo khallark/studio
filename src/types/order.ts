@@ -80,6 +80,7 @@ export interface Order {
       name?: string;
       first_name?: string;
       last_name?: string;
+      default_address?: any;
       phone?: string;
     };
     line_items: any[];
@@ -142,6 +143,7 @@ export interface UseOrdersFilters {
   paymentTypeFilter?: 'all' | 'prepaid' | 'cod';
   vendorName?: string;
   invertSearch?: boolean;
+  stateFilter?: string;
   storeFilter?: string[]; // ✅ NEW: Array of store IDs to filter by
 }
 

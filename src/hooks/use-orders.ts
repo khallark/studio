@@ -514,6 +514,18 @@ export function useOrders(
                 }
             }
 
+            // State (province) filter — global
+            if (filters.stateFilter && filters.stateFilter !== 'all') {
+                filteredOrders = filteredOrders.filter((order) => {
+                    const province =
+                        order.raw.shipping_address?.province ||
+                        order.raw.billing_address?.province ||
+                        order.raw.customer?.default_address?.province ||
+                        null;
+                    return province === filters.stateFilter;
+                });
+            }
+
             // ============================================================
             // CLIENT-SIDE PAGINATION
             // ============================================================
@@ -522,10 +534,24 @@ export function useOrders(
             const endIndex = startIndex + rowsPerPage;
             const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
+            const availableProvinces = Array.from(
+                new Set(
+                    filteredOrders
+                        .map((order) =>
+                            order.raw.shipping_address?.province ||
+                            order.raw.billing_address?.province ||
+                            order.raw.customer?.default_address?.province ||
+                            null
+                        )
+                        .filter((p): p is string => !!p)
+                )
+            ).sort();
+
             return {
                 orders: paginatedOrders,
                 totalCount: filteredOrders.length,
                 hasMore: allOrders.length >= (rowsPerPage * storesToQuery.length), // Rough estimate
+                availableProvinces,
             };
         },
 

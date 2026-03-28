@@ -846,6 +846,18 @@ export default function BusinessOrdersPage() {
         }
     };
 
+    // Add this new handler near your other handlers:
+    const handlePageCheckbox = (isChecked: boolean) => {
+        const currentPageIds = orders.map(o => o.id);
+        if (isChecked) {
+            setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
+        } else {
+            // Only remove current page's IDs — preserve other pages' selections
+            setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
+            setIsSelectAllPages(false);
+        }
+    };
+
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
 
     const rtoDialogCounts = React.useMemo(() => {
@@ -1670,7 +1682,7 @@ export default function BusinessOrdersPage() {
                                             <TableHead className="w-12">
                                                 <Checkbox
                                                     checked={areAllOnPageSelected}
-                                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                                    onCheckedChange={(checked) => handlePageCheckbox(!!checked)}
                                                 />
                                             </TableHead>
                                             <TableHead>Order</TableHead>

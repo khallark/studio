@@ -1620,40 +1620,13 @@ export default function BusinessOrdersPage() {
                         {areAllOnPageSelected && totalFilteredCount > rowsPerPage && (
                             <div className="px-3 pb-2 flex items-center gap-2 text-xs border-t pt-2">
                                 {isSelectAllPages ? (
-                                    <>
-                                        <span className="text-muted-foreground">
-                                            All <strong>{totalFilteredCount}</strong> orders across all pages are selected.
-                                        </span>
-                                        <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="h-auto p-0 text-xs"
-                                            onClick={() => {
-                                                setIsSelectAllPages(false);
-                                                setSelectedOrders(orders.map(o => o.id));
-                                            }}
-                                        >
-                                            Clear to this page only
-                                        </Button>
-                                    </>
+                                    <span className="text-muted-foreground">
+                                        All <strong>{totalFilteredCount}</strong> orders across all pages are selected.
+                                    </span>
                                 ) : (
-                                    <>
-                                        <span className="text-muted-foreground">
-                                            All <strong>{rowsPerPage}</strong> orders on this page are selected.
-                                        </span>
-                                        <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="h-auto p-0 text-xs"
-                                            disabled={isFetchingAllIds}
-                                            onClick={() => setShouldFetchAllIds(true)}
-                                        >
-                                            {isFetchingAllIds
-                                                ? <><Loader2 className="h-3 w-3 animate-spin mr-1 inline" />Selecting...</>
-                                                : `Select all ${totalFilteredCount} orders`
-                                            }
-                                        </Button>
-                                    </>
+                                    <span className="text-muted-foreground">
+                                        All <strong>{rowsPerPage}</strong> orders on this page are selected.
+                                    </span>
                                 )}
                             </div>
                         )}

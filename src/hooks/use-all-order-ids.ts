@@ -23,7 +23,7 @@ export function useAllOrderIds(
 ) {
     return useQuery({
         queryKey: ['allOrderIds', businessId, stores, activeTab, filters],
-        queryFn: async (): Promise<string[]> => {
+        queryFn: async (): Promise<{ id: string, storeId: string }[]> => {
             if (!businessId || !stores.length) return [];
 
             const storesToQuery = filters.storeFilter?.length
@@ -114,7 +114,7 @@ export function useAllOrderIds(
             // Apply all the same client-side filters (search, payment, state, packed, etc.)
             const filtered = await applyClientSideFilters(allOrders, activeTab, filters, businessId);
 
-            return filtered.map(o => o.id);
+            return filtered.map(o => ({ id: o.id, storeId: o.storeId }));
         },
         enabled: enabled && !!businessId && stores.length > 0,
         staleTime: 30_000,

@@ -318,6 +318,7 @@ export default function BusinessOrdersPage() {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+    const [selectedOrdersMap, setSelectedOrdersMap] = useState<Record<string, string>>({});
     const [isSelectAllPages, setIsSelectAllPages] = useState(false);
     const [shouldFetchAllIds, setShouldFetchAllIds] = useState(false);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -424,8 +425,8 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const getOrderStoreId = (orderId: string): string | null => {
-        const order = orders.find(o => o.id === orderId);
-        return order?.storeId || null;
+        // Check map first (works cross-page), fall back to current page
+        return selectedOrdersMap[orderId] || orders.find(o => o.id === orderId)?.storeId || null;
     };
 
     const updateStatus = useUpdateOrderStatus(businessId, user);
@@ -454,8 +455,8 @@ export default function BusinessOrdersPage() {
     const isSharedStoreAdmin = businessId === SUPER_ADMIN_ID;
 
     const hasSharedStoreOrder = selectedOrders.some(orderId => {
-        const order = orders.find(o => o.id === orderId);
-        return SHARED_STORE_IDS.includes(String(order?.storeId));
+        const storeId = selectedOrdersMap[orderId];
+        return SHARED_STORE_IDS.includes(String(storeId));
     });
 
     const isDispatching = dispatchOrders.isPending;
@@ -492,12 +493,12 @@ export default function BusinessOrdersPage() {
     const handleDispatch = (orderIds: string[]) => {
         const ordersByStore = new Map<string, string[]>();
         orderIds.forEach(orderId => {
-            const order = orders.find(o => o.id === orderId);
-            if (order?.storeId) {
-                if (!ordersByStore.has(order.storeId)) {
-                    ordersByStore.set(order.storeId, []);
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) {
+                    ordersByStore.set(storeId, []);
                 }
-                ordersByStore.get(order.storeId)!.push(orderId);
+                ordersByStore.get(storeId)!.push(orderId);
             }
         });
 
@@ -509,8 +510,7 @@ export default function BusinessOrdersPage() {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }
                 }
             });
@@ -541,8 +541,7 @@ export default function BusinessOrdersPage() {
                     onSuccess: () => {
                         completedStores++;
                         if (completedStores === totalStores) {
-                            setSelectedOrders([]);
-                            setIsSelectAllPages(false);
+                            clearAllSelections()
                         }
                     }
                 });
@@ -552,12 +551,12 @@ export default function BusinessOrdersPage() {
 
         const ordersByStore = new Map<string, string[]>();
         selectedOrders.forEach(orderId => {
-            const order = orders.find(o => o.id === orderId);
-            if (order?.storeId) {
-                if (!ordersByStore.has(order.storeId)) {
-                    ordersByStore.set(order.storeId, []);
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) {
+                    ordersByStore.set(storeId, []);
                 }
-                ordersByStore.get(order.storeId)!.push(orderId);
+                ordersByStore.get(storeId)!.push(orderId);
             }
         });
 
@@ -569,8 +568,7 @@ export default function BusinessOrdersPage() {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }
                 }
             });
@@ -580,11 +578,12 @@ export default function BusinessOrdersPage() {
     const handleDownloadSlips = () => {
         if (selectedOrders.length === 0) return;
         const ordersByStore = new Map<string, string[]>();
-        orders.filter(o => selectedOrders.includes(o.id) && o.awb).forEach(order => {
-            if (!ordersByStore.has(order.storeId)) {
-                ordersByStore.set(order.storeId, []);
+        selectedOrders.forEach(orderId => {
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) ordersByStore.set(storeId, []);
+                ordersByStore.get(storeId)!.push(orderId);
             }
-            ordersByStore.get(order.storeId)!.push(order.id);
         });
 
         if (ordersByStore.size === 0) return;
@@ -597,8 +596,7 @@ export default function BusinessOrdersPage() {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }
                 }
             });
@@ -609,12 +607,12 @@ export default function BusinessOrdersPage() {
         if (selectedOrders.length === 0) return;
         const ordersByStore = new Map<string, string[]>();
         selectedOrders.forEach(orderId => {
-            const order = orders.find(o => o.id === orderId);
-            if (order?.storeId) {
-                if (!ordersByStore.has(order.storeId)) {
-                    ordersByStore.set(order.storeId, []);
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) {
+                    ordersByStore.set(storeId, []);
                 }
-                ordersByStore.get(order.storeId)!.push(orderId);
+                ordersByStore.get(storeId)!.push(orderId);
             }
         });
 
@@ -626,8 +624,7 @@ export default function BusinessOrdersPage() {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }
                 }
             });
@@ -638,12 +635,12 @@ export default function BusinessOrdersPage() {
         if (selectedOrders.length === 0) return;
         const ordersByStore = new Map<string, string[]>();
         selectedOrders.forEach(orderId => {
-            const order = orders.find(o => o.id === orderId);
-            if (order?.storeId) {
-                if (!ordersByStore.has(order.storeId)) {
-                    ordersByStore.set(order.storeId, []);
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) {
+                    ordersByStore.set(storeId, []);
                 }
-                ordersByStore.get(order.storeId)!.push(orderId);
+                ordersByStore.get(storeId)!.push(orderId);
             }
         });
 
@@ -655,8 +652,7 @@ export default function BusinessOrdersPage() {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }
                 }
             });
@@ -678,17 +674,20 @@ export default function BusinessOrdersPage() {
     const handleBulkSelectByAwb = (awbs: string[], customStatus: string) => {
         if (!customStatus) return;
         const statusAwbMap = new Map(
-            orders.filter(o => o.customStatus === customStatus && o.awb).map(o => [o.awb!, o.id])
+            orders.filter(o => o.customStatus === customStatus && o.awb).map(o => [o.awb!, o])
         );
-        const foundOrderIds = awbs.reduce((acc, awb) => {
-            if (statusAwbMap.has(awb)) {
-                acc.add(statusAwbMap.get(awb)!);
-            }
+        const foundOrders = awbs.reduce((acc, awb) => {
+            if (statusAwbMap.has(awb)) acc.push(statusAwbMap.get(awb)!);
             return acc;
-        }, new Set<string>());
+        }, [] as Order[]);
 
-        if (foundOrderIds.size > 0) {
-            setSelectedOrders(prev => Array.from(new Set([...prev, ...Array.from(foundOrderIds)])));
+        if (foundOrders.length > 0) {
+            setSelectedOrders(prev => Array.from(new Set([...prev, ...foundOrders.map(o => o.id)])));
+            setSelectedOrdersMap(prev => {
+                const next = { ...prev };
+                foundOrders.forEach(o => { next[o.id] = o.storeId; });
+                return next;
+            });
         }
     };
 
@@ -748,10 +747,10 @@ export default function BusinessOrdersPage() {
 
         const ordersByStore = new Map<string, string[]>();
         selectedOrders.forEach(orderId => {
-            const order = orders.find(o => o.id === orderId);
-            if (order?.storeId) {
-                if (!ordersByStore.has(order.storeId)) ordersByStore.set(order.storeId, []);
-                ordersByStore.get(order.storeId)!.push(orderId);
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) ordersByStore.set(storeId, []);
+                ordersByStore.get(storeId)!.push(orderId);
             }
         });
 
@@ -766,8 +765,7 @@ export default function BusinessOrdersPage() {
                     onSuccess: () => {
                         completedStores++;
                         if (completedStores === totalStores) {
-                            setSelectedOrders([]);
-                            setIsSelectAllPages(false);
+                            clearAllSelections()
                         }
                     }
                 }
@@ -794,7 +792,9 @@ export default function BusinessOrdersPage() {
     useEffect(() => {
         setCurrentPage(1);
         setSelectedOrders([]);
-        setIsSelectAllPages(false); // RESET on any filter change
+        setSelectedOrdersMap({});
+        setIsSelectAllPages(false);
+        setShouldFetchAllIds(false);
         setPackedFilter('all');
     }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
 
@@ -811,9 +811,12 @@ export default function BusinessOrdersPage() {
 
     useEffect(() => {
         if (shouldFetchAllIds && allOrderIds && !isFetchingAllIds) {
-            setSelectedOrders(allOrderIds);
+            setSelectedOrders(allOrderIds.map(o => o.id));
+            setSelectedOrdersMap(
+                Object.fromEntries(allOrderIds.map(o => [o.id, o.storeId]))
+            );
             setIsSelectAllPages(true);
-            setShouldFetchAllIds(false); // reset trigger
+            setShouldFetchAllIds(false);
         }
     }, [shouldFetchAllIds, allOrderIds, isFetchingAllIds]);
 
@@ -831,18 +834,34 @@ export default function BusinessOrdersPage() {
     };
 
     const handleSelectOrder = (orderId: string) => {
-        setIsSelectAllPages(false); // Deselect all-pages mode when toggling individual rows
-        setSelectedOrders(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
+        setIsSelectAllPages(false);
+        const isCurrentlySelected = selectedOrders.includes(orderId);
+        if (isCurrentlySelected) {
+            setSelectedOrders(prev => prev.filter(id => id !== orderId));
+            setSelectedOrdersMap(prev => {
+                const next = { ...prev };
+                delete next[orderId];
+                return next;
+            });
+        } else {
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+            setSelectedOrders(prev => [...prev, orderId]);
+            setSelectedOrdersMap(prev => ({ ...prev, [orderId]: order.storeId }));
+        }
     };
 
     const handleSelectAll = (isChecked: boolean) => {
         const currentPageIds = orders.map(o => o.id);
         if (isChecked) {
             setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
+            setSelectedOrdersMap(prev => {
+                const next = { ...prev };
+                orders.forEach(o => { next[o.id] = o.storeId; });
+                return next;
+            });
         } else {
-            // Deselect everything — both current page and any cross-page selection
-            setSelectedOrders([]);
-            setIsSelectAllPages(false);
+            clearAllSelections();
         }
     };
 
@@ -851,11 +870,26 @@ export default function BusinessOrdersPage() {
         const currentPageIds = orders.map(o => o.id);
         if (isChecked) {
             setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
+            setSelectedOrdersMap(prev => {
+                const next = { ...prev };
+                orders.forEach(o => { next[o.id] = o.storeId; });
+                return next;
+            });
         } else {
-            // Only remove current page's IDs — preserve other pages' selections
             setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
+            setSelectedOrdersMap(prev => {
+                const next = { ...prev };
+                currentPageIds.forEach(id => delete next[id]);
+                return next;
+            });
             setIsSelectAllPages(false);
         }
+    };
+
+    const clearAllSelections = () => {
+        setSelectedOrders([]);
+        setSelectedOrdersMap({});
+        setIsSelectAllPages(false);
     };
 
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
@@ -1446,8 +1480,7 @@ export default function BusinessOrdersPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                        setSelectedOrders([]);
-                                        setIsSelectAllPages(false);
+                                        clearAllSelections()
                                     }}
                                     className="h-7 px-2 text-xs"
                                 >
@@ -1521,8 +1554,8 @@ export default function BusinessOrdersPage() {
                                                     Generate PO
                                                 </DropdownMenuItem>
                                                 {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                                    const order = orders.find(o => o.id === orderId);
-                                                    return SHARED_STORE_IDS.includes(String(order?.storeId));
+                                                    const storeId = selectedOrdersMap[orderId];
+                                                    return SHARED_STORE_IDS.includes(String(storeId));
                                                 })) && (
                                                         <DropdownMenuItem
                                                             onClick={handleAssignAwbClick}
@@ -1882,8 +1915,7 @@ export default function BusinessOrdersPage() {
                             pickupName,
                             shippingMode
                         );
-                        setSelectedOrders([]);
-                        setIsSelectAllPages(false);
+                        clearAllSelections()
                     }}
                     businessId={businessId}
                 />
@@ -1936,8 +1968,7 @@ export default function BusinessOrdersPage() {
                         isOpen={isGeneratePODialogOpen}
                         onClose={() => {
                             setIsGeneratePODialogOpen(false);
-                            setSelectedOrders([]);
-                            setIsSelectAllPages(false);
+                            clearAllSelections()
                         }}
                         selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
                         shopId={validation.storeId}

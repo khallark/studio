@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    if (['Delivered', 'DTO Requested'].includes(orderData?.customStatus)) {
+    if (!['Delivered', 'DTO Requested'].includes(orderData?.customStatus)) {
       return NextResponse.json({
         ok: false,
         reason: 'Order should be "Delivered" or "DTO Requested"',

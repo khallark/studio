@@ -196,7 +196,14 @@ export async function POST(req: NextRequest) {
     if (!forwardAwb) {
       return NextResponse.json({
         ok: false,
-        reason: 'Order does not have a forward AWB. Cannot fetch pickup location.'
+        reason: 'Order does not have a forward AWB.'
+      }, { status: 400 });
+    }
+
+    if (['Delivered', 'DTO Requested'].includes(orderData?.customStatus)) {
+      return NextResponse.json({
+        ok: false,
+        reason: 'Order should be "Delivered" or "DTO Requested"',
       }, { status: 400 });
     }
 

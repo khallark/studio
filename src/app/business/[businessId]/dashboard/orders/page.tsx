@@ -89,9 +89,6 @@ import { AssignAwbDialog } from '@/components/assign-awb-dialog';
 import { useProcessingQueue } from '@/contexts/processing-queue-context';
 import { GenerateAwbDialog } from '@/components/generate-awb-dialog';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DateRange } from 'react-day-picker';
-import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -173,7 +170,7 @@ interface MobileOrderCardProps {
     isSelected: boolean;
     onSelect: () => void;
     onView: () => void;
-    renderActionItems: (order: Order) => React.ReactNode; // Add this
+    renderActionItems: (order: Order) => React.ReactNode;
     activeTab: CustomStatus | 'All Orders';
     getStatusBadgeVariant: (status: CustomStatus | string | null) => "default" | "secondary" | "destructive" | "outline" | "success";
     getPaymentBadgeVariant: (status: string | null) => string;
@@ -185,7 +182,7 @@ function MobileOrderCard({
     isSelected,
     onSelect,
     onView,
-    renderActionItems, // Add this
+    renderActionItems,
     activeTab,
     getStatusBadgeVariant,
     getPaymentBadgeVariant,
@@ -295,7 +292,7 @@ function MobileOrderCard({
 export default function BusinessOrdersPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const queryClient = useQueryClient(); // Add this line if not present
+    const queryClient = useQueryClient();
 
     const {
         isAuthorized,
@@ -320,6 +317,7 @@ export default function BusinessOrdersPage() {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+    const [isSelectAllPages, setIsSelectAllPages] = useState(false); // NEW
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [selectedStores, setSelectedStores] = useState<string[]>([]);
@@ -329,7 +327,7 @@ export default function BusinessOrdersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
     const [invertSearch, setInvertSearch] = useState(false);
-    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
     const [courierFilter, setCourierFilter] = useState<'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
     const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
     const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
@@ -433,13 +431,11 @@ export default function BusinessOrdersPage() {
     const isDisabled = !isAnyOrderSelected;
     const isSharedStoreAdmin = businessId === SUPER_ADMIN_ID;
 
-    // ✅ Check if any selected order is from SHARED_STORE_ID
     const hasSharedStoreOrder = selectedOrders.some(orderId => {
         const order = orders.find(o => o.id === orderId);
         return SHARED_STORE_IDS.includes(String(order?.storeId));
     });
 
-    // ✅ Track loading states from mutations
     const isDispatching = dispatchOrders.isPending;
     const isBulkUpdating = bulkUpdate.isPending;
     const isBookingReturn = bookReturn.isPending;
@@ -492,6 +488,7 @@ export default function BusinessOrdersPage() {
                     completedStores++;
                     if (completedStores === totalStores) {
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }
                 }
             });
@@ -523,6 +520,7 @@ export default function BusinessOrdersPage() {
                         completedStores++;
                         if (completedStores === totalStores) {
                             setSelectedOrders([]);
+                            setIsSelectAllPages(false);
                         }
                     }
                 });
@@ -550,6 +548,7 @@ export default function BusinessOrdersPage() {
                     completedStores++;
                     if (completedStores === totalStores) {
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }
                 }
             });
@@ -577,6 +576,7 @@ export default function BusinessOrdersPage() {
                     completedStores++;
                     if (completedStores === totalStores) {
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }
                 }
             });
@@ -605,6 +605,7 @@ export default function BusinessOrdersPage() {
                     completedStores++;
                     if (completedStores === totalStores) {
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }
                 }
             });
@@ -633,6 +634,7 @@ export default function BusinessOrdersPage() {
                     completedStores++;
                     if (completedStores === totalStores) {
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }
                 }
             });
@@ -741,7 +743,10 @@ export default function BusinessOrdersPage() {
                 {
                     onSuccess: () => {
                         completedStores++;
-                        if (completedStores === totalStores) setSelectedOrders([]);
+                        if (completedStores === totalStores) {
+                            setSelectedOrders([]);
+                            setIsSelectAllPages(false);
+                        }
                     }
                 }
             );
@@ -763,9 +768,11 @@ export default function BusinessOrdersPage() {
         if (savedRowsPerPage) setRowsPerPage(Number(savedRowsPerPage));
     }, []);
 
+    // Reset page, selection, and packed filter on any filter/tab change
     useEffect(() => {
         setCurrentPage(1);
         setSelectedOrders([]);
+        setIsSelectAllPages(false); // RESET on any filter change
         setPackedFilter('all');
     }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
 
@@ -794,6 +801,7 @@ export default function BusinessOrdersPage() {
     };
 
     const handleSelectOrder = (orderId: string) => {
+        setIsSelectAllPages(false); // Deselect all-pages mode when toggling individual rows
         setSelectedOrders(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
     };
 
@@ -802,7 +810,9 @@ export default function BusinessOrdersPage() {
         if (isChecked) {
             setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
         } else {
-            setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
+            // Deselect everything — both current page and any cross-page selection
+            setSelectedOrders([]);
+            setIsSelectAllPages(false);
         }
     };
 
@@ -893,7 +903,6 @@ export default function BusinessOrdersPage() {
                         {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
                             <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
                         }
-                        {/* ADD THIS: Show "Perform Pickup" option only for picked up orders */}
                         {order.isEligibleForPickup && (
                             <DropdownMenuItem
                                 onClick={() => {
@@ -1042,29 +1051,6 @@ export default function BusinessOrdersPage() {
                                         : `All ${stores.length} stores`}
                                 </p>
                             </div>
-
-                            {/* Desktop Actions */}
-                            {/* <div className="hidden md:flex items-center gap-2">
-                                {businessId === SUPER_ADMIN_ID && (
-                                    <Button variant="outline" size="sm" onClick={() => setIsTaxReportDialogOpen(true)}>
-                                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                                        Tax Report
-                                    </Button>
-                                )}
-                                {activeTab === 'Confirmed' && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsAvailabilityDialogOpen(true)}
-                                        disabled={isAnyOperationInProgress}
-                                    >
-                                        Perform Items availability
-                                    </Button>)}
-                                <Button variant="outline" size="sm" onClick={() => refetchOrders()} disabled={isFetching}>
-                                    <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
-                                    Refresh
-                                </Button>
-                            </div> */}
 
                             {/* Mobile Actions */}
                             <div className="flex items-center gap-1">
@@ -1327,9 +1313,6 @@ export default function BusinessOrdersPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="all">All Items</SelectItem>
-                                                        {/* <SelectItem value="pending">Manually Pending ({availabilityCounts?.pending || 0})</SelectItem>
-                                                        <SelectItem value="unavailable">Manually Unavailble ({availabilityCounts?.unavailable || 0})</SelectItem>
-                                                        <SelectItem value="available">Manually Available ({availabilityCounts?.available || 0})</SelectItem> */}
                                                         <SelectItem value="picked up">Picked up ({availabilityCounts?.pickedUp || 0})</SelectItem>
                                                         <SelectItem value="eligible">Pickup Eligible ({availabilityCounts?.eligible || 0})</SelectItem>
                                                         <SelectItem value="not eligible">Not Pickup eligible ({availabilityCounts?.notEligible || 0})</SelectItem>
@@ -1404,151 +1387,111 @@ export default function BusinessOrdersPage() {
 
                 {/* Bulk Actions Bar */}
                 {selectedOrders.length > 0 && (
-                    <div className="shrink-0 border-b bg-primary/5 px-3 py-2 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                checked={areAllOnPageSelected}
-                                onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                            />
-                            <span className="text-xs font-medium">
-                                {selectedOrders.length} selected
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedOrders([])} className="h-7 px-2 text-xs">
-                                Clear
-                            </Button>
-                        </div>
+                    <div className="shrink-0 border-b bg-primary/5">
+                        {/* Selection row */}
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    checked={areAllOnPageSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                />
+                                <span className="text-xs font-medium">
+                                    {isSelectAllPages
+                                        ? `All ${totalFilteredCount} orders selected`
+                                        : `${selectedOrders.length} selected`}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setSelectedOrders([]);
+                                        setIsSelectAllPages(false);
+                                    }}
+                                    className="h-7 px-2 text-xs"
+                                >
+                                    Clear
+                                </Button>
+                            </div>
 
-                        {/* Bulk Action Buttons */}
-                        <div className="flex items-center gap-1">
-                            {/* Desktop Bulk Actions */}
-                            {/* <div className="hidden md:flex items-center gap-1">
-                                {activeTab === 'New' && (
-                                    <Button size="sm" variant="outline" onClick={() => handleBulkUpdateStatus('Confirmed')} disabled={isAnyOperationInProgress}>
-                                        {bulkUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                                        Confirm
-                                    </Button>
-                                )}
-                                {activeTab === 'Confirmed' && (
-                                    <>
-                                        <Button size="sm" variant="outline" onClick={handleGeneratePOClick}>
-                                            Generate PO
+                            {/* Bulk Action Buttons */}
+                            <div className="flex items-center gap-1">
+                                {/* Download Actions Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="sm" variant="outline" disabled={isAnyOperationInProgress}>
+                                            <Download className="h-4 w-4 md:mr-1" />
+                                            <span className="hidden md:inline">Download</span>
+                                            <ChevronDown className="h-3 w-3 ml-1" />
                                         </Button>
-                                        {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                            const order = orders.find(o => o.id === orderId);
-                                            return order?.storeId === SHARED_STORE_ID;
-                                        })) && (<Button size="sm" variant="outline" onClick={handleAssignAwbClick} disabled={isAnyOperationInProgress}>
-                                            Assign AWBs
-                                        </Button>)}
-                                    </>
-                                )}
-                                {activeTab === 'Ready To Dispatch' && (
-                                    <>
-                                        <Button size="sm" variant="outline" onClick={() => { setIsAwbBulkSelectOpen(true); setAwbBulkSelectStatus('Ready To Dispatch'); }}>
-                                            <ScanBarcode className="h-4 w-4 mr-1" />
-                                            AWB Select
-                                        </Button>
-                                        <Button size="sm" onClick={() => handleBulkUpdateStatus('Dispatched')} disabled={isAnyOperationInProgress}>
-                                            {dispatchOrders.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                                            Dispatch
-                                        </Button>
-                                    </>
-                                )}
-                                {activeTab === 'Delivered' && (
-                                    <Button size="sm" variant="outline" onClick={() => handleBulkUpdateStatus('Closed')} disabled={isAnyOperationInProgress}>
-                                        Close Orders
-                                    </Button>
-                                )}
-                                {activeTab === 'RTO Delivered' && (
-                                    <Button size="sm" variant="outline" onClick={() => handleBulkUpdateStatus('RTO Closed')} disabled={isAnyOperationInProgress}>
-                                        RTO Close
-                                    </Button>
-                                )}
-                                {activeTab === 'DTO Requested' && (
-                                    <Button size="sm" variant="outline" onClick={() => handleBulkUpdateStatus('DTO Requested')} disabled={isAnyOperationInProgress}>
-                                        {bookReturn.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                                        Book Returns
-                                    </Button>
-                                )}
-                            </div> */}
-
-                            {/* Download Actions Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" disabled={isAnyOperationInProgress}>
-                                        <Download className="h-4 w-4 md:mr-1" />
-                                        <span className="hidden md:inline">Download</span>
-                                        <ChevronDown className="h-3 w-3 ml-1" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                        onClick={handleDownloadExcel}
-                                        disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
-                                    >
-                                        {isDownloadingExcel && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                        Download Excel
-                                    </DropdownMenuItem>
-                                    {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) &&
-                                        (<DropdownMenuItem
-                                            onClick={handleDownloadSlips}
-                                            disabled={isDisabled || isDownloadingSlips || isAnyOperationInProgress}
-                                        >
-                                            {isDownloadingSlips && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Download Slips
-                                        </DropdownMenuItem>)}
-                                    {['Confirmed', 'Ready To Dispatch'].includes(activeTab) && (
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
                                         <DropdownMenuItem
-                                            onClick={handleDownloadProductsExcel}
-                                            disabled={isDisabled || isDownloadingProducts || isAnyOperationInProgress}
+                                            onClick={handleDownloadExcel}
+                                            disabled={isDisabled || isDownloadingExcel || isAnyOperationInProgress}
                                         >
-                                            {isDownloadingProducts && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Download Products
+                                            {isDownloadingExcel && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                            Download Excel
                                         </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* Mobile Bulk Actions Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="default">
-                                        Actions
-                                        <ChevronDown className="h-3 w-3 ml-1" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    {activeTab === 'New' && (
-                                        <DropdownMenuItem
-                                            onClick={() => handleBulkUpdateStatus('Confirmed')}
-                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
-                                        >
-                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Confirm
-                                        </DropdownMenuItem>
-                                    )}
-                                    {activeTab === 'Confirmed' && (
-                                        <>
-                                            <DropdownMenuItem
-                                                onClick={handleGeneratePOClick}
-                                                disabled={isDisabled || isAnyOperationInProgress}
+                                        {!['All Orders', 'New', 'Confirmed', 'Cancellation Requested', 'Cancelled'].includes(activeTab) &&
+                                            (<DropdownMenuItem
+                                                onClick={handleDownloadSlips}
+                                                disabled={isDisabled || isDownloadingSlips || isAnyOperationInProgress}
                                             >
-                                                Generate PO
+                                                {isDownloadingSlips && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Download Slips
+                                            </DropdownMenuItem>)}
+                                        {['Confirmed', 'Ready To Dispatch'].includes(activeTab) && (
+                                            <DropdownMenuItem
+                                                onClick={handleDownloadProductsExcel}
+                                                disabled={isDisabled || isDownloadingProducts || isAnyOperationInProgress}
+                                            >
+                                                {isDownloadingProducts && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Download Products
                                             </DropdownMenuItem>
-                                            {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                                const order = orders.find(o => o.id === orderId);
-                                                return SHARED_STORE_IDS.includes(String(order?.storeId));
-                                            })) && (
-                                                    <DropdownMenuItem
-                                                        onClick={handleAssignAwbClick}
-                                                        disabled={isDisabled || (!isSharedStoreAdmin && hasSharedStoreOrder) || isAnyOperationInProgress}
-                                                    >
-                                                        Assign AWBs
-                                                    </DropdownMenuItem>
-                                                )}
-                                        </>
-                                    )}
-                                    {activeTab === 'Ready To Dispatch' && (
-                                        <>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* Bulk Actions Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="sm" variant="default">
+                                            Actions
+                                            <ChevronDown className="h-3 w-3 ml-1" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        {activeTab === 'New' && (
+                                            <DropdownMenuItem
+                                                onClick={() => handleBulkUpdateStatus('Confirmed')}
+                                                disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                            >
+                                                {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Confirm
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'Confirmed' && (
+                                            <>
+                                                <DropdownMenuItem
+                                                    onClick={handleGeneratePOClick}
+                                                    disabled={isDisabled || isAnyOperationInProgress}
+                                                >
+                                                    Generate PO
+                                                </DropdownMenuItem>
+                                                {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
+                                                    const order = orders.find(o => o.id === orderId);
+                                                    return SHARED_STORE_IDS.includes(String(order?.storeId));
+                                                })) && (
+                                                        <DropdownMenuItem
+                                                            onClick={handleAssignAwbClick}
+                                                            disabled={isDisabled || (!isSharedStoreAdmin && hasSharedStoreOrder) || isAnyOperationInProgress}
+                                                        >
+                                                            Assign AWBs
+                                                        </DropdownMenuItem>
+                                                    )}
+                                            </>
+                                        )}
+                                        {activeTab === 'Ready To Dispatch' && (
                                             <DropdownMenuItem
                                                 onClick={() => handleBulkUpdateStatus('Dispatched')}
                                                 disabled={isDisabled || isDispatching || isAnyOperationInProgress}
@@ -1556,47 +1499,85 @@ export default function BusinessOrdersPage() {
                                                 {isDispatching && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                                 Dispatch
                                             </DropdownMenuItem>
-                                        </>
-                                    )}
-                                    {activeTab === 'Delivered' && (
-                                        <DropdownMenuItem
-                                            onClick={() => handleBulkUpdateStatus('Closed')}
-                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
-                                        >
-                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Close Orders
-                                        </DropdownMenuItem>
-                                    )}
-                                    {activeTab === 'RTO In Transit' && (
-                                        <DropdownMenuItem
-                                            onClick={() => handleRTOBulkAction('RTO Closed')}
-                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
-                                        >
-                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Mark RTO Closed
-                                        </DropdownMenuItem>
-                                    )}
-                                    {activeTab === 'RTO Delivered' && (
-                                        <DropdownMenuItem
-                                            onClick={() => handleRTOBulkAction('RTO Closed')}
-                                            disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
-                                        >
-                                            {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            RTO Close
-                                        </DropdownMenuItem>
-                                    )}
-                                    {activeTab === 'DTO Requested' && (
-                                        <DropdownMenuItem
-                                            onClick={() => handleBulkUpdateStatus('DTO Requested')}
-                                            disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
-                                        >
-                                            {isBookingReturn && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                                            Book Returns
-                                        </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                        )}
+                                        {activeTab === 'Delivered' && (
+                                            <DropdownMenuItem
+                                                onClick={() => handleBulkUpdateStatus('Closed')}
+                                                disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                            >
+                                                {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Close Orders
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'RTO In Transit' && (
+                                            <DropdownMenuItem
+                                                onClick={() => handleRTOBulkAction('RTO Closed')}
+                                                disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                            >
+                                                {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Mark RTO Closed
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'RTO Delivered' && (
+                                            <DropdownMenuItem
+                                                onClick={() => handleRTOBulkAction('RTO Closed')}
+                                                disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
+                                            >
+                                                {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                RTO Close
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'DTO Requested' && (
+                                            <DropdownMenuItem
+                                                onClick={() => handleBulkUpdateStatus('DTO Requested')}
+                                                disabled={isDisabled || isBookingReturn || isAnyOperationInProgress}
+                                            >
+                                                {isBookingReturn && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Book Returns
+                                            </DropdownMenuItem>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
+
+                        {/* ── Select-all-pages banner ── */}
+                        {areAllOnPageSelected && totalFilteredCount > rowsPerPage && (
+                            <div className="px-3 pb-2 flex items-center gap-2 text-xs border-t pt-2">
+                                {isSelectAllPages ? (
+                                    <>
+                                        <span className="text-muted-foreground">
+                                            All <strong>{totalFilteredCount}</strong> orders across all pages are selected.
+                                        </span>
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0 text-xs"
+                                            onClick={() => {
+                                                setIsSelectAllPages(false);
+                                                setSelectedOrders(orders.map(o => o.id));
+                                            }}
+                                        >
+                                            Clear to this page only
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-muted-foreground">
+                                            All <strong>{rowsPerPage}</strong> orders on this page are selected.
+                                        </span>
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0 text-xs"
+                                            onClick={() => setIsSelectAllPages(true)}
+                                        >
+                                            Select all {totalFilteredCount} orders
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1639,7 +1620,7 @@ export default function BusinessOrdersPage() {
                                         isSelected={selectedOrders.includes(order.id)}
                                         onSelect={() => handleSelectOrder(order.id)}
                                         onView={() => setViewingOrder(order)}
-                                        renderActionItems={renderActionItems} // Pass it here
+                                        renderActionItems={renderActionItems}
                                         activeTab={activeTab}
                                         getStatusBadgeVariant={getStatusBadgeVariant}
                                         getPaymentBadgeVariant={getPaymentBadgeVariant}
@@ -1856,6 +1837,7 @@ export default function BusinessOrdersPage() {
                             shippingMode
                         );
                         setSelectedOrders([]);
+                        setIsSelectAllPages(false);
                     }}
                     businessId={businessId}
                 />
@@ -1909,6 +1891,7 @@ export default function BusinessOrdersPage() {
                         onClose={() => {
                             setIsGeneratePODialogOpen(false);
                             setSelectedOrders([]);
+                            setIsSelectAllPages(false);
                         }}
                         selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
                         shopId={validation.storeId}
@@ -1939,7 +1922,6 @@ export default function BusinessOrdersPage() {
                 businessId={businessId}
             />
 
-            {/* Perform Pickup Dialog */}
             {orderForPickup && user && (
                 <PerformPickupDialog
                     isOpen={isPerformPickupDialogOpen}
@@ -1957,7 +1939,6 @@ export default function BusinessOrdersPage() {
                 />
             )}
 
-            {/* Start Packaging Dialog */}
             {isStartPackagingOpen && user && (
                 <StartPackagingDialog
                     isOpen={isStartPackagingOpen}

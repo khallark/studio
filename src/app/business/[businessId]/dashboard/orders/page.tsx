@@ -122,6 +122,7 @@ import {
     useDownloadProductsExcel,
     useUpdateShippedStatuses,
 } from '@/hooks/use-order-mutations';
+import { useAllOrderIds } from '@/hooks/use-all-order-ids';
 import { Order, CustomStatus } from '@/types/order';
 import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
@@ -317,7 +318,8 @@ export default function BusinessOrdersPage() {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-    const [isSelectAllPages, setIsSelectAllPages] = useState(false); // NEW
+    const [isSelectAllPages, setIsSelectAllPages] = useState(false);
+    const [shouldFetchAllIds, setShouldFetchAllIds] = useState(false);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [selectedStores, setSelectedStores] = useState<string[]>([]);
@@ -386,6 +388,26 @@ export default function BusinessOrdersPage() {
             packedFilter,
             paymentTypeFilter,
         }
+    );
+
+    const { data: allOrderIds, isFetching: isFetchingAllIds } = useAllOrderIds(
+        businessId,
+        stores,
+        vendorName,
+        activeTab,
+        {
+            searchQuery: debouncedSearchQuery,
+            invertSearch,
+            dateRange: dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined,
+            courierFilter: courierFilter === 'all' ? undefined : courierFilter,
+            availabilityFilter,
+            rtoInTransitFilter,
+            storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
+            stateFilter: stateFilter === 'all' ? undefined : stateFilter,
+            packedFilter,
+            paymentTypeFilter,
+        },
+        shouldFetchAllIds  // only fetches when user clicks "Select all N"
     );
 
     const orders = ordersData?.orders || [];
@@ -786,6 +808,14 @@ export default function BusinessOrdersPage() {
         const newTab = validTabs.includes(tabParam as any) ? (tabParam as CustomStatus | 'All Orders') : 'All Orders';
         if (newTab !== activeTab) setActiveTab(newTab);
     }, [searchParams]);
+
+    useEffect(() => {
+        if (shouldFetchAllIds && allOrderIds && !isFetchingAllIds) {
+            setSelectedOrders(allOrderIds);
+            setIsSelectAllPages(true);
+            setShouldFetchAllIds(false); // reset trigger
+        }
+    }, [shouldFetchAllIds, allOrderIds, isFetchingAllIds]);
 
     // ============================================================
     // PAGINATION & SELECTION
@@ -1570,9 +1600,13 @@ export default function BusinessOrdersPage() {
                                             variant="link"
                                             size="sm"
                                             className="h-auto p-0 text-xs"
-                                            onClick={() => setIsSelectAllPages(true)}
+                                            disabled={isFetchingAllIds}
+                                            onClick={() => setShouldFetchAllIds(true)}
                                         >
-                                            Select all {totalFilteredCount} orders
+                                            {isFetchingAllIds
+                                                ? <><Loader2 className="h-3 w-3 animate-spin mr-1 inline" />Selecting...</>
+                                                : `Select all ${totalFilteredCount} orders`
+                                            }
                                         </Button>
                                     </>
                                 )}

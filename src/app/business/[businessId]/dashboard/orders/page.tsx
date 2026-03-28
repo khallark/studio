@@ -1252,31 +1252,28 @@ export default function BusinessOrdersPage() {
                                         {/* Date Range */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">Date Range</Label>
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                        <CalendarDays className="mr-2 h-4 w-4" />
-                                                        {dateRange?.from ? (
-                                                            dateRange.to ? (
-                                                                `${format(dateRange.from, "LLL dd")} - ${format(dateRange.to, "LLL dd")}`
-                                                            ) : (
-                                                                format(dateRange.from, "LLL dd, y")
-                                                            )
-                                                        ) : (
-                                                            "Pick a date range"
-                                                        )}
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0" align="start">
-                                                    <Calendar
-                                                        initialFocus
-                                                        mode="range"
-                                                        selected={dateRange}
-                                                        onSelect={setDateRange}
-                                                        numberOfMonths={1}
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="date"
+                                                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                                    value={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''}
+                                                    onChange={(e) => {
+                                                        const from = e.target.value ? new Date(e.target.value) : undefined;
+                                                        setDateRange(from ? { from, to: dateRange?.to } : undefined);
+                                                    }}
+                                                />
+                                                <span className="text-muted-foreground text-xs shrink-0">to</span>
+                                                <input
+                                                    type="date"
+                                                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                                    value={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}
+                                                    min={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined}
+                                                    onChange={(e) => {
+                                                        const to = e.target.value ? new Date(e.target.value) : undefined;
+                                                        setDateRange(dateRange?.from ? { from: dateRange.from, to } : undefined);
+                                                    }}
+                                                />
+                                            </div>
                                             {dateRange && (
                                                 <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} className="w-full">
                                                     Clear Date Range

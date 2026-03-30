@@ -89,7 +89,7 @@ import { GRN, GRNStatus, PurchaseOrder } from '@/types/warehouse';
 // TYPES
 // ============================================================
 
-type SortField = 'createdAt' | 'receivedAt' | 'totalReceivedValue' | 'grnNumber';
+type SortField = 'createdAt' | 'receivedAt' | 'totalReceivedValue' | 'grnNumber' | 'billNumber';
 type SortOrder = 'asc' | 'desc';
 
 interface GRNItemFormRow {
@@ -1244,6 +1244,18 @@ export default function GRNsPage() {
                                                 )}
                                             </button>
                                         </TableHead>
+                                        <TableHead className="w-[120px]">
+                                            <button
+                                                className="flex items-center gap-1 hover:text-foreground"
+                                                onClick={() => toggleSort('billNumber')}
+                                            >
+                                                <Hash className="h-3.5 w-3.5" />
+                                                Bill #
+                                                {sortField === 'billNumber' && (
+                                                    <ChevronDown className={cn('h-3 w-3 transition-transform', sortOrder === 'asc' && 'rotate-180')} />
+                                                )}
+                                            </button>
+                                        </TableHead>
                                         <TableHead>
                                             <div className="flex items-center gap-1">
                                                 <Link2 className="h-3.5 w-3.5" />
@@ -1290,6 +1302,9 @@ export default function GRNsPage() {
                                         >
                                             <TableCell className="font-mono font-medium text-sm">
                                                 {grn.grnNumber}
+                                            </TableCell>
+                                            <TableCell className="font-mono font-medium text-sm">
+                                                {grn.billNumber}
                                             </TableCell>
                                             <TableCell className="font-mono text-sm text-muted-foreground">
                                                 {grn.poNumber}

@@ -110,6 +110,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error }, { status });
         }
 
+        const q = await db.collection(`users/${businessId}/grns`).where('billNumber', '==', billNumber).get();
+
+        if (q.docs.length) {
+            return NextResponse.json(
+                {
+                    error: 'Validation Error',
+                    message: `Bill number already used`,
+                },
+                { status: 400 }
+            );
+        }
+
         // ============================================================
         // PRODUCT EXISTENCE VALIDATION
         // ============================================================

@@ -186,8 +186,8 @@ export function useOrders(
                 }
 
                 const fetchLimit = searchType === 'clientSide'
-                    ? Math.max(rowsPerPage * 3, 100)
-                    : rowsPerPage * 2;
+                    ? Math.max(rowsPerPage * 6, 100)
+                    : rowsPerPage * 6;
 
                 q = query(q, limit(fetchLimit));
 

@@ -538,12 +538,12 @@ export default function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
 
-    // useEffect(() => {
-    //     if (gpDatePreset === 'custom' && (!gpCustomDateRange?.from || !gpCustomDateRange?.to)) return;
-    //     if (businessAuth.isAuthorized && !businessAuth.loading) handleGenerateGrossProfit(true);
-    //     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth.loading]);
-    
+    useEffect(() => {
+        if (gpDatePreset === 'custom' && (!gpCustomDateRange?.from || !gpCustomDateRange?.to)) return;
+        if (businessAuth.isAuthorized && !businessAuth.loading) handleGenerateGrossProfit(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gpDatePreset, gpCustomDateRange]);
+
 
     useEffect(() => {
         if (!remittanceDateRange?.from || !remittanceDateRange?.to) return;

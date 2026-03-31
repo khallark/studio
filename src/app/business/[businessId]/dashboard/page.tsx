@@ -316,6 +316,7 @@ export default function Dashboard() {
     // ── Gross Profit ─────────────────────────────────────────────────────────
     const [grossProfitData, setGrossProfitData] = useState<FirestoreGrossProfitData | null>(null);
     const [gpDatePreset, setGpDatePreset] = useState<DateRangePreset>('today');
+    const isFirst = useRef(true);
     const [gpCustomDateRange, setGpCustomDateRange] = useState<DateRange | undefined>();
     const [gpIsCalendarOpen, setGpIsCalendarOpen] = useState(false);
     const [isGpSubmitting, setIsGpSubmitting] = useState(false);
@@ -539,10 +540,13 @@ export default function Dashboard() {
     }, [datePreset, customDateRange, selectedStores, businessAuth.isAuthorized, businessAuth.loading]);
 
     useEffect(() => {
+        if (isFirst.current) {
+            isFirst.current = false;
+            return;
+        }
         if (gpDatePreset === 'custom' && (!gpCustomDateRange?.from || !gpCustomDateRange?.to)) return;
-        if (businessAuth.isAuthorized && !businessAuth.loading && gpDatePreset === 'today') handleGenerateGrossProfit(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth]);
+    }, [gpDatePreset, gpCustomDateRange,]);
 
 
     useEffect(() => {

@@ -362,6 +362,28 @@ async function handleOrderWebhook(
         return;
       }
 
+      let lineItemsToSave = orderData.line_items;
+      const existingData = snap.data();
+      if (
+        existingData?.customStatus === 'DTO Refunded' ||
+        existingData?.customStatus === 'Pending Refunds'
+      ) {
+        const existingLineItems: any[] = existingData?.raw?.line_items || [];
+        const preservedFieldsByItemId = new Map<string, { refundedAmount?: number; qc_status?: string }>();
+        for (const item of existingLineItems) {
+          const itemId = String(item.variant_id || item.id);
+          const fields: { refundedAmount?: number; qc_status?: string } = {};
+          if (item.refundedAmount !== undefined && item.refundedAmount !== null) fields.refundedAmount = item.refundedAmount;
+          if (item.qc_status !== undefined && item.qc_status !== null) fields.qc_status = item.qc_status;
+          if (Object.keys(fields).length > 0) preservedFieldsByItemId.set(itemId, fields);
+        }
+        lineItemsToSave = (orderData.line_items || []).map((item: any) => {
+          const itemId = String(item.variant_id || item.id);
+          const preserved = preservedFieldsByItemId.get(itemId);
+          return preserved ? { ...item, ...preserved } : item;
+        });
+      }
+
       // Check if the order was cancelled
       const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
       const alreadyCancelled = snap.data()?.customStatus === 'Cancelled';
@@ -369,6 +391,7 @@ async function handleOrderWebhook(
       let log;
       let updateData: { [key: string]: any } = {
         ...dataToSave,
+        raw: { ...orderData, line_items: lineItemsToSave },
         updatedByTopic: topic,
       };
 

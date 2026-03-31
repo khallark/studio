@@ -83,6 +83,33 @@ export async function POST(req: NextRequest) {
         let refundResult = null;
         let storeCreditResult = null;
 
+        // Update line_items with refundedAmount for each item
+        const existingLineItems = orderData?.raw?.line_items || [];
+        const updatedLineItems = existingLineItems.map((item: any) => {
+            const itemId = item.variant_id || item.id;
+            // Get the refund amount for this item, default to 0 if not in the map
+            const itemRefundAmount = itemRefundAmounts[itemId] ?? itemRefundAmounts[String(itemId)] ?? 0;
+            return { ...item, refundedAmount: itemRefundAmount };
+        });
+
+        const itemsMissingRefundedAmount = updatedLineItems.filter(
+            (item: any) => item.refundedAmount === undefined || item.refundedAmount === null
+        );
+
+        if (itemsMissingRefundedAmount.length > 0) {
+            return NextResponse.json(
+                {
+                    error: 'Integrity check failed: one or more line items are missing refundedAmount.',
+                    culpritItems: itemsMissingRefundedAmount.map((i: any) => ({
+                        id: i.id,
+                        variant_id: i.variant_id,
+                        name: i.name,
+                    })),
+                },
+                { status: 400 }
+            );
+        }
+
         // Process refund via Shopify if method is store_credit
         if (refundMethod === 'store_credit') {
             try {
@@ -160,18 +187,6 @@ export async function POST(req: NextRequest) {
                 );
             }
         }
-
-        // Update line_items with refundedAmount for each item
-        const existingLineItems = orderData?.raw?.line_items || [];
-        const updatedLineItems = existingLineItems.map((item: any) => {
-            const itemId = item.variant_id || item.id;
-            // Get the refund amount for this item, default to 0 if not in the map
-            const itemRefundAmount = itemRefundAmounts[itemId] ?? itemRefundAmounts[String(itemId)] ?? 0;
-            return {
-                ...item,
-                refundedAmount: itemRefundAmount,
-            };
-        });
 
         // Update Firestore order document
         const updateData: any = {

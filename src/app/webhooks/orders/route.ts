@@ -362,14 +362,9 @@ async function handleOrderWebhook(
         return;
       }
 
-      // ← ADD THIS
-      if (snap.data()?.customStatus === 'Cancelled') {
-        console.log(`Order ${orderId} is already cancelled. Ignoring duplicate update webhook.`);
-        return;
-      }
-
       // Check if the order was cancelled
       const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
+      const alreadyCancelled = snap.data()?.customStatus === 'Cancelled';
 
       let log;
       let updateData: { [key: string]: any } = {
@@ -377,7 +372,8 @@ async function handleOrderWebhook(
         updatedByTopic: topic,
       };
 
-      if (isCancelled) {
+      if (isCancelled && !alreadyCancelled) {
+        // First time we're seeing the cancellation — do the full thing
         log = {
           status: "Cancelled",
           createdAt: Timestamp.now(),

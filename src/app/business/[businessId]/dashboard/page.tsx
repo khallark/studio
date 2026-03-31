@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2 } from 'lucide-react';
+import { CalendarIcon, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Plus, Minus, Equal, Download, Loader2, MoveRight } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 // ============================================================
 // TYPES
@@ -426,7 +427,18 @@ export default function Dashboard() {
                 }),
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message ?? `Status ${res.status}`); }
-            toast({ title: 'Tax Report Queued', description: 'The report will be sent to you on WhatsApp shortly.' });
+            toast({
+                title: `Tax Report generation Started`,
+                description: `Your tax report is queued for generation and will soon be available to download`,
+                action: (
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={`/business/${businessAuth.businessId}/dashboard/reports/tax`}>
+                            View Progress
+                            <MoveRight className="ml-2 h-4 w-4" />
+                        </Link>
+                    </Button>
+                )
+            });
         } catch (err: unknown) {
             toast({ title: 'Error', description: err instanceof Error ? err.message : 'Something went wrong.', variant: 'destructive' });
         } finally {

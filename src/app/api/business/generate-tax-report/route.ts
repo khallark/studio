@@ -207,8 +207,9 @@ export async function POST(req: NextRequest) {
         // ✅ Return success - report is queued
         return NextResponse.json({
             success: true,
-            message: 'Tax report generation has been initiated. You will receive the report on WhatsApp shortly.',
+            message: 'Tax report generation has been queued.',
             taskName: responseData.taskName,
+            docId: responseData.docId,
             dateRange: responseData.dateRange,
             status: responseData.status || 'queued'
         }, { status: 202 }); // 202 Accepted - request accepted for processing

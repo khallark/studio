@@ -29,6 +29,7 @@ import {
   Truck,
   MessageCircleReplyIcon,
   Handshake,
+  FolderClockIcon,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -602,6 +603,21 @@ export default function BusinessLayout({
                     )}
                   </Link>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Reports Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={FolderClockIcon}
+                  label="Reports"
+                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/reports`)}
+                >
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/reports/tax`}
+                    label="Tax Reports"
+                    isActive={pathname === `/business/${businessId}/dashboard/reports/tax`}
+                  />
+                </NavSection>
               </SidebarMenuItem>
 
               {/* Orders Section */}

@@ -362,6 +362,12 @@ async function handleOrderWebhook(
         return;
       }
 
+      // ← ADD THIS
+      if (snap.data()?.customStatus === 'Cancelled') {
+        console.log(`Order ${orderId} is already cancelled. Ignoring duplicate update webhook.`);
+        return;
+      }
+
       // Check if the order was cancelled
       const isCancelled = orderData.cancelled_at !== null && orderData.cancelled_at !== undefined;
 

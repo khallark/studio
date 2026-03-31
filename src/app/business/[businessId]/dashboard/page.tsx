@@ -540,9 +540,9 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (gpDatePreset === 'custom' && (!gpCustomDateRange?.from || !gpCustomDateRange?.to)) return;
-        if (businessAuth.isAuthorized && !businessAuth.loading) handleGenerateGrossProfit(true);
+        if (businessAuth.isAuthorized && !businessAuth.loading && gpDatePreset === 'today') handleGenerateGrossProfit(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gpDatePreset, gpCustomDateRange]);
+    }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth]);
 
 
     useEffect(() => {

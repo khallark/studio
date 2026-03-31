@@ -543,6 +543,7 @@ export default function Dashboard() {
     //     if (businessAuth.isAuthorized && !businessAuth.loading) handleGenerateGrossProfit(true);
     //     // eslint-disable-next-line react-hooks/exhaustive-deps
     // }, [gpDatePreset, gpCustomDateRange, businessAuth.isAuthorized, businessAuth.loading]);
+    
 
     useEffect(() => {
         if (!remittanceDateRange?.from || !remittanceDateRange?.to) return;

@@ -152,8 +152,8 @@ export function useOrders(
 
                     q = query(
                         q,
-                        where('createdAt', '>=', filters.dateRange.from.toISOString()),
-                        where('createdAt', '<', toDate.toISOString())
+                        where('createdAt', '>=', filters.dateRange.from.toISOString().slice(0, 19) + 'Z'),
+                        where('createdAt', '<', toDate.toISOString().slice(0, 19) + 'Z')
                     );
                 }
 

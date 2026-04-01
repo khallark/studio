@@ -115,19 +115,6 @@ interface ProductFormData {
     stock: string;
 }
 
-const CATEGORIES = [
-    'Apparel',
-    'Accessories',
-    'Footwear',
-    'Electronics',
-    'Home & Living',
-    'Beauty & Personal Care',
-    'Sports & Outdoors',
-    'Books & Stationery',
-    'Food & Beverages',
-    'Other',
-];
-
 const TAX_RATES = [0, 5, 12, 18, 28];
 
 const initialFormData: ProductFormData = {
@@ -882,16 +869,22 @@ export default function ProductsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Categories</SelectItem>
-                                    {CATEGORIES.map((cat) => (
-                                        <SelectItem key={cat} value={cat}>
-                                            {cat}{' '}
-                                            {categoryCounts[cat] && (
-                                                <span className="text-muted-foreground">
-                                                    ({categoryCounts[cat]})
-                                                </span>
-                                            )}
-                                        </SelectItem>
-                                    ))}
+                                    {Object.keys(categoryCounts).length === 0 ? (
+                                        <div className="py-6 text-center text-sm text-muted-foreground">
+                                            No categories yet
+                                        </div>
+                                    ) : (
+                                        Object.keys(categoryCounts)
+                                            .sort()
+                                            .map((cat) => (
+                                                <SelectItem key={cat} value={cat}>
+                                                    {cat}
+                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                        ({categoryCounts[cat]})
+                                                    </span>
+                                                </SelectItem>
+                                            ))
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1332,11 +1325,22 @@ export default function ProductsPage() {
                                         <SelectValue placeholder="Select a category" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CATEGORIES.map((cat) => (
-                                            <SelectItem key={cat} value={cat}>
-                                                {cat}
-                                            </SelectItem>
-                                        ))}
+                                        {Object.keys(categoryCounts).length === 0 ? (
+                                            <div className="py-6 text-center text-sm text-muted-foreground">
+                                                No categories yet
+                                            </div>
+                                        ) : (
+                                            Object.keys(categoryCounts)
+                                                .sort()
+                                                .map((cat) => (
+                                                    <SelectItem key={cat} value={cat}>
+                                                        {cat}
+                                                        <span className="ml-2 text-xs text-muted-foreground">
+                                                            ({categoryCounts[cat]})
+                                                        </span>
+                                                    </SelectItem>
+                                                ))
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 {formErrors.category && (

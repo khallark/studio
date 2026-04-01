@@ -356,9 +356,6 @@ export default function BusinessOrdersPage() {
     const [orderForRefund, setOrderForRefund] = useState<Order | null>(null);
     const [isPerformPickupDialogOpen, setIsPerformPickupDialogOpen] = useState(false);
     const [orderForPickup, setOrderForPickup] = useState<Order | null>(null);
-    // RTO UPC confirmation dialog
-    const [isRTOUPCDialogOpen, setIsRTOUPCDialogOpen] = useState(false);
-    const [pendingRTOStatus, setPendingRTOStatus] = useState<'RTO Closed' | null>(null);
     const [isStartPackagingOpen, setIsStartPackagingOpen] = useState(false);
 
     // ============================================================
@@ -564,7 +561,7 @@ export default function BusinessOrdersPage() {
         const totalStores = ordersByStore.size;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
-            bulkUpdate.mutate({ orderIds: storeOrderIds, status, storeId, createUPCsForNonPickupReady: false }, {
+            bulkUpdate.mutate({ orderIds: storeOrderIds, status, storeId }, {
                 onSuccess: () => {
                     completedStores++;
                     if (completedStores === totalStores) {
@@ -736,15 +733,7 @@ export default function BusinessOrdersPage() {
         }
     };
 
-    const handleRTOBulkAction = (status: 'RTO Closed') => {
-        setPendingRTOStatus(status);
-        setIsRTOUPCDialogOpen(true);
-    };
-
-    const executeRTOUpdate = (createUPCsForNonPickupReady: boolean) => {
-        if (!pendingRTOStatus) return;
-        setIsRTOUPCDialogOpen(false);
-
+    const handleRTOClose = () => {
         const ordersByStore = new Map<string, string[]>();
         selectedOrders.forEach(orderId => {
             const storeId = selectedOrdersMap[orderId];
@@ -756,23 +745,18 @@ export default function BusinessOrdersPage() {
 
         let completedStores = 0;
         const totalStores = ordersByStore.size;
-        const statusToUpdate = pendingRTOStatus;
 
         ordersByStore.forEach((storeOrderIds, storeId) => {
             bulkUpdate.mutate(
-                { orderIds: storeOrderIds, status: statusToUpdate, storeId, createUPCsForNonPickupReady },
+                { orderIds: storeOrderIds, status: 'RTO Closed', storeId },
                 {
                     onSuccess: () => {
                         completedStores++;
-                        if (completedStores === totalStores) {
-                            clearAllSelections()
-                        }
+                        if (completedStores === totalStores) clearAllSelections();
                     }
                 }
             );
         });
-
-        setPendingRTOStatus(null);
     };
 
     // ============================================================
@@ -894,14 +878,6 @@ export default function BusinessOrdersPage() {
 
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
 
-    const rtoDialogCounts = React.useMemo(() => {
-        const selectedList = orders.filter(o => selectedOrders.includes(o.id));
-        return {
-            withoutUPC: selectedList.filter(o => !o.pickupReady).length,
-            withUPC: selectedList.filter(o => o.pickupReady === true).length,
-        };
-    }, [orders, selectedOrders]);
-
     // ============================================================
     // BADGE VARIANTS
     // ============================================================
@@ -1021,21 +997,18 @@ export default function BusinessOrdersPage() {
                 return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
             case 'RTO Delivered':
                 return (
-                    <>
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'RTO Closed')}>RTO Close</DropdownMenuItem>
-                        <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId, createUPCsForNonPickupReady: false })}
-                        >
-                            Mark as Lost
-                        </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId })}
+                    >
+                        Mark as Lost
+                    </DropdownMenuItem>
                 );
             case 'RTO In Transit':
                 return (
                     <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
-                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId, createUPCsForNonPickupReady: false })}
+                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId })}
                     >
                         Mark as Lost
                     </DropdownMenuItem>
@@ -1586,7 +1559,7 @@ export default function BusinessOrdersPage() {
                                         )}
                                         {activeTab === 'RTO In Transit' && (
                                             <DropdownMenuItem
-                                                onClick={() => handleRTOBulkAction('RTO Closed')}
+                                                onClick={handleRTOClose}
                                                 disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
                                             >
                                                 {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1595,7 +1568,7 @@ export default function BusinessOrdersPage() {
                                         )}
                                         {activeTab === 'RTO Delivered' && (
                                             <DropdownMenuItem
-                                                onClick={() => handleRTOBulkAction('RTO Closed')}
+                                                onClick={handleRTOClose}
                                                 disabled={isDisabled || isBulkUpdating || isAnyOperationInProgress}
                                             >
                                                 {isBulkUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -2268,37 +2241,6 @@ export default function BusinessOrdersPage() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            <AlertDialog open={isRTOUPCDialogOpen} onOpenChange={setIsRTOUPCDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Reflect UPCs in Put Away?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Do you want the UPCs of the selected orders to reflect in put away?
-                            If yes, UPCs for orders without existing UPCs will be created as{' '}
-                            <strong>putAway: inbound</strong>, and already existing UPCs will be
-                            updated to <strong>putAway: inbound</strong>. If no, neither will happen.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setPendingRTOStatus(null)}>
-                            Cancel
-                        </AlertDialogCancel>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsRTOUPCDialogOpen(false);
-                                executeRTOUpdate(false);
-                            }}
-                        >
-                            No
-                        </Button>
-                        <AlertDialogAction onClick={() => executeRTOUpdate(true)}>
-                            Yes
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </>
     );
 }

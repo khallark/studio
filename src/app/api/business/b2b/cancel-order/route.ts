@@ -2,7 +2,7 @@
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
-import { Lot, MaterialReservation, MaterialTransaction, MaterialTransactionType, Order } from "@/types/b2b";
+import { Lot, Order } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,33 +17,35 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !orderId || !cancelledBy || !reason) {
-            return NextResponse.json({ error: "businessId, orderId, cancelledBy, reason are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, orderId, cancelledBy, reason are required." },
+                { status: 400 },
+            );
         }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         const orderRef = db.doc(`users/${businessId}/orders/${orderId}`);
         const orderDoc = await orderRef.get();
-
         if (!orderDoc.exists) {
             return NextResponse.json({ error: "order_not_found" }, { status: 404 });
         }
 
         const order = orderDoc.data() as Order;
-
         if (order.status === "CANCELLED") {
             return NextResponse.json({ error: "order_already_cancelled" }, { status: 400 });
         }
 
+        // DRAFT: no lots exist — just flip order status
         if (order.status === "DRAFT") {
             await orderRef.update({ status: "CANCELLED", updatedAt: Timestamp.now() });
             return NextResponse.json({ success: true, lotsCancelled: 0 }, { status: 200 });
         }
 
+        // IN_PRODUCTION: cancel all non-terminal lots
         const lotsSnap = await db
             .collection(`users/${businessId}/lots`)
             .where("orderId", "==", orderId)
@@ -58,45 +60,17 @@ export async function POST(req: NextRequest) {
         const batch = db.batch();
 
         for (const lotDoc of cancellableLots) {
-            const lot = lotDoc.data() as Lot;
-
-            batch.update(lotDoc.ref, { status: "CANCELLED", updatedAt: now });
-
-            const reservationsSnap = await db
-                .collection(`users/${businessId}/material_reservations`)
-                .where("lotId", "==", lotDoc.id)
-                .where("status", "==", "RESERVED")
-                .get();
-
-            for (const resDoc of reservationsSnap.docs) {
-                const reservation = resDoc.data() as MaterialReservation;
-
-                batch.update(resDoc.ref, { status: "RELEASED", updatedAt: now });
-
-                const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
-                batch.set(txRef, {
-                    id: txRef.id,
-                    materialId: reservation.materialId,
-                    materialName: reservation.materialName,
-                    type: "RETURN" as MaterialTransactionType,
-                    quantity: reservation.quantityRequired,
-                    referenceId: orderId,
-                    referenceType: "LOT",
-                    note: `Order ${order.orderNumber} cancelled — Lot ${lot.lotNumber} reserved stock released. Reason: ${reason}`,
-                    createdBy: cancelledBy,
-                    createdAt: now,
-                    stockBefore: null,
-                    stockAfter: null,
-                } satisfies MaterialTransaction);
-            }
+            batch.update(lotDoc.ref, {
+                status: "CANCELLED",
+                isDelayed: false,
+                delayDays: 0,
+                updatedAt: now,
+            });
         }
 
-        batch.update(orderRef, {
-            status: "CANCELLED",
-            updatedAt: now,
-        });
-
+        batch.update(orderRef, { status: "CANCELLED", updatedAt: now });
         await batch.commit();
+
         return NextResponse.json({ success: true, lotsCancelled: cancellableLots.length }, { status: 200 });
 
     } catch (error) {

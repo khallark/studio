@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !buyerId || !buyerName || !buyerContact || !shipDate || !deliveryAddress || !createdBy || !lots) {
-            return NextResponse.json({ error: "businessId, buyerId, buyerName, buyerContact, shipDate, deliveryAddress, createdBy, lots are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, buyerId, buyerName, buyerContact, shipDate, deliveryAddress, createdBy, lots are required." },
+                { status: 400 },
+            );
         }
         if (!lots.length) {
             return NextResponse.json({ error: "at_least_one_lot_required" }, { status: 400 });
@@ -31,8 +34,7 @@ export async function POST(req: NextRequest) {
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         const buyerDoc = await db.doc(`users/${businessId}/buyers/${buyerId}`).get();
@@ -40,26 +42,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "buyer_not_found" }, { status: 404 });
         }
         if (!(buyerDoc.data() as Buyer).isActive) {
-            return NextResponse.json({ error: "buyer_inactive", message: "Cannot create an order for an inactive buyer." }, { status: 400 });
+            return NextResponse.json(
+                { error: "buyer_inactive", message: "Cannot create an order for an inactive buyer." },
+                { status: 400 },
+            );
         }
 
-        // Fetch configured stages once — reused for all lot validations
         const configuredStages = await getConfiguredStageNames(businessId);
         if (configuredStages.size === 0) {
-            return NextResponse.json({ error: "no_stages_configured", message: "No production stages have been configured for this business. Add stages in Stage Config first." }, { status: 400 });
+            return NextResponse.json(
+                { error: "no_stages_configured", message: "No production stages configured. Add stages in Stage Config first." },
+                { status: 400 },
+            );
         }
 
         for (const lot of lots) {
             if (!lot.productId) {
-                return NextResponse.json({ error: "lot_missing_product", message: "Each lot must have a productId." }, { status: 400 });
+                return NextResponse.json({ error: "lot_missing_product" }, { status: 400 });
             }
             if (!lot.quantity || lot.quantity <= 0) {
-                return NextResponse.json({ error: "lot_invalid_quantity", message: "Each lot must have a quantity greater than 0." }, { status: 400 });
+                return NextResponse.json({ error: "lot_invalid_quantity" }, { status: 400 });
             }
             if (!lot.stages?.length) {
-                return NextResponse.json({ error: "lot_missing_stages", message: "Each lot must have at least one stage." }, { status: 400 });
+                return NextResponse.json({ error: "lot_missing_stages" }, { status: 400 });
             }
-
             const productDoc = await db.doc(`users/${businessId}/b2bProducts/${lot.productId}`).get();
             if (!productDoc.exists) {
                 return NextResponse.json({ error: "product_not_found", message: `Product ${lot.productId} does not exist.` }, { status: 404 });
@@ -67,13 +73,11 @@ export async function POST(req: NextRequest) {
             if (!(productDoc.data() as Product).isActive) {
                 return NextResponse.json({ error: "product_inactive", message: `Product "${lot.productName}" is inactive.` }, { status: 400 });
             }
-
-            // Validate stage names for this lot
-            const lotStageNames = lot.stages.map(s => s.stage);
-            const stageError = validateStageNames(lotStageNames, configuredStages, `Lot "${lot.productName}"`);
+            const stageError = validateStageNames(lot.stages.map(s => s.stage), configuredStages, `Lot "${lot.productName}"`);
             if (stageError) {
                 return NextResponse.json({ error: "invalid_stage", message: stageError }, { status: 400 });
             }
+            // BOM validation is deferred to confirm-order — a draft may be saved before BOM is set up
         }
 
         const orderNumber = await generateOrderNumber(businessId);

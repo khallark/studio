@@ -18,13 +18,15 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !materialId || quantity == null || !note || !createdBy) {
-            return NextResponse.json({ error: "businessId, materialId, quantity, note, createdBy are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, materialId, quantity, note, createdBy are required." },
+                { status: 400 },
+            );
         }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         if (quantity === 0) {
@@ -40,11 +42,12 @@ export async function POST(req: NextRequest) {
             const material = matDoc.data() as RawMaterial;
             if (!material.isActive) throw new Error("material_inactive");
 
-            const projectedAvailable = material.availableStock + quantity;
-            if (projectedAvailable < 0) throw new Error("adjustment_exceeds_available_stock");
+            // Guard: totalStock cannot go below zero (no reservations to consider)
+            const projectedTotal = material.totalStock + quantity;
+            if (projectedTotal < 0) throw new Error("adjustment_exceeds_stock");
 
             const stockBefore = material.totalStock;
-            const stockAfter = stockBefore + quantity;
+            const stockAfter = projectedTotal;
             const now = Timestamp.now();
 
             tx.update(materialRef, {
@@ -74,15 +77,10 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         const message = (error as Error).message;
-        if (message === "material_not_found") {
-            return NextResponse.json({ error: "material_not_found" }, { status: 404 });
-        } else if (message === "material_inactive") {
-            return NextResponse.json({ error: "material_inactive", message: "Cannot adjust stock for an inactive material." }, { status: 400 });
-        } else if (message === "adjustment_exceeds_available_stock") {
-            return NextResponse.json({ error: "adjustment_exceeds_available_stock" }, { status: 400 });
-        } else {
-            console.error("adjustStock error:", error);
-            return NextResponse.json({ error: "internal", message }, { status: 500 });
-        }
+        if (message === "material_not_found") return NextResponse.json({ error: "material_not_found" }, { status: 404 });
+        if (message === "material_inactive") return NextResponse.json({ error: "material_inactive" }, { status: 400 });
+        if (message === "adjustment_exceeds_stock") return NextResponse.json({ error: "adjustment_exceeds_stock", message: "Adjustment would bring total stock below zero." }, { status: 400 });
+        console.error("adjustStock error:", error);
+        return NextResponse.json({ error: "internal", message }, { status: 500 });
     }
 }

@@ -2,7 +2,7 @@
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
-import { BOMEntry } from "@/types/b2b";
+import { BOM } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,26 +17,24 @@ export async function POST(req: NextRequest) {
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         const bomRef = db.doc(`users/${businessId}/bom/${bomId}`);
         const bomDoc = await bomRef.get();
 
         if (!bomDoc.exists) {
-            return NextResponse.json({ error: "bom_entry_not_found" }, { status: 404 });
+            return NextResponse.json({ error: "bom_not_found" }, { status: 404 });
         }
-
-        if (!(bomDoc.data() as BOMEntry).isActive) {
-            return NextResponse.json({ error: "bom_entry_already_inactive" }, { status: 400 });
+        if (!(bomDoc.data() as BOM).isActive) {
+            return NextResponse.json({ error: "bom_already_inactive" }, { status: 400 });
         }
 
         await bomRef.update({ isActive: false, updatedAt: Timestamp.now() });
         return NextResponse.json({ success: true }, { status: 200 });
 
     } catch (error) {
-        console.error("deactivateBOMEntry error:", error);
+        console.error("deactivateBOM error:", error);
         return NextResponse.json({ error: "internal", message: (error as Error).message }, { status: 500 });
     }
 }

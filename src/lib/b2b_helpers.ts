@@ -1,35 +1,17 @@
-import { BOMEntry, DraftLotInput, Lot, LotStage, MaterialReservation, ProductionStageConfig, RawMaterial } from "@/types/b2b";
+import {
+  BOM,
+  DraftLotInput,
+  Lot,
+  LotBOMStage,
+  LotStage,
+  ProductionStageConfig,
+} from "@/types/b2b";
 import { db } from "./firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 
 // ============================================================================
-// HELPERS
+// COUNTER HELPERS
 // ============================================================================
-
-export async function calculateMaterialRequirements(
-    businessId: string,
-    lotInputs: DraftLotInput[],
-): Promise<{ materialId: string; materialName: string; materialUnit: string; quantityRequired: number }[]> {
-    const requirements = [];
-    for (const lotInput of lotInputs) {
-        const bomSnap = await db
-            .collection(`users/${businessId}/bom`)
-            .where("productId", "==", lotInput.productId)
-            .where("isActive", "==", true)
-            .get();
-        for (const bomDoc of bomSnap.docs) {
-            const bom = bomDoc.data() as BOMEntry;
-            const qtyRequired = lotInput.quantity * bom.quantityPerPiece * (1 + bom.wastagePercent / 100);
-            requirements.push({
-                materialId: bom.materialId,
-                materialName: bom.materialName,
-                materialUnit: bom.materialUnit,
-                quantityRequired: Math.ceil(qtyRequired * 100) / 100,
-            });
-        }
-    }
-    return requirements;
-}
 
 export async function generateLotNumber(businessId: string): Promise<string> {
   const counterRef = db.doc(`users/${businessId}/counters/lots`);
@@ -54,10 +36,13 @@ export async function generateOrderNumber(businessId: string): Promise<string> {
   return `ORD-${year}-${String(result).padStart(4, "0")}`;
 }
 
+// ============================================================================
+// DELAY COMPUTATION
+// ============================================================================
+
 export function computeDelayStatus(stages: LotStage[]): { isDelayed: boolean; delayDays: number } {
   const now = Timestamp.now().toDate();
   let maxDelay = 0;
-
   for (const stage of stages) {
     if (stage.status === "PENDING" || stage.status === "IN_PROGRESS") {
       const planned = stage.plannedDate.toDate();
@@ -65,12 +50,51 @@ export function computeDelayStatus(stages: LotStage[]): { isDelayed: boolean; de
       if (diff > 0) maxDelay = Math.max(maxDelay, diff);
     }
   }
-
   return { isDelayed: maxDelay > 0, delayDays: maxDelay };
 }
 
-// Shared lot-building logic — used by both createOrder and confirmOrder
-export async function buildLotsAndReservations(
+// ============================================================================
+// STAGE VALIDATION
+// ============================================================================
+
+export async function getConfiguredStageNames(businessId: string): Promise<Set<string>> {
+  const snap = await db.collection(`users/${businessId}/production_stage_config`).get();
+  return new Set(snap.docs.map((d) => (d.data() as ProductionStageConfig).name));
+}
+
+export function validateStageName(
+  stage: string,
+  configured: Set<string>,
+  context?: string,
+): string | null {
+  if (!configured.has(stage)) {
+    const label = context ? `${context}: ` : "";
+    return `${label}Stage "${stage}" is not configured for this business. Add it in Stage Config before using it.`;
+  }
+  return null;
+}
+
+export function validateStageNames(
+  stages: string[],
+  configured: Set<string>,
+  context?: string,
+): string | null {
+  for (const stage of stages) {
+    const err = validateStageName(stage, configured, context);
+    if (err) return err;
+  }
+  return null;
+}
+
+// ============================================================================
+// LOT BUILDER
+//
+// Replaces the old buildLotsAndReservations.  No stock reservations are
+// created.  Each lot gets a bomSnapshot captured from the chosen BOM (or
+// from the inline customBOM the user provided).
+// ============================================================================
+
+export async function buildLots(
   businessId: string,
   orderId: string,
   orderNumber: string,
@@ -78,10 +102,9 @@ export async function buildLotsAndReservations(
   buyerName: string,
   shipDate: Timestamp,
   createdBy: string,
-  lotInputs: DraftLotInput[]
-): Promise<{ lotDocs: Lot[]; reservationDocs: MaterialReservation[] }> {
+  lotInputs: DraftLotInput[],
+): Promise<{ lotDocs: Lot[] }> {
   const lotDocs: Lot[] = [];
-  const reservationDocs: MaterialReservation[] = [];
 
   for (const lotInput of lotInputs) {
     const lotNumber = await generateLotNumber(businessId);
@@ -100,6 +123,40 @@ export async function buildLotsAndReservations(
       completedBy: null,
       note: null,
     }));
+
+    // ── Resolve BOM snapshot ────────────────────────────────────────────
+    let bomId: string | null = null;
+    let bomSnapshot: LotBOMStage[] = [];
+
+    if (lotInput.bomId) {
+      // Predefined BOM — fetch and snapshot
+      const bomDoc = await db.doc(`users/${businessId}/bom/${lotInput.bomId}`).get();
+      if (!bomDoc.exists) throw new Error(`bom_not_found:${lotInput.bomId}`);
+      const bom = bomDoc.data() as BOM;
+      if (!bom.isActive) throw new Error(`bom_inactive:${lotInput.bomId}`);
+      bomId = bom.id;
+      bomSnapshot = bom.stages.map((stage) => ({
+        stage: stage.stage,
+        materials: stage.materials.map((m) => ({
+          materialId: m.materialId,
+          materialName: m.materialName,
+          materialUnit: m.materialUnit,
+          quantityPerPiece: m.quantityPerPiece,
+          wastagePercent: m.wastagePercent,
+          totalQuantity:
+            Math.round(
+              lotInput.quantity *
+              m.quantityPerPiece *
+              (1 + m.wastagePercent / 100) *
+              100,
+            ) / 100,
+        })),
+      }));
+    } else if (lotInput.customBOM && lotInput.customBOM.length > 0) {
+      // User-supplied inline BOM
+      bomSnapshot = lotInput.customBOM;
+    }
+    // If neither — lot has no material tracking. bomSnapshot stays [].
 
     lotDocs.push({
       id: lotId,
@@ -121,104 +178,28 @@ export async function buildLotsAndReservations(
       shipDate,
       isDelayed: false,
       delayDays: 0,
+      bomId,
+      bomSnapshot,
       status: "ACTIVE",
       createdBy,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
-
-    const bomSnap = await db.collection(`users/${businessId}/bom`)
-      .where("productId", "==", lotInput.productId)
-      .where("isActive", "==", true)
-      .get();
-
-    for (const bomDoc of bomSnap.docs) {
-      const bom = bomDoc.data() as BOMEntry;
-      const reservationId = db.collection(`users/${businessId}/material_reservations`).doc().id;
-      const qtyRequired = lotInput.quantity * bom.quantityPerPiece * (1 + bom.wastagePercent / 100);
-
-      reservationDocs.push({
-        id: reservationId,
-        lotId,
-        lotNumber,
-        orderId,
-        orderNumber,
-        materialId: bom.materialId,
-        materialName: bom.materialName,
-        materialUnit: bom.materialUnit,
-        quantityRequired: Math.ceil(qtyRequired * 100) / 100,
-        quantityConsumed: 0,
-        consumedAtStage: bom.consumedAtStage,
-        status: "RESERVED",
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
-    }
   }
 
-  return { lotDocs, reservationDocs };
+  return { lotDocs };
 }
 
-// Shared stock check — used by both createOrder and confirmOrder
-export async function checkStockShortfalls(
-  businessId: string,
-  requirements: { materialId: string; materialName: string; materialUnit: string; quantityRequired: number }[],
-): Promise<string[]> {
-  const materialTotals: Record<string, number> = {};
-  for (const r of requirements) {
-    materialTotals[r.materialId] = (materialTotals[r.materialId] ?? 0) + r.quantityRequired;
-  }
-
-  const shortfalls: string[] = [];
-  for (const [materialId, required] of Object.entries(materialTotals)) {
-    const matDoc = await db.doc(`users/${businessId}/raw_materials/${materialId}`).get();
-    if (!matDoc.exists) { shortfalls.push(materialId); continue; }
-    const mat = matDoc.data() as RawMaterial;
-    if (mat.availableStock < required) {
-      shortfalls.push(`${mat.name} (need ${required} ${mat.unit}, have ${mat.availableStock})`);
-    }
-  }
-
-  return shortfalls;
-}
-
-export async function getConfiguredStageNames(businessId: string): Promise<Set<string>> {
-    const snap = await db
-        .collection(`users/${businessId}/production_stage_config`)
-        .get();
-    return new Set(snap.docs.map(d => (d.data() as ProductionStageConfig).name));
-}
-
-export function validateStageName(
-    stage: string,
-    configured: Set<string>,
-    context?: string,
-): string | null {
-    if (!configured.has(stage)) {
-        const label = context ? `${context}: ` : "";
-        return `${label}Stage "${stage}" is not configured for this business. Add it in Stage Config before using it.`;
-    }
-    return null;
-}
- 
-export function validateStageNames(
-    stages: string[],
-    configured: Set<string>,
-    context?: string,
-): string | null {
-    for (const stage of stages) {
-        const err = validateStageName(stage, configured, context);
-        if (err) return err;
-    }
-    return null;
-}
+// ============================================================================
+// PAYLOAD INTERFACES  (used by API routes for type-safe body parsing)
+// ============================================================================
 
 export interface SaveDraftOrderPayload {
   businessId: string;
   buyerId: string;
   buyerName: string;
   buyerContact: string;
-  shipDate: string;               // ISO string
+  shipDate: string;
   deliveryAddress: string;
   note?: string;
   createdBy: string;
@@ -229,8 +210,6 @@ export interface ConfirmOrderPayload {
   businessId: string;
   orderId: string;
   confirmedBy: string;
-  // Optional — pass updated lots if changes were made during review.
-  // If omitted, the draftLots stored on the order doc are used.
   lots?: DraftLotInput[];
 }
 
@@ -239,7 +218,7 @@ export interface CreateOrderPayload {
   buyerId: string;
   buyerName: string;
   buyerContact: string;
-  shipDate: string;               // ISO string
+  shipDate: string;
   deliveryAddress: string;
   note?: string;
   createdBy: string;
@@ -257,7 +236,7 @@ export interface AddStockPayload {
   businessId: string;
   materialId: string;
   quantity: number;
-  referenceId: string;    // PO number, GRN number, supplier invoice, etc.
+  referenceId: string;
   note?: string;
   createdBy: string;
 }
@@ -265,7 +244,7 @@ export interface AddStockPayload {
 export interface AdjustStockPayload {
   businessId: string;
   materialId: string;
-  quantity: number;       // positive = add, negative = remove
-  note: string;           // required for adjustments — must explain why
+  quantity: number;
+  note: string;
   createdBy: string;
 }

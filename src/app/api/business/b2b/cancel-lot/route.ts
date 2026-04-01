@@ -2,7 +2,7 @@
 
 import { authUserForBusiness } from "@/lib/authoriseUser";
 import { db } from "@/lib/firebase-admin";
-import { Lot, MaterialReservation, MaterialTransaction, MaterialTransactionType } from "@/types/b2b";
+import { Lot } from "@/types/b2b";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,71 +17,42 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !lotId || !cancelledBy || !reason) {
-            return NextResponse.json({ error: "businessId, lotId, cancelledBy, reason are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, lotId, cancelledBy, reason are required." },
+                { status: 400 },
+            );
         }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         const lotRef = db.doc(`users/${businessId}/lots/${lotId}`);
+        const lotDoc = await lotRef.get();
 
-        await db.runTransaction(async (tx) => {
-            const lotDoc = await tx.get(lotRef);
-            if (!lotDoc.exists) throw new Error("lot_not_found");
+        if (!lotDoc.exists) {
+            return NextResponse.json({ error: "lot_not_found" }, { status: 404 });
+        }
+        const lot = lotDoc.data() as Lot;
+        if (lot.status === "CANCELLED") {
+            return NextResponse.json({ error: "lot_already_cancelled" }, { status: 400 });
+        }
+        if (lot.status === "COMPLETED") {
+            return NextResponse.json({ error: "lot_already_completed" }, { status: 400 });
+        }
 
-            const lot = lotDoc.data() as Lot;
-            if (lot.status === "CANCELLED") throw new Error("lot_already_cancelled");
-            if (lot.status === "COMPLETED") throw new Error("lot_already_completed");
-
-            const now = Timestamp.now();
-
-            tx.update(lotRef, { status: "CANCELLED", isDelayed: false, delayDays: 0, updatedAt: now });
-
-            const reservationsSnap = await db
-                .collection(`users/${businessId}/material_reservations`)
-                .where("lotId", "==", lotId)
-                .where("status", "==", "RESERVED")
-                .get();
-
-            for (const resDoc of reservationsSnap.docs) {
-                const reservation = resDoc.data() as MaterialReservation;
-
-                tx.update(resDoc.ref, { status: "RELEASED", updatedAt: now });
-
-                const txRef = db.collection(`users/${businessId}/material_transactions`).doc();
-                tx.set(txRef, {
-                    id: txRef.id,
-                    materialId: reservation.materialId,
-                    materialName: reservation.materialName,
-                    type: "RETURN" as MaterialTransactionType,
-                    quantity: reservation.quantityRequired,
-                    referenceId: lotId,
-                    referenceType: "LOT",
-                    note: `Lot ${lot.lotNumber} cancelled — reserved stock released. Reason: ${reason}`,
-                    createdBy: cancelledBy,
-                    createdAt: now,
-                    stockBefore: null,
-                    stockAfter: null,
-                } satisfies MaterialTransaction);
-            }
+        await lotRef.update({
+            status: "CANCELLED",
+            isDelayed: false,
+            delayDays: 0,
+            updatedAt: Timestamp.now(),
         });
 
         return NextResponse.json({ success: true }, { status: 200 });
 
     } catch (error) {
-        const message = (error as Error).message;
-        if (message === "lot_not_found") {
-            return NextResponse.json({ error: "lot_not_found" }, { status: 404 });
-        } else if (message === "lot_already_cancelled") {
-            return NextResponse.json({ error: "lot_already_cancelled" }, { status: 400 });
-        } else if (message === "lot_already_completed") {
-            return NextResponse.json({ error: "lot_already_completed" }, { status: 400 });
-        } else {
-            console.error("cancelLot error:", error);
-            return NextResponse.json({ error: "internal", message }, { status: 500 });
-        }
+        console.error("cancelLot error:", error);
+        return NextResponse.json({ error: "internal", message: (error as Error).message }, { status: 500 });
     }
 }

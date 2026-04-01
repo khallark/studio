@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useBusinessContext } from '../../../layout';
 import { db } from '@/lib/firebase';
 import { doc, collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
-import { Lot, LotStageHistory, MaterialReservation } from '@/types/b2b';
+import { Lot, LotStageHistory } from '@/types/b2b';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Table, TableBody, TableCell, TableHead,
@@ -35,23 +35,23 @@ import {
     DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-    ArrowLeft, CheckCircle2, Clock, AlertTriangle,
+    ArrowLeft, CheckCircle2, AlertTriangle,
     PauseCircle, ChevronRight, Loader2, XCircle,
-    Package, Boxes, History, Calendar,
+    Boxes, History, Calendar,
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
-    COMPLETED:   'bg-emerald-500',
+    COMPLETED: 'bg-emerald-500',
     IN_PROGRESS: 'bg-primary',
-    BLOCKED:     'bg-amber-400',
-    PENDING:     'bg-muted',
+    BLOCKED: 'bg-amber-400',
+    PENDING: 'bg-muted',
 };
 
 const STATUS_TEXT_COLORS: Record<string, string> = {
-    COMPLETED:   'text-emerald-600',
+    COMPLETED: 'text-emerald-600',
     IN_PROGRESS: 'text-primary',
-    BLOCKED:     'text-amber-600',
-    PENDING:     'text-muted-foreground',
+    BLOCKED: 'text-amber-600',
+    PENDING: 'text-muted-foreground',
 };
 
 export default function LotDetailPage() {
@@ -60,46 +60,39 @@ export default function LotDetailPage() {
     const { businessId, user, isAuthorized, loading: authLoading } = useBusinessContext();
     const lotId = params.lotId as string;
 
-    const [lot, setLot]           = useState<Lot | null>(null);
-    const [history, setHistory]   = useState<LotStageHistory[]>([]);
-    const [reservations, setReservations] = useState<MaterialReservation[]>([]);
-    const [loading, setLoading]   = useState(true);
+    const [lot, setLot] = useState<Lot | null>(null);
+    const [history, setHistory] = useState<LotStageHistory[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Advance dialog
-    const [advanceOpen, setAdvanceOpen]   = useState(false);
-    const [advanceNote, setAdvanceNote]   = useState('');
-    const [isAdvancing, setIsAdvancing]   = useState(false);
+    const [advanceOpen, setAdvanceOpen] = useState(false);
+    const [advanceNote, setAdvanceNote] = useState('');
+    const [isAdvancing, setIsAdvancing] = useState(false);
 
-    // Block dialog
-    const [blockOpen, setBlockOpen]       = useState(false);
-    const [blockReason, setBlockReason]   = useState('');
-    const [isBlocking, setIsBlocking]     = useState(false);
+    const [blockOpen, setBlockOpen] = useState(false);
+    const [blockReason, setBlockReason] = useState('');
+    const [isBlocking, setIsBlocking] = useState(false);
 
-    // Cancel dialog
-    const [cancelOpen, setCancelOpen]     = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [isCancelling, setIsCancelling] = useState(false);
 
     useEffect(() => {
         if (!isAuthorized || !businessId || !lotId) return;
 
-        const unsub1 = onSnapshot(doc(db, 'users', businessId, 'lots', lotId), snap => {
+        const u1 = onSnapshot(doc(db, 'users', businessId, 'lots', lotId), snap => {
             if (snap.exists()) setLot({ id: snap.id, ...snap.data() } as Lot);
             setLoading(false);
         });
-        const unsub2 = onSnapshot(
+        const u2 = onSnapshot(
             query(collection(db, 'users', businessId, 'lot_stage_history'), where('lotId', '==', lotId), orderBy('movedAt', 'desc')),
             snap => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as LotStageHistory)))
         );
-        const unsub3 = onSnapshot(
-            query(collection(db, 'users', businessId, 'material_reservations'), where('lotId', '==', lotId)),
-            snap => setReservations(snap.docs.map(d => ({ id: d.id, ...d.data() } as MaterialReservation)))
-        );
-        return () => { unsub1(); unsub2(); unsub3(); };
+        return () => { u1(); u2(); };
     }, [businessId, isAuthorized, lotId]);
 
     const isBlockedLot = lot?.stages.some(s => s.status === 'BLOCKED') ?? false;
-    const currentStageData = lot?.stages.find(s => s.status === 'IN_PROGRESS' || s.status === 'BLOCKED');
+    const isLastStage = lot ? lot.currentSequence === lot.totalStages : false;
+    const totalMaterials = lot ? lot.bomSnapshot.reduce((s, st) => s + st.materials.length, 0) : 0;
 
     const handleAdvance = async () => {
         if (!lot || !user) return;
@@ -113,7 +106,7 @@ export default function LotDetailPage() {
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.error || 'Failed');
-            toast({ title: 'Stage Advanced', description: `Lot #${lot.lotNumber} moved forward.` });
+            toast({ title: 'Stage Advanced' });
             setAdvanceOpen(false);
             setAdvanceNote('');
         } catch (err) {
@@ -176,8 +169,6 @@ export default function LotDetailPage() {
     );
     if (!isAuthorized || !lot) return null;
 
-    const isLastStage = lot.currentSequence === lot.totalStages;
-
     return (
         <div className="flex flex-col h-full overflow-y-auto">
             {/* Header */}
@@ -196,6 +187,7 @@ export default function LotDetailPage() {
                             </Badge>
                         )}
                         {isBlockedLot && <Badge variant="outline" className="text-amber-600 border-amber-300">BLOCKED</Badge>}
+                        {lot.bomId && <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">Predefined BOM</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{lot.productName} · {lot.buyerName} · {lot.orderNumber}</p>
                 </div>
@@ -240,7 +232,9 @@ export default function LotDetailPage() {
                 <Tabs defaultValue="stages">
                     <TabsList>
                         <TabsTrigger value="stages">Stage Pipeline</TabsTrigger>
-                        <TabsTrigger value="materials">Materials ({reservations.length})</TabsTrigger>
+                        <TabsTrigger value="materials">
+                            Materials {totalMaterials > 0 ? `(${totalMaterials})` : ''}
+                        </TabsTrigger>
                         <TabsTrigger value="history">History ({history.length})</TabsTrigger>
                     </TabsList>
 
@@ -258,12 +252,9 @@ export default function LotDetailPage() {
                                         stage.status === 'COMPLETED' && 'border-emerald-200/50 bg-emerald-50/30 dark:bg-emerald-950/10',
                                         stage.status === 'PENDING' && 'border-border/50 bg-muted/20',
                                     )}>
-                                    {/* Stage indicator */}
                                     <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0', STATUS_COLORS[stage.status])}>
                                         {stage.status === 'COMPLETED' ? <CheckCircle2 className="h-4 w-4" /> : stage.sequence}
                                     </div>
-
-                                    {/* Stage info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className={cn('font-semibold text-sm', STATUS_TEXT_COLORS[stage.status])}>{stage.stage}</p>
@@ -290,43 +281,53 @@ export default function LotDetailPage() {
                         </div>
                     </TabsContent>
 
-                    {/* Materials Tab */}
+                    {/* Materials Tab — shows BOM snapshot */}
                     <TabsContent value="materials" className="mt-4">
-                        {reservations.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground text-sm">No material reservations for this lot</div>
+                        {lot.bomSnapshot.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground text-sm">
+                                No material tracking for this lot.
+                            </div>
                         ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Material</TableHead>
-                                        <TableHead>Stage</TableHead>
-                                        <TableHead className="text-right">Required</TableHead>
-                                        <TableHead className="text-right">Consumed</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {reservations.map(r => (
-                                        <TableRow key={r.id}>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Boxes className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="text-sm font-medium">{r.materialName}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell><Badge variant="outline" className="text-xs">{r.consumedAtStage}</Badge></TableCell>
-                                            <TableCell className="text-right font-mono text-sm">{r.quantityRequired} {r.materialUnit}</TableCell>
-                                            <TableCell className="text-right font-mono text-sm">{r.quantityConsumed} {r.materialUnit}</TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={r.status === 'CONSUMED' ? 'success' : r.status === 'RELEASED' ? 'secondary' : 'default'}
-                                                    className="text-xs">{r.status}
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                            <div className="space-y-4">
+                                {lot.bomSnapshot.map((stage, si) => (
+                                    <div key={si} className="border rounded-xl overflow-hidden">
+                                        <div className="px-4 py-2 bg-muted/50 border-b">
+                                            <Badge variant="outline" className="text-xs font-mono">{stage.stage}</Badge>
+                                        </div>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Material</TableHead>
+                                                    <TableHead className="text-right">Qty / Piece</TableHead>
+                                                    <TableHead className="text-right">Wastage %</TableHead>
+                                                    <TableHead className="text-right">Total Required</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {stage.materials.map((m, mi) => (
+                                                    <TableRow key={mi}>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <Boxes className="h-4 w-4 text-muted-foreground" />
+                                                                <span className="text-sm font-medium">{m.materialName}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-sm">
+                                                            {m.quantityPerPiece} <span className="text-xs text-muted-foreground">{m.materialUnit}</span>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                                                            {m.wastagePercent}%
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-sm font-semibold">
+                                                            {m.totalQuantity} <span className="text-xs text-muted-foreground font-normal">{m.materialUnit}</span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </TabsContent>
 
@@ -345,9 +346,7 @@ export default function LotDetailPage() {
                                             <History className="h-4 w-4 text-primary" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium">
-                                                {h.fromStage} → {h.toStage}
-                                            </p>
+                                            <p className="text-sm font-medium">{h.fromStage} → {h.toStage}</p>
                                             <p className="text-xs text-muted-foreground">
                                                 {h.movedAt ? format(h.movedAt.toDate(), 'dd MMM yyyy, HH:mm') : '—'}
                                                 {h.movedBy && ` · By ${h.movedBy}`}
@@ -418,7 +417,7 @@ export default function LotDetailPage() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Lot</AlertDialogTitle>
-                        <AlertDialogDescription>Cancel Lot #{lot.lotNumber}? Reserved materials will be released.</AlertDialogDescription>
+                        <AlertDialogDescription>Cancel Lot #{lot.lotNumber}?</AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="px-6 pb-2">
                         <Input placeholder="Reason (optional)" value={cancelReason} onChange={e => setCancelReason(e.target.value)} />

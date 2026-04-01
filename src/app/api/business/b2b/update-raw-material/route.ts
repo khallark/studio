@@ -5,7 +5,9 @@ import { db } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 
-const STOCK_FIELDS = ["totalStock", "reservedStock", "availableStock"];
+// Only these two stock fields are managed by add-stock / adjust-stock.
+// They cannot be set directly via this update route.
+const STOCK_FIELDS = ["totalStock", "availableStock"];
 
 export async function POST(req: NextRequest) {
     try {
@@ -18,23 +20,21 @@ export async function POST(req: NextRequest) {
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         const materialRef = db.doc(`users/${businessId}/raw_materials/${materialId}`);
         const materialDoc = await materialRef.get();
-
         if (!materialDoc.exists) {
             return NextResponse.json({ error: "material_not_found" }, { status: 404 });
         }
 
         for (const f of STOCK_FIELDS) {
             if (f in fields) {
-                return NextResponse.json({
-                    error: "stock_fields_not_allowed",
-                    message: `Cannot update ${f} directly. Use addStock or adjustStock.`,
-                }, { status: 400 });
+                return NextResponse.json(
+                    { error: "stock_fields_not_allowed", message: `Cannot update ${f} directly. Use add-stock or adjust-stock.` },
+                    { status: 400 },
+                );
             }
         }
 
@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
         const updates = Object.fromEntries(
             Object.entries(fields).filter(([, v]) => v !== undefined),
         );
-
         await materialRef.update({ ...updates, updatedAt: Timestamp.now() });
         return NextResponse.json({ success: true }, { status: 200 });
 

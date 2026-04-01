@@ -19,13 +19,15 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !materialId || quantity == null || !referenceId || !createdBy) {
-            return NextResponse.json({ error: "businessId, materialId, quantity, referenceId, createdBy are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, materialId, quantity, referenceId, createdBy are required." },
+                { status: 400 },
+            );
         }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
         if (quantity <= 0) {
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
             const stockAfter = stockBefore + quantity;
             const now = Timestamp.now();
 
+            // totalStock and availableStock are always equal (no reservations)
             tx.update(materialRef, {
                 totalStock: FieldValue.increment(quantity),
                 availableStock: FieldValue.increment(quantity),
@@ -72,13 +75,9 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         const message = (error as Error).message;
-        if (message === "material_not_found") {
-            return NextResponse.json({ error: "material_not_found" }, { status: 404 });
-        } else if (message === "material_inactive") {
-            return NextResponse.json({ error: "material_inactive", message: "Cannot add stock to an inactive material." }, { status: 400 });
-        } else {
-            console.error("addStock error:", error);
-            return NextResponse.json({ error: "internal", message }, { status: 500 });
-        }
+        if (message === "material_not_found") return NextResponse.json({ error: "material_not_found" }, { status: 404 });
+        if (message === "material_inactive") return NextResponse.json({ error: "material_inactive", message: "Cannot add stock to an inactive material." }, { status: 400 });
+        console.error("addStock error:", error);
+        return NextResponse.json({ error: "internal", message }, { status: 500 });
     }
 }

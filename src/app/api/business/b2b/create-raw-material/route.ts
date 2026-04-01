@@ -21,34 +21,31 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!businessId || !name || !sku || !unit || !category || reorderLevel == null || !createdBy) {
-            return NextResponse.json({ error: "businessId, name, sku, unit, category, reorderLevel, createdBy are required." }, { status: 400 });
+            return NextResponse.json(
+                { error: "businessId, name, sku, unit, category, reorderLevel, createdBy are required." },
+                { status: 400 },
+            );
         }
-
         if (reorderLevel < 0) {
             return NextResponse.json({ error: "reorderLevel must be zero or greater." }, { status: 400 });
         }
 
         const result = await authUserForBusiness({ businessId, req });
         if (!result.authorised) {
-            const { error, status } = result;
-            return NextResponse.json({ error }, { status });
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
-        // SKU is the document ID — normalized to uppercase
         const materialId = sku.trim().toUpperCase();
-
-        // Check for duplicate by reading the doc directly (one read, no query)
         const materialRef = db.doc(`users/${businessId}/raw_materials/${materialId}`);
         const existingDoc = await materialRef.get();
         if (existingDoc.exists) {
-            return NextResponse.json({
-                error: "sku_already_exists",
-                message: `A raw material with SKU "${materialId}" already exists.`,
-            }, { status: 400 });
+            return NextResponse.json(
+                { error: "sku_already_exists", message: `A raw material with SKU "${materialId}" already exists.` },
+                { status: 400 },
+            );
         }
 
         const now = Timestamp.now();
-
         await materialRef.set({
             id: materialId,
             name,
@@ -56,8 +53,7 @@ export async function POST(req: NextRequest) {
             unit,
             category,
             totalStock: 0,
-            reservedStock: 0,
-            availableStock: 0,
+            availableStock: 0,  // no reservedStock field — availableStock = totalStock always
             reorderLevel,
             supplierName: supplierName ?? null,
             isActive: true,

@@ -657,6 +657,24 @@ export default function BusinessLayout({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const agentRootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const el = agentRootRef.current;
+    if (!el) return;
+
+    const fix = () => {
+      if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
+      if (el.hasAttribute('inert')) el.removeAttribute('inert');
+    };
+
+    fix();
+    const observer = new MutationObserver(fix);
+    observer.observe(el, { attributes: true, attributeFilter: ['aria-hidden', 'inert'] });
+    return () => observer.disconnect();
+  }, [mounted]);
+
   useEffect(() => setMounted(true), []);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
@@ -688,7 +706,7 @@ export default function BusinessLayout({
       ──────────────────────────────────────────────────────────────────── */}
 
       {mounted && createPortal(
-        <div data-radix-portal="" className="majime-agent-root">
+        <div ref={agentRootRef} data-radix-portal="" className="majime-agent-root">
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}

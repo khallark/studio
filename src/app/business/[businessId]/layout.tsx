@@ -648,17 +648,22 @@ export default function BusinessLayout({
 
   useEffect(() => {
     const handler = (e: PointerEvent) => {
-      console.log('window capture fired');
-      console.log('button ref:', chatButtonRef.current);
-      console.log('contains:', chatButtonRef.current?.contains(e.target as Node));
-      if (
-        chatButtonRef.current?.contains(e.target as Node) ||
-        chatPanelRef.current?.contains(e.target as Node)
-      ) {
-        console.log('stopping propagation');
+      const isInsideEl = (el: HTMLElement | null) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        );
+      };
+
+      if (isInsideEl(chatButtonRef.current) || isInsideEl(chatPanelRef.current)) {
         e.stopPropagation();
       }
     };
+
     window.addEventListener('pointerdown', handler, true);
     return () => window.removeEventListener('pointerdown', handler, true);
   }, []);

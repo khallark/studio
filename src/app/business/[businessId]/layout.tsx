@@ -213,6 +213,7 @@ function MajimeAgentPeekButton({
     <AnimatePresence>
       {!isOpen && (
         <motion.div
+          onPointerDownCapture={(e) => e.stopPropagation()}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           style={{ pointerEvents: 'auto' }}
           initial={{ x: '90%' }}
@@ -466,6 +467,7 @@ function MajimeAgentChatPanel({
 
           {/* Chat Panel */}
           <motion.div
+            onPointerDownCapture={(e) => e.stopPropagation()}
             className="fixed bottom-0 right-0 z-[9999] flex flex-col"
             style={{
               width: 'clamp(320px, 400px, 100vw)',

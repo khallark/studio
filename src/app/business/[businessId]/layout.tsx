@@ -3,7 +3,7 @@
 
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, forwardRef } from 'react';
 import { Building2, ShieldX, Home, ArrowLeft, LogIn, Sparkles, X, Send, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -187,13 +187,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 const MOUSE_THRESHOLD_PX = 50; // px from right edge to trigger near-state
 
-function MajimeAgentPeekButton({
-  onClick,
-  isOpen,
-}: {
+const MajimeAgentPeekButton = forwardRef<HTMLDivElement, {
   onClick: () => void;
   isOpen: boolean;
-}) {
+}>(({ onClick, isOpen }, ref) => {
   const [mouseNear, setMouseNear] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -213,6 +210,7 @@ function MajimeAgentPeekButton({
     <AnimatePresence>
       {!isOpen && (
         <motion.div
+          ref={ref}
           onPointerDownCapture={(e) => e.stopPropagation()}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           initial={{ x: '90%' }}
@@ -253,22 +251,18 @@ function MajimeAgentPeekButton({
       )}
     </AnimatePresence>
   );
-}
+});
 
 // ============================================================
 // CHAT PANEL
 // Slides in from the right. Persists across page navigations.
 // ============================================================
 
-function MajimeAgentChatPanel({
-  isOpen,
-  onClose,
-  businessId,
-}: {
+const MajimeAgentChatPanel = forwardRef<HTMLDivElement, {
   isOpen: boolean;
   onClose: () => void;
   businessId: string;
-}) {
+}>(({ isOpen, onClose, businessId }, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -466,6 +460,7 @@ function MajimeAgentChatPanel({
 
           {/* Chat Panel */}
           <motion.div
+            ref={ref}
             onPointerDownCapture={(e) => e.stopPropagation()}
             className="fixed bottom-0 right-0 z-[9999] flex flex-col"
             style={{
@@ -623,7 +618,7 @@ function MajimeAgentChatPanel({
       )}
     </AnimatePresence>
   );
-}
+});
 
 // ============================================================
 // BUSINESS LAYOUT (root — wraps all /business/[id]/* pages)
@@ -647,6 +642,22 @@ export default function BusinessLayout({
   // Kept at this level so the panel survives page-to-page navigation.
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const chatButtonRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
+      if (
+        chatButtonRef.current?.contains(e.target as Node) ||
+        chatPanelRef.current?.contains(e.target as Node)
+      ) {
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('pointerdown', handler, true); // capture — fires before document
+    return () => window.removeEventListener('pointerdown', handler, true);
+  }, []);
 
   useEffect(() => setMounted(true), []);
 
@@ -682,12 +693,14 @@ export default function BusinessLayout({
         <>
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
+            ref={chatButtonRef}
             isOpen={isChatOpen}
             onClick={() => setIsChatOpen(true)}
           />
 
           {/* Chat panel — slides in from right */}
           <MajimeAgentChatPanel
+            ref={chatPanelRef}
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}

@@ -660,25 +660,19 @@ export default function BusinessLayout({
   useEffect(() => {
     if (!mounted) return;
 
-    const observer = new MutationObserver(() => {
+    let rafId: number;
+
+    const fix = () => {
       const el = document.querySelector('[data-majime-agent]') as HTMLElement | null;
-      if (!el) return;
-
-      let node: HTMLElement | null = el;
-      while (node && node !== document.body) {
-        if (node.getAttribute('aria-hidden') === 'true') node.removeAttribute('aria-hidden');
-        if ((node as any).inert) (node as any).inert = false;
-        node = node.parentElement;
+      if (el) {
+        if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
+        if ((el as any).inert) (el as any).inert = false;
       }
-    });
+      rafId = requestAnimationFrame(fix);
+    };
 
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['aria-hidden', 'inert'],
-      subtree: true,
-    });
-
-    return () => observer.disconnect();
+    rafId = requestAnimationFrame(fix);
+    return () => cancelAnimationFrame(rafId);
   }, [mounted]);
 
   useEffect(() => setMounted(true), []);

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { createPortal } from 'react-dom';
-import { FocusScope } from '@radix-ui/react-focus-scope';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 // ============================================================
 // BUSINESS CONTEXT
@@ -467,24 +467,22 @@ function MajimeAgentChatPanel({
           />
 
           {/* Chat Panel */}
-          <motion.div
-            onPointerDownCapture={(e) => e.stopPropagation()}
-            className="fixed bottom-0 right-0 z-[9999] flex flex-col"
-            style={{
-              width: 'clamp(320px, 400px, 100vw)',
-              height: 'calc(100dvh - 1.5rem)',
-              pointerEvents: 'auto',
-            }}
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 33 }}
-          >
-            <div
-              className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden"
-              style={{ pointerEvents: 'auto' }}
+          <DialogPrimitive.Root open={isOpen} modal={false}>
+            <DialogPrimitive.Content
+              className="fixed bottom-0 right-0 z-[9999] flex flex-col focus:outline-none"
+              style={{
+                width: 'clamp(320px, 400px, 100vw)',
+                height: 'calc(100dvh - 1.5rem)',
+                pointerEvents: 'auto',
+              }}
+              onInteractOutside={(e) => e.preventDefault()}
+              onOpenAutoFocus={(e) => e.preventDefault()}
             >
-              <FocusScope trapped={false}>
+              <div
+                className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden"
+                style={{ pointerEvents: 'auto' }}
+              >
+
                 {/* ── Header ────────────────────────────────────────────── */}
                 <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/[0.03] to-transparent">
                   {/* Identity */}
@@ -625,9 +623,9 @@ function MajimeAgentChatPanel({
                     {' '}for new line
                   </p>
                 </div>
-              </FocusScope>
-            </div>
-          </motion.div>
+              </div>
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Root>
         </>
       )}
     </AnimatePresence>

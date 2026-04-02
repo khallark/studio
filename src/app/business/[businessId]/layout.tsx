@@ -566,6 +566,7 @@ function MajimeAgentChatPanel({
                     value={input}
                     onChange={handleTextareaChange}
                     onKeyDown={handleKeyDown}
+                    style={{ pointerEvents: 'auto' }}
                     placeholder="Ask anything about Majime…"
                     rows={1}
                     disabled={!sessionId || isLoading}
@@ -584,6 +585,7 @@ function MajimeAgentChatPanel({
                   <Button
                     size="icon"
                     className="shrink-0 h-[42px] w-[42px] rounded-xl shadow-sm"
+                    style={{ pointerEvents: 'auto' }}
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading || !sessionId}
                     title="Send message"

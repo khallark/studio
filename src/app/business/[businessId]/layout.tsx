@@ -212,7 +212,7 @@ function MajimeAgentPeekButton({
     <AnimatePresence>
       {!isOpen && (
         <motion.div
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           initial={{ x: '90%' }}
           animate={{ x: peekX }}
           exit={{ x: '100%' }}
@@ -451,7 +451,7 @@ function MajimeAgentChatPanel({
         <>
           {/* Subtle backdrop scrim — doesn't block clicks, just adds depth */}
           <motion.div
-            className="fixed inset-0 z-30 pointer-events-none"
+            className="fixed inset-0 z-[9998] pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -464,7 +464,7 @@ function MajimeAgentChatPanel({
 
           {/* Chat Panel */}
           <motion.div
-            className="fixed bottom-0 right-0 z-40 flex flex-col"
+            className="fixed bottom-0 right-0 z-[9999] flex flex-col"
             style={{
               width: 'clamp(320px, 400px, 100vw)',
               height: 'calc(100dvh - 1.5rem)',

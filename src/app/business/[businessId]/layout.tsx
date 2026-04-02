@@ -432,7 +432,6 @@ function MajimeAgentChatPanel({
             height: 'calc(100dvh - 1.5rem)',
             pointerEvents: 'auto',
           }}
-          onPointerDown={(e) => e.stopPropagation()}
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
@@ -597,9 +596,20 @@ export default function BusinessLayout({
     const container = document.createElement('div');
     container.setAttribute('data-majime-agent', '');
     container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
-    document.documentElement.appendChild(container); // <html>, not <body>
+
+    // Stop BOTH events Radix uses to interfere with the chat:
+    // 1. pointerdown → used by Radix to detect "click outside" → closes dialogs/dropdowns
+    // 2. focusin     → used by FocusScope to detect "focus escaped" → steals focus back
+    const stop = (e: Event) => e.stopPropagation();
+    container.addEventListener('pointerdown', stop);
+    container.addEventListener('focusin', stop);
+
+    document.documentElement.appendChild(container);
     setPortalContainer(container);
+
     return () => {
+      container.removeEventListener('pointerdown', stop);
+      container.removeEventListener('focusin', stop);
       if (document.documentElement.contains(container)) {
         document.documentElement.removeChild(container);
       }

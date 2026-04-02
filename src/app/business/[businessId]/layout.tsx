@@ -432,6 +432,7 @@ function MajimeAgentChatPanel({
             height: 'calc(100dvh - 1.5rem)',
             pointerEvents: 'auto',
           }}
+          onPointerDown={(e) => e.stopPropagation()}
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}

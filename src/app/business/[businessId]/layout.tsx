@@ -479,7 +479,10 @@ function MajimeAgentChatPanel({
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 33 }}
           >
-            <div className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden">
+            <div
+              className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden"
+              style={{ pointerEvents: 'auto' }}
+            >
 
               {/* ── Header ────────────────────────────────────────────── */}
               <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/[0.03] to-transparent">

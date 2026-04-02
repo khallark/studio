@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Portal } from '@radix-ui/react-portal';
 import { createPortal } from 'react-dom';
 
 // ============================================================
@@ -566,6 +565,9 @@ function MajimeAgentChatPanel({
                     ref={textareaRef}
                     value={input}
                     onChange={handleTextareaChange}
+                    onMouseDown={(e) => {
+                      setTimeout(() => e.currentTarget.focus(), 0);
+                    }}
                     onKeyDown={handleKeyDown}
                     style={{ pointerEvents: 'auto' }}
                     placeholder="Ask anything about Majime…"
@@ -656,23 +658,6 @@ export default function BusinessLayout({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const agentRootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const el = agentRootRef.current;
-    if (!el) return;
-
-    const handler = (e: FocusEvent) => {
-      if (el.contains(e.target as Node)) {
-        e.stopImmediatePropagation();
-      }
-    };
-
-    window.addEventListener('focusin', handler, true);
-    return () => window.removeEventListener('focusin', handler, true);
-  }, [mounted]);
-
   useEffect(() => setMounted(true), []);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
@@ -703,8 +688,8 @@ export default function BusinessLayout({
             User clicks × / "end session" → panel closes (button reappears)
       ──────────────────────────────────────────────────────────────────── */}
 
-      {mounted && (
-        <Portal>
+      {mounted && createPortal(
+        <>
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}
@@ -717,7 +702,8 @@ export default function BusinessLayout({
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}
           />
-        </Portal>
+        </>,
+        document.body
       )}
     </BusinessContext.Provider>
   );

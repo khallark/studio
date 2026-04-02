@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import { createPortal } from 'react-dom';
 
 // ============================================================
 // BUSINESS CONTEXT
@@ -212,6 +213,7 @@ function MajimeAgentPeekButton({
     <AnimatePresence>
       {!isOpen && (
         <motion.div
+          onPointerDownCapture={(e) => e.stopPropagation()}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           initial={{ x: '90%' }}
           animate={{ x: peekX }}
@@ -464,6 +466,7 @@ function MajimeAgentChatPanel({
 
           {/* Chat Panel */}
           <motion.div
+            onPointerDownCapture={(e) => e.stopPropagation()}
             className="fixed bottom-0 right-0 z-[9999] flex flex-col"
             style={{
               width: 'clamp(320px, 400px, 100vw)',
@@ -643,6 +646,9 @@ export default function BusinessLayout({
   // ── Chat state ───────────────────────────────────────────────────────────
   // Kept at this level so the panel survives page-to-page navigation.
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -672,18 +678,23 @@ export default function BusinessLayout({
             User clicks × / "end session" → panel closes (button reappears)
       ──────────────────────────────────────────────────────────────────── */}
 
-      {/* Peek tab — right edge, vertically centred */}
-      <MajimeAgentPeekButton
-        isOpen={isChatOpen}
-        onClick={() => setIsChatOpen(true)}
-      />
+      {mounted && createPortal(
+        <>
+          {/* Peek tab — right edge, vertically centred */}
+          <MajimeAgentPeekButton
+            isOpen={isChatOpen}
+            onClick={() => setIsChatOpen(true)}
+          />
 
-      {/* Chat panel — slides in from right */}
-      <MajimeAgentChatPanel
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        businessId={businessId}
-      />
+          {/* Chat panel — slides in from right */}
+          <MajimeAgentChatPanel
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            businessId={businessId}
+          />
+        </>,
+        document.body
+      )}
     </BusinessContext.Provider>
   );
 }

@@ -27,11 +27,13 @@ export async function POST(req: NextRequest) {
 
         const authResult = await authUserForBusiness({ req, businessId });
         if (!authResult.authorised) {
+            console.log(authResult.error);
             return NextResponse.json(
                 { error: authResult.error },
                 { status: authResult.status }
             );
         }
+
 
         // ============================================================
         // CORE LOGIC

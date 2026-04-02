@@ -662,15 +662,14 @@ export default function BusinessLayout({
     const el = agentRootRef.current;
     if (!el) return;
 
-    const fix = () => {
-      if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
-      if (el.hasAttribute('inert')) el.removeAttribute('inert');
+    const handler = (e: FocusEvent) => {
+      if (el.contains(e.target as Node)) {
+        e.stopImmediatePropagation();
+      }
     };
 
-    fix();
-    const observer = new MutationObserver(fix);
-    observer.observe(el, { attributes: true, attributeFilter: ['aria-hidden', 'inert'] });
-    return () => observer.disconnect();
+    window.addEventListener('focusin', handler, true);
+    return () => window.removeEventListener('focusin', handler, true);
   }, [mounted]);
 
   useEffect(() => setMounted(true), []);

@@ -762,7 +762,7 @@ export default function BusinessLayout({
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [businessId]);
+  }, []);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
   useEffect(() => {

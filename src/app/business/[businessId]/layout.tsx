@@ -657,23 +657,27 @@ export default function BusinessLayout({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const agentRootRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!mounted) return;
-    const el = agentRootRef.current;
-    if (!el) return;
 
-    const fix = () => {
-      console.log('aria-hidden:', el.getAttribute('aria-hidden'));
-      console.log('inert:', el.hasAttribute('inert'));
-      if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
-      if (el.hasAttribute('inert')) el.removeAttribute('inert');
-    };
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector('[data-majime-agent]') as HTMLElement | null;
+      if (!el) return;
 
-    fix();
-    const observer = new MutationObserver(fix);
-    observer.observe(el, { attributes: true, attributeFilter: ['aria-hidden', 'inert'] });
+      let node: HTMLElement | null = el;
+      while (node && node !== document.body) {
+        if (node.getAttribute('aria-hidden') === 'true') node.removeAttribute('aria-hidden');
+        if ((node as any).inert) (node as any).inert = false;
+        node = node.parentElement;
+      }
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['aria-hidden', 'inert'],
+      subtree: true,
+    });
+
     return () => observer.disconnect();
   }, [mounted]);
 
@@ -708,7 +712,7 @@ export default function BusinessLayout({
       ──────────────────────────────────────────────────────────────────── */}
 
       {mounted && createPortal(
-        <div ref={agentRootRef} data-radix-portal="" className="majime-agent-root">
+        <div data-majime-agent="" data-radix-portal="" className="majime-agent-root">
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}

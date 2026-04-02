@@ -82,3 +82,8 @@
     @apply bg-background text-foreground text-sm md:text-base;
   }
 }
+
+.majime-agent-root,
+.majime-agent-root * {
+  pointer-events: auto !important;
+}

@@ -686,7 +686,7 @@ export default function BusinessLayout({
       ──────────────────────────────────────────────────────────────────── */}
 
       {mounted && createPortal(
-        <>
+        <div className="majime-agent-root">
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}
@@ -699,7 +699,7 @@ export default function BusinessLayout({
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}
           />
-        </>,
+        </div>,
         document.body
       )}
     </BusinessContext.Provider>

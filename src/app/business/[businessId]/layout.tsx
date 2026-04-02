@@ -659,7 +659,7 @@ export default function BusinessLayout({
     setSessionLoading(true);
 
     try {
-      const idToken = await user.getIdToken();
+      const idToken = await user?.getIdToken();
       const res = await fetch('/api/business/agent/session/create', {
         method: 'POST',
         headers: {

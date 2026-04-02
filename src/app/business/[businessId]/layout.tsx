@@ -572,7 +572,7 @@ export default function BusinessLayout({
   const businessId = params?.businessId as string;
 
   const businessAuth = useBusinessAuthorization(businessId);
-  const { isAuthorized, loading } = businessAuth;
+  const { isAuthorized, loading, user } = businessAuth;
 
   // ── Chat UI state ────────────────────────────────────────────────────────
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -659,9 +659,13 @@ export default function BusinessLayout({
     setSessionLoading(true);
 
     try {
+      const idToken = await user?.getIdToken();
       const res = await fetch('/api/business/agent/session/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ businessId }),
       });
 

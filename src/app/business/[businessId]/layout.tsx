@@ -453,19 +453,6 @@ function MajimeAgentChatPanel({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Subtle backdrop scrim — doesn't block clicks, just adds depth */}
-          <motion.div
-            className="fixed inset-0 z-[9998] pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{
-              background:
-                'linear-gradient(to left, rgba(0,0,0,0.06) 0%, transparent 60%)',
-            }}
-          />
-
           {/* Chat Panel */}
           <DialogPrimitive.Root open={isOpen} modal={false}>
             <DialogPrimitive.Content

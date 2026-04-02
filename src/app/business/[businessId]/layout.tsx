@@ -665,6 +665,8 @@ export default function BusinessLayout({
     if (!el) return;
 
     const fix = () => {
+      console.log('aria-hidden:', el.getAttribute('aria-hidden'));
+      console.log('inert:', el.hasAttribute('inert'));
       if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
       if (el.hasAttribute('inert')) el.removeAttribute('inert');
     };

@@ -469,6 +469,7 @@ function MajimeAgentChatPanel({
           {/* Chat Panel */}
           <DialogPrimitive.Root open={isOpen} modal={false}>
             <DialogPrimitive.Content
+              // asChild
               className="fixed bottom-0 right-0 z-[9999] flex flex-col focus:outline-none"
               style={{
                 width: 'clamp(320px, 400px, 100vw)',
@@ -477,6 +478,7 @@ function MajimeAgentChatPanel({
               }}
               onInteractOutside={(e) => e.preventDefault()}
               onOpenAutoFocus={(e) => e.preventDefault()}
+              onPointerDownCapture={(e) => e.stopPropagation()}
             >
               <div
                 className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden"

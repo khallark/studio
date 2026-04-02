@@ -212,6 +212,7 @@ const MajimeAgentPeekButton = forwardRef<HTMLDivElement, {
         <motion.div
           ref={ref}
           onPointerDownCapture={(e) => e.stopPropagation()}
+          style={{ pointerEvents: 'auto' }}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           initial={{ x: '90%' }}
           animate={{ x: peekX }}
@@ -466,6 +467,7 @@ const MajimeAgentChatPanel = forwardRef<HTMLDivElement, {
             style={{
               width: 'clamp(320px, 400px, 100vw)',
               height: 'calc(100dvh - 1.5rem)',
+              pointerEvents: 'auto',
             }}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}

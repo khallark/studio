@@ -4,13 +4,12 @@
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useBusinessAuthorization } from '@/hooks/use-business-authorization';
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { Building2, ShieldX, Home, ArrowLeft, LogIn, Sparkles, X, Send, RotateCcw } from 'lucide-react';
+import { Building2, ShieldX, Home, ArrowLeft, Sparkles, X, Send, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { createPortal } from 'react-dom';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 // ============================================================
 // BUSINESS CONTEXT
@@ -25,7 +24,7 @@ export function useBusinessContext() {
 }
 
 // ============================================================
-// AUTH STATES (unchanged)
+// AUTH STATES
 // ============================================================
 
 function LoadingState() {
@@ -117,7 +116,7 @@ interface ChatMessage {
 }
 
 // ============================================================
-// LOADING DOTS — shown while agent is thinking
+// LOADING DOTS
 // ============================================================
 
 function LoadingDots() {
@@ -149,7 +148,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       transition={{ duration: 0.18, ease: 'easeOut' }}
       className={cn('flex items-end gap-2 mb-3', isUser ? 'flex-row-reverse' : 'flex-row')}
     >
-      {/* Agent avatar — only for assistant messages */}
       {!isUser && (
         <div className="shrink-0 mb-0.5">
           <div className="w-5 h-5 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
@@ -157,8 +155,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </div>
         </div>
       )}
-
-      {/* Bubble */}
       <div
         className={cn(
           'max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words',
@@ -169,8 +165,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       >
         {message.isLoading ? <LoadingDots /> : message.content}
       </div>
-
-      {/* Timestamp — subtle, on hover or always shown */}
       {!message.isLoading && (
         <span className="shrink-0 text-[10px] text-muted-foreground/50 mb-0.5 select-none">
           {format(message.timestamp, 'h:mm a')}
@@ -182,11 +176,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 // ============================================================
 // PEEK BUTTON
-// Partially visible at right edge. Animates based on mouse proximity.
-// Layout: [label text][icon] — icon is rightmost (always peeking)
 // ============================================================
 
-const MOUSE_THRESHOLD_PX = 50; // px from right edge to trigger near-state
+const MOUSE_THRESHOLD_PX = 50;
 
 function MajimeAgentPeekButton({
   onClick,
@@ -206,8 +198,6 @@ function MajimeAgentPeekButton({
     return () => window.removeEventListener('mousemove', onMouseMove);
   }, []);
 
-  // translateX: positive = pushed further right (more hidden behind edge)
-  // '0%' = fully visible, '58%' = only ~42% peeking (icon + partial text)
   const peekX = isHovered ? '0%' : mouseNear ? '33%' : '90%';
 
   return (
@@ -236,7 +226,6 @@ function MajimeAgentPeekButton({
               'select-none',
             )}
           >
-            {/* Label — visible as button slides out */}
             <div className="text-left">
               <p className="text-[11px] font-medium text-primary-foreground/70 leading-none mb-0.5 uppercase tracking-wide">
                 Ask the
@@ -245,8 +234,6 @@ function MajimeAgentPeekButton({
                 Majime Agent!
               </p>
             </div>
-
-            {/* Icon chip — always the rightmost visible portion */}
             <div className="shrink-0 w-9 h-9 rounded-xl bg-primary-foreground/15 border border-primary-foreground/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
@@ -259,7 +246,6 @@ function MajimeAgentPeekButton({
 
 // ============================================================
 // CHAT PANEL
-// Slides in from the right. Persists across page navigations.
 // ============================================================
 
 function MajimeAgentChatPanel({
@@ -310,8 +296,6 @@ function MajimeAgentChatPanel({
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen || sessionId) return;
-
-    // STUB: Replace with Firestore session creation above.
     const stubId = `session_${Date.now()}`;
     setSessionId(stubId);
     setMessages([
@@ -325,12 +309,10 @@ function MajimeAgentChatPanel({
     ]);
   }, [isOpen, sessionId]);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input when panel opens
   useEffect(() => {
     if (isOpen) {
       const t = setTimeout(() => textareaRef.current?.focus(), 320);
@@ -355,12 +337,10 @@ function MajimeAgentChatPanel({
     setInput('');
     setIsLoading(true);
 
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
 
-    // Add a loading placeholder bubble
     const loadingId = `loading_${Date.now()}`;
     setMessages((prev) => [
       ...prev,
@@ -379,24 +359,20 @@ function MajimeAgentChatPanel({
     //   const { data } = await majimeAgent({
     //     conversationId: sessionId,
     //     message: userMsg.content,
-    //     currentPage: window.location.pathname,  // gives the LLM page context
+    //     currentPage: window.location.pathname,
     //   });
     //
-    //   Then replace loading message with data.reply:
-    //     setMessages(prev =>
-    //       prev.filter(m => m.id !== loadingId).concat({
-    //         id: `assistant_${Date.now()}`,
-    //         role: 'assistant',
-    //         content: data.reply,
-    //         timestamp: new Date(),
-    //       })
-    //     );
-    //
-    //   Any navigation actions returned from the agent (data.actions) can be
-    //   handled here — e.g. router.push(action.path) for navigate-type actions.
+    //   setMessages(prev =>
+    //     prev.filter(m => m.id !== loadingId).concat({
+    //       id: `assistant_${Date.now()}`,
+    //       role: 'assistant',
+    //       content: data.reply,
+    //       timestamp: new Date(),
+    //     })
+    //   );
     // ─────────────────────────────────────────────────────────────────────
 
-    // STUB: Simulated delay + placeholder reply. Remove when backend is ready.
+    // STUB: remove when backend is ready
     await new Promise((r) => setTimeout(r, 1400));
     setMessages((prev) =>
       prev
@@ -405,7 +381,7 @@ function MajimeAgentChatPanel({
           id: `assistant_${Date.now()}`,
           role: 'assistant',
           content:
-            'The Majime Agent backend isn\'t connected yet — but once it is, I\'ll be able to look up your orders, lots, warehouse data, and more in real time. Stay tuned!',
+            "The Majime Agent backend isn't connected yet — but once it is, I'll be able to look up your orders, lots, warehouse data, and more in real time. Stay tuned!",
           timestamp: new Date(),
         })
     );
@@ -425,8 +401,6 @@ function MajimeAgentChatPanel({
     //       { status: 'ended', endedAt: serverTimestamp() }
     //     );
     //   }
-    //
-    // Then reset local state as below.
 
     setMessages([]);
     setSessionId(null);
@@ -444,7 +418,6 @@ function MajimeAgentChatPanel({
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Auto-resize up to ~5 lines
     e.target.style.height = 'auto';
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
@@ -452,191 +425,149 @@ function MajimeAgentChatPanel({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Chat Panel */}
-          <DialogPrimitive.Root open={isOpen} modal={false}>
-            <DialogPrimitive.Content
-              asChild
-              className="fixed bottom-0 right-0 z-[9999] flex flex-col focus:outline-none"
-              style={{
-                width: 'clamp(320px, 400px, 100vw)',
-                height: 'calc(100dvh - 1.5rem)',
-                pointerEvents: 'auto',
-              }}
-              onInteractOutside={(e) => e.preventDefault()}
-              onOpenAutoFocus={(e) => e.preventDefault()}
-              onPointerDownCapture={(e) => e.stopPropagation()}
-            >
-              <motion.div
-                className="fixed bottom-0 right-0 z-[9999] flex flex-col focus:outline-none"
-                style={{
-                  width: 'clamp(320px, 400px, 100vw)',
-                  height: 'calc(100dvh - 1.5rem)',
-                  pointerEvents: 'auto',
-                }}
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', stiffness: 300, damping: 33 }}
+        <motion.div
+          className="fixed bottom-0 right-0 z-[9999] flex flex-col"
+          style={{
+            width: 'clamp(320px, 400px, 100vw)',
+            height: 'calc(100dvh - 1.5rem)',
+            pointerEvents: 'auto',
+          }}
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 33 }}
+        >
+          <div className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden">
+
+            {/* ── Header ── */}
+            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/[0.03] to-transparent">
+              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/12 border border-primary/20 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground leading-none">Majime Assistant</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-none">Your platform guide</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="text-[11px] text-muted-foreground font-medium">Online</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                onClick={handleEndConversation}
+                title="End this conversation"
               >
-                <div
-                  className="flex flex-col h-full bg-background border-l border-t border-border/60 rounded-tl-2xl shadow-2xl shadow-black/15 overflow-hidden"
-                  style={{ pointerEvents: 'auto' }}
-                >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
 
-                  {/* ── Header ────────────────────────────────────────────── */}
-                  <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/[0.03] to-transparent">
-                    {/* Identity */}
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/12 border border-primary/20 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground leading-none">
-                          Majime Assistant
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5 leading-none">
-                          Your platform guide
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Online indicator */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-medium">Online</span>
-                    </div>
-
-                    {/* Close / end conversation */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
-                      onClick={handleEndConversation}
-                      title="End this conversation"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+            {/* ── Messages ── */}
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 scroll-smooth">
+              {messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-8">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-primary" />
                   </div>
-
-                  {/* ── Messages ──────────────────────────────────────────── */}
-                  <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 scroll-smooth">
-                    {/* Empty state — only before session initializes */}
-                    {messages.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-8">
-                        <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                          <Sparkles className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Starting session…</p>
-                          <p className="text-xs text-muted-foreground mt-1">Setting up your conversation</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Message list */}
-                    {messages.map((msg) => (
-                      <MessageBubble key={msg.id} message={msg} />
-                    ))}
-
-                    {/* Scroll anchor */}
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  {/* ── Divider with session info ─────────────────────────── */}
-                  {sessionId && (
-                    <div className="px-4 py-1 flex items-center gap-2">
-                      <div className="flex-1 h-px bg-border/50" />
-                      <span className="text-[10px] text-muted-foreground/50 font-mono select-none">
-                        {/* TODO (Backend): Show session ID or "session started at HH:mm" once Firestore session is real */}
-                        Session active
-                      </span>
-                      <div className="flex-1 h-px bg-border/50" />
-                    </div>
-                  )}
-
-                  {/* ── Input area ────────────────────────────────────────── */}
-                  <div className="shrink-0 border-t border-border/50 bg-background/70 backdrop-blur-sm px-3 pb-3 pt-2.5">
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        ref={textareaRef}
-                        value={input}
-                        onChange={handleTextareaChange}
-                        onKeyDown={handleKeyDown}
-                        style={{ pointerEvents: 'auto' }}
-                        placeholder="Ask anything about Majime…"
-                        rows={1}
-                        disabled={!sessionId || isLoading}
-                        className={cn(
-                          'flex-1 resize-none rounded-xl border border-border/60 bg-muted/40',
-                          'px-3.5 py-2.5 text-sm leading-relaxed',
-                          'placeholder:text-muted-foreground/60',
-                          'focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40',
-                          'min-h-[42px] max-h-[120px]',
-                          'disabled:opacity-50 disabled:cursor-not-allowed',
-                          'transition-all duration-150',
-                        )}
-                      />
-
-                      {/* Send button */}
-                      <Button
-                        size="icon"
-                        className="shrink-0 h-[42px] w-[42px] rounded-xl shadow-sm"
-                        style={{ pointerEvents: 'auto' }}
-                        onClick={handleSend}
-                        disabled={!input.trim() || isLoading || !sessionId}
-                        title="Send message"
-                      >
-                        <AnimatePresence mode="wait">
-                          {isLoading ? (
-                            <motion.div
-                              key="loading"
-                              initial={{ opacity: 0, rotate: -90 }}
-                              animate={{ opacity: 1, rotate: 0 }}
-                              exit={{ opacity: 0, rotate: 90 }}
-                              transition={{ duration: 0.15 }}
-                            >
-                              <RotateCcw className="h-4 w-4 animate-spin" />
-                            </motion.div>
-                          ) : (
-                            <motion.div
-                              key="send"
-                              initial={{ opacity: 0, y: 4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -4 }}
-                              transition={{ duration: 0.12 }}
-                            >
-                              <Send className="h-4 w-4" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </Button>
-                    </div>
-
-                    {/* Keyboard hint */}
-                    <p className="text-[10px] text-muted-foreground/45 mt-2 text-center select-none">
-                      <kbd className="px-1 py-px rounded bg-muted/80 border border-border/50 text-[10px]">Enter</kbd>
-                      {' '}to send &nbsp;·&nbsp;{' '}
-                      <kbd className="px-1 py-px rounded bg-muted/80 border border-border/50 text-[10px]">Shift + Enter</kbd>
-                      {' '}for new line
-                    </p>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Starting session…</p>
+                    <p className="text-xs text-muted-foreground mt-1">Setting up your conversation</p>
                   </div>
                 </div>
-              </motion.div>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Root>
-        </>
+              )}
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* ── Session divider ── */}
+            {sessionId && (
+              <div className="px-4 py-1 flex items-center gap-2">
+                <div className="flex-1 h-px bg-border/50" />
+                <span className="text-[10px] text-muted-foreground/50 font-mono select-none">
+                  {/* TODO (Backend): Show "session started at HH:mm" once Firestore session is real */}
+                  Session active
+                </span>
+                <div className="flex-1 h-px bg-border/50" />
+              </div>
+            )}
+
+            {/* ── Input area ── */}
+            <div className="shrink-0 border-t border-border/50 bg-background/70 backdrop-blur-sm px-3 pb-3 pt-2.5">
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask anything about Majime…"
+                  rows={1}
+                  disabled={!sessionId || isLoading}
+                  className={cn(
+                    'flex-1 resize-none rounded-xl border border-border/60 bg-muted/40',
+                    'px-3.5 py-2.5 text-sm leading-relaxed',
+                    'placeholder:text-muted-foreground/60',
+                    'focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40',
+                    'min-h-[42px] max-h-[120px]',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    'transition-all duration-150',
+                  )}
+                />
+                <Button
+                  size="icon"
+                  className="shrink-0 h-[42px] w-[42px] rounded-xl shadow-sm"
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading || !sessionId}
+                  title="Send message"
+                >
+                  <AnimatePresence mode="wait">
+                    {isLoading ? (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 0, rotate: -90 }}
+                        animate={{ opacity: 1, rotate: 0 }}
+                        exit={{ opacity: 0, rotate: 90 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <RotateCcw className="h-4 w-4 animate-spin" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="send"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.12 }}
+                      >
+                        <Send className="h-4 w-4" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground/45 mt-2 text-center select-none">
+                <kbd className="px-1 py-px rounded bg-muted/80 border border-border/50 text-[10px]">Enter</kbd>
+                {' '}to send &nbsp;·&nbsp;{' '}
+                <kbd className="px-1 py-px rounded bg-muted/80 border border-border/50 text-[10px]">Shift + Enter</kbd>
+                {' '}for new line
+              </p>
+            </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
 // ============================================================
-// BUSINESS LAYOUT (root — wraps all /business/[id]/* pages)
-// Chat state lives here so it persists across page navigations.
+// BUSINESS LAYOUT
 // ============================================================
 
 export default function BusinessLayout({
@@ -652,30 +583,27 @@ export default function BusinessLayout({
   const businessAuth = useBusinessAuthorization(businessId);
   const { isAuthorized, loading } = businessAuth;
 
-  // ── Chat state ───────────────────────────────────────────────────────────
-  // Kept at this level so the panel survives page-to-page navigation.
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+
+  // ── Portal container — appended to <html>, not <body> ───────────────────
+  // hideOthers (used internally by all Radix components) only walks children
+  // of <body>. Mounting the chat as a child of <html> puts it completely
+  // outside that scope — no Radix component can ever set aria-hidden or
+  // inert on it, regardless of version or component type.
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!mounted) return;
-
-    let rafId: number;
-
-    const fix = () => {
-      const el = document.querySelector('[data-majime-agent]') as HTMLElement | null;
-      if (el) {
-        if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
-        if ((el as any).inert) (el as any).inert = false;
+    const container = document.createElement('div');
+    container.setAttribute('data-majime-agent', '');
+    container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
+    document.documentElement.appendChild(container); // <html>, not <body>
+    setPortalContainer(container);
+    return () => {
+      if (document.documentElement.contains(container)) {
+        document.documentElement.removeChild(container);
       }
-      rafId = requestAnimationFrame(fix);
     };
-
-    rafId = requestAnimationFrame(fix);
-    return () => cancelAnimationFrame(rafId);
-  }, [mounted]);
-
-  useEffect(() => setMounted(true), []);
+  }, []);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -685,42 +613,28 @@ export default function BusinessLayout({
     }
   }, [isAuthorized, loading, businessId, pathname, router]);
 
-  // ── Auth guards ──────────────────────────────────────────────────────────
   if (loading) return <LoadingState />;
   if (!isAuthorized) return <NotAuthorizedState />;
 
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <BusinessContext.Provider value={businessAuth}>
-      {/* Page content */}
       {children}
 
-      {/* ── Majime Agent ──────────────────────────────────────────────────
-          The peek button and chat panel render as fixed overlays, so they
-          float above all page content without affecting layout flow.
-
-          Flow:
-            User's mouse nears right edge → peek button slides into view
-            User clicks button            → chat panel opens (button hides)
-            User clicks × / "end session" → panel closes (button reappears)
-      ──────────────────────────────────────────────────────────────────── */}
-
-      {mounted && createPortal(
-        <div data-majime-agent="" data-radix-portal="" className="majime-agent-root">
+      {portalContainer && createPortal(
+        <>
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}
             onClick={() => setIsChatOpen(true)}
           />
-
           {/* Chat panel — slides in from right */}
           <MajimeAgentChatPanel
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}
           />
-        </div>,
-        document.body
+        </>,
+        portalContainer
       )}
     </BusinessContext.Provider>
   );

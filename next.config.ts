@@ -222,6 +222,14 @@ const nextConfig: NextConfig = {
         destination: '/proxy/api/checkout/verify-otp/route',
       },
       {
+        source: '/api/business/agent/session/create',
+        destination: '/api/business/agent/session/create/route',
+      },
+      {
+        source: '/api/business/agent/session/end',
+        destination: '/api/business/agent/session/end/route',
+      },
+      {
         source: '/api/business/members/create-invite',
         destination: '/api/business/members/create-invite/route',
       },

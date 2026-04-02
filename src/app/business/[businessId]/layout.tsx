@@ -206,14 +206,14 @@ function MajimeAgentPeekButton({
 
   // translateX: positive = pushed further right (more hidden behind edge)
   // '0%' = fully visible, '58%' = only ~42% peeking (icon + partial text)
-  const peekX = isHovered ? '0%' : mouseNear ? '36%' : '76%';
+  const peekX = isHovered ? '0%' : mouseNear ? '33%' : '90%';
 
   return (
     <AnimatePresence>
       {!isOpen && (
         <motion.div
           className="fixed right-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer"
-          initial={{ x: '76%' }}
+          initial={{ x: '90%' }}
           animate={{ x: peekX }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}

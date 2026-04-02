@@ -597,28 +597,57 @@ export default function BusinessLayout({
     container.setAttribute('data-majime-agent', '');
     container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
 
-    // Register on document in CAPTURE phase, BEFORE any Radix dialog ever opens.
-    // This guarantees our handler is first in the queue.
-    // stopImmediatePropagation kills all subsequent capture handlers on document
-    // (Radix's FocusScope + outside-click detectors) when event is inside chat.
-    const blockIfInChat = (e: Event) => {
+    // ── Block Radix from interfering with the chat ───────────────────────────
+    // Radix's FocusScope works via TWO document-level listeners:
+    //
+    //   1. `focusout`  — fires on the dialog's focused element when focus LEAVES.
+    //                    relatedTarget = where focus is going.
+    //                    Radix checks: if relatedTarget is outside dialog → yank focus back.
+    //                    This fires BEFORE focusin on the new target, so blocking focusin alone
+    //                    is too late — focus is already yanked back by then.
+    //
+    //   2. `focusin`   — fires on the element that received focus.
+    //                    Radix checks: if target is outside dialog → yank focus back.
+    //
+    // Both are registered WITHOUT capture (bubble phase).
+    // We register WITH capture (true) so ours fires first, before Radix's.
+    //
+    // Additionally, Radix's DismissableLayer listens for `pointerdown`/`mousedown`
+    // on document (bubble) to detect outside clicks and close dialogs/dropdowns.
+    // We block those too when the click target is inside the chat.
+
+    // Block focusin/pointerdown/mousedown when the event TARGET is inside the chat
+    const blockIfTargetInChat = (e: Event) => {
       if (container.contains(e.target as Node)) {
         e.stopPropagation();
         e.stopImmediatePropagation();
       }
     };
 
-    document.addEventListener('pointerdown', blockIfInChat, true);
-    document.addEventListener('focusin', blockIfInChat, true);
-    document.addEventListener('mousedown', blockIfInChat, true); // some Radix versions use mousedown
+    // Block focusout when focus is moving TO the chat (relatedTarget is inside chat).
+    // This is the critical one — Radix uses focusout + relatedTarget to detect
+    // focus escaping the dialog and yanks it back before focusin ever fires.
+    const blockIfFocusMovingToChat = (e: Event) => {
+      const relatedTarget = (e as FocusEvent).relatedTarget as Node | null;
+      if (relatedTarget && container.contains(relatedTarget)) {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }
+    };
 
-    document.documentElement.appendChild(container);
+    document.addEventListener('focusin', blockIfTargetInChat, true);
+    document.addEventListener('focusout', blockIfFocusMovingToChat, true); // ← the key one
+    document.addEventListener('pointerdown', blockIfTargetInChat, true);
+    document.addEventListener('mousedown', blockIfTargetInChat, true);
+
+    document.documentElement.appendChild(container); // <html>, not <body>
     setPortalContainer(container);
 
     return () => {
-      document.removeEventListener('pointerdown', blockIfInChat, true);
-      document.removeEventListener('focusin', blockIfInChat, true);
-      document.removeEventListener('mousedown', blockIfInChat, true);
+      document.removeEventListener('focusin', blockIfTargetInChat, true);
+      document.removeEventListener('focusout', blockIfFocusMovingToChat, true);
+      document.removeEventListener('pointerdown', blockIfTargetInChat, true);
+      document.removeEventListener('mousedown', blockIfTargetInChat, true);
       if (document.documentElement.contains(container)) {
         document.documentElement.removeChild(container);
       }

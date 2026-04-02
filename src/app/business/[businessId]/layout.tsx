@@ -569,9 +569,10 @@ export default function BusinessLayout({
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
+  const businessId = params?.businessId as string;
 
-  const businessAuth = useBusinessContext();
-  const { isAuthorized, loading, businessId } = businessAuth;
+  const businessAuth = useBusinessAuthorization(businessId);
+  const { isAuthorized, loading } = businessAuth;
 
   // ── Chat UI state ────────────────────────────────────────────────────────
   const [isChatOpen, setIsChatOpen] = useState(false);

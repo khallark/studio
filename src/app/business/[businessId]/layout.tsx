@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import { Portal } from '@radix-ui/react-portal';
 import { createPortal } from 'react-dom';
 
 // ============================================================
@@ -702,8 +703,8 @@ export default function BusinessLayout({
             User clicks × / "end session" → panel closes (button reappears)
       ──────────────────────────────────────────────────────────────────── */}
 
-      {mounted && createPortal(
-        <div ref={agentRootRef} className="majime-agent-root">
+      {mounted && (
+        <Portal>
           {/* Peek tab — right edge, vertically centred */}
           <MajimeAgentPeekButton
             isOpen={isChatOpen}
@@ -716,8 +717,7 @@ export default function BusinessLayout({
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}
           />
-        </div>,
-        document.body
+        </Portal>
       )}
     </BusinessContext.Provider>
   );

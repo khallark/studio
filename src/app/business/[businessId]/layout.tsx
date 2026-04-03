@@ -642,7 +642,6 @@ export default function BusinessLayout({
       document.removeEventListener('focusout', blockIfFocusMovingToChat, true);
       document.removeEventListener('pointerdown', blockIfTargetInChat, true);
       document.removeEventListener('mousedown', blockIfTargetInChat, true);
-      unsubscribeRef.current?.();
       if (document.documentElement.contains(container)) {
         document.documentElement.removeChild(container);
       }
@@ -748,21 +747,34 @@ export default function BusinessLayout({
   // ── Cleanup on page close / refresh (beforeunload) ───────────────────────
   // Uses sendBeacon — the only reliable way to fire a request on page unload.
   // sendBeacon with a JSON Blob works with Next.js req.json() on the server.
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (!sessionIdRef.current) return;
-      navigator.sendBeacon(
-        '/api/business/agent/session/end',
-        new Blob(
-          [JSON.stringify({ businessId, sessionId: sessionIdRef.current })],
-          { type: 'application/json' }
-        )
-      );
-    };
+  // ── End session helper — used in both unmount and beforeunload ────────────
+  const endSession = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    navigator.sendBeacon(
+      '/api/business/agent/session/end',
+      new Blob(
+        [JSON.stringify({ businessId, sessionId: sessionIdRef.current })],
+        { type: 'application/json' }
+      )
+    );
+    sessionIdRef.current = null; // prevent double-fire
+  }, [businessId]);
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+  // ── beforeunload: page close / refresh ───────────────────────────────────
+  useEffect(() => {
+    window.addEventListener('beforeunload', endSession);
+    return () => window.removeEventListener('beforeunload', endSession);
+  }, [endSession]);
+
+  // ── Unmount: client-side navigation away from this layout ─────────────────
+  // beforeunload does NOT fire for Next.js client-side route changes.
+  // The layout unmounting is the only signal we get in that case.
+  useEffect(() => {
+    return () => {
+      endSession();
+      unsubscribeRef.current?.();
+    };
+  }, [endSession]);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
   useEffect(() => {

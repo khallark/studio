@@ -459,7 +459,7 @@ function MajimeAgentChatPanel({
         <motion.div
           className="fixed bottom-0 right-0 z-[9999] flex flex-col"
           style={{
-            width: 'clamp(320px, 400px, 100vw)',
+            width: 'clamp(320px, 550px, 100vw)',
             height: 'calc(100dvh - 1.5rem)',
             pointerEvents: 'auto',
           }}

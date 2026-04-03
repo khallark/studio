@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { createPortal } from 'react-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { db } from '@/lib/firebase';
 import {
   doc,
@@ -175,13 +177,85 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       )}
       <div
         className={cn(
-          'max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words',
+          'max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words',
           isUser
             ? 'bg-primary text-primary-foreground rounded-br-sm shadow-sm shadow-primary/20'
             : 'bg-muted text-foreground rounded-bl-sm border border-border/40'
         )}
       >
-        {message.content}
+        {isUser ? (
+          // User messages — plain text, no markdown needed
+          message.content
+        ) : (
+          // Assistant messages — full markdown rendering
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Paragraphs — no extra margin on first/last to keep bubble padding clean
+              p: ({ children }) => (
+                <p className="mb-2 last:mb-0">{children}</p>
+              ),
+              // Bold
+              strong: ({ children }) => (
+                <strong className="font-semibold text-foreground">{children}</strong>
+              ),
+              // Italic
+              em: ({ children }) => (
+                <em className="italic">{children}</em>
+              ),
+              // Unordered lists
+              ul: ({ children }) => (
+                <ul className="mt-1 mb-2 last:mb-0 space-y-0.5 pl-4 list-disc">{children}</ul>
+              ),
+              // Ordered lists
+              ol: ({ children }) => (
+                <ol className="mt-1 mb-2 last:mb-0 space-y-0.5 pl-4 list-decimal">{children}</ol>
+              ),
+              // List items
+              li: ({ children }) => (
+                <li className="leading-relaxed">{children}</li>
+              ),
+              // Inline code
+              code: ({ inline, children }: any) =>
+                inline ? (
+                  <code className="px-1 py-0.5 rounded bg-background/60 border border-border/40 font-mono text-[11px]">
+                    {children}
+                  </code>
+                ) : (
+                  <code className="block mt-1.5 mb-2 last:mb-0 px-3 py-2 rounded-lg bg-background/60 border border-border/40 font-mono text-[11px] whitespace-pre-wrap overflow-x-auto">
+                    {children}
+                  </code>
+                ),
+              // Code blocks (wraps inline code above)
+              pre: ({ children }) => <>{children}</>,
+              // Headings — unlikely in chat but handle gracefully
+              h1: ({ children }) => <p className="font-bold text-base mb-1">{children}</p>,
+              h2: ({ children }) => <p className="font-bold mb-1">{children}</p>,
+              h3: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+              // Horizontal rule
+              hr: () => <hr className="my-2 border-border/40" />,
+              // Links — open in new tab
+              a: ({ href, children }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 text-primary hover:opacity-80 transition-opacity"
+                >
+                  {children}
+                </a>
+              ),
+              // Blockquote
+              blockquote: ({ children }) => (
+                <blockquote className="pl-3 border-l-2 border-border/60 text-muted-foreground my-1.5">
+                  {children}
+                </blockquote>
+              ),
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        )}
       </div>
       <span className="shrink-0 text-[10px] text-muted-foreground/50 mb-0.5 select-none">
         {format(message.timestamp, 'h:mm a')}
@@ -385,7 +459,7 @@ function MajimeAgentChatPanel({
         <motion.div
           className="fixed bottom-0 right-0 z-[9999] flex flex-col"
           style={{
-            width: 'clamp(420px, 525px, 100vw)',
+            width: 'clamp(320px, 400px, 100vw)',
             height: 'calc(100dvh - 1.5rem)',
             pointerEvents: 'auto',
           }}

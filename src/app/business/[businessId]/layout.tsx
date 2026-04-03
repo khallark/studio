@@ -573,6 +573,7 @@ export default function BusinessLayout({
 
   const businessAuth = useBusinessAuthorization(businessId);
   const { isAuthorized, loading, user } = businessAuth;
+  const idTokenRef = useRef<string | null>(null);
 
   // ── Chat UI state ────────────────────────────────────────────────────────
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -591,6 +592,18 @@ export default function BusinessLayout({
   // Keep refs in sync
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   useEffect(() => { sessionLoadingRef.current = sessionLoading; }, [sessionLoading]);
+  // Keep token fresh — refresh every 50 minutes (tokens expire at 60)
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshToken = async () => {
+      idTokenRef.current = await user.getIdToken();
+    };
+
+    refreshToken(); // get immediately on mount
+    const interval = setInterval(refreshToken, 50 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // ── Portal container — appended to <html>, not <body> ───────────────────
   // hideOthers (used internally by all Radix components) only walks children
@@ -658,12 +671,11 @@ export default function BusinessLayout({
     setSessionLoading(true);
 
     try {
-      const idToken = await user?.getIdToken();
       const res = await fetch('/api/business/agent/session/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${idTokenRef.current}`,
         },
         body: JSON.stringify({ businessId }),
       });
@@ -749,15 +761,19 @@ export default function BusinessLayout({
   // sendBeacon with a JSON Blob works with Next.js req.json() on the server.
   // ── End session helper — used in both unmount and beforeunload ────────────
   const endSession = useCallback(() => {
-    if (!sessionIdRef.current) return;
-    navigator.sendBeacon(
-      '/api/business/agent/session/end',
-      new Blob(
-        [JSON.stringify({ businessId, sessionId: sessionIdRef.current })],
-        { type: 'application/json' }
-      )
-    );
-    sessionIdRef.current = null; // prevent double-fire
+    if (!sessionIdRef.current || !idTokenRef.current) return;
+
+    fetch('/api/business/agent/session/end', {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idTokenRef.current}`,
+      },
+      body: JSON.stringify({ businessId, sessionId: sessionIdRef.current }),
+    });
+
+    sessionIdRef.current = null;
   }, [businessId]);
 
   // ── beforeunload: page close / refresh ───────────────────────────────────

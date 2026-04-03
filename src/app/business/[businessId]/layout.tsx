@@ -210,7 +210,7 @@ function MajimeAgentPeekButton({
     return () => window.removeEventListener('mousemove', onMouseMove);
   }, []);
 
-  const peekX = isHovered ? '0%' : mouseNear ? '33%' : '90%';
+  const peekX = isHovered ? '0%' : mouseNear ? '33%' : '92%';
 
   return (
     <AnimatePresence>
@@ -219,7 +219,7 @@ function MajimeAgentPeekButton({
           onPointerDownCapture={(e) => e.stopPropagation()}
           className="fixed right-0 top-1/2 -translate-y-1/2 z-[9999] cursor-pointer"
           style={{ pointerEvents: 'auto' }}
-          initial={{ x: '90%' }}
+          initial={{ x: '92%' }}
           animate={{ x: peekX }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}

@@ -43,29 +43,7 @@ export async function POST(req: NextRequest) {
             .doc(businessId)
             .collection('agent_sessions');
 
-        // Check for an existing idle/generating session — reuse it instead of
-        // creating a new one. 'idle' and 'generating' both mean the session is
-        // still active. 'error' sessions are also reusable.
-        const existingQuery = await sessionsRef
-            .where('status', 'in', ['idle', 'generating', 'error'])
-            .orderBy('createdAt', 'desc')
-            .limit(1)
-            .get();
-
-        if (!existingQuery.empty) {
-            const existing = existingQuery.docs[0];
-            return NextResponse.json(
-                {
-                    success: true,
-                    message: 'Existing active session found',
-                    sessionId: existing.id,
-                    isNew: false,
-                },
-                { status: 200 }
-            );
-        }
-
-        // No active session — create a fresh one.
+        // Craete a fresh active session.
         const newSessionRef = sessionsRef.doc();
         const now = Timestamp.now();
 

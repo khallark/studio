@@ -190,7 +190,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 // PEEK BUTTON
 // ============================================================
 
-const MOUSE_THRESHOLD_PX = 50;
+const MOUSE_THRESHOLD_PX = 100;
 
 function MajimeAgentPeekButton({
   onClick,

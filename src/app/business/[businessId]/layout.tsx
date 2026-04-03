@@ -10,8 +10,6 @@ import {
   useState,
   useRef,
   useCallback,
-  Dispatch,
-  SetStateAction,
 } from 'react';
 import { Building2, ShieldX, Home, ArrowLeft, Sparkles, X, Send, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,8 +18,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { createPortal } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
-import type { AgentSession } from '@/types/agent';
+import {
+  doc,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore';
+import type { AgentSession, AgentMessage, AgentSessionStatus } from '@/types/agent';
 
 // ============================================================
 // BUSINESS CONTEXT
@@ -124,7 +131,6 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  isLoading?: boolean;
 }
 
 // ============================================================
@@ -175,13 +181,33 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : 'bg-muted text-foreground rounded-bl-sm border border-border/40'
         )}
       >
-        {message.isLoading ? <LoadingDots /> : message.content}
+        {message.content}
       </div>
-      {!message.isLoading && (
-        <span className="shrink-0 text-[10px] text-muted-foreground/50 mb-0.5 select-none">
-          {format(message.timestamp, 'h:mm a')}
-        </span>
-      )}
+      <span className="shrink-0 text-[10px] text-muted-foreground/50 mb-0.5 select-none">
+        {format(message.timestamp, 'h:mm a')}
+      </span>
+    </motion.div>
+  );
+}
+
+// Loading bubble — separate from real messages, driven by session status
+function LoadingBubble() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className="flex items-end gap-2 mb-3"
+    >
+      <div className="shrink-0 mb-0.5">
+        <div className="w-5 h-5 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
+          <Sparkles className="w-2.5 h-2.5 text-primary" />
+        </div>
+      </div>
+      <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-muted border border-border/40">
+        <LoadingDots />
+      </div>
     </motion.div>
   );
 }
@@ -259,10 +285,13 @@ function MajimeAgentPeekButton({
 // ============================================================
 // CHAT PANEL
 //
-// Session state lives in BusinessLayout (survives page navigation).
-// This component only owns: input text, send-in-progress loading.
-// Messages, sessionId, sessionLoading all come from the layout.
+// Owns: input text + local isSending only.
+// messages, sessionId, sessionStatus, generatingStartedAt all flow
+// in from BusinessLayout, driven entirely by Firestore onSnapshot.
 // ============================================================
+
+// How long before we treat a stuck 'generating' lock as stale
+const STALE_GENERATING_MS = 30_000;
 
 function MajimeAgentChatPanel({
   isOpen,
@@ -270,16 +299,20 @@ function MajimeAgentChatPanel({
   businessId,
   sessionId,
   sessionLoading,
+  sessionStatus,
+  generatingStartedAt,
   messages,
-  setMessages,
+  onSend,
 }: {
   isOpen: boolean;
   onClose: () => void;
   businessId: string;
   sessionId: string | null;
   sessionLoading: boolean;
+  sessionStatus: AgentSessionStatus | null;
+  generatingStartedAt: Date | null;
   messages: ChatMessage[];
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+  onSend: (content: string) => Promise<void>;
 }) {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -287,80 +320,44 @@ function MajimeAgentChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll on new messages
+  // Stale lock: if 'generating' hasn't resolved in 30s, unblock the user
+  const isStaleGenerating =
+    sessionStatus === 'generating' &&
+    generatingStartedAt !== null &&
+    Date.now() - generatingStartedAt.getTime() > STALE_GENERATING_MS;
+
+  // Input is blocked while the agent is generating (unless the lock is stale)
+  const isBlocked =
+    !sessionId ||
+    sessionLoading ||
+    isSending ||
+    (sessionStatus === 'generating' && !isStaleGenerating);
+
+  // Auto-scroll on new messages or status change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, sessionStatus]);
 
-  // Focus textarea when panel opens (after slide-in animation)
+  // Focus textarea when panel opens
   useEffect(() => {
-    if (isOpen && sessionId) {
+    if (isOpen && sessionId && !isBlocked) {
       const t = setTimeout(() => textareaRef.current?.focus(), 320);
       return () => clearTimeout(t);
     }
-  }, [isOpen, sessionId]);
+  }, [isOpen, sessionId, isBlocked]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SEND MESSAGE
-  // ─────────────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isSending || !sessionId) return;
-
-    const userMsg: ChatMessage = {
-      id: `user_${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
+    if (!input.trim() || isBlocked) return;
+    const content = input.trim();
     setInput('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsSending(true);
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    try {
+      await onSend(content);
+    } finally {
+      setIsSending(false);
     }
-
-    const loadingId = `loading_${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      { id: loadingId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true },
-    ]);
-
-    // ─────────────────────────────────────────────────────────────────────
-    // TODO (Backend): Replace the stub below with a call to your Cloud Function:
-    //
-    //   import { getFunctions, httpsCallable } from 'firebase/functions';
-    //   const majimeAgent = httpsCallable(getFunctions(), 'majimeAgent');
-    //
-    //   const { data } = await majimeAgent({
-    //     conversationId: sessionId,
-    //     message: userMsg.content,
-    //     currentPage: window.location.pathname,
-    //   });
-    //
-    //   The agent Cloud Function will write the assistant message into Firestore.
-    //   onSnapshot (set up in BusinessLayout) will pick it up and update messages
-    //   automatically — so you only need to remove the loading bubble here:
-    //
-    //   setMessages(prev => prev.filter(m => m.id !== loadingId));
-    //   // onSnapshot handles the rest.
-    // ─────────────────────────────────────────────────────────────────────
-
-    // STUB: simulated reply. Remove when backend is ready.
-    await new Promise((r) => setTimeout(r, 1400));
-    setMessages((prev) =>
-      prev
-        .filter((m) => m.id !== loadingId)
-        .concat({
-          id: `assistant_${Date.now()}`,
-          role: 'assistant',
-          content: "The Majime Agent backend isn't connected yet — but once it is, I'll be able to look up your orders, lots, warehouse data, and more in real time. Stay tuned!",
-          timestamp: new Date(),
-        })
-    );
-    setIsSending(false);
-  }, [input, isSending, sessionId, setMessages]);
+  }, [input, isBlocked, onSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -375,9 +372,13 @@ function MajimeAgentChatPanel({
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PANEL CONTENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // Derive header indicator
+  const indicatorState: 'loading' | 'generating' | 'error' | 'online' =
+    sessionLoading ? 'loading'
+      : sessionStatus === 'generating' && !isStaleGenerating ? 'generating'
+        : sessionStatus === 'error' || isStaleGenerating ? 'error'
+          : 'online';
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -407,9 +408,9 @@ function MajimeAgentChatPanel({
                 </div>
               </div>
 
-              {/* Online / loading indicator */}
+              {/* Status indicator */}
               <div className="flex items-center gap-1.5 shrink-0">
-                {sessionLoading ? (
+                {indicatorState === 'loading' && (
                   <>
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />
@@ -417,18 +418,29 @@ function MajimeAgentChatPanel({
                     </span>
                     <span className="text-[11px] text-muted-foreground font-medium">Starting…</span>
                   </>
-                ) : sessionId ? (
+                )}
+                {indicatorState === 'generating' && (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-medium">Thinking…</span>
+                  </>
+                )}
+                {indicatorState === 'error' && (
+                  <>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive" />
+                    <span className="text-[11px] text-destructive font-medium">Error</span>
+                  </>
+                )}
+                {indicatorState === 'online' && (
                   <>
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                     </span>
                     <span className="text-[11px] text-muted-foreground font-medium">Online</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-muted-foreground/40" />
-                    <span className="text-[11px] text-muted-foreground font-medium">Offline</span>
                   </>
                 )}
               </div>
@@ -448,7 +460,7 @@ function MajimeAgentChatPanel({
             {/* ── Messages ── */}
             <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 scroll-smooth">
 
-              {/* Session loading skeleton */}
+              {/* Session starting skeleton */}
               {sessionLoading && messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-8">
                   <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -461,10 +473,24 @@ function MajimeAgentChatPanel({
                 </div>
               )}
 
-              {/* Messages */}
+              {/* Error banner */}
+              {(sessionStatus === 'error' || isStaleGenerating) && (
+                <div className="mb-3 mx-1 px-3.5 py-2.5 rounded-xl bg-destructive/8 border border-destructive/20 text-xs text-destructive">
+                  Something went wrong generating a response. You can try sending your message again.
+                </div>
+              )}
+
+              {/* Message list */}
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
+
+              {/* Loading bubble — shown while agent is generating, driven by Firestore status */}
+              <AnimatePresence>
+                {sessionStatus === 'generating' && !isStaleGenerating && (
+                  <LoadingBubble key="loading-bubble" />
+                )}
+              </AnimatePresence>
 
               <div ref={messagesEndRef} />
             </div>
@@ -488,9 +514,13 @@ function MajimeAgentChatPanel({
                   value={input}
                   onChange={handleTextareaChange}
                   onKeyDown={handleKeyDown}
-                  placeholder={sessionLoading ? 'Starting session…' : 'Ask anything about Majime…'}
+                  placeholder={
+                    sessionLoading ? 'Starting session…'
+                      : sessionStatus === 'generating' ? 'Waiting for response…'
+                        : 'Ask anything about Majime…'
+                  }
                   rows={1}
-                  disabled={!sessionId || isSending}
+                  disabled={isBlocked}
                   className={cn(
                     'flex-1 resize-none rounded-xl border border-border/60 bg-muted/40',
                     'px-3.5 py-2.5 text-sm leading-relaxed',
@@ -505,7 +535,7 @@ function MajimeAgentChatPanel({
                   size="icon"
                   className="shrink-0 h-[42px] w-[42px] rounded-xl shadow-sm"
                   onClick={handleSend}
-                  disabled={!input.trim() || isSending || !sessionId}
+                  disabled={!input.trim() || isBlocked}
                   title="Send message"
                 >
                   <AnimatePresence mode="wait">
@@ -555,10 +585,16 @@ function MajimeAgentChatPanel({
 // within the /business/[businessId]/* subtree.
 //
 // Session lifecycle:
-//   Open chat (first time) → initSession() → create Firestore doc + onSnapshot
-//   Navigate pages         → session + messages persist (layout never unmounts)
-//   Close panel (X button) → panel hides, session stays active
-//   Page close / refresh   → beforeunload fires sendBeacon → end session API
+//   Open chat (first time) → initSession() → API creates Firestore doc
+//   Two onSnapshot listeners:
+//     1. Session doc     → drives status + generatingStartedAt
+//     2. Messages subcol → drives message list (ordered by createdAt)
+//   User sends message   → addDoc() directly to messages subcollection
+//   Cloud Function fires → sets status='generating', writes reply, sets status='idle'
+//   Navigate pages       → layout never unmounts, session + messages persist
+//   Close panel (X)      → panel hides, session stays active
+//   Page close/refresh   → beforeunload keepalive fetch → end session API
+//   Layout unmounts      → cleanup endSession + unsubscribe both snapshots
 // ============================================================
 
 export default function BusinessLayout({
@@ -578,38 +614,38 @@ export default function BusinessLayout({
   // ── Chat UI state ────────────────────────────────────────────────────────
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // ── Session state ────────────────────────────────────────────────────────
+  // ── Session state — driven by Firestore onSnapshot ───────────────────────
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<AgentSessionStatus | null>(null);
+  const [generatingStartedAt, setGeneratingStartedAt] = useState<Date | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Refs so beforeunload / async callbacks always see the latest values
-  // without needing to be in the dependency arrays.
+  // Refs — so beforeunload, endSession, and async callbacks always see
+  // the latest values without stale closure issues.
   const sessionIdRef = useRef<string | null>(null);
   const sessionLoadingRef = useRef(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Two separate unsubscribes for the two onSnapshot listeners
+  const unsubSessionRef = useRef<(() => void) | null>(null);
+  const unsubMessagesRef = useRef<(() => void) | null>(null);
 
   // Keep refs in sync
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   useEffect(() => { sessionLoadingRef.current = sessionLoading; }, [sessionLoading]);
+
   // Keep token fresh — refresh every 50 minutes (tokens expire at 60)
   useEffect(() => {
     if (!user) return;
-
     const refreshToken = async () => {
       idTokenRef.current = await user.getIdToken();
     };
-
-    refreshToken(); // get immediately on mount
+    refreshToken();
     const interval = setInterval(refreshToken, 50 * 60 * 1000);
     return () => clearInterval(interval);
   }, [user]);
 
   // ── Portal container — appended to <html>, not <body> ───────────────────
-  // hideOthers (used internally by all Radix components) only walks children
-  // of <body>. Mounting the chat as a child of <html> puts it completely
-  // outside that scope — no Radix component can ever set aria-hidden or
-  // inert on it, regardless of version or component type.
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -617,23 +653,12 @@ export default function BusinessLayout({
     container.setAttribute('data-majime-agent', '');
     container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
 
-    // Block Radix's FocusScope and DismissableLayer from interfering with the chat.
-    // Both mechanisms use document-level listeners. We register first (layout mounts
-    // before any dialog ever opens) in capture phase so we fire before Radix does.
-    //
-    // - pointerdown / mousedown : DismissableLayer outside-click detection
-    // - focusin                 : FocusScope detects where focus arrived
-    // - focusout (relatedTarget): FocusScope detects focus LEAVING the dialog
-    //   ↑ This is the critical one — Radix yanks focus back via focusout +
-    //     relatedTarget BEFORE focusin fires on the new target.
-
     const blockIfTargetInChat = (e: Event) => {
       if (container.contains(e.target as Node)) {
         e.stopPropagation();
         e.stopImmediatePropagation();
       }
     };
-
     const blockIfFocusMovingToChat = (e: Event) => {
       const relatedTarget = (e as FocusEvent).relatedTarget as Node | null;
       if (relatedTarget && container.contains(relatedTarget)) {
@@ -661,9 +686,37 @@ export default function BusinessLayout({
     };
   }, []);
 
+  // ── End session — synchronous, safe for both beforeunload and unmount ────
+  const endSession = useCallback(() => {
+    if (!sessionIdRef.current || !idTokenRef.current) return;
+    fetch('/api/business/agent/session/end', {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idTokenRef.current}`,
+      },
+      body: JSON.stringify({ businessId, sessionId: sessionIdRef.current }),
+    });
+    sessionIdRef.current = null; // guard against double-fire
+  }, [businessId]);
+
+  // ── beforeunload: page close / hard refresh ──────────────────────────────
+  useEffect(() => {
+    window.addEventListener('beforeunload', endSession);
+    return () => window.removeEventListener('beforeunload', endSession);
+  }, [endSession]);
+
+  // ── Unmount: client-side navigation away from layout ─────────────────────
+  useEffect(() => {
+    return () => {
+      endSession();
+      unsubSessionRef.current?.();
+      unsubMessagesRef.current?.();
+    };
+  }, [endSession]);
+
   // ── Session init ─────────────────────────────────────────────────────────
-  // Called once when the user first opens the chat.
-  // Uses refs for the guard so this callback stays stable (no extra deps).
   const initSession = useCallback(async () => {
     if (sessionIdRef.current || sessionLoadingRef.current) return;
 
@@ -681,116 +734,85 @@ export default function BusinessLayout({
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message ?? 'Failed to create session');
-      }
+      if (!res.ok) throw new Error(data.message ?? 'Failed to create session');
 
       const newSessionId: string = data.sessionId;
       setSessionId(newSessionId);
       sessionIdRef.current = newSessionId;
 
-      // Welcome message — shown immediately on first open.
-      // Once the agent backend is live, this can be driven by the
-      // first assistant message in the Firestore session doc instead.
-      if (data.isNew) {
-        setMessages([
-          {
-            id: 'welcome',
-            role: 'assistant',
-            content:
-              "Hi! I'm the Majime Assistant. I can help you navigate the platform, look up orders, lots, warehouse data, and guide you through any workflow. What would you like to know?",
-            timestamp: new Date(),
-          },
-        ]);
-      }
+      const sessionDocRef = doc(db, 'users', businessId, 'agent_sessions', newSessionId);
+      const messagesQuery = query(
+        collection(db, 'users', businessId, 'agent_sessions', newSessionId, 'messages'),
+        orderBy('createdAt', 'asc')
+      );
 
-      // ── onSnapshot ────────────────────────────────────────────────────────
-      // Subscribes to the session document. When the agent Cloud Function writes
-      // the assistant reply to session.messages in Firestore, this fires and
-      // updates the UI automatically.
-      //
-      // Hydration logic:
-      //   - Keep any local `isLoading: true` bubble (user sees "thinking…")
-      //   - Replace all other messages with the Firestore source of truth
-      //   - If Firestore has no messages yet (session just created), leave
-      //     the local welcome message alone.
-      const sessionRef = doc(db, 'users', businessId, 'agent_sessions', newSessionId);
-
-      const unsubscribe = onSnapshot(sessionRef, (snap) => {
+      // ── Listener 1: Session doc → status + generatingStartedAt ─────────────
+      unsubSessionRef.current = onSnapshot(sessionDocRef, (snap) => {
         if (!snap.exists()) return;
-        const sessionData = snap.data() as AgentSession;
+        const s = snap.data() as AgentSession;
+        setSessionStatus(s.status);
+        setGeneratingStartedAt(s.generatingStartedAt ? s.generatingStartedAt.toDate() : null);
+      });
 
-        setMessages((prev) => {
-          // Always preserve any in-flight loading bubble
-          const loadingBubbles = prev.filter((m) => m.isLoading === true);
-
-          const firestoreMessages: ChatMessage[] = sessionData.messages.map((m) => ({
+      // ── Listener 2: Messages subcollection → message list ──────────────────
+      unsubMessagesRef.current = onSnapshot(messagesQuery, (snap) => {
+        const msgs: ChatMessage[] = snap.docs.map((d) => {
+          const m = d.data() as AgentMessage;
+          return {
             id: m.id,
             role: m.role,
             content: m.content,
             timestamp: m.createdAt.toDate(),
-          }));
-
-          // Session just created / no agent messages yet — keep local state
-          if (firestoreMessages.length === 0) return prev;
-
-          return [...firestoreMessages, ...loadingBubbles];
+          };
         });
-      });
 
-      unsubscribeRef.current = unsubscribe;
+        // Show welcome message until the first real message arrives
+        if (msgs.length === 0) {
+          setMessages([
+            {
+              id: 'welcome',
+              role: 'assistant',
+              content: "Hi! I'm the Majime Assistant. I can help you navigate the platform, look up orders, lots, warehouse data, and guide you through any workflow. What would you like to know?",
+              timestamp: new Date(),
+            },
+          ]);
+        } else {
+          setMessages(msgs);
+        }
+      });
 
     } catch (err) {
       console.error('❌ Failed to init agent session:', err);
-      // Panel stays open with a disabled input — user can retry by closing and reopening.
     } finally {
       sessionLoadingRef.current = false;
       setSessionLoading(false);
     }
-  }, [businessId]); // businessId is stable for the lifetime of the layout
+  }, [businessId]);
+
+  // ── Send message — writes directly to Firestore messages subcollection ───
+  // Cloud Function (onDocumentCreated) picks it up and generates the reply.
+  const handleSend = useCallback(async (content: string) => {
+    if (!sessionIdRef.current) return;
+
+    const messagesColRef = collection(
+      db, 'users', businessId, 'agent_sessions', sessionIdRef.current, 'messages'
+    );
+
+    const newDocRef = await addDoc(messagesColRef, {
+      role: 'user',
+      content,
+      createdAt: Timestamp.now(),
+    });
+
+    // Write id back so it mirrors the doc ID — keeps AgentMessage shape consistent
+    await updateDoc(newDocRef, { id: newDocRef.id });
+  }, [businessId]);
 
   // ── Open handler ─────────────────────────────────────────────────────────
   const handleChatOpen = useCallback(() => {
     setIsChatOpen(true);
     initSession();
   }, [initSession]);
-
-  // ── Cleanup on page close / refresh (beforeunload) ───────────────────────
-  // Uses sendBeacon — the only reliable way to fire a request on page unload.
-  // sendBeacon with a JSON Blob works with Next.js req.json() on the server.
-  // ── End session helper — used in both unmount and beforeunload ────────────
-  const endSession = useCallback(() => {
-    if (!sessionIdRef.current || !idTokenRef.current) return;
-
-    fetch('/api/business/agent/session/end', {
-      method: 'POST',
-      keepalive: true,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idTokenRef.current}`,
-      },
-      body: JSON.stringify({ businessId, sessionId: sessionIdRef.current }),
-    });
-
-    sessionIdRef.current = null;
-  }, [businessId]);
-
-  // ── beforeunload: page close / refresh ───────────────────────────────────
-  useEffect(() => {
-    window.addEventListener('beforeunload', endSession);
-    return () => window.removeEventListener('beforeunload', endSession);
-  }, [endSession]);
-
-  // ── Unmount: client-side navigation away from this layout ─────────────────
-  // beforeunload does NOT fire for Next.js client-side route changes.
-  // The layout unmounting is the only signal we get in that case.
-  useEffect(() => {
-    return () => {
-      endSession();
-      unsubscribeRef.current?.();
-    };
-  }, [endSession]);
 
   // ── Auth redirect ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -822,8 +844,10 @@ export default function BusinessLayout({
             businessId={businessId}
             sessionId={sessionId}
             sessionLoading={sessionLoading}
+            sessionStatus={sessionStatus}
+            generatingStartedAt={generatingStartedAt}
             messages={messages}
-            setMessages={setMessages}
+            onSend={handleSend}
           />
         </>,
         portalContainer

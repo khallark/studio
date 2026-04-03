@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-
         // ============================================================
         // CORE LOGIC
         // ============================================================
@@ -44,9 +43,11 @@ export async function POST(req: NextRequest) {
             .doc(businessId)
             .collection('agent_sessions');
 
-        // Check for an existing active session — reuse it instead of creating a new one.
+        // Check for an existing idle/generating session — reuse it instead of
+        // creating a new one. 'idle' and 'generating' both mean the session is
+        // still active. 'error' sessions are also reusable.
         const existingQuery = await sessionsRef
-            .where('status', '==', 'active')
+            .where('status', 'in', ['idle', 'generating', 'error'])
             .orderBy('createdAt', 'desc')
             .limit(1)
             .get();
@@ -71,11 +72,11 @@ export async function POST(req: NextRequest) {
         await newSessionRef.set({
             sessionId: newSessionRef.id,
             businessId,
-            status: 'active',
+            status: 'idle',
+            generatingStartedAt: null,
             createdAt: now,
             endedAt: null,
             lastActivityAt: now,
-            messages: [],
         } satisfies AgentSession);
 
         // ============================================================

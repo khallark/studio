@@ -1,45 +1,34 @@
 // src/types/agent.ts
-//
-// Shared types for the Majime Agent session system.
-// Timestamp is structurally typed to be compatible with both
-// Firebase client SDK (firebase/firestore) and Admin SDK (firebase-admin/firestore).
 
 export type AgentMessageRole = 'user' | 'assistant';
 
-export interface AgentMessage {
-  id: string;
-  role: AgentMessageRole;
-  content: string;
-  createdAt: {
-    toDate(): Date;
-    seconds: number;
-    nanoseconds: number;
-  };
+export type AgentSessionStatus = 'idle' | 'generating' | 'error';
+
+// Firestore timestamp shape — compatible with both client + admin SDK.
+export interface FirestoreTimestamp {
+  toDate(): Date;
+  seconds: number;
+  nanoseconds: number;
 }
 
-export type AgentSessionStatus = 'active' | 'ended';
+// Subcollection document.
+// Path: users/{businessId}/agent_sessions/{sessionId}/messages/{messageId}
+export interface AgentMessage {
+  id: string;                  // mirrors the doc ID
+  role: AgentMessageRole;
+  content: string;
+  createdAt: FirestoreTimestamp;
+}
 
-// Firestore document structure.
+// Session document.
 // Path: users/{businessId}/agent_sessions/{sessionId}
-// Rule: no optional fields — every field is always present, nullable fields are `T | null`.
+// Rule: no optional fields — every field is always present, nullable fields are T | null.
 export interface AgentSession {
-  sessionId: string; // mirrors the doc ID
+  sessionId: string;           // mirrors the doc ID
   businessId: string;
   status: AgentSessionStatus;
-  createdAt: {
-    toDate(): Date;
-    seconds: number;
-    nanoseconds: number;
-  };
-  endedAt: {
-    toDate(): Date;
-    seconds: number;
-    nanoseconds: number;
-  } | null;
-  lastActivityAt: {
-    toDate(): Date;
-    seconds: number;
-    nanoseconds: number;
-  };
-  messages: AgentMessage[];
+  generatingStartedAt: FirestoreTimestamp | null; // null when status is idle/error
+  createdAt: FirestoreTimestamp;
+  endedAt: FirestoreTimestamp | null;
+  lastActivityAt: FirestoreTimestamp;
 }

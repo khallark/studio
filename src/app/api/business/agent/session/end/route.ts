@@ -2,10 +2,9 @@
 //
 // Called in two ways:
 //   1. Normal close — fetch() from the client
-//   2. Page unload  — navigator.sendBeacon() from beforeunload
+//   2. Page unload  — keepalive fetch() from beforeunload
 //
-// Both send JSON in the request body. sendBeacon uses a Blob with
-// content-type 'application/json', which Next.js req.json() handles correctly.
+// Both send JSON in the request body.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -71,8 +70,8 @@ export async function POST(req: NextRequest) {
 
         const session = sessionSnap.data() as AgentSession;
 
-        if (session.status === 'ended') {
-            // Already ended — idempotent, no-op.
+        // 'ended' is the only terminal state — all others can be ended.
+        if (session.endedAt !== null) {
             return NextResponse.json(
                 { success: true, message: 'Session already ended' },
                 { status: 200 }
@@ -80,7 +79,7 @@ export async function POST(req: NextRequest) {
         }
 
         await sessionRef.update({
-            status: 'ended',
+            status: 'ended' as AgentSession['status'],
             endedAt: Timestamp.now(),
         });
 

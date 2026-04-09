@@ -688,6 +688,12 @@ export default function BusinessLayout({
                     isActive={pathname === `/business/${businessId}/warehouse/GRNs`}
                   />
                   <NavItem
+                    href={`/business/${businessId}/warehouse/credit-notes`}
+                    icon={X}
+                    label="Create Credit Notes"
+                    isActive={pathname === `/business/${businessId}/warehouse/credit-notes`}
+                  />
+                  <NavItem
                     href={`/business/${businessId}/warehouse/put-away`}
                     icon={Truck}
                     label="Put Away"

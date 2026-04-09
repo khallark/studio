@@ -423,15 +423,19 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/api/business/warehouse/party/create',
-        destination: '/api/business/warehouse/party/create/route'
+        destination: '/api/business/warehouse/party/create/route',
       },
       {
         source: '/api/business/warehouse/party/update',
-        destination: '/api/business/warehouse/party/update/route'
+        destination: '/api/business/warehouse/party/update/route',
       },
       {
         source: '/api/business/warehouse/party/delete',
-        destination: '/api/business/warehouse/party/delete/route'
+        destination: '/api/business/warehouse/party/delete/route',
+      },
+      {
+        source: '/api/business/warehouse/credit-notes/complete',
+        destination: '/api/business/warehouse/credit-notes/complete/route',
       },
       {
         source: '/api/business/b2b/add-stock',

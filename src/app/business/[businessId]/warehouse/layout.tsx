@@ -22,6 +22,7 @@ import {
     MessageCircleReplyIcon,
     Shirt,
     Handshake,
+    X,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -203,6 +204,12 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/GRNs`,
             icon: Shirt,
             description: 'Process GRNs',
+        },
+        {
+            label: 'Credit Notes',
+            href: `/business/${businessId}/warehouse/credit-notes`,
+            icon: X,
+            description: 'Manually remove items from warehouses',
         },
         {
             label: 'Put Away',

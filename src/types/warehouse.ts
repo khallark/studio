@@ -1,7 +1,7 @@
 // /types/warehouse.ts
 
 import { Timestamp } from "firebase-admin/firestore";
- 
+
 // user/{businessId}/products/{productId}
 export interface Product {
     /** Firestore document ID — same value as `sku`. */
@@ -10,12 +10,12 @@ export interface Product {
     sku: string;
     weight: number;
     category: string;
- 
+
     /** HSN (Harmonised System of Nomenclature) code — mandatory for GST compliance. */
     hsn: string;
     /** GST tax rate percentage, e.g. 5, 12, 18, 28. */
     taxRate: number;
- 
+
     // Optional fields stored as explicit null rather than undefined so that
     // Firestore serialisation is predictable and type-narrowing is simple.
     description: string | null;
@@ -23,12 +23,12 @@ export interface Product {
     stock: number | null;
     status: 'active' | 'draft' | 'archived' | null;
     mappedVariants: MappedVariant[] | null;
- 
+
     createdBy: string | null;
     createdAt: Timestamp;
     updatedBy: string | null;
     updatedAt: Timestamp | null;
- 
+
     // Inventory counters initialised on creation.
     inShelfQuantity: number;
     inventory: {
@@ -218,45 +218,47 @@ export interface Placement {
 
 // users/{businessId}/upcs/{upcId}
 export type UPC = {
-  id: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  createdBy: string;
-  updatedBy: string;
+    id: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
 
-  storeId: string | null;
-  orderId: string | null;
+    storeId: string | null;
+    orderId: string | null;
 
-  grnRef: string | null;
-  
-  putAway: "none" | "outbound" | null;
+    grnRef: string | null;
 
-  productId: string;
-  warehouseId: string;
-  zoneId: string;
-  rackId: string;
-  shelfId: string;
-  placementId: string;
+    putAway: "none" | "outbound" | null;
+
+    creditNoteRef: string | null;
+    productId: string;
+    warehouseId: string;
+    zoneId: string;
+    rackId: string;
+    shelfId: string;
+    placementId: string;
 } | {
-  id: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  createdBy: string;
-  updatedBy: string;
+    id: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    createdBy: string;
+    updatedBy: string;
 
-  storeId: string | null;
-  orderId: string | null;
+    storeId: string | null;
+    orderId: string | null;
 
-  grnRef: string | null;
+    grnRef: string | null;
 
-  putAway: "inbound";
+    putAway: "inbound";
 
-  productId: string;
-  warehouseId: string | null;
-  zoneId: string | null;
-  rackId: string | null;
-  shelfId: string | null;
-  placementId: string | null;
+    creditNoteRef: string | null;
+    productId: string;
+    warehouseId: string | null;
+    zoneId: string | null;
+    rackId: string | null;
+    shelfId: string | null;
+    placementId: string | null;
 }
 
 // users/{businessId}/placements/{placementId}/logs/{logId}
@@ -485,4 +487,43 @@ export interface Party {
     updatedAt: Timestamp;
     createdBy: string;
     updatedBy: string;
+}
+
+export interface CreditNote {
+    id: string;
+    creditNoteNumber: string;       // CN-001, CN-002, ...
+
+    businessId: string;
+    storeId: string;
+
+    // Party reference — supplier goods are being returned to
+    partyId: string;
+    partyName: string;
+
+    warehouseId: string;
+
+    reason: string;                 // "Damaged", "Quality Rejection", "Excess Stock", etc.
+    status: 'completed';
+
+    items: CreditNoteItem[];
+
+    totalItems: number;             // total UPC count across all items
+    totalValue: number;             // sum of qty * unitPrice across all items
+
+    notes: string | null;
+
+    createdBy: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    completedAt: Timestamp | null;
+}
+
+export interface CreditNoteItem {
+    productId: string;
+    sku: string;
+    hsn: string;
+    taxRate: number;
+    unitPrice: number;              // purchase price per unit (ex-tax)
+    quantity: number;               // number of UPCs being removed — must equal upcs.length
+    upcs: string[];                 // specific UPC codes to set putAway: null
 }

@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
                     orderId: null,
                     grnRef: grnId,
                     putAway: 'inbound',
+                    creditNoteRef: null,
                     productId: item.sku,
                     warehouseId: null,
                     zoneId: null,

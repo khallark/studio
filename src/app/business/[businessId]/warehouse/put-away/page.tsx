@@ -66,6 +66,7 @@ interface UPC {
     orderId: string | null;
     grnRef: string | null;
     putAway: "none" | "inbound" | "outbound" | null;
+    creditNoteRef: string | null;
     productId: string;
     warehouseId: string | null;
     zoneId: string | null;
@@ -259,6 +260,29 @@ function useGrnNumberMap(grnRefs: string[], businessId: string | null) {
             return map;
         },
         enabled: !!businessId && grnRefs.length > 0,
+        staleTime: 60 * 1000,
+    });
+}
+
+function useCreditNoteNumberMap(cnRefs: string[], businessId: string | null) {
+    return useQuery({
+        queryKey: ['creditNoteNumberMap', businessId, ...cnRefs],
+        queryFn: async () => {
+            if (!businessId || cnRefs.length === 0) return {} as Record<string, string>;
+            const map: Record<string, string> = {};
+            await Promise.all(
+                cnRefs.map(async (cnId) => {
+                    try {
+                        const snap = await getDoc(doc(db, 'users', businessId, 'credit_notes', cnId));
+                        map[cnId] = snap.exists() ? (snap.data().creditNoteNumber || cnId) : cnId;
+                    } catch {
+                        map[cnId] = cnId;
+                    }
+                })
+            );
+            return map;
+        },
+        enabled: !!businessId && cnRefs.length > 0,
         staleTime: 60 * 1000,
     });
 }
@@ -815,6 +839,94 @@ function GRNGroupedUPCList({ upcs, onPutAway, searchQuery, grnNumberMap }: {
     );
 }
 
+function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap }: {
+    upcs: GroupedUPC[];
+    searchQuery: string;
+    creditNoteNumberMap: Record<string, string>;
+}) {
+    const filteredUPCs = upcs.filter(upc =>
+        upc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        upc.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (upc.creditNoteRef && upc.creditNoteRef.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (upc.creditNoteRef && creditNoteNumberMap[upc.creditNoteRef]?.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const cnGroups = useMemo(() => {
+        const groups: Record<string, GroupedUPC[]> = {};
+        for (const upc of filteredUPCs) {
+            const key = upc.creditNoteRef || 'unknown';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(upc);
+        }
+        return Object.entries(groups)
+            .map(([cnRef, groupUpcs]) => {
+                const sorted = [...groupUpcs].sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+                const newestTs = Math.max(...groupUpcs.map(u => u.updatedAt.toMillis()));
+                return { cnRef, upcs: sorted, newestTs };
+            })
+            .sort((a, b) => b.newestTs - a.newestTs);
+    }, [filteredUPCs]);
+
+    if (upcs.length === 0) {
+        return (
+            <Card><CardContent className="p-12 text-center">
+                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-1">No Credit Note UPCs</h3>
+                <p className="text-muted-foreground">No outbound UPCs from Credit Notes.</p>
+            </CardContent></Card>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {cnGroups.length === 0 ? (
+                <Card><CardContent className="p-8 text-center text-muted-foreground">No UPCs match your search</CardContent></Card>
+            ) : cnGroups.map(group => {
+                const groupDate = group.upcs[0]?.updatedAt.toDate().toLocaleDateString('en-IN', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                });
+                const products = [...new Set(group.upcs.map(u => u.productId))];
+
+                return (
+                    <div key={group.cnRef}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-rose-600" />
+                            <span className="text-sm font-semibold text-rose-700 font-mono">
+                                {creditNoteNumberMap[group.cnRef] || group.cnRef}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                                {group.upcs.length} UPC{group.upcs.length !== 1 ? 's' : ''}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                                {'\u2022'} {products.length} product{products.length !== 1 ? 's' : ''}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {'\u2022'} {groupDate}
+                            </span>
+                            <div className="flex-1 h-px bg-border" />
+                        </div>
+                        <Card><div className="divide-y">
+                            {group.upcs.map(upc => (
+                                <div key={upc.id} className="p-3 hover:bg-muted/40 transition-colors flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <code className="text-sm font-mono font-medium">{upc.id}</code>
+                                            <Badge variant="outline" className="text-xs">{upc.productId}</Badge>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                                        {upc.updatedAt.toDate().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
+                            ))}
+                        </div></Card>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ============================================================
 // INBOUND TAB
 // ============================================================
@@ -968,6 +1080,143 @@ function InboundTab({ grouped, isLoading, onPutAway }: {
     );
 }
 
+function OutboundTab({ upcs, isLoading, onPutAway }: {
+    upcs: GroupedUPC[];
+    isLoading: boolean;
+    onPutAway: (upcs: GroupedUPC[]) => void;
+}) {
+    const { businessId } = useBusinessContext();
+    const [activeSubTab, setActiveSubTab] = useState('dispatch');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+
+    const toBeDispatched = upcs.filter(u => !u.creditNoteRef);
+    const toBeRemoved = upcs.filter(u => !!u.creditNoteRef);
+
+    const applyDateFilter = (list: GroupedUPC[]) => {
+        if (!dateFrom && !dateTo) return list;
+        return list.filter(upc => {
+            const d = upc.updatedAt.toDate();
+            if (dateFrom && d < new Date(dateFrom + 'T00:00:00')) return false;
+            if (dateTo && d > new Date(dateTo + 'T23:59:59')) return false;
+            return true;
+        });
+    };
+
+    const filteredDispatched = applyDateFilter(toBeDispatched);
+
+    const uniqueCnRefs = useMemo(
+        () => [...new Set(toBeRemoved.map(u => u.creditNoteRef).filter(Boolean) as string[])],
+        [toBeRemoved],
+    );
+    const { data: creditNoteNumberMap = {} } = useCreditNoteNumberMap(uniqueCnRefs, businessId);
+
+    const cnSearchMatchCount = useMemo(() => {
+        if (!searchQuery) return 0;
+        const q = searchQuery.toLowerCase();
+        return toBeRemoved.filter(upc =>
+            upc.id.toLowerCase().includes(q) ||
+            upc.productId.toLowerCase().includes(q) ||
+            (upc.creditNoteRef && upc.creditNoteRef.toLowerCase().includes(q)) ||
+            (upc.creditNoteRef && creditNoteNumberMap[upc.creditNoteRef]?.toLowerCase().includes(q))
+        ).length;
+    }, [toBeRemoved, searchQuery, creditNoteNumberMap]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                {[1, 2].map(i => (<Card key={i}><CardHeader><Skeleton className="h-8 w-48" /></CardHeader></Card>))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Filter bar */}
+            <Card><CardContent className="p-4 min-h-[56px] flex items-center">
+                {activeSubTab === 'dispatch' ? (
+                    <div className="flex flex-wrap items-center gap-3 w-full">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium">Filter by date</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">From</Label>
+                                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 w-40 text-sm" />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground">To</Label>
+                                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 w-40 text-sm" />
+                            </div>
+                            {(dateFrom || dateTo) && (
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                                    <X className="h-3.5 w-3.5 mr-1" />Clear
+                                </Button>
+                            )}
+                        </div>
+                        {(dateFrom || dateTo) && (
+                            <span className="text-xs text-muted-foreground ml-auto">
+                                {filteredDispatched.length} UPC(s) in range
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-3 w-full">
+                        <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium">Search Credit Notes</span>
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by CN number, UPC ID, or product SKU..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-sm"
+                            />
+                        </div>
+                        {searchQuery && (
+                            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setSearchQuery('')}>
+                                <X className="h-3.5 w-3.5 mr-1" />Clear
+                            </Button>
+                        )}
+                        {searchQuery && (
+                            <span className="text-xs text-muted-foreground ml-auto">
+                                {cnSearchMatchCount} UPC(s) matched
+                            </span>
+                        )}
+                    </div>
+                )}
+            </CardContent></Card>
+
+            {/* Sub-tabs */}
+            <Tabs value={activeSubTab} onValueChange={(v) => { setActiveSubTab(v); setSearchQuery(''); setDateFrom(''); setDateTo(''); }}>
+                <TabsList className="w-full sm:w-auto">
+                    <TabsTrigger value="dispatch" className="gap-2">
+                        <Truck className="h-4 w-4" />
+                        To be Dispatched
+                        {toBeDispatched.length > 0 && <Badge variant="secondary" className="ml-1 h-5 text-xs">{toBeDispatched.length}</Badge>}
+                    </TabsTrigger>
+                    <TabsTrigger value="remove" className="gap-2">
+                        <RotateCcw className="h-4 w-4" />
+                        To be Removed
+                        {toBeRemoved.length > 0 && <Badge variant="secondary" className="ml-1 h-5 text-xs">{toBeRemoved.length}</Badge>}
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="dispatch" className="mt-4">
+                    <DateGroupedUPCList upcs={filteredDispatched} onPutAway={onPutAway} />
+                </TabsContent>
+                <TabsContent value="remove" className="mt-4">
+                    <CreditNoteGroupedUPCList
+                        upcs={toBeRemoved}
+                        searchQuery={searchQuery}
+                        creditNoteNumberMap={creditNoteNumberMap}
+                    />
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -1054,46 +1303,12 @@ export default function PutAwayPage() {
                     <InboundTab grouped={grouped} isLoading={isLoadingGrouped} onPutAway={handlePutAway} />
                 </TabsContent>
 
-                <TabsContent value="outbound" className="space-y-4">
-                    {isLoadingOutbound ? (
-                        <Card><CardHeader><Skeleton className="h-8 w-48" /></CardHeader></Card>
-                    ) : enrichedOutbound.length > 0 ? (
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-purple-500/10"><Truck className="h-5 w-5 text-purple-600" /></div>
-                                    <div><CardTitle className="text-lg">Ready for Pickup</CardTitle><CardDescription>{enrichedOutbound.length} UPC(s) waiting for courier</CardDescription></div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="border rounded-lg divide-y max-h-[500px] overflow-auto">
-                                    {enrichedOutbound.map((upc) => (
-                                        <div key={upc.id} className="p-3 hover:bg-muted/40 transition-colors">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Package className="h-4 w-4 text-purple-600" />
-                                                <code className="text-sm font-mono font-medium">{upc.id}</code>
-                                                <Badge variant="outline" className="text-xs">{upc.productId}</Badge>
-                                            </div>
-                                            {upc.orderName && (
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground ml-6">
-                                                    <FileText className="h-3 w-3" /><span>{upc.orderName}</span>
-                                                    {upc.storeName && (<><span>{'\u2022'}</span><Store className="h-3 w-3" /><span>{upc.storeName}</span></>)}
-                                                    {upc.orderStatus && (<><span>{'\u2022'}</span><Badge variant="secondary" className="text-xs h-5">{upc.orderStatus}</Badge></>)}
-                                                </div>
-                                            )}
-                                            <p className="text-xs text-muted-foreground ml-6 mt-1">Updated: {upc.updatedAt.toDate().toLocaleString()}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card><CardContent className="p-12 text-center">
-                            <Truck className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                            <h3 className="text-lg font-semibold mb-1">No Outbound UPCs</h3>
-                            <p className="text-muted-foreground">No UPCs are currently waiting for pickup</p>
-                        </CardContent></Card>
-                    )}
+                <TabsContent value="outbound">
+                    <OutboundTab
+                        upcs={enrichedOutbound}
+                        isLoading={isLoadingOutbound}
+                        onPutAway={handlePutAway}
+                    />
                 </TabsContent>
 
                 <TabsContent value="dispatched" className="space-y-4">

@@ -373,6 +373,7 @@ export async function POST(req: NextRequest) {
                                 orderId: String(orderId),
                                 grnRef: null,
                                 putAway: 'inbound', // ✅ Set to inbound for RTO
+                                creditNoteRef: null,
                                 productId: businessProductSku,
                                 warehouseId: null,
                                 zoneId: null,

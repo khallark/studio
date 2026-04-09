@@ -605,7 +605,7 @@ function UPCGroupCard({ title, icon: Icon, iconColor, bgColor, upcs, onPutAway }
 // DATE-GROUPED UPC LIST
 // ============================================================
 
-function DateGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void }) {
+function DateGroupedUPCList({ upcs, onPutAway, hidePutAway }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void, hidePutAway?: boolean; }) {
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -651,18 +651,20 @@ function DateGroupedUPCList({ upcs, onPutAway }: { upcs: GroupedUPC[]; onPutAway
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search by UPC, order name, or product SKU..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+            {!hidePutAway && (
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search by UPC, order name, or product SKU..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                        {selectedUPCs.size === filteredUPCs.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                    <Button size="sm" onClick={handlePutAway} disabled={selectedUPCs.size === 0}>
+                        <ArrowDownToLine className="h-4 w-4 mr-2" />Put Away ({selectedUPCs.size})
+                    </Button>
                 </div>
-                <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                    {selectedUPCs.size === filteredUPCs.length ? 'Deselect All' : 'Select All'}
-                </Button>
-                <Button size="sm" onClick={handlePutAway} disabled={selectedUPCs.size === 0}>
-                    <ArrowDownToLine className="h-4 w-4 mr-2" />Put Away ({selectedUPCs.size})
-                </Button>
-            </div>
+            )}
 
             {dateGroups.length === 0 ? (
                 <Card><CardContent className="p-8 text-center text-muted-foreground">No UPCs match your search</CardContent></Card>
@@ -1203,7 +1205,7 @@ function OutboundTab({ upcs, isLoading, onPutAway }: {
                 </TabsList>
 
                 <TabsContent value="dispatch" className="mt-4">
-                    <DateGroupedUPCList upcs={filteredDispatched} onPutAway={onPutAway} />
+                    <DateGroupedUPCList upcs={filteredDispatched} onPutAway={onPutAway} hidePutAway />
                 </TabsContent>
                 <TabsContent value="remove" className="mt-4">
                     <CreditNoteGroupedUPCList

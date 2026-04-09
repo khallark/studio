@@ -26,6 +26,7 @@ import {
     CalendarDays,
     X,
     ClipboardCheck,
+    Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +111,8 @@ interface Shelf {
     zoneId: string;
     warehouseId: string;
 }
+
+const MAX_SELECTION = 100;
 
 // ============================================================
 // HOOKS - DATA FETCHING
@@ -518,6 +521,7 @@ function UPCGroupCard({ title, icon: Icon, iconColor, bgColor, upcs, onPutAway }
     title: string; icon: React.ElementType; iconColor: string; bgColor: string;
     upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void;
 }) {
+    const { toast } = useToast();
     const [isExpanded, setIsExpanded] = useState(false);
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState('');
@@ -529,14 +533,40 @@ function UPCGroupCard({ title, icon: Icon, iconColor, bgColor, upcs, onPutAway }
     );
 
     const toggleSelectAll = () => {
-        if (selectedUPCs.size === filteredUPCs.length) setSelectedUPCs(new Set());
-        else setSelectedUPCs(new Set(filteredUPCs.map(u => u.id)));
+        if (selectedUPCs.size === filteredUPCs.length) {
+            setSelectedUPCs(new Set());
+        } else {
+            if (filteredUPCs.length > MAX_SELECTION) {
+                toast({
+                    title: 'Selection limit reached',
+                    description: `Only ${MAX_SELECTION} UPCs can be put away at a time. Selecting first ${MAX_SELECTION}.`,
+                    variant: 'destructive',
+                });
+                setSelectedUPCs(new Set(filteredUPCs.slice(0, MAX_SELECTION).map(u => u.id)));
+            } else {
+                setSelectedUPCs(new Set(filteredUPCs.map(u => u.id)));
+            }
+        }
     };
 
     const toggleSelect = (id: string) => {
-        const newSet = new Set(selectedUPCs);
-        newSet.has(id) ? newSet.delete(id) : newSet.add(id);
-        setSelectedUPCs(newSet);
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                if (next.size >= MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can put away at most ${MAX_SELECTION} UPCs at a time.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                next.add(id);
+            }
+            return next;
+        });
     };
 
     return (
@@ -606,6 +636,7 @@ function UPCGroupCard({ title, icon: Icon, iconColor, bgColor, upcs, onPutAway }
 // ============================================================
 
 function DateGroupedUPCList({ upcs, onPutAway, hidePutAway }: { upcs: GroupedUPC[]; onPutAway: (upcs: GroupedUPC[]) => void, hidePutAway?: boolean; }) {
+    const { toast } = useToast();
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -632,10 +663,39 @@ function DateGroupedUPCList({ upcs, onPutAway, hidePutAway }: { upcs: GroupedUPC
     }, [filteredUPCs]);
 
     const toggleSelect = (id: string) => {
-        setSelectedUPCs(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                if (next.size >= MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can put away at most ${MAX_SELECTION} UPCs at a time.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                next.add(id);
+            }
+            return next;
+        });
     };
     const toggleSelectAll = () => {
-        setSelectedUPCs(prev => prev.size === filteredUPCs.length ? new Set() : new Set(filteredUPCs.map(u => u.id)));
+        if (selectedUPCs.size === filteredUPCs.length) {
+            setSelectedUPCs(new Set());
+        } else {
+            if (filteredUPCs.length > MAX_SELECTION) {
+                toast({
+                    title: 'Selection limit reached',
+                    description: `Only ${MAX_SELECTION} UPCs can be put away at a time. Selecting first ${MAX_SELECTION}.`,
+                    variant: 'destructive',
+                });
+                setSelectedUPCs(new Set(filteredUPCs.slice(0, MAX_SELECTION).map(u => u.id)));
+            } else {
+                setSelectedUPCs(new Set(filteredUPCs.map(u => u.id)));
+            }
+        }
     };
     const handlePutAway = () => { onPutAway(upcs.filter(u => selectedUPCs.has(u.id))); };
 
@@ -679,7 +739,9 @@ function DateGroupedUPCList({ upcs, onPutAway, hidePutAway }: { upcs: GroupedUPC
                     <Card><div className="divide-y">
                         {group.upcs.map(upc => (
                             <div key={upc.id} className="p-3 hover:bg-muted/40 transition-colors flex items-center gap-3">
-                                <Checkbox checked={selectedUPCs.has(upc.id)} onCheckedChange={() => toggleSelect(upc.id)} />
+                                {!hidePutAway && (
+                                    <Checkbox checked={selectedUPCs.has(upc.id)} onCheckedChange={() => toggleSelect(upc.id)} />
+                                )}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <code className="text-sm font-mono font-medium">{upc.id}</code>
@@ -715,6 +777,7 @@ function GRNGroupedUPCList({ upcs, onPutAway, searchQuery, grnNumberMap }: {
     searchQuery: string;
     grnNumberMap: Record<string, string>;
 }) {
+    const { toast } = useToast();
     const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
 
     // Search matches UPC id, product SKU, GRN ref (doc ID), or resolved grnNumber
@@ -745,18 +808,59 @@ function GRNGroupedUPCList({ upcs, onPutAway, searchQuery, grnNumberMap }: {
     const getGroupProducts = (groupUpcs: GroupedUPC[]): string[] => [...new Set(groupUpcs.map(u => u.productId))];
 
     const toggleSelect = (id: string) => {
-        setSelectedUPCs(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                if (next.size >= MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can put away at most ${MAX_SELECTION} UPCs at a time.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                next.add(id);
+            }
+            return next;
+        });
     };
     const toggleSelectAll = () => {
-        setSelectedUPCs(prev => prev.size === filteredUPCs.length ? new Set() : new Set(filteredUPCs.map(u => u.id)));
+        if (selectedUPCs.size === filteredUPCs.length) {
+            setSelectedUPCs(new Set());
+        } else {
+            if (filteredUPCs.length > MAX_SELECTION) {
+                toast({
+                    title: 'Selection limit reached',
+                    description: `Only ${MAX_SELECTION} UPCs can be put away at a time. Selecting first ${MAX_SELECTION}.`,
+                    variant: 'destructive',
+                });
+                setSelectedUPCs(new Set(filteredUPCs.slice(0, MAX_SELECTION).map(u => u.id)));
+            } else {
+                setSelectedUPCs(new Set(filteredUPCs.map(u => u.id)));
+            }
+        }
     };
     const toggleSelectGroup = (groupUpcs: GroupedUPC[]) => {
         setSelectedUPCs(prev => {
             const next = new Set(prev);
             const groupIds = groupUpcs.map(u => u.id);
             const allSelected = groupIds.every(id => next.has(id));
-            if (allSelected) groupIds.forEach(id => next.delete(id));
-            else groupIds.forEach(id => next.add(id));
+            if (allSelected) {
+                groupIds.forEach(id => next.delete(id));
+            } else {
+                const toAdd = groupIds.filter(id => !next.has(id));
+                if (next.size + toAdd.length > MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can put away at most ${MAX_SELECTION} UPCs at a time. ${MAX_SELECTION - next.size} slots remaining.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                toAdd.forEach(id => next.add(id));
+            }
             return next;
         });
     };
@@ -841,11 +945,18 @@ function GRNGroupedUPCList({ upcs, onPutAway, searchQuery, grnNumberMap }: {
     );
 }
 
-function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap }: {
+function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap, businessId, user }: {
     upcs: GroupedUPC[];
     searchQuery: string;
     creditNoteNumberMap: Record<string, string>;
+    businessId: string;
+    user: User | null | undefined;
 }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [selectedUPCs, setSelectedUPCs] = useState<Set<string>>(new Set());
+    const [dispatching, setDispatching] = useState(false);
+
     const filteredUPCs = upcs.filter(upc =>
         upc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         upc.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -869,6 +980,94 @@ function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap }: {
             .sort((a, b) => b.newestTs - a.newestTs);
     }, [filteredUPCs]);
 
+    const toggleSelect = (id: string) => {
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                if (next.size >= MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can dispatch at most ${MAX_SELECTION} UPCs at a time.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectGroup = (groupUpcs: GroupedUPC[]) => {
+        setSelectedUPCs(prev => {
+            const next = new Set(prev);
+            const groupIds = groupUpcs.map(u => u.id);
+            const allSelected = groupIds.every(id => next.has(id));
+
+            if (allSelected) {
+                groupIds.forEach(id => next.delete(id));
+            } else {
+                const toAdd = groupIds.filter(id => !next.has(id));
+                if (next.size + toAdd.length > MAX_SELECTION) {
+                    toast({
+                        title: 'Selection limit reached',
+                        description: `You can dispatch at most ${MAX_SELECTION} UPCs at a time. ${MAX_SELECTION - next.size} slots remaining.`,
+                        variant: 'destructive',
+                    });
+                    return prev;
+                }
+                toAdd.forEach(id => next.add(id));
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedUPCs.size === filteredUPCs.length) {
+            setSelectedUPCs(new Set());
+        } else {
+            if (filteredUPCs.length > MAX_SELECTION) {
+                toast({
+                    title: 'Selection limit reached',
+                    description: `Only ${MAX_SELECTION} UPCs can be dispatched at a time. Selecting first ${MAX_SELECTION}.`,
+                    variant: 'destructive',
+                });
+                setSelectedUPCs(new Set(filteredUPCs.slice(0, MAX_SELECTION).map(u => u.id)));
+            } else {
+                setSelectedUPCs(new Set(filteredUPCs.map(u => u.id)));
+            }
+        }
+    };
+
+    const handleDispatch = async () => {
+        if (selectedUPCs.size === 0) return;
+        setDispatching(true);
+        try {
+            const idToken = await user?.getIdToken();
+            const res = await fetch('/api/business/warehouse/credit-notes/dispatch-upcs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ businessId, upcIds: [...selectedUPCs] }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to dispatch UPCs');
+
+            toast({
+                title: 'Dispatch Successful',
+                description: `${data.count} credit note UPC(s) have been removed from inventory.`,
+            });
+            setSelectedUPCs(new Set());
+            queryClient.invalidateQueries({ queryKey: ['putAwayUPCs', businessId] });
+            queryClient.invalidateQueries({ queryKey: ['enrichedUPCs'] });
+        } catch (err: any) {
+            toast({ title: 'Dispatch Failed', description: err.message, variant: 'destructive' });
+        } finally {
+            setDispatching(false);
+        }
+    };
+
     if (upcs.length === 0) {
         return (
             <Card><CardContent className="p-12 text-center">
@@ -881,13 +1080,41 @@ function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap }: {
 
     return (
         <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                    {selectedUPCs.size > 0
+                        ? `${selectedUPCs.size} of ${filteredUPCs.length} selected (max ${MAX_SELECTION})`
+                        : `${filteredUPCs.length} UPC${filteredUPCs.length !== 1 ? 's' : ''}`}
+                </span>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                        {selectedUPCs.size === filteredUPCs.length && filteredUPCs.length > 0 ? 'Deselect All' : 'Select All'}
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={handleDispatch}
+                        disabled={selectedUPCs.size === 0 || dispatching}
+                        className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                        {dispatching
+                            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Dispatching...</>
+                            : <><Package className="h-4 w-4 mr-2" />Dispatch ({selectedUPCs.size})</>
+                        }
+                    </Button>
+                </div>
+            </div>
+
+            {/* CN groups */}
             {cnGroups.length === 0 ? (
                 <Card><CardContent className="p-8 text-center text-muted-foreground">No UPCs match your search</CardContent></Card>
             ) : cnGroups.map(group => {
+                const groupIds = group.upcs.map(u => u.id);
+                const allGroupSelected = groupIds.length > 0 && groupIds.every(id => selectedUPCs.has(id));
+                const products = [...new Set(group.upcs.map(u => u.productId))];
                 const groupDate = group.upcs[0]?.updatedAt.toDate().toLocaleDateString('en-IN', {
                     day: '2-digit', month: 'short', year: 'numeric',
                 });
-                const products = [...new Set(group.upcs.map(u => u.productId))];
 
                 return (
                     <div key={group.cnRef}>
@@ -906,12 +1133,29 @@ function CreditNoteGroupedUPCList({ upcs, searchQuery, creditNoteNumberMap }: {
                                 {'\u2022'} {groupDate}
                             </span>
                             <div className="flex-1 h-px bg-border" />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2"
+                                onClick={() => toggleSelectGroup(group.upcs)}
+                            >
+                                {allGroupSelected ? 'Deselect CN' : 'Select CN'}
+                            </Button>
                         </div>
+
                         <Card><div className="divide-y">
                             {group.upcs.map(upc => (
-                                <div key={upc.id} className="p-3 hover:bg-muted/40 transition-colors flex items-center gap-3">
+                                <div
+                                    key={upc.id}
+                                    className="p-3 hover:bg-muted/40 transition-colors flex items-center gap-3 cursor-pointer"
+                                    onClick={() => toggleSelect(upc.id)}
+                                >
+                                    <Checkbox
+                                        checked={selectedUPCs.has(upc.id)}
+                                        onCheckedChange={() => toggleSelect(upc.id)}
+                                    />
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center gap-2">
                                             <code className="text-sm font-mono font-medium">{upc.id}</code>
                                             <Badge variant="outline" className="text-xs">{upc.productId}</Badge>
                                         </div>
@@ -1087,7 +1331,7 @@ function OutboundTab({ upcs, isLoading, onPutAway }: {
     isLoading: boolean;
     onPutAway: (upcs: GroupedUPC[]) => void;
 }) {
-    const { businessId } = useBusinessContext();
+    const { businessId, user } = useBusinessContext();
     const [activeSubTab, setActiveSubTab] = useState('dispatch');
     const [searchQuery, setSearchQuery] = useState('');
     const [dateFrom, setDateFrom] = useState('');
@@ -1212,6 +1456,8 @@ function OutboundTab({ upcs, isLoading, onPutAway }: {
                         upcs={toBeRemoved}
                         searchQuery={searchQuery}
                         creditNoteNumberMap={creditNoteNumberMap}
+                        businessId={businessId}
+                        user={user}
                     />
                 </TabsContent>
             </Tabs>

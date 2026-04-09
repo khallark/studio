@@ -438,6 +438,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/credit-notes/complete/route',
       },
       {
+        source: '/api/business/warehouse/credit-notes/dispatch-upcs',
+        destination: '/api/business/warehouse/credit-notes/dispatch-upcs/route',
+      },
+      {
         source: '/api/business/b2b/add-stock',
         destination: '/api/business/b2b/add-stock/route',
       },

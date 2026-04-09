@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
         if (!businessId) {
             return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
         }
-        if (!upcIds || !Array.isArray(upcIds) || upcIds.length === 0 || upcIds.length > 500) {
-            return NextResponse.json({ error: 'upcIds must be a non-empty array of length at most 500' }, { status: 400 });
+        if (!upcIds || !Array.isArray(upcIds) || upcIds.length === 0 || upcIds.length > 100) {
+            return NextResponse.json({ error: 'upcIds must be a non-empty array of length at most 100' }, { status: 400 });
         }
         if (!warehouseId || !zoneId || !rackId || !shelfId) {
             return NextResponse.json({ error: 'missing warehouseId, zoneId, rackId or shelfId' }, { status: 400 });
@@ -88,6 +88,22 @@ export async function POST(request: NextRequest) {
                 missingUpcs,
             }, { status: 404 });
         }
+
+        // Reject any UPCs that are outbound for order dispatch (not credit note)
+        // These must go through fulfillment, not put-away
+        const blockedUpcs = upcDocs
+            .filter(d => {
+                const data = d.data() as UPC;
+                return data.putAway === 'outbound' && !data.creditNoteRef;
+            })
+            .map(d => d.id);
+
+        if (blockedUpcs.length > 0) {
+            return NextResponse.json({
+                error: 'Some UPCs are outbound for order dispatch and cannot be put away',
+                blockedUpcs,
+            }, { status: 400 });
+        }   
 
         // update UPC docs with new location
         let batch = db.batch();

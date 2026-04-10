@@ -10,6 +10,7 @@ import { ChevronRight, Loader2, X } from 'lucide-react';
 import { cn as CN } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 import { useBusinessContext } from '../../layout';
+import { User } from 'firebase/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ function CreateCreditNoteDialog({
     onCreated,
 }: {
     businessId: string;
-    user: any;
+    user: User | null | undefined;
     onClose: () => void;
     onCreated: () => void;
 }) {
@@ -369,9 +370,13 @@ function CreateCreditNoteDialog({
                 draftItems[0]?.selectedUpcs.includes(u.id)
             );
 
+            const idToken = await user?.getIdToken();
             const res = await fetch('/api/business/warehouse/credit-notes/complete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`
+                },
                 body: JSON.stringify({
                     businessId,
                     partyId: selectedParty.id,

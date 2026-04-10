@@ -236,7 +236,7 @@ export function StartPackagingDialog({
         chunksRef.current = [];
 
         const options = [
-            { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 500_000, audioBitsPerSecond: 32_000 },
+            { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 500_000, audioBitsPerSecond: 32_000 },
             { mimeType: 'video/webm', videoBitsPerSecond: 500_000, audioBitsPerSecond: 32_000 },
             {},
         ];
@@ -255,12 +255,14 @@ export function StartPackagingDialog({
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.onstop = () => {
             cancelAnimationFrame(animFrameRef.current); // Stop the draw loop
-            const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+            const blob = new Blob(chunksRef.current, {
+                type: mediaRecorderRef.current?.mimeType || chunksRef.current[0]?.type || 'video/webm'
+            });
             setRecordedBlob(blob);
         };
 
         mediaRecorderRef.current = recorder;
-        recorder.start(1000);
+        recorder.start();
         setIsRecording(true);
         setRecordingTime(0);
     };

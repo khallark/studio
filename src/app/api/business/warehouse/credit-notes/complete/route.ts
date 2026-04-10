@@ -30,7 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness } from '@/lib/authoriseUser';
-import { CreditNote, CreditNoteItem } from '@/types/warehouse';
+import { CreditNote, CreditNoteItem, UPC } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
@@ -112,7 +112,8 @@ export async function POST(req: NextRequest) {
             if (!snap.exists) {
                 return NextResponse.json({ error: `UPC ${upcId} does not exist` }, { status: 400 });
             }
-            if (snap.data()?.putAway !== 'none') {
+            const data = snap.data() as UPC;
+            if (data.putAway !== 'none') {
                 return NextResponse.json(
                     { error: `UPC ${upcId} is not shelved (putAway: '${snap.data()?.putAway}') — cannot include in credit note` },
                     { status: 400 },

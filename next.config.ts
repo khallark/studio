@@ -442,6 +442,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/credit-notes/dispatch-upcs/route',
       },
       {
+        source: '/api/business/warehouse/credit-notes/download-bills',
+        destination: '/api/business/warehouse/credit-notes/download-bills/route',
+      },
+      {
         source: '/api/business/b2b/add-stock',
         destination: '/api/business/b2b/add-stock/route',
       },

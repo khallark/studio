@@ -1,9 +1,12 @@
+// /api/business/warehouse/grns/download-bill
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { GRN } from '@/types/warehouse';
 import { Party, PurchaseOrder } from '@/types/warehouse';
+import { authUserForBusiness } from '@/lib/authoriseUser';
 
 // ─── Type assertion for chromium runtime properties ───────────────────────────
 const chromiumConfig = chromium as typeof chromium & {
@@ -548,33 +551,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'businessId and grnId are required.' }, { status: 400 });
         }
 
-        // ── Auth: verify Firebase ID token ───────────────────────────────────
-        const authHeader = req.headers.get('Authorization') ?? '';
-        const idToken = authHeader.replace('Bearer ', '').trim();
-        if (!idToken) {
-            return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+        // ── Auth ──────────────────────────────────────────────────────────────
+        const { authorised, businessDoc, error, status } = await authUserForBusiness({ businessId, req });
+        if(!authorised || !businessDoc?.exists) {
+            return NextResponse.json({ error }, { status });
         }
-
-        let uid: string;
-        try {
-            const decoded = await adminAuth.verifyIdToken(idToken);
-            uid = decoded.uid;
-        } catch {
-            return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
-        }
-
-        // Verify user belongs to this business
-        const bizRef = db.doc(`users/${businessId}`);
-        const bizSnap = await bizRef.get();
-        if (!bizSnap.exists) {
-            return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
-        }
-        const bizData = bizSnap.data()!;
-
-        const memberSnap = await db.doc(`users/${businessId}/members/${uid}`).get();
-        if (!memberSnap.exists) {
-            return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
-        }
+        
+        const bizData = businessDoc.data();
 
         // ── Fetch GRN ─────────────────────────────────────────────────────────
         const grnSnap = await db.doc(`users/${businessId}/grns/${grnId}`).get();

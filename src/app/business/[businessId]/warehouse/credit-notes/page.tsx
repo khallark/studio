@@ -6,11 +6,12 @@ import { db } from '@/lib/firebase';
 import { Party, Warehouse, Zone, Rack, Shelf, UPC } from '@/types/warehouse';
 import { CreditNote, CreditNoteItem } from '@/types/warehouse';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronRight, Loader2, X, Download } from 'lucide-react';
 import { cn as CN } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 import { useBusinessContext } from '../../layout';
 import { User } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ const STATUS_COLOR: Record<CreditNote['status'], string> = {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CreditNotesPage() {
+    const { toast, dismiss } = useToast();
     const { businessId, user } = useBusinessContext();
 
     // ── List state ───────────────────────────────────────────────────────────
@@ -59,6 +61,9 @@ export default function CreditNotesPage() {
 
     // ── Dialog state ─────────────────────────────────────────────────────────
     const [dialogOpen, setDialogOpen] = useState(false);
+
+    // ── Download state ───────────────────────────────────────────────────────
+    const [downloadingCnId, setDownloadingCnId] = useState<string | null>(null);
 
     useEffect(() => {
         const q = query(
@@ -74,6 +79,57 @@ export default function CreditNotesPage() {
 
     const openDialog = () => setDialogOpen(true);
     const closeDialog = () => setDialogOpen(false);
+
+    const handleDownloadBill = async (cn: CreditNote) => {
+        if (!user || downloadingCnId) return;
+        setDownloadingCnId(cn.id);
+
+        const { id: loadingToastId } = toast({
+            title: 'Generating PDF…',
+            description: `Building credit note for ${cn.creditNoteNumber}`,
+            duration: 60_000,
+        });
+
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/business/warehouse/credit-notes/download-bill', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ businessId, creditNoteId: cn.id }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error ?? `Server error ${res.status}`);
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${cn.creditNoteNumber}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            dismiss(loadingToastId);
+            toast({
+                title: 'PDF Downloaded',
+                description: `${cn.creditNoteNumber}.pdf saved successfully.`,
+            });
+        } catch (err: any) {
+            dismiss(loadingToastId);
+            toast({
+                title: 'Download Failed',
+                description: err?.message ?? 'Could not generate the credit note PDF.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDownloadingCnId(null);
+        }
+    };
 
     return (
         <div className="p-6">
@@ -112,6 +168,7 @@ export default function CreditNotesPage() {
                                 <th className="px-4 py-3 text-right">Total Value</th>
                                 <th className="px-4 py-3 text-left">Status</th>
                                 <th className="px-4 py-3 text-left">Date</th>
+                                <th className="px-4 py-3 w-10"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -130,6 +187,18 @@ export default function CreditNotesPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">{formatDate(cn.createdAt)}</td>
+                                    <td className="px-4 py-3">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDownloadBill(cn); }}
+                                            disabled={downloadingCnId === cn.id}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+                                            title="Download Credit Note PDF"
+                                        >
+                                            {downloadingCnId === cn.id
+                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                : <Download className="h-3.5 w-3.5" />}
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

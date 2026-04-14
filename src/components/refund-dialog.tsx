@@ -403,7 +403,16 @@ export function RefundDialog({
                                 </Badge>
                               )}
                               {item.qc_status && (
-                                <Badge variant='success' className="ml-2">
+                                <Badge
+                                  className={`ml-2 ${item.qc_status === 'QC Fail'
+                                    ? 'bg-red-100 text-red-700 border-red-200'
+                                    : item.qc_status === 'Not Received'
+                                      ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                      : item.qc_status === 'QC Pass'
+                                        ? 'bg-green-100 text-green-700 border-green-200'
+                                        : ''
+                                    }`}
+                                >
                                   {item.qc_status}
                                 </Badge>
                               )}

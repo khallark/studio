@@ -375,16 +375,10 @@ export function StartPackagingDialog({
     const canSave = scanState === 'found' && !!recordedBlob && !isUploading;
 
     return (
-        <Dialog
-            open={isOpen}
-            onOpenChange={(open) => {
-                if (open) return;
-            }}
-        >
+        <Dialog open={isOpen} onOpenChange={(o) => !o && handleClose()}>
             <DialogContent
                 className="max-w-3xl max-h-[90vh] overflow-y-auto"
-                onPointerDownOutside={(e) => e.preventDefault()}
-                onEscapeKeyDown={(e) => e.preventDefault()}
+                onInteractOutside={(e) => e.preventDefault()}
             >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
@@ -431,11 +425,11 @@ export function StartPackagingDialog({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="absolute right-0 top-0"
-                                        onClick={handleClose}
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                                        onClick={resetSession}
                                         disabled={isUploading}
                                     >
-                                        <X className="h-4 w-4" />
+                                        <X className="h-3 w-3" />
                                     </Button>
                                 )}
                             </div>

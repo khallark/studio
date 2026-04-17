@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
 
         await orderRef?.update(updateData);
         orderData.refundedAmount = refundAmount;
-        orderData.refundMethod = refundMethod;
+        orderData.refundMethod = refundMethod === 'store_credit' ? 'Store Credit' : 'Manual';
 
 
         if (refundMethod === 'store_credit') {

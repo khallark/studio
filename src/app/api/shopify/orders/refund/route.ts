@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
 
         const orderData = orderDoc.data();
 
+        if(!orderData) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
         // Additional auth for shared store
         if (SHARED_STORE_IDS.includes(shop)) {
             const vendorName = businessData?.vendorName;
@@ -205,6 +209,8 @@ export async function POST(req: NextRequest) {
         };
 
         await orderRef?.update(updateData);
+        orderData.refundedAmount = refundAmount;
+        orderData.refundMethod = refundMethod;
 
 
         if (refundMethod === 'store_credit') {

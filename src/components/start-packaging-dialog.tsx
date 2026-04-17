@@ -375,8 +375,12 @@ export function StartPackagingDialog({
     const canSave = scanState === 'found' && !!recordedBlob && !isUploading;
 
     return (
-        <Dialog open={isOpen} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={isOpen}>
+            <DialogContent
+                className="max-w-3xl max-h-[90vh] overflow-y-auto"
+                onPointerDownOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Package className="h-5 w-5" />

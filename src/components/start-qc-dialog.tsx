@@ -127,7 +127,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 },
-            frameRate: { ideal: 15 },
+            frameRate: { ideal: 24, max: 30 },
             facingMode: { ideal: 'environment' }  // Back camera
           },
           audio: true
@@ -192,8 +192,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
         },
         {
           mimeType: 'video/webm;codecs=vp8',
-          videoBitsPerSecond: 300000,   // Reduced from 1000000 (300kbps)
-          audioBitsPerSecond: 32000,    // Reduced from 64000 (32kbps)
+          videoBitsPerSecond: 800000,   // Reduced from 1000000 (300kbps)
+          audioBitsPerSecond: 64000,    // Reduced from 64000 (32kbps)
         },
         {
           mimeType: 'video/webm',
@@ -245,7 +245,7 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
       };
 
       // OPTIMIZED: Request data in chunks for better memory management
-      mediaRecorder.start(1000); // Get data every second
+      mediaRecorder.start(); // Get data every second
       setIsRecording(true);
     }
   };

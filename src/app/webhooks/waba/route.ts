@@ -320,7 +320,6 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
 
             await orderDoc.ref.update({
                 customStatus: 'Confirmed',
-                lastStatusUpdate: FieldValue.serverTimestamp(),
                 customStatusesLogs: FieldValue.arrayUnion(log),
             });
         }
@@ -351,8 +350,6 @@ async function updateToCancallationRequested(orderDoc: DocumentSnapshot): Promis
 
         await orderDoc.ref.update({
             customStatus: 'Cancellation Requested',
-            cancellationRequestedAt: FieldValue.serverTimestamp(),
-            lastStatusUpdate: FieldValue.serverTimestamp(),
             customStatusesLogs: FieldValue.arrayUnion(log),
         });
 

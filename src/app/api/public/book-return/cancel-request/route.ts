@@ -80,7 +80,6 @@ export async function POST(req: NextRequest) {
             returnItemsVariantIds: FieldValue.delete(),
             return_request_date: FieldValue.delete(),
             customStatusesLogs: updatedLogs,
-            lastStatusUpdate: Timestamp.now()
         });
 
         return NextResponse.json({

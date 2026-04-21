@@ -180,7 +180,11 @@ export async function POST(req: NextRequest) {
                     // Update status but deny return
                     await orderRef.update({
                         customStatus: updatedStatus,
-                        lastStatusUpdate: FieldValue.serverTimestamp()
+                        customStatusesLogs: FieldValue.arrayUnion({
+                            status: "Updated Status",
+                            createdAt: Timestamp.now(),
+                            remarks: `The order was updated to "${updatedStatus}" while the customer was trying to request a DTO return.`
+                        }),
                     });
                 }
 

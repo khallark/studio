@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const confirmedLog = sortedLogs[confirmedIndex];
     // Keep only logs up to and including the first Confirmed entry
     const trimmedLogs = sortedLogs.slice(0, confirmedIndex + 1);
 
@@ -65,8 +64,6 @@ export async function POST(req: NextRequest) {
       awb: FieldValue.delete(),
       courier: FieldValue.delete(),
       courierProvider: FieldValue.delete(),
-      lastUpdatedAt: FieldValue.serverTimestamp(),
-      lastStatusUpdate: confirmedLog.createdAt,
       customStatusesLogs: trimmedLogs,
     });
 

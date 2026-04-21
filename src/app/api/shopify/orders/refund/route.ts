@@ -198,7 +198,6 @@ export async function POST(req: NextRequest) {
             refundMethod: refundMethod,
             'raw.line_items': updatedLineItems,
             customStatus: 'DTO Refunded',
-            lastStatusUpdate: FieldValue.serverTimestamp(),
             customStatusesLogs: FieldValue.arrayUnion({
                 status: 'DTO Refunded',
                 createdAt: Timestamp.now(),

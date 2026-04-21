@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const deliveredLog = sortedLogs[deliveredIndex];
     // Keep only logs up to and including the first Delivered entry
     const trimmedLogs = sortedLogs.slice(0, deliveredIndex + 1);
 
@@ -65,8 +64,6 @@ export async function POST(req: NextRequest) {
       awb_reverse: FieldValue.delete(),
       courier_reverse: FieldValue.delete(),
       courierReverseProvider: FieldValue.delete(),
-      lastUpdatedAt: FieldValue.serverTimestamp(),
-      lastStatusUpdate: deliveredLog.createdAt,
       customStatusesLogs: trimmedLogs,
     });
 

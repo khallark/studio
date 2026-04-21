@@ -105,8 +105,6 @@ export async function POST(req: NextRequest) {
       'raw.line_items': updatedLineItems,
       'unboxing_video_path': videoPath,
       customStatus: 'Pending Refunds',
-      lastStatusUpdate: FieldValue.serverTimestamp(),
-      pendingRefundsAt: FieldValue.serverTimestamp(),
       customStatusesLogs: FieldValue.arrayUnion({
         status: 'Pending Refunds',
         createdAt: Timestamp.now(),

@@ -86,9 +86,6 @@ export async function POST(req: NextRequest) {
             // Update the order document
             transaction.update(orderRef, {
                 customStatus: status,
-                lastUpdatedAt: FieldValue.serverTimestamp(),
-                lastStatusUpdate: FieldValue.serverTimestamp(),
-                lastUpdatedBy: userRefData,
                 customStatusesLogs: FieldValue.arrayUnion(log), // Append log to order's log array
             });
         });

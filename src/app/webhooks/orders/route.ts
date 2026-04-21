@@ -344,7 +344,6 @@ async function handleOrderWebhook(
       }
       tx.set(orderRef, {
         ...dataToSave,
-        lastStatusUpdate: FieldValue.serverTimestamp(),
         customStatus,
         isDeleted: false,
         createdByTopic: topic,
@@ -403,7 +402,6 @@ async function handleOrderWebhook(
           remarks: `This order was cancelled on Shopify`
         };
         updateData.customStatus = 'Cancelled';
-        updateData.lastStatusUpdate = Timestamp.now();
         console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
 
         try {

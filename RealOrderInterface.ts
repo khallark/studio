@@ -11,18 +11,109 @@ export interface Order {
     totalPrice: number;
     currency: Currency;
     vendors: string[];
-    raw: Raw;
-    lastWebhookTopic: Topic;
-    isDeleted: boolean;
-    createdByTopic: Topic;
-    receivedAt: Timestamp;
+    raw: {
+        id: number;
+        admin_graphql_api_id: string;
+        app_id: number;
+        browser_ip: string | null;
+        buyer_accepts_marketing: boolean;
+        cancel_reason: string | null;
+        cancelled_at: ISODateString | null;
+        cart_token: string | null;
+        checkout_id: number | null;
+        checkout_token: string | null;
+        client_details: ClientDetails | null;
+        closed_at: ISODateString | null;
+        confirmation_number: string;
+        confirmed: boolean;
+        contact_email: string | null;
+        created_at: ISODateString;
+        currency: Currency;
+        current_shipping_price_set: Set;
+        current_subtotal_price: string;
+        current_subtotal_price_set: Set;
+        current_total_additional_fees_set: null;
+        current_total_discounts: string;
+        current_total_discounts_set: Set;
+        current_total_duties_set: null;
+        current_total_price: string;
+        current_total_price_set: Set;
+        current_total_tax: string;
+        current_total_tax_set: Set;
+        customer_locale: string | null;
+        device_id: null;
+        discount_codes: DiscountCode[];
+        duties_included: boolean;
+        email: string;
+        estimated_taxes: boolean;
+        financial_status: FinancialStatus;
+        fulfillment_status: FulfillmentStatusEnum | null;
+        landing_site: string | null;
+        landing_site_ref: null;
+        location_id: null;
+        merchant_business_entity_id: string;
+        merchant_of_record_app_id: null;
+        name: string;
+        note: string | null;
+        note_attributes: NoteAttribute[];
+        number: number;
+        order_number: number;
+        order_status_url: string;
+        original_total_additional_fees_set: null;
+        original_total_duties_set: null;
+        payment_gateway_names: string[];
+        phone: string | null;
+        po_number: null;
+        presentment_currency: Currency;
+        processed_at: ISODateString;
+        reference: null;
+        referring_site: string | null;
+        source_identifier: null;
+        source_name: string;
+        source_url: null;
+        subtotal_price: string;
+        subtotal_price_set: Set;
+        tags: string;
+        tax_exempt: boolean;
+        tax_lines: TaxLine[];
+        taxes_included: boolean;
+        test: boolean;
+        token: string;
+        total_cash_rounding_payment_adjustment_set: Set;
+        total_cash_rounding_refund_adjustment_set: Set;
+        total_discounts: string;
+        total_discounts_set: Set;
+        total_line_items_price: string;
+        total_line_items_price_set: Set;
+        total_outstanding: string;
+        total_price: string;
+        total_price_set: Set;
+        total_shipping_price_set: Set;
+        total_tax: string;
+        total_tax_set: Set;
+        total_tip_received: string;
+        total_weight: number;
+        updated_at: ISODateString;
+        user_id: number | null;
+        billing_address: Address;
+        customer: Customer;
+        discount_applications: DiscountApplication[];
+        fulfillments: Fulfillment[];
+        line_items: LineItem[];
+        payment_terms: PaymentTerms | null;
+        refunds: Refund[];
+        shipping_address: Address;
+        shipping_lines: ShippingLine[];
+        returns: any[];
+        line_item_groups: any[];
+    };
+    receivedAt: Timestamp
     newAt: Timestamp;
     customStatus: CustomStatusEnum;
     lastStatusUpdate: Timestamp;
     customStatusesLogs: CustomStatusesLog[];
     confirmedAt?: Timestamp;
     whatsapp_messages: string[];
-    updatedByTopic?: Topic;
     cancelledAt?: Timestamp;
     pickupReadyAt?: Timestamp;
     pickupReady?: boolean;
@@ -37,7 +128,6 @@ export interface Order {
     lastPackedAt?: Timestamp;
     packingVidUrls?: PackingVidURL[];
     cancellationRequestedAt?: Timestamp;
-    lastUpdatedBy?: LastUpdatedBy;
     lastUpdatedAt?: Timestamp;
     dispatchedAt?: Timestamp;
     inTransitAt?: Timestamp;
@@ -76,12 +166,9 @@ export interface Timestamp {
 export enum Courier {
     BlueDart = "Blue Dart",
     Delhivery = "Delhivery",
+    Shiprocket = "Shiprocket",
+    Xpressbees = "Xpressbees",
     Dtdc = "DTDC",
-}
-
-export enum Topic {
-    OrdersCreate = "orders/create",
-    OrdersUpdated = "orders/updated",
 }
 
 export enum Currency {
@@ -131,113 +218,9 @@ export enum FulfillmentStatusEnum {
     Unfulfilled = "unfulfilled",
 }
 
-export interface LastUpdatedBy {
-    uid: string;
-    email: string;
-    displayName: string;
-}
-
 export interface PackingVidURL {
     packingVidUrl: string;
     packedAt: Timestamp;
-}
-
-export interface Raw {
-    id: number;
-    admin_graphql_api_id: string;
-    app_id: number;
-    browser_ip: string | null;
-    buyer_accepts_marketing: boolean;
-    cancel_reason: string | null;
-    cancelled_at: Date | null;
-    cart_token: string | null;
-    checkout_id: number | null;
-    checkout_token: string | null;
-    client_details: ClientDetails | null;
-    closed_at: ISODateString | null;
-    company?: string | null;
-    confirmation_number: string;
-    confirmed: boolean;
-    contact_email: string | null;
-    created_at: ISODateString;
-    currency: Currency;
-    current_shipping_price_set: Set;
-    current_subtotal_price: string;
-    current_subtotal_price_set: Set;
-    current_total_additional_fees_set: null;
-    current_total_discounts: string;
-    current_total_discounts_set: Set;
-    current_total_duties_set: null;
-    current_total_price: string;
-    current_total_price_set: Set;
-    current_total_tax: string;
-    current_total_tax_set: Set;
-    customer_locale: string | null;
-    device_id: null;
-    discount_codes: DiscountCode[];
-    duties_included: boolean;
-    email: string;
-    estimated_taxes: boolean;
-    financial_status: FinancialStatus;
-    fulfillment_status: FulfillmentStatusEnum | null;
-    landing_site: string | null;
-    landing_site_ref: null;
-    location_id: null;
-    merchant_business_entity_id: string;
-    merchant_of_record_app_id: null;
-    name: string;
-    note: string | null;
-    note_attributes: NoteAttribute[];
-    number: number;
-    order_number: number;
-    order_status_url: string;
-    original_total_additional_fees_set: null;
-    original_total_duties_set: null;
-    payment_gateway_names: string[];
-    phone: string | null;
-    po_number: null;
-    presentment_currency: Currency;
-    processed_at: ISODateString;
-    reference: null;
-    referring_site: string | null;
-    source_identifier: null;
-    source_name: string;
-    source_url: null;
-    subtotal_price: string;
-    subtotal_price_set: Set;
-    tags: string;
-    tax_exempt: boolean;
-    tax_lines: TaxLine[];
-    taxes_included: boolean;
-    test: boolean;
-    token: string;
-    total_cash_rounding_payment_adjustment_set: Set;
-    total_cash_rounding_refund_adjustment_set: Set;
-    total_discounts: string;
-    total_discounts_set: Set;
-    total_line_items_price: string;
-    total_line_items_price_set: Set;
-    total_outstanding: string;
-    total_price: string;
-    total_price_set: Set;
-    total_shipping_price_set: Set;
-    total_tax: string;
-    total_tax_set: Set;
-    total_tip_received: string;
-    total_weight: number;
-    updated_at: ISODateString;
-    user_id: number | null;
-    billing_address: Address;
-    customer: Customer;
-    discount_applications: DiscountApplication[];
-    fulfillments: Fulfillment[];
-    line_items: LineItem[];
-    payment_terms: PaymentTerms | null;
-    refunds: Refund[];
-    shipping_address: Address;
-    shipping_lines: ShippingLine[];
-    returns: any[];
-    line_item_groups: any[];
 }
 
 export interface Address {

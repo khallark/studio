@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     const confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
 
-    if (confirmedIndex === -1) {
+    if (confirmedIndex === -1 && (orderData?.customStatus ?? "") !== "Cancellation Requested") {
       return NextResponse.json(
         { error: 'No "Confirmed" log entry found for this order. Cannot revert status.' },
         { status: 422 }

@@ -41,15 +41,34 @@ export async function POST(req: NextRequest) {
     }
 
     const rawLogs: any[] = orderData?.customStatusesLogs ?? [];
+    const currentStatus = orderData?.customStatus ?? '';
 
     // Sort ascending by createdAt
     const sortedLogs = [...rawLogs].sort(
       (a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0)
     );
 
-    const confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
+    let confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
 
-    if (confirmedIndex === -1 && (orderData?.customStatus ?? "") !== "Cancellation Requested") {
+    // If cancellation was requested from "New" status, there's no Confirmed log yet.
+    // Synthesize one after the "New" log so the revert lands on "Confirmed".
+    if (confirmedIndex === -1 && currentStatus === 'Cancellation Requested') {
+      const newLogIndex = sortedLogs.findIndex((log) => log.status === 'New');
+      const confirmedLog = {
+        status: 'Confirmed',
+        remarks: 'Auto-confirmed during "Cancellation Requested" revert',
+        createdAt: Timestamp.now(),
+      };
+
+      // Insert right after the "New" log (or at the end if no "New" log found)
+      const insertAt = newLogIndex !== -1 ? newLogIndex + 1 : sortedLogs.length;
+      sortedLogs.splice(insertAt, 0, confirmedLog);
+
+      // Re-find since we just inserted it
+      confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
+    }
+
+    if (confirmedIndex === -1) {
       return NextResponse.json(
         { error: 'No "Confirmed" log entry found for this order. Cannot revert status.' },
         { status: 422 }

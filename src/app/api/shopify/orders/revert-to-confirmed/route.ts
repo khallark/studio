@@ -50,23 +50,23 @@ export async function POST(req: NextRequest) {
 
     let confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
 
-    // If cancellation was requested from "New" status, there's no Confirmed log yet.
-    // Synthesize one after the "New" log so the revert lands on "Confirmed".
-    if (confirmedIndex === -1 && currentStatus === 'Cancellation Requested') {
-      const newLogIndex = sortedLogs.findIndex((log) => log.status === 'New');
-      const confirmedLog = {
-        status: 'Confirmed',
-        remarks: 'Auto-confirmed during "Cancellation Requested" revert',
-        createdAt: Timestamp.now(),
-      };
+    // // If cancellation was requested from "New" status, there's no Confirmed log yet.
+    // // Synthesize one after the "New" log so the revert lands on "Confirmed".
+    // if (confirmedIndex === -1 && currentStatus === 'Cancellation Requested') {
+    //   const newLogIndex = sortedLogs.findIndex((log) => log.status === 'New');
+    //   const confirmedLog = {
+    //     status: 'Confirmed',
+    //     remarks: 'Auto-confirmed during "Cancellation Requested" revert',
+    //     createdAt: Timestamp.now(),
+    //   };
 
-      // Insert right after the "New" log (or at the end if no "New" log found)
-      const insertAt = newLogIndex !== -1 ? newLogIndex + 1 : sortedLogs.length;
-      sortedLogs.splice(insertAt, 0, confirmedLog);
+    //   // Insert right after the "New" log (or at the end if no "New" log found)
+    //   const insertAt = newLogIndex !== -1 ? newLogIndex + 1 : sortedLogs.length;
+    //   sortedLogs.splice(insertAt, 0, confirmedLog);
 
-      // Re-find since we just inserted it
-      confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
-    }
+    //   // Re-find since we just inserted it
+    //   confirmedIndex = sortedLogs.findIndex((log) => log.status === 'Confirmed');
+    // }
 
     if (confirmedIndex === -1) {
       return NextResponse.json(

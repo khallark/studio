@@ -1017,8 +1017,6 @@ export default function BusinessOrdersPage() {
                 return (
                     <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Undo Closed</DropdownMenuItem>
                 );
-            case 'Cancellation Requested':
-                return <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Confirmed')}>Back to Confirmed</DropdownMenuItem>;
             default:
                 return null;
         }

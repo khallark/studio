@@ -33,7 +33,16 @@ interface ValidationResult {
     errors: string[];
 }
 
-// Valid categories
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const VALID_TAX_RATES = [0, 5, 12, 18, 28];
+const MAX_WEIGHT_GRAMS = 50000;
+const MAX_NAME_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+const HSN_REGEX = /^\d{4,8}$/;
+
 const VALID_CATEGORIES = [
     'Apparel',
     'Accessories',
@@ -122,50 +131,85 @@ function validateRow(
         return { valid: false, error: `Row ${rowIndex}: SKU is required` };
     }
 
+    if (sku.length < 2 || sku.length > 100) {
+        return { valid: false, error: `Row ${rowIndex}: SKU must be between 2 and 100 characters` };
+    }
+
+    // ── Add mode: all required fields ────────────────────────────────────────
     if (mode === 'add') {
         const name = row['Product Name']?.toString().trim();
-        const weight = parseFloat(row['Weight']?.toString() ?? '0');
+        const weightRaw = row['Weight'];
         const hsn = row['HSN']?.toString().trim();
         const taxRateRaw = row['Tax Rate'];
+        const categoryRaw = row['Category']?.toString().trim();
 
+        // Name
         if (!name) {
             return { valid: false, error: `Row ${rowIndex}: Product Name is required for adding new products` };
         }
-
-        if (!weight || weight <= 0) {
-            return { valid: false, error: `Row ${rowIndex}: Weight must be greater than 0` };
+        if (name.length > MAX_NAME_LENGTH) {
+            return { valid: false, error: `Row ${rowIndex}: Product Name must not exceed ${MAX_NAME_LENGTH} characters` };
         }
 
+        // Weight
+        if (weightRaw === undefined || weightRaw === null || weightRaw === '') {
+            return { valid: false, error: `Row ${rowIndex}: Weight is required for adding new products` };
+        }
+        const weight = parseFloat(weightRaw.toString());
+        if (isNaN(weight) || weight <= 0 || weight > MAX_WEIGHT_GRAMS) {
+            return { valid: false, error: `Row ${rowIndex}: Weight must be between 0 and ${MAX_WEIGHT_GRAMS} grams` };
+        }
+
+        // HSN
         if (!hsn) {
             return { valid: false, error: `Row ${rowIndex}: HSN code is required for adding new products` };
         }
+        if (!HSN_REGEX.test(hsn.toUpperCase())) {
+            return { valid: false, error: `Row ${rowIndex}: HSN code must be 4 to 8 digits` };
+        }
 
+        // Tax Rate
         if (taxRateRaw === undefined || taxRateRaw === null || taxRateRaw === '') {
             return { valid: false, error: `Row ${rowIndex}: Tax Rate is required for adding new products` };
         }
-
         const taxRate = parseFloat(taxRateRaw.toString());
-        if (isNaN(taxRate) || taxRate < 0) {
-            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be a non-negative number` };
+        if (isNaN(taxRate) || !VALID_TAX_RATES.includes(taxRate)) {
+            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be one of: ${VALID_TAX_RATES.join(', ')}` };
+        }
+
+        // Category
+        if (categoryRaw && !VALID_CATEGORIES.includes(categoryRaw)) {
+            return { valid: false, error: `Row ${rowIndex}: Category must be one of: ${VALID_CATEGORIES.join(', ')}` };
         }
     }
 
-    // Validate weight if provided in update mode too
+    // ── Shared validations (both modes, if field is present) ─────────────────
+
+    // Weight
     if (row['Weight'] !== undefined && row['Weight'] !== null && row['Weight'] !== '') {
         const weight = parseFloat(row['Weight'].toString());
-        if (isNaN(weight) || weight <= 0) {
-            return { valid: false, error: `Row ${rowIndex}: Weight must be a positive number` };
+        if (isNaN(weight) || weight <= 0 || weight > MAX_WEIGHT_GRAMS) {
+            return { valid: false, error: `Row ${rowIndex}: Weight must be between 0 and ${MAX_WEIGHT_GRAMS} grams` };
         }
     }
 
-    // Validate Tax Rate if provided in update mode
+    // Tax Rate
     if (row['Tax Rate'] !== undefined && row['Tax Rate'] !== null && row['Tax Rate'] !== '') {
         const taxRate = parseFloat(row['Tax Rate'].toString());
-        if (isNaN(taxRate) || taxRate < 0) {
-            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be a non-negative number` };
+        if (isNaN(taxRate) || !VALID_TAX_RATES.includes(taxRate)) {
+            return { valid: false, error: `Row ${rowIndex}: Tax Rate must be one of: ${VALID_TAX_RATES.join(', ')}` };
         }
     }
 
+    // HSN
+    if (row['HSN'] !== undefined && row['HSN'] !== null && row['HSN'] !== '') {
+        const hsn = row['HSN'].toString().trim();
+        if (!HSN_REGEX.test(hsn)) {
+            return { valid: false, error: `Row ${rowIndex}: HSN code must be 4 to 8 digits` };
+        }
+    }
+
+    // Price
     if (row['Price'] !== undefined && row['Price'] !== null && row['Price'] !== '') {
         const price = parseFloat(row['Price'].toString());
         if (isNaN(price) || price < 0) {
@@ -173,10 +217,35 @@ function validateRow(
         }
     }
 
+    // Stock
     if (row['Stock'] !== undefined && row['Stock'] !== null && row['Stock'] !== '') {
-        const stock = parseInt(row['Stock'].toString());
-        if (isNaN(stock) || stock < 0) {
+        const stock = Number(row['Stock'].toString());
+        if (isNaN(stock) || stock < 0 || !Number.isInteger(stock)) {
             return { valid: false, error: `Row ${rowIndex}: Stock must be a non-negative integer` };
+        }
+    }
+
+    // Category
+    if (row['Category'] !== undefined && row['Category'] !== null && row['Category'] !== '') {
+        const cat = row['Category'].toString().trim();
+        if (!VALID_CATEGORIES.includes(cat)) {
+            return { valid: false, error: `Row ${rowIndex}: Category must be one of: ${VALID_CATEGORIES.join(', ')}` };
+        }
+    }
+
+    // Product Name length (update mode)
+    if (row['Product Name'] !== undefined && row['Product Name'] !== null && row['Product Name'] !== '') {
+        const name = row['Product Name'].toString().trim();
+        if (name.length > MAX_NAME_LENGTH) {
+            return { valid: false, error: `Row ${rowIndex}: Product Name must not exceed ${MAX_NAME_LENGTH} characters` };
+        }
+    }
+
+    // Description length
+    if (row['Description'] !== undefined && row['Description'] !== null && row['Description'] !== '') {
+        const desc = row['Description'].toString().trim();
+        if (desc.length > MAX_DESCRIPTION_LENGTH) {
+            return { valid: false, error: `Row ${rowIndex}: Description must not exceed ${MAX_DESCRIPTION_LENGTH} characters` };
         }
     }
 
@@ -405,6 +474,9 @@ export async function POST(req: NextRequest) {
         const userData = userDoc?.data();
         const userEmail = userData?.email ?? userData?.primaryContact?.email ?? null;
 
+        // Track SKUs seen within this file to detect duplicates
+        const seenSkusInFile = new Set<string>();
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             const rowIndex = i + 2; // +2: row 1 is header, data is 0-indexed
@@ -426,6 +498,19 @@ export async function POST(req: NextRequest) {
             }
 
             const skuUpper = sku!.toUpperCase();
+
+            // ── Duplicate SKU within file check ──────────────────────────────
+            if (seenSkusInFile.has(skuUpper)) {
+                results.push({
+                    ...row,
+                    Status: 'Skipped',
+                    Message: `Duplicate SKU "${skuUpper}" in file — only the first occurrence is processed`,
+                });
+                skippedCount++;
+                continue;
+            }
+            seenSkusInFile.add(skuUpper);
+
             const productRef = productsRef?.doc(skuUpper);
 
             if (mode === 'add') {
@@ -444,7 +529,6 @@ export async function POST(req: NextRequest) {
                         ? parseInt(row['Stock'].toString())
                         : 0;
 
-                // Build the new product document typed as Omit<Product, 'id'>
                 const productData: Omit<Product, 'id'> = {
                     name: row['Product Name']!.toString().trim(),
                     sku: skuUpper,
@@ -519,8 +603,6 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
-                // Only update fields that are explicitly present in the row.
-                // Typed as Partial<Product> since we write a subset of fields.
                 const updateData: Partial<Product> & { updatedBy: string | null; updatedAt: Timestamp } = {
                     updatedBy: userId ?? null,
                     updatedAt: Timestamp.now(),
@@ -555,8 +637,6 @@ export async function POST(req: NextRequest) {
                     updateData.price = parseFloat(row['Price'].toString());
                     changes.push({ field: 'price', fieldLabel: 'Price', oldValue: '(previous)', newValue: updateData.price });
                 }
-                // Note: Stock updates in update mode don't affect inventory.openingStock.
-                // Use the inventory adjustment API for stock changes.
                 if (row['Stock'] !== undefined && row['Stock'] !== '') {
                     updateData.stock = parseInt(row['Stock'].toString());
                     changes.push({ field: 'stock', fieldLabel: 'Stock', oldValue: '(previous)', newValue: updateData.stock });

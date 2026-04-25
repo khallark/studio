@@ -538,6 +538,69 @@ export function useDownloadSlips(
   });
 }
 
+export function useDownloadManifest(
+  businessId: string | null,
+  user: User | null | undefined
+) {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ orderIds, storeId }: { orderIds: string[]; storeId: string | null; }) => {
+      if (!storeId || !user || orderIds.length === 0) {
+        throw new Error('Invalid parameters');
+      }
+
+      toast({
+        title: 'Generating Manifest',
+        description: 'Your PDF will begin downloading shortly. This may take a moment.',
+      });
+
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/shopify/orders/download-manifest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, shop: storeId, orderIds }),
+      });
+
+      if (!response.ok) {
+        let msg = 'Failed to download manifest';
+        try {
+          const err = await response.json();
+          msg = err?.details || err?.error || msg;
+        } catch {
+          msg = await response.text().catch(() => msg);
+        }
+        throw new Error(msg);
+      }
+
+      return response.blob();
+    },
+
+    onSuccess: (blob) => {
+      // Trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shipping-manifest-${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
+
+    onError: (error: Error) => {
+      toast({
+        title: 'Download Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // ============================================================
 // MUTATION 9: DOWNLOAD EXCEL
 // ============================================================

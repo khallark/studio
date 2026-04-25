@@ -102,6 +102,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/download-slips/route',
       },
       {
+        source: '/api/shopify/orders/download-manifest',
+        destination: '/api/shopify/orders/download-manifest/route',
+      },
+      {
         source: '/api/shopify/orders/dispatch',
         destination: '/api/shopify/orders/dispatch/route',
       },

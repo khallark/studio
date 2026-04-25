@@ -121,6 +121,7 @@ import {
     useDownloadExcel,
     useDownloadProductsExcel,
     useUpdateShippedStatuses,
+    useDownloadManifest,
 } from '@/hooks/use-order-mutations';
 import { useAllOrderIds } from '@/hooks/use-all-order-ids';
 import { Order, CustomStatus } from '@/types/order';
@@ -433,6 +434,7 @@ export default function BusinessOrdersPage() {
     const splitOrder = useOrderSplit(businessId, user);
     const bookReturn = useReturnBooking(businessId, user);
     const downloadSlips = useDownloadSlips(businessId, user);
+    const downloadManifest = useDownloadManifest(businessId, user);
     const downloadExcel = useDownloadExcel(businessId, user);
     const downloadProductsExcel = useDownloadProductsExcel(businessId, user);
     const updateShippedStatuses = useUpdateShippedStatuses(businessId, user);
@@ -445,7 +447,8 @@ export default function BusinessOrdersPage() {
         bookReturn.isPending ||
         downloadSlips.isPending ||
         downloadExcel.isPending ||
-        downloadProductsExcel.isPending;
+        downloadProductsExcel.isPending ||
+        downloadManifest.isPending;
 
     const isAnyOrderSelected = selectedOrders.length > 0;
     const isDisabled = !isAnyOrderSelected;
@@ -460,6 +463,7 @@ export default function BusinessOrdersPage() {
     const isBulkUpdating = bulkUpdate.isPending;
     const isBookingReturn = bookReturn.isPending;
     const isDownloadingSlips = downloadSlips.isPending;
+    const isDownloadingManifest = downloadManifest.isPending;
     const isDownloadingExcel = downloadExcel.isPending;
     const isDownloadingProducts = downloadProductsExcel.isPending;
 
@@ -595,6 +599,31 @@ export default function BusinessOrdersPage() {
                     if (completedStores === totalStores) {
                         clearAllSelections()
                     }
+                }
+            });
+        });
+    };
+
+    const handleDownloadManifest = () => {
+        if (selectedOrders.length === 0) return;
+        const ordersByStore = new Map<string, string[]>();
+        selectedOrders.forEach(orderId => {
+            const storeId = selectedOrdersMap[orderId];
+            if (storeId) {
+                if (!ordersByStore.has(storeId)) ordersByStore.set(storeId, []);
+                ordersByStore.get(storeId)!.push(orderId);
+            }
+        });
+        if (ordersByStore.size === 0) return;
+
+        let completedStores = 0;
+        const totalStores = ordersByStore.size;
+
+        ordersByStore.forEach((storeOrderIds, storeId) => {
+            downloadManifest.mutate({ orderIds: storeOrderIds, storeId }, {
+                onSuccess: () => {
+                    completedStores++;
+                    if (completedStores === totalStores) clearAllSelections();
                 }
             });
         });
@@ -1485,7 +1514,17 @@ export default function BusinessOrdersPage() {
                                             >
                                                 {isDownloadingSlips && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                                 Download Slips
-                                            </DropdownMenuItem>)}
+                                            </DropdownMenuItem>
+                                        )}
+                                        {activeTab === 'Dispatched' && (
+                                            <DropdownMenuItem
+                                                onClick={handleDownloadManifest}
+                                                disabled={isDisabled || isDownloadingManifest || isAnyOperationInProgress}
+                                            >
+                                                {isDownloadingManifest && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                                Download Manifest
+                                            </DropdownMenuItem>
+                                        )}
                                         {['Confirmed', 'Ready To Dispatch'].includes(activeTab) && (
                                             <DropdownMenuItem
                                                 onClick={handleDownloadProductsExcel}

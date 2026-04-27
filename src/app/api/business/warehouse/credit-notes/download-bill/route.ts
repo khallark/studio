@@ -295,7 +295,7 @@ function buildCreditNoteHTML(payload: {
     <!-- ── HEADER ── -->
     <div class="header">
         <div class="header-left">
-            <span class="title">Credit Note</span>
+            <span class="title">Debit Note</span>
             <span class="status-pill">COMPLETED</span>
         </div>
         <div class="logo">
@@ -308,7 +308,7 @@ function buildCreditNoteHTML(payload: {
     <div class="subheader">
         <table>
             <tr>
-                <td class="lbl">Credit Note #</td>
+                <td class="lbl">Debit Note #</td>
                 <td class="val">${escapeHtml(cn.creditNoteNumber)}</td>
             </tr>
             <tr>

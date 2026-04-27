@@ -1516,7 +1516,7 @@ export default function BusinessOrdersPage() {
                                                 Download Slips
                                             </DropdownMenuItem>
                                         )}
-                                        {activeTab === 'Dispatched' && (
+                                        {['Dispatched', 'Ready To Dispatch'].includes(activeTab) && (
                                             <DropdownMenuItem
                                                 onClick={handleDownloadManifest}
                                                 disabled={isDisabled || isDownloadingManifest || isAnyOperationInProgress}

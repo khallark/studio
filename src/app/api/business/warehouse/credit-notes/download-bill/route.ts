@@ -388,9 +388,9 @@ function buildCreditNoteHTML(payload: {
     <div class="terms">
         <div class="terms-title">Terms and Conditions</div>
         <ol>
-            <li>This credit note is issued for goods returned or written off from our warehouse.</li>
+            <li>This debit note is issued for goods returned or written off from our warehouse.</li>
             <li>The supplier is requested to process the refund within 30 days of receiving this note.</li>
-            <li>Any disputes must be raised within 7 days of receiving this credit note.</li>
+            <li>Any disputes must be raised within 7 days of receiving this debit note.</li>
         </ol>
     </div>
 

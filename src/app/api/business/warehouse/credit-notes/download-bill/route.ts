@@ -381,7 +381,7 @@ function buildCreditNoteHTML(payload: {
 
     ${cn.notes ? `
     <div class="reason-box">
-        <b>Notes:</b> ${escapeHtml(cn.notes)}
+        <b>Notes:</b> ${escapeHtml(cn.notes).trim().replace(/\s+/g, ' ').replace(/^\w/, c => c.toUpperCase())}
     </div>` : ''}
 
     <!-- ── TERMS ── -->

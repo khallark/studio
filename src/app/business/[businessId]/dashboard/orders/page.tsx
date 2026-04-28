@@ -414,7 +414,7 @@ export default function BusinessOrdersPage() {
     const availableProvinces = ordersData?.availableProvinces || [];
 
     const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
-    const { data: availabilityCounts } = useAvailabilityCounts(businessId, stores, vendorName);
+    const { data: availabilityCounts } = useAvailabilityCounts(businessId, activeTab, stores, vendorName);
     const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores, vendorName);
     const { data: unusedAwbsCount = 0 } = useAwbCount(businessId);
 

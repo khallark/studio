@@ -7,9 +7,9 @@ import { db } from '@/lib/firebase';
 import { Order } from './use-orders';
 import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
-export function useAvailabilityCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
+export function useAvailabilityCounts(businessId: string | null, activeTab: string, stores: string[], vendorName: string | null | undefined) {
   return useQuery({
-    queryKey: ['availabilityCounts', businessId, stores],
+    queryKey: ['availabilityCounts', businessId, stores, activeTab],
 
     queryFn: async () => {
       if (!businessId) throw new Error('No business ID provided');
@@ -208,8 +208,9 @@ export function useAvailabilityCounts(businessId: string | null, stores: string[
     },
 
     enabled: !!businessId && stores.length > 0,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }

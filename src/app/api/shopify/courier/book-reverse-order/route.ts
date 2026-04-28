@@ -383,6 +383,9 @@ export async function POST(req: NextRequest) {
 
     const shopData = (await shopRef.get()).data() as any;
 
+    orderData.awb_reverse = String(awb);
+    orderData.courier_reverse = "Delhivery";
+    orderData.courierReverseProvider = "Delhivery";
     await sendDTOBookedOrderWhatsAppMessage(shopData, orderData);
 
     return NextResponse.json(

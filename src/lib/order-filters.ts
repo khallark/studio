@@ -22,9 +22,9 @@ export async function applyClientSideFilters(
             filtered = filtered.filter((order) => {
                 const customerName =
                     (order.raw.shipping_address?.name ??
-                    order.raw.billing_address?.name ??
-                    order.raw.customer?.name ??
-                    `${order.raw.shipping_address?.first_name || ''} ${order.raw.shipping_address?.last_name || ''}`.trim()) ||
+                        order.raw.billing_address?.name ??
+                        order.raw.customer?.name ??
+                        `${order.raw.shipping_address?.first_name || ''} ${order.raw.shipping_address?.last_name || ''}`.trim()) ||
                     `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() ||
                     order.email || '';
 
@@ -150,6 +150,13 @@ export async function applyClientSideFilters(
             filters.paymentTypeFilter === 'cod'
                 ? o.financialStatus === 'pending'
                 : o.financialStatus !== 'pending'
+        );
+    }
+
+    // Order status filter (All Orders tab only)
+    if (activeTab === 'All Orders' && filters.statusFilter && filters.statusFilter.length > 0) {
+        filtered = filtered.filter(order =>
+            filters.statusFilter!.includes(order.customStatus as CustomStatus)
         );
     }
 

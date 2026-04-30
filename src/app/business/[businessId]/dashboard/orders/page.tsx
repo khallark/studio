@@ -338,6 +338,7 @@ export default function BusinessOrdersPage() {
     const [packedFilter, setPackedFilter] = useState<'all' | 'packed' | 'unpacked'>('all');
     const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'cod'>('all');
     const [stateFilter, setStateFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<CustomStatus[]>([]);
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -383,6 +384,7 @@ export default function BusinessOrdersPage() {
             availabilityFilter,
             rtoInTransitFilter,
             storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
+            statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
             stateFilter: stateFilter === 'all' ? undefined : stateFilter,
             packedFilter,
             paymentTypeFilter,
@@ -402,6 +404,7 @@ export default function BusinessOrdersPage() {
             availabilityFilter,
             rtoInTransitFilter,
             storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
+            statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
             stateFilter: stateFilter === 'all' ? undefined : stateFilter,
             packedFilter,
             paymentTypeFilter,
@@ -809,6 +812,7 @@ export default function BusinessOrdersPage() {
         setIsSelectAllPages(false);
         setShouldFetchAllIds(false);
         setPackedFilter('all');
+        setStatusFilter([]);
     }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
 
     useEffect(() => {
@@ -1065,6 +1069,7 @@ export default function BusinessOrdersPage() {
         packedFilter !== 'all',
         paymentTypeFilter !== 'all',
         stateFilter !== 'all',
+        statusFilter.length > 0,
     ].filter(Boolean).length;
 
     // ============================================================
@@ -1239,6 +1244,43 @@ export default function BusinessOrdersPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
+
+                                        {/* Order Status Filter */}
+                                        {activeTab === 'All Orders' && (
+                                            <div className="space-y-3">
+                                                <Label className="text-sm font-medium">Order Status</Label>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setStatusFilter([])}
+                                                        className="flex-1"
+                                                    >
+                                                        Clear
+                                                    </Button>
+                                                </div>
+                                                <div className="max-h-52 overflow-y-auto space-y-2 border rounded-lg p-2">
+                                                    {STATUS_TABS.filter(t => t.value !== 'All Orders').map(tab => (
+                                                        <div key={tab.value} className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`status-${tab.value}`}
+                                                                checked={statusFilter.includes(tab.value as CustomStatus)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setStatusFilter(prev => [...prev, tab.value as CustomStatus]);
+                                                                    } else {
+                                                                        setStatusFilter(prev => prev.filter(s => s !== tab.value));
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Label htmlFor={`status-${tab.value}`} className="text-sm font-normal cursor-pointer">
+                                                                {tab.label}
+                                                            </Label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* State Filter */}
                                         <div className="space-y-3">
@@ -1515,7 +1557,7 @@ export default function BusinessOrdersPage() {
                                                 {isDownloadingSlips && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                                 Download Slips
                                             </DropdownMenuItem>
-                                        )}
+                                            )}
                                         {['Dispatched', 'Ready To Dispatch'].includes(activeTab) && (
                                             <DropdownMenuItem
                                                 onClick={handleDownloadManifest}

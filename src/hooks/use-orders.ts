@@ -526,6 +526,13 @@ export function useOrders(
                 });
             }
 
+            // Order status filter (All Orders tab only)
+            if (activeTab === 'All Orders' && filters.statusFilter && filters.statusFilter.length > 0) {
+                filteredOrders = filteredOrders.filter(order =>
+                    filters.statusFilter!.includes(order.customStatus as CustomStatus)
+                );
+            }
+
             // ============================================================
             // CLIENT-SIDE PAGINATION
             // ============================================================

@@ -136,6 +136,7 @@ export interface UseOrdersFilters {
     from: Date;
     to?: Date;
   };
+  statusFilter?: CustomStatus[];
   packedFilter?: 'all' | 'packed' | 'unpacked';
   courierFilter?: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
   availabilityFilter?: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';

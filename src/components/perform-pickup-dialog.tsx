@@ -32,6 +32,7 @@ interface SubItem {
   variantId: string;
   assignedUpc: {
     id: string;
+    productId: string;
     rackId: string;
     shelfId: string;
   } | null;
@@ -146,6 +147,7 @@ export function PerformPickupDialog({
 
           const assignedUpcs: {
               id: string;
+              productId: string;
               rackId: string;
               shelfId: string;
             }[] = [];
@@ -158,6 +160,7 @@ export function PerformPickupDialog({
 
             assignedUpcs.push({
               id: upc.id,
+              productId: upc.data().productId,
               rackId: rackDoc.data()?.name,
               shelfId: shelfDoc.data()?.name,
             })
@@ -323,7 +326,10 @@ export function PerformPickupDialog({
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">
-                                SKU: {subItem.itemSku}
+                                Store Product SKU: {subItem.itemSku}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Business Product SKU: {subItem.assignedUpc?.productId}
                               </p>
                             </div>
                           </div>

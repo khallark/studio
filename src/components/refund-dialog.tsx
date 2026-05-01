@@ -291,6 +291,16 @@ export function RefundDialog({
 
         <ScrollArea className="flex-1 overflow-y-auto pr-4 -mr-4">
           <div className="space-y-6 py-4">
+            {/* Return Reason */}
+            {order.booked_return_reason && (
+              <div className="space-y-2">
+                <h4 className="font-semibold">Return Reason</h4>
+                <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                  {order.booked_return_reason}
+                </p>
+              </div>
+            )}
+
             {/* Customer Images and QC Video Section */}
             {hasMedia && (
               <>

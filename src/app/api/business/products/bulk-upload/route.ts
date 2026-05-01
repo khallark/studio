@@ -176,11 +176,6 @@ function validateRow(
         if (isNaN(taxRate) || !VALID_TAX_RATES.includes(taxRate)) {
             return { valid: false, error: `Row ${rowIndex}: Tax Rate must be one of: ${VALID_TAX_RATES.join(', ')}` };
         }
-
-        // Category
-        if (categoryRaw && !VALID_CATEGORIES.includes(categoryRaw)) {
-            return { valid: false, error: `Row ${rowIndex}: Category must be one of: ${VALID_CATEGORIES.join(', ')}` };
-        }
     }
 
     // ── Shared validations (both modes, if field is present) ─────────────────
@@ -228,9 +223,6 @@ function validateRow(
     // Category
     if (row['Category'] !== undefined && row['Category'] !== null && row['Category'] !== '') {
         const cat = row['Category'].toString().trim();
-        if (!VALID_CATEGORIES.includes(cat)) {
-            return { valid: false, error: `Row ${rowIndex}: Category must be one of: ${VALID_CATEGORIES.join(', ')}` };
-        }
     }
 
     // Product Name length (update mode)

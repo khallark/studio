@@ -12,13 +12,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -55,12 +48,10 @@ import {
     SheetFooter,
     SheetClose,
 } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
 import {
     Download,
     MoreHorizontal,
     Loader2,
-    ScanBarcode,
     Clock,
     X,
     Store,
@@ -73,7 +64,6 @@ import {
     ChevronRight,
     Package,
     MoreVertical,
-    Check,
     CalendarDays,
     Truck,
     BoxIcon,
@@ -160,6 +150,34 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
     { value: 'Cancellation Requested', label: 'Cancellation Requested', shortLabel: 'Cancel-R' },
     { value: 'Cancelled', label: 'Cancelled', shortLabel: 'Cancel' },
 ];
+
+type TabFilterState = {
+    searchQuery: string;
+    invertSearch: boolean;
+    dateRange: { from?: Date; to?: Date } | undefined;
+    courierFilter: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
+    availabilityFilter: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
+    rtoInTransitFilter: 'all' | 're-attempt' | 'refused' | 'no-reply';
+    packedFilter: 'all' | 'packed' | 'unpacked';
+    paymentTypeFilter: 'all' | 'prepaid' | 'cod';
+    stateFilter: string;
+    statusFilter: CustomStatus[];
+    selectedStores: string[];
+};
+
+const getDefaultTabFilters = (): TabFilterState => ({
+        searchQuery: '',
+        invertSearch: false,
+        dateRange: undefined,
+        courierFilter: 'all',
+        availabilityFilter: 'all',
+        rtoInTransitFilter: 'all',
+        packedFilter: 'all',
+        paymentTypeFilter: 'all',
+        stateFilter: 'all',
+        statusFilter: [],
+        selectedStores: [],
+    });
 
 // ============================================================
 // MOBILE ORDER CARD COMPONENT
@@ -323,21 +341,31 @@ export default function BusinessOrdersPage() {
     const [selectedOrdersDataMap, setSelectedOrdersDataMap] = useState<Record<string, Order>>({});
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-    const [selectedStores, setSelectedStores] = useState<string[]>([]);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
     // Filter state
-    const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
-    const [invertSearch, setInvertSearch] = useState(false);
-    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
-    const [courierFilter, setCourierFilter] = useState<'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees'>('all');
-    const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending'>('all');
-    const [rtoInTransitFilter, setRtoInTransitFilter] = useState<'all' | 're-attempt' | 'refused' | 'no-reply'>('all');
-    const [packedFilter, setPackedFilter] = useState<'all' | 'packed' | 'unpacked'>('all');
-    const [paymentTypeFilter, setPaymentTypeFilter] = useState<'all' | 'prepaid' | 'cod'>('all');
-    const [stateFilter, setStateFilter] = useState<string>('all');
-    const [statusFilter, setStatusFilter] = useState<CustomStatus[]>([]);
+    const [filtersByTab, setFiltersByTab] = useState<
+        Record<CustomStatus | 'All Orders', TabFilterState>
+    >(() => {
+        return STATUS_TABS.reduce((acc, tab) => {
+            acc[tab.value] = getDefaultTabFilters();
+            return acc;
+        }, {} as Record<CustomStatus | 'All Orders', TabFilterState>);
+    });
+
+    const currentFilters = filtersByTab[activeTab];
+
+    const [debouncedSearchQuery] = useDebounce(currentFilters.searchQuery, 400);
+
+    const updateCurrentTabFilters = (updates: Partial<TabFilterState>) => {
+        setFiltersByTab(prev => ({
+            ...prev,
+            [activeTab]: {
+                ...prev[activeTab],
+                ...updates,
+            },
+        }));
+    };
 
     // Dialog state
     const [isAwbDialogOpen, setIsAwbDialogOpen] = useState(false);
@@ -377,16 +405,18 @@ export default function BusinessOrdersPage() {
         rowsPerPage,
         {
             searchQuery: debouncedSearchQuery,
-            invertSearch,
-            dateRange: dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined,
-            courierFilter: courierFilter === 'all' ? undefined : courierFilter,
-            availabilityFilter,
-            rtoInTransitFilter,
-            storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
-            statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
-            stateFilter: stateFilter === 'all' ? undefined : stateFilter,
-            packedFilter,
-            paymentTypeFilter,
+            invertSearch: currentFilters.invertSearch,
+            dateRange: currentFilters.dateRange?.from
+                ? { from: currentFilters.dateRange.from, to: currentFilters.dateRange.to }
+                : undefined,
+            courierFilter: currentFilters.courierFilter === 'all' ? undefined : currentFilters.courierFilter,
+            availabilityFilter: currentFilters.availabilityFilter,
+            rtoInTransitFilter: currentFilters.rtoInTransitFilter,
+            storeFilter: currentFilters.selectedStores.length > 0 ? currentFilters.selectedStores : undefined,
+            statusFilter: currentFilters.statusFilter.length > 0 ? currentFilters.statusFilter : undefined,
+            stateFilter: currentFilters.stateFilter === 'all' ? undefined : currentFilters.stateFilter,
+            packedFilter: currentFilters.packedFilter,
+            paymentTypeFilter: currentFilters.paymentTypeFilter,
         },
         pageCursors[currentPage]
     );
@@ -791,28 +821,21 @@ export default function BusinessOrdersPage() {
     useEffect(() => {
         setCurrentPage(1);
         setPageCursors({ 1: undefined });
-        setSelectedOrders([]);
-        setSelectedOrdersMap({});
-        setSelectedOrdersDataMap({});
+        clearAllSelections();
     }, [
         activeTab,
-        dateRange,
-        courierFilter,
-        availabilityFilter,
-        rtoInTransitFilter,
-        selectedStores,
         debouncedSearchQuery,
-        invertSearch,
-        stateFilter,
-        packedFilter,
-        paymentTypeFilter,
-        statusFilter,
+        currentFilters.invertSearch,
+        currentFilters.dateRange,
+        currentFilters.courierFilter,
+        currentFilters.availabilityFilter,
+        currentFilters.rtoInTransitFilter,
+        currentFilters.selectedStores,
+        currentFilters.stateFilter,
+        currentFilters.packedFilter,
+        currentFilters.paymentTypeFilter,
+        currentFilters.statusFilter,
     ]);
-
-    useEffect(() => {
-        setPackedFilter('all');
-        setStatusFilter([]);
-    }, [activeTab]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -1094,16 +1117,16 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const activeFiltersCount = [
-        selectedStores.length > 0,
-        dateRange?.from,
-        courierFilter !== 'all',
-        availabilityFilter !== 'all',
-        rtoInTransitFilter !== 'all',
-        invertSearch,
-        packedFilter !== 'all',
-        paymentTypeFilter !== 'all',
-        stateFilter !== 'all',
-        statusFilter.length > 0,
+        currentFilters.selectedStores.length > 0,
+        currentFilters.dateRange?.from,
+        currentFilters.courierFilter !== 'all',
+        currentFilters.availabilityFilter !== 'all',
+        currentFilters.rtoInTransitFilter !== 'all',
+        currentFilters.invertSearch,
+        currentFilters.packedFilter !== 'all',
+        currentFilters.paymentTypeFilter !== 'all',
+        currentFilters.stateFilter !== 'all',
+        currentFilters.statusFilter.length > 0,
     ].filter(Boolean).length;
 
     // ============================================================
@@ -1161,8 +1184,8 @@ export default function BusinessOrdersPage() {
                             <div className="min-w-0">
                                 <h1 className="text-lg md:text-xl font-bold truncate">Orders</h1>
                                 <p className="text-xs text-muted-foreground hidden sm:block">
-                                    {selectedStores.length > 0
-                                        ? `${selectedStores.length} of ${stores.length} stores`
+                                    {currentFilters.selectedStores.length > 0
+                                        ? `${currentFilters.selectedStores.length} of ${stores.length} stores`
                                         : `All ${stores.length} stores`}
                                 </p>
                             </div>
@@ -1226,16 +1249,16 @@ export default function BusinessOrdersPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search orders..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={currentFilters.searchQuery}
+                                    onChange={(e) => updateCurrentTabFilters({ searchQuery: e.target.value })}
                                     className="pl-9 h-9 text-sm"
                                 />
-                                {searchQuery && (
+                                {currentFilters.searchQuery && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                                        onClick={() => setSearchQuery('')}
+                                        onClick={() => updateCurrentTabFilters({ searchQuery: '' })}
                                     >
                                         <X className="h-3 w-3" />
                                     </Button>
@@ -1267,7 +1290,10 @@ export default function BusinessOrdersPage() {
                                         {/* Payment Filter */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">Payment Type</Label>
-                                            <Select value={paymentTypeFilter} onValueChange={(v) => setPaymentTypeFilter(v as any)}>
+                                            <Select
+                                                value={currentFilters.paymentTypeFilter}
+                                                onValueChange={(v) => updateCurrentTabFilters({ paymentTypeFilter: v as TabFilterState['paymentTypeFilter'] })}
+                                            >
                                                 <SelectTrigger>
                                                     <SelectValue />
                                                 </SelectTrigger>
@@ -1287,7 +1313,7 @@ export default function BusinessOrdersPage() {
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => setStatusFilter([])}
+                                                        onClick={() => updateCurrentTabFilters({ statusFilter: [] })}
                                                         className="flex-1"
                                                     >
                                                         Clear
@@ -1298,13 +1324,13 @@ export default function BusinessOrdersPage() {
                                                         <div key={tab.value} className="flex items-center space-x-2">
                                                             <Checkbox
                                                                 id={`status-${tab.value}`}
-                                                                checked={statusFilter.includes(tab.value as CustomStatus)}
+                                                                checked={currentFilters.statusFilter.includes(tab.value as CustomStatus)}
                                                                 onCheckedChange={(checked) => {
-                                                                    if (checked) {
-                                                                        setStatusFilter(prev => [...prev, tab.value as CustomStatus]);
-                                                                    } else {
-                                                                        setStatusFilter(prev => prev.filter(s => s !== tab.value));
-                                                                    }
+                                                                    updateCurrentTabFilters({
+                                                                        statusFilter: checked
+                                                                            ? [...currentFilters.statusFilter, tab.value as CustomStatus]
+                                                                            : currentFilters.statusFilter.filter(s => s !== tab.value),
+                                                                    });
                                                                 }}
                                                             />
                                                             <Label htmlFor={`status-${tab.value}`} className="text-sm font-normal cursor-pointer">
@@ -1319,10 +1345,15 @@ export default function BusinessOrdersPage() {
                                         {/* State Filter */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">State</Label>
-                                            <Select value={stateFilter} onValueChange={setStateFilter}>
+
+                                            <Select
+                                                value={currentFilters.stateFilter}
+                                                onValueChange={(value) => updateCurrentTabFilters({ stateFilter: value })}
+                                            >
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="All States" />
                                                 </SelectTrigger>
+
                                                 <SelectContent>
                                                     <SelectItem value="all">All States</SelectItem>
                                                     {availableProvinces.map((province) => (
@@ -1332,11 +1363,12 @@ export default function BusinessOrdersPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {stateFilter !== 'all' && (
+
+                                            {currentFilters.stateFilter !== 'all' && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => setStateFilter('all')}
+                                                    onClick={() => updateCurrentTabFilters({ stateFilter: 'all' })}
                                                     className="w-full"
                                                 >
                                                     Clear State Filter
@@ -1351,7 +1383,7 @@ export default function BusinessOrdersPage() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => setSelectedStores([])}
+                                                    onClick={() => updateCurrentTabFilters({ selectedStores: [] })}
                                                     className="flex-1"
                                                 >
                                                     Clear
@@ -1359,7 +1391,7 @@ export default function BusinessOrdersPage() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => setSelectedStores(stores)}
+                                                    onClick={() => updateCurrentTabFilters({ selectedStores: stores })}
                                                     className="flex-1"
                                                 >
                                                     Select All
@@ -1370,13 +1402,13 @@ export default function BusinessOrdersPage() {
                                                     <div key={storeId} className="flex items-center space-x-2">
                                                         <Checkbox
                                                             id={`store-${storeId}`}
-                                                            checked={selectedStores.includes(storeId)}
+                                                            checked={currentFilters.selectedStores.includes(storeId)}
                                                             onCheckedChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedStores(prev => [...prev, storeId]);
-                                                                } else {
-                                                                    setSelectedStores(prev => prev.filter(s => s !== storeId));
-                                                                }
+                                                                updateCurrentTabFilters({
+                                                                    selectedStores: checked
+                                                                        ? [...currentFilters.selectedStores, storeId]
+                                                                        : currentFilters.selectedStores.filter(s => s !== storeId),
+                                                                });
                                                             }}
                                                         />
                                                         <Label htmlFor={`store-${storeId}`} className="text-sm font-normal cursor-pointer truncate">
@@ -1394,26 +1426,36 @@ export default function BusinessOrdersPage() {
                                                 <input
                                                     type="date"
                                                     className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                                    value={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''}
+                                                    value={currentFilters.dateRange?.from ? format(currentFilters.dateRange.from, 'yyyy-MM-dd') : ''}
                                                     onChange={(e) => {
                                                         const from = e.target.value ? new Date(e.target.value) : undefined;
-                                                        setDateRange(from ? { from, to: dateRange?.to } : undefined);
+
+                                                        updateCurrentTabFilters({
+                                                            dateRange: from
+                                                                ? { from, to: currentFilters.dateRange?.to }
+                                                                : undefined,
+                                                        });
                                                     }}
                                                 />
                                                 <span className="text-muted-foreground text-xs shrink-0">to</span>
                                                 <input
                                                     type="date"
                                                     className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                                    value={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}
-                                                    min={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined}
+                                                    value={currentFilters.dateRange?.to ? format(currentFilters.dateRange.to, 'yyyy-MM-dd') : ''}
+                                                    min={currentFilters.dateRange?.from ? format(currentFilters.dateRange.from, 'yyyy-MM-dd') : undefined}
                                                     onChange={(e) => {
                                                         const to = e.target.value ? new Date(e.target.value) : undefined;
-                                                        setDateRange(dateRange?.from ? { from: dateRange.from, to } : undefined);
+
+                                                        updateCurrentTabFilters({
+                                                            dateRange: currentFilters.dateRange?.from
+                                                                ? { from: currentFilters.dateRange.from, to }
+                                                                : undefined,
+                                                        });
                                                     }}
                                                 />
                                             </div>
-                                            {dateRange && (
-                                                <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} className="w-full">
+                                            {currentFilters.dateRange && (
+                                                <Button variant="ghost" size="sm" onClick={() => updateCurrentTabFilters({ dateRange: undefined })} className="w-full">
                                                     Clear Date Range
                                                 </Button>
                                             )}
@@ -1423,7 +1465,7 @@ export default function BusinessOrdersPage() {
                                         {!['New', 'Confirmed', 'Cancelled'].includes(activeTab) && (
                                             <div className="space-y-3">
                                                 <Label className="text-sm font-medium">Courier</Label>
-                                                <Select value={courierFilter} onValueChange={(v) => setCourierFilter(v as any)}>
+                                                <Select value={currentFilters.courierFilter} onValueChange={(v) => updateCurrentTabFilters({ courierFilter: v as TabFilterState['courierFilter'] })}>
                                                     <SelectTrigger>
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -1442,7 +1484,7 @@ export default function BusinessOrdersPage() {
                                         {activeTab === 'Ready To Dispatch' && (
                                             <div className="space-y-3">
                                                 <Label className="text-sm font-medium">Packed Status</Label>
-                                                <Select value={packedFilter} onValueChange={(v) => setPackedFilter(v as any)}>
+                                                <Select value={currentFilters.packedFilter} onValueChange={(v) => updateCurrentTabFilters({ packedFilter: v as TabFilterState['packedFilter'] })}>
                                                     <SelectTrigger>
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -1459,7 +1501,7 @@ export default function BusinessOrdersPage() {
                                         {activeTab === 'Confirmed' && (
                                             <div className="space-y-3">
                                                 <Label className="text-sm font-medium">Availability</Label>
-                                                <Select value={availabilityFilter} onValueChange={(v) => setAvailabilityFilter(v as any)}>
+                                                <Select value={currentFilters.availabilityFilter} onValueChange={(v) => updateCurrentTabFilters({ availabilityFilter: v as TabFilterState['availabilityFilter'] })}>
                                                     <SelectTrigger>
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -1478,7 +1520,7 @@ export default function BusinessOrdersPage() {
                                         {activeTab === 'RTO In Transit' && (
                                             <div className="space-y-3">
                                                 <Label className="text-sm font-medium">RTO Status</Label>
-                                                <Select value={rtoInTransitFilter} onValueChange={(v) => setRtoInTransitFilter(v as any)}>
+                                                <Select value={currentFilters.rtoInTransitFilter} onValueChange={(v) => updateCurrentTabFilters({ rtoInTransitFilter: v as TabFilterState['rtoInTransitFilter'] })}>
                                                     <SelectTrigger>
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -1495,7 +1537,7 @@ export default function BusinessOrdersPage() {
                                         {/* Invert Search */}
                                         <div className="flex items-center justify-between">
                                             <Label className="text-sm font-medium">Invert Search</Label>
-                                            <Switch checked={invertSearch} onCheckedChange={setInvertSearch} />
+                                            <Switch checked={currentFilters.invertSearch} onCheckedChange={(checked) => updateCurrentTabFilters({ invertSearch: checked })} />
                                         </div>
                                     </div>
 
@@ -1736,7 +1778,7 @@ export default function BusinessOrdersPage() {
                             <Package className="h-16 w-16 text-muted-foreground/30 mb-4" />
                             <h3 className="text-lg font-medium mb-1">No orders found</h3>
                             <p className="text-sm text-muted-foreground text-center">
-                                {searchQuery ? 'Try adjusting your search or filters' : `No ${activeTab.toLowerCase()} orders yet`}
+                                {currentFilters.searchQuery ? 'Try adjusting your search or filters' : `No ${activeTab.toLowerCase()} orders yet`}
                             </p>
                         </div>
                     ) : (

@@ -1255,15 +1255,15 @@ export default function BusinessOrdersPage() {
                                         )}
                                     </Button>
                                 </SheetTrigger>
-                                <SheetContent side="right" className="w-full sm:max-w-md">
-                                    <SheetHeader>
+                                <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+                                    <SheetHeader className="shrink-0 px-6 pt-6 pb-4">
                                         <SheetTitle>Filters</SheetTitle>
                                         <SheetDescription>
                                             Narrow down your orders
                                         </SheetDescription>
                                     </SheetHeader>
 
-                                    <div className="py-6 space-y-6">
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                                         {/* Payment Filter */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">Payment Type</Label>
@@ -1499,7 +1499,7 @@ export default function BusinessOrdersPage() {
                                         </div>
                                     </div>
 
-                                    <SheetFooter>
+                                    <SheetFooter className="shrink-0 border-t px-6 py-4">
                                         <SheetClose asChild>
                                             <Button className="w-full">Apply Filters</Button>
                                         </SheetClose>

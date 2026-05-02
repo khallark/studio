@@ -2,14 +2,27 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { collection, query, where, orderBy, limit, getDocs, and, doc, getDoc } from 'firebase/firestore';
+import {
+    collection,
+    query,
+    where,
+    orderBy,
+    limit,
+    getDocs,
+    doc,
+    getDoc,
+    startAfter,
+    QueryConstraint,
+    DocumentData,
+    QueryDocumentSnapshot,
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
 import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
-// HOOK - Now business-wide, not store-specific
+// HOOK - Business-wide cursor pagination
 // ============================================================
 
 /**
@@ -20,25 +33,80 @@ function shouldSkipOrder(order: Order): boolean {
     return !!order?.raw?.cancelled_at;
 }
 
+type StoreCursorMap = Record<string, QueryDocumentSnapshot<DocumentData> | null>;
+
+type OrderWithDocSnap = Order & {
+    __docSnap: QueryDocumentSnapshot<DocumentData>;
+};
+
+type StoreQueryResult = {
+    storeId: string;
+    orders: OrderWithDocSnap[];
+    lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+    hasMore: boolean;
+};
+
+function toMillis(value: unknown): number {
+    if (!value) return 0;
+
+    if (typeof value === 'string') {
+        const time = new Date(value).getTime();
+        return Number.isNaN(time) ? 0 : time;
+    }
+
+    if (typeof value === 'number') return value;
+
+    if (value instanceof Date) return value.getTime();
+
+    if (
+        typeof value === 'object' &&
+        value !== null &&
+        'toDate' in value &&
+        typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+        return (value as { toDate: () => Date }).toDate().getTime();
+    }
+
+    return 0;
+}
+
 export function useOrders(
     businessId: string | null,
-    stores: string[], // All stores in the business
+    stores: string[],
     vendorName: string | null,
     activeTab: CustomStatus | 'All Orders',
     currentPage: number,
     rowsPerPage: number,
-    filters: UseOrdersFilters = {}
+    filters: UseOrdersFilters = {},
+    pageCursor?: StoreCursorMap
 ) {
     return useQuery({
         // Query key - cache is based on these parameters
-        queryKey: ['orders', businessId, stores, activeTab, currentPage, rowsPerPage, filters],
+        // Do not put QueryDocumentSnapshot objects in the key; currentPage represents the cursor state.
+        queryKey: [
+            'orders',
+            businessId,
+            stores,
+            activeTab,
+            currentPage,
+            rowsPerPage,
+            filters,
+            Object.keys(pageCursor || {}).join('|'),
+        ],
 
         // Query function - fetches and processes data from multiple stores
         queryFn: async () => {
             if (!businessId) throw new Error('No business ID provided');
+
             if (!stores || stores.length === 0) {
                 console.warn('No stores available in business');
-                return { orders: [], totalCount: 0, hasMore: false };
+                return {
+                    orders: [],
+                    totalCount: undefined,
+                    hasMore: false,
+                    nextCursor: {},
+                    availableProvinces: [],
+                };
             }
 
             // Determine which stores to query based on filter
@@ -47,7 +115,13 @@ export function useOrders(
                 : stores;
 
             if (storesToQuery.length === 0) {
-                return { orders: [], totalCount: 0, hasMore: false };
+                return {
+                    orders: [],
+                    totalCount: undefined,
+                    hasMore: false,
+                    nextCursor: {},
+                    availableProvinces: [],
+                };
             }
 
             console.log(`📦 Querying ${storesToQuery.length} stores:`, storesToQuery);
@@ -60,88 +134,79 @@ export function useOrders(
             let searchValue = '';
 
             if (filters.searchQuery) {
-                const query = filters.searchQuery.trim();
+                const searchQuery = filters.searchQuery.trim();
 
-                if (/^#[\w-]+$/i.test(query)) {
+                if (/^#[\w-]+$/i.test(searchQuery)) {
                     searchType = 'name';
-                    searchValue = query.toUpperCase();
+                    searchValue = searchQuery.toUpperCase();
                 }
-                else if (/^[A-Z0-9]{10,}$/i.test(query)) {
+                else if (/^[A-Z0-9]{10,}$/i.test(searchQuery)) {
                     searchType = 'awb';
-                    searchValue = query.toUpperCase();
+                    searchValue = searchQuery.toUpperCase();
                 }
                 else {
                     searchType = 'clientSide';
-                    searchValue = query.toLowerCase();
+                    searchValue = searchQuery.toLowerCase();
                 }
             }
 
+            const sortField =
+                activeTab === 'RTO Delivered' || activeTab === 'RTO Closed'
+                    ? 'lastStatusUpdate'
+                    : 'createdAt';
+
             // ============================================================
-            // QUERY EACH STORE AND AGGREGATE RESULTS
+            // QUERY EACH STORE
             // ============================================================
 
-            const allOrders: Order[] = [];
-
-            // Fetch orders from each store in parallel
-            const storeQueries = storesToQuery.map(async (storeId) => {
+            const storeQueries = storesToQuery.map(async (storeId): Promise<StoreQueryResult> => {
                 const ordersRef = collection(db, 'accounts', storeId, 'orders');
+                const constraints: QueryConstraint[] = [];
 
-                let q = query(ordersRef);
-
-                // Track if we need client-side status filtering
                 let needsClientSideStatusFilter = false;
                 const excludedStatuses = ['New', 'DTO Requested', 'Pending Refunds'];
 
-                // ✅ NEW: Filter by vendor for shared store
+                // Filter by vendor for shared stores
                 if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
                     if (vendorName === 'OWR') {
-                        q = query(q, where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
+                        constraints.push(where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
 
-                        // ✅ FIX: Force client-side status filtering for OWR
                         if (activeTab === 'All Orders') {
                             needsClientSideStatusFilter = true;
                         }
-                    }
-                    else {
-                        q = query(q, where('vendors', 'array-contains', vendorName));
+                    } else {
+                        constraints.push(where('vendors', 'array-contains', vendorName));
                     }
                 }
 
-                // Filter by status tab - use customStatus for all tabs
                 const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
+                const hasServerSideSearch = searchType === 'name' || searchType === 'awb';
 
-                // Server-side search
-                const hasSearch = searchType === 'name' || searchType === 'awb';
-
+                // Filter by status tab - use customStatus for all tabs
                 if (activeTab === 'All Orders') {
                     if (isSharedStoreNonSuperAdmin) {
-                        // ✅ Only use not-in if there's no search query
-                        // Firestore doesn't allow not-in with other where clauses on different fields
-                        if (!hasSearch) {
-                            q = query(q, where('customStatus', 'not-in', excludedStatuses));
+                        // Firestore does not allow this not-in combination with some search filters.
+                        if (!hasServerSideSearch) {
+                            constraints.push(where('customStatus', 'not-in', excludedStatuses));
                         } else {
-                            // Will filter on client-side after fetching
                             needsClientSideStatusFilter = true;
                         }
                     }
                 } else {
-                    // For specific status tabs
                     if (isSharedStoreNonSuperAdmin && excludedStatuses.includes(activeTab)) {
-                        // Hide these tabs for non-super-admin users on shared store
-                        q = query(q, where('customStatus', '==', 'some-random-shit'));
+                        // Hide these tabs for non-super-admin users on shared stores.
+                        constraints.push(where('customStatus', '==', 'some-random-shit'));
                     } else {
-                        q = query(q, where('customStatus', '==', activeTab));
+                        constraints.push(where('customStatus', '==', activeTab));
                     }
                 }
 
+                // Server-side search
                 if (searchType === 'name') {
-                    q = query(q, where('name', '==', searchValue));
+                    constraints.push(where('name', '==', searchValue));
                 } else if (searchType === 'awb') {
-                    q = query(
-                        q,
-                        where('awb', '>=', searchValue),
-                        where('awb', '<=', searchValue + '\uf8ff')
-                    );
+                    constraints.push(where('awb', '>=', searchValue));
+                    constraints.push(where('awb', '<=', searchValue + '\uf8ff'));
                 }
 
                 // Date range filter
@@ -150,8 +215,7 @@ export function useOrders(
                         ? addDays(filters.dateRange.to, 1)
                         : addDays(filters.dateRange.from, 1);
 
-                    q = query(
-                        q,
+                    constraints.push(
                         where('createdAt', '>=', filters.dateRange.from.toISOString().slice(0, 19) + 'Z'),
                         where('createdAt', '<', toDate.toISOString().slice(0, 19) + 'Z')
                     );
@@ -163,87 +227,107 @@ export function useOrders(
                     filters.courierFilter &&
                     filters.courierFilter !== 'all'
                 ) {
-                    if (filters.courierFilter === 'Delhivery') {
-                        q = query(q, where('courierProvider', '==', 'Delhivery'));
-                    } else if (filters.courierFilter === 'Shiprocket') {
-                        q = query(q, where('courierProvider', '==', 'Shiprocket'));
-                    } else if (filters.courierFilter === 'Blue Dart') {
-                        q = query(q, where('courierProvider', '==', 'Blue Dart'));
-                    } else if (filters.courierFilter === 'Xpressbees') {
-                        q = query(q, where('courierProvider', '==', 'Xpressbees'));
-                    }
+                    constraints.push(where('courierProvider', '==', filters.courierFilter));
                 }
 
                 if (filters.vendorName) {
-                    q = query(q, where('vendors', 'array-contains', filters.vendorName));
+                    constraints.push(where('vendors', 'array-contains', filters.vendorName));
                 }
 
                 // Sorting - always by time for business-wide view
-                if (activeTab === 'RTO Delivered' || activeTab === "RTO Closed") {
-                    q = query(q, orderBy('lastStatusUpdate', 'desc'));
-                } else {
-                    q = query(q, orderBy('createdAt', 'desc')); // Time-wise sorting
+                constraints.push(orderBy(sortField, 'desc'));
+
+                // Cursor for this store/page
+                if (pageCursor?.[storeId]) {
+                    constraints.push(startAfter(pageCursor[storeId]));
                 }
 
-                const fetchLimit = searchType === 'clientSide'
-                    ? Math.max(rowsPerPage * 6, 100)
-                    : rowsPerPage * 6;
+                // Fetch slightly extra per store so client-side filters and merge sorting still have enough candidates.
+                const hasClientSideFilters =
+                    searchType === 'clientSide' ||
+                    (!!filters.availabilityFilter && filters.availabilityFilter !== 'all') ||
+                    (!!filters.rtoInTransitFilter && filters.rtoInTransitFilter !== 'all') ||
+                    (!!filters.stateFilter && filters.stateFilter !== 'all') ||
+                    (!!filters.packedFilter && filters.packedFilter !== 'all') ||
+                    (!!filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all') ||
+                    (activeTab === 'All Orders' && !!filters.statusFilter?.length);
 
-                q = query(q, limit(fetchLimit));
+                const perStoreFetchLimit = hasClientSideFilters
+                    ? Math.max(rowsPerPage * 2, 50)
+                    : rowsPerPage + 1;
+
+                constraints.push(limit(perStoreFetchLimit));
 
                 try {
-                    const snapshot = await getDocs(q);
-                    let orders = snapshot.docs.map((doc) => ({
-                        ...doc.data(),
-                        id: doc.id,
-                        storeId, // Add store ID to each order
-                    })) as Order[];
+                    const snapshot = await getDocs(query(ordersRef, ...constraints));
 
-                    // ✅ Apply client-side status filter if needed
+                    let orders = snapshot.docs.map((docSnap) => ({
+                        ...docSnap.data(),
+                        id: docSnap.id,
+                        storeId,
+                        __docSnap: docSnap,
+                    })) as OrderWithDocSnap[];
+
                     if (needsClientSideStatusFilter) {
                         orders = orders.filter(order => !excludedStatuses.includes(order.customStatus));
                     }
 
-                    return orders;
+                    return {
+                        storeId,
+                        orders,
+                        lastDoc: snapshot.docs[snapshot.docs.length - 1] ?? null,
+                        hasMore: snapshot.docs.length === perStoreFetchLimit,
+                    };
                 } catch (error: any) {
                     console.error(`Error fetching orders from store ${storeId}:`, error);
 
-                    if (error.message.includes("The query requires an index.")) {
+                    if (error?.message?.includes('The query requires an index.')) {
                         try {
                             await fetch('/api/test', {
-                                method: "POST",
-                                body: JSON.stringify({ str: error.message })
+                                method: 'POST',
+                                body: JSON.stringify({ str: error.message }),
                             });
                         } catch { }
                     }
 
-                    return [];
+                    return {
+                        storeId,
+                        orders: [],
+                        lastDoc: null,
+                        hasMore: false,
+                    };
                 }
             });
 
-            // Wait for all store queries to complete
             const storeResults = await Promise.all(storeQueries);
 
-            // Flatten results from all stores
-            storeResults.forEach(storeOrders => {
-                allOrders.push(...storeOrders);
-            });
+            // ============================================================
+            // MERGE + GLOBAL SORT
+            // ============================================================
 
-            // ============================================================
-            // SORT AGGREGATED RESULTS BY TIME
-            // ============================================================
+            const allOrders = storeResults.flatMap(result => result.orders);
 
             allOrders.sort((a, b) => {
-                const timeA = new Date(a.createdAt || 0).getTime();
-                const timeB = new Date(b.createdAt || 0).getTime();
-                return timeB - timeA; // Newest first
+                const timeA = toMillis(
+                    sortField === 'lastStatusUpdate'
+                        ? (a.lastStatusUpdate || a.createdAt)
+                        : a.createdAt
+                );
+
+                const timeB = toMillis(
+                    sortField === 'lastStatusUpdate'
+                        ? (b.lastStatusUpdate || b.createdAt)
+                        : b.createdAt
+                );
+
+                return timeB - timeA;
             });
 
             // ============================================================
             // CLIENT-SIDE FILTERING
             // ============================================================
 
-            let filteredOrders = allOrders;
+            let filteredOrders: OrderWithDocSnap[] = allOrders;
 
             // Client-side search
             if (searchType === 'clientSide' && searchValue) {
@@ -534,12 +618,22 @@ export function useOrders(
             }
 
             // ============================================================
-            // CLIENT-SIDE PAGINATION
+            // CURSOR PAGINATION
             // ============================================================
 
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const endIndex = startIndex + rowsPerPage;
-            const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+            const pageOrders = filteredOrders.slice(0, rowsPerPage);
+            const nextCursor: StoreCursorMap = {};
+
+            for (const result of storeResults) {
+                const lastReturnedOrderFromThisStore = [...pageOrders]
+                    .reverse()
+                    .find(order => order.storeId === result.storeId);
+
+                nextCursor[result.storeId] =
+                    lastReturnedOrderFromThisStore?.__docSnap ||
+                    pageCursor?.[result.storeId] ||
+                    null;
+            }
 
             const availableProvinces = Array.from(
                 new Set(
@@ -555,9 +649,10 @@ export function useOrders(
             ).sort();
 
             return {
-                orders: paginatedOrders,
-                totalCount: filteredOrders.length,
-                hasMore: allOrders.length >= (rowsPerPage * storesToQuery.length), // Rough estimate
+                orders: pageOrders.map(({ __docSnap, ...order }) => order),
+                totalCount: undefined,
+                hasMore: storeResults.some(result => result.hasMore) || filteredOrders.length > rowsPerPage,
+                nextCursor,
                 availableProvinces,
             };
         },

@@ -123,7 +123,6 @@ import {
     useUpdateShippedStatuses,
     useDownloadManifest,
 } from '@/hooks/use-order-mutations';
-import { useAllOrderIds } from '@/hooks/use-all-order-ids';
 import { Order, CustomStatus } from '@/types/order';
 import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
@@ -318,10 +317,10 @@ export default function BusinessOrdersPage() {
     });
 
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageCursors, setPageCursors] = useState<Record<number, any>>({ 1: undefined });
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
     const [selectedOrdersMap, setSelectedOrdersMap] = useState<Record<string, string>>({});
-    const [isSelectAllPages, setIsSelectAllPages] = useState(false);
-    const [shouldFetchAllIds, setShouldFetchAllIds] = useState(false);
+    const [selectedOrdersDataMap, setSelectedOrdersDataMap] = useState<Record<string, Order>>({});
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [selectedStores, setSelectedStores] = useState<string[]>([]);
@@ -388,32 +387,11 @@ export default function BusinessOrdersPage() {
             stateFilter: stateFilter === 'all' ? undefined : stateFilter,
             packedFilter,
             paymentTypeFilter,
-        }
-    );
-
-    const { data: allOrderIds, isFetching: isFetchingAllIds } = useAllOrderIds(
-        businessId,
-        stores,
-        vendorName,
-        activeTab,
-        {
-            searchQuery: debouncedSearchQuery,
-            invertSearch,
-            dateRange: dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined,
-            courierFilter: courierFilter === 'all' ? undefined : courierFilter,
-            availabilityFilter,
-            rtoInTransitFilter,
-            storeFilter: selectedStores.length > 0 ? selectedStores : undefined,
-            statusFilter: statusFilter.length > 0 ? statusFilter : undefined,
-            stateFilter: stateFilter === 'all' ? undefined : stateFilter,
-            packedFilter,
-            paymentTypeFilter,
         },
-        shouldFetchAllIds  // only fetches when user clicks "Select all N"
+        pageCursors[currentPage]
     );
 
     const orders = ordersData?.orders || [];
-    const totalFilteredCount = ordersData?.totalCount || 0;
     const availableProvinces = ordersData?.availableProvinces || [];
 
     const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
@@ -528,13 +506,18 @@ export default function BusinessOrdersPage() {
         }
 
         if (status === 'DTO Requested') {
-            const ordersToReturn = orders.filter(o => selectedOrders.includes(o.id));
             const ordersByStore = new Map<string, string[]>();
-            ordersToReturn.forEach(order => {
-                if (!ordersByStore.has(order.storeId)) {
-                    ordersByStore.set(order.storeId, []);
+
+            selectedOrders.forEach(orderId => {
+                const storeId = selectedOrdersMap[orderId];
+
+                if (storeId) {
+                    if (!ordersByStore.has(storeId)) {
+                        ordersByStore.set(storeId, []);
+                    }
+
+                    ordersByStore.get(storeId)!.push(orderId);
                 }
-                ordersByStore.get(order.storeId)!.push(order.id);
             });
 
             let completedStores = 0;
@@ -545,11 +528,12 @@ export default function BusinessOrdersPage() {
                     onSuccess: () => {
                         completedStores++;
                         if (completedStores === totalStores) {
-                            clearAllSelections()
+                            clearAllSelections();
                         }
                     }
                 });
             });
+
             return;
         }
 
@@ -689,8 +673,18 @@ export default function BusinessOrdersPage() {
     };
 
     const handleAssignAwbClick = () => {
-        const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
-        if (ordersToProcess.length === 0) return;
+        const ordersToProcess = selectedOrders
+            .map(orderId => selectedOrdersDataMap[orderId])
+            .filter((order): order is Order => Boolean(order));
+
+        if (ordersToProcess.length === 0) {
+            toast({
+                title: 'No Orders Found',
+                description: 'Selected order details are not available. Please reselect the orders.',
+                variant: 'destructive',
+            });
+            return;
+        }
 
         if (ordersToProcess.length > unusedAwbsCount) {
             setIsLowAwbAlertOpen(true);
@@ -717,16 +711,27 @@ export default function BusinessOrdersPage() {
                 foundOrders.forEach(o => { next[o.id] = o.storeId; });
                 return next;
             });
+            setSelectedOrdersDataMap(prev => {
+                const next = { ...prev };
+                foundOrders.forEach(o => {
+                    next[o.id] = o;
+                });
+                return next;
+            });
         }
     };
 
     const validateSingleStore = (orderIds: string[]) => {
-        const selectedOrdersList = orders.filter(o => orderIds.includes(o.id));
-        const storeIds = new Set(selectedOrdersList.map(o => o.storeId));
+        const storeIds = new Set(
+            orderIds
+                .map(orderId => selectedOrdersMap[orderId])
+                .filter(Boolean)
+        );
+
         return {
             valid: storeIds.size === 1,
             storeId: storeIds.size === 1 ? Array.from(storeIds)[0] : null,
-            storeCount: storeIds.size
+            storeCount: storeIds.size,
         };
     };
 
@@ -741,28 +746,6 @@ export default function BusinessOrdersPage() {
             return;
         }
         setIsGeneratePODialogOpen(true);
-    };
-
-    const handleOrderAction = (order: Order, action: string) => {
-        switch (action) {
-            case 'confirm':
-                handleUpdateStatus(order.id, 'Confirmed');
-                break;
-            case 'assign-awb':
-                setSelectedOrders([order.id]);
-                handleAssignAwbClick();
-                break;
-            case 'dispatch':
-                handleDispatch([order.id]);
-                break;
-            case 'revert-confirmed':
-                handleRevertStatus(order.id, 'Confirmed');
-                break;
-            case 'book-return':
-                setOrderForReturn(order);
-                setIsReturnDialogOpen(true);
-                break;
-        }
     };
 
     const handleRTOClose = () => {
@@ -807,16 +790,33 @@ export default function BusinessOrdersPage() {
     // Reset page, selection, and packed filter on any filter/tab change
     useEffect(() => {
         setCurrentPage(1);
+        setPageCursors({ 1: undefined });
         setSelectedOrders([]);
         setSelectedOrdersMap({});
-        setIsSelectAllPages(false);
-        setShouldFetchAllIds(false);
+        setSelectedOrdersDataMap({});
+    }, [
+        activeTab,
+        dateRange,
+        courierFilter,
+        availabilityFilter,
+        rtoInTransitFilter,
+        selectedStores,
+        debouncedSearchQuery,
+        invertSearch,
+        stateFilter,
+        packedFilter,
+        paymentTypeFilter,
+        statusFilter,
+    ]);
+
+    useEffect(() => {
         setPackedFilter('all');
         setStatusFilter([]);
-    }, [activeTab, dateRange, courierFilter, availabilityFilter, rtoInTransitFilter, selectedStores]);
+    }, [activeTab]);
 
     useEffect(() => {
         setCurrentPage(1);
+        setPageCursors({ 1: undefined });
     }, [rowsPerPage]);
 
     useEffect(() => {
@@ -826,32 +826,35 @@ export default function BusinessOrdersPage() {
         if (newTab !== activeTab) setActiveTab(newTab);
     }, [searchParams]);
 
-    useEffect(() => {
-        if (shouldFetchAllIds && allOrderIds && !isFetchingAllIds) {
-            setSelectedOrders(allOrderIds.map(o => o.id));
-            setSelectedOrdersMap(
-                Object.fromEntries(allOrderIds.map(o => [o.id, o.storeId]))
-            );
-            setIsSelectAllPages(true);
-            setShouldFetchAllIds(false);
-        }
-    }, [shouldFetchAllIds, allOrderIds, isFetchingAllIds]);
-
     // ============================================================
     // PAGINATION & SELECTION
     // ============================================================
 
-    const totalPages = Math.ceil(totalFilteredCount / rowsPerPage);
-    const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
-    const handlePreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
+    const hasMore = !!ordersData?.hasMore;
+
+    const handleNextPage = () => {
+        if (!hasMore || !ordersData?.nextCursor) return;
+
+        setPageCursors(prev => ({
+            ...prev,
+            [currentPage + 1]: ordersData.nextCursor,
+        }));
+
+        setCurrentPage(prev => prev + 1);
+    };
+
+    const handlePreviousPage = () => {
+        if (currentPage <= 1) return;
+        setCurrentPage(prev => prev - 1);
+    };
     const handleSetRowsPerPage = (value: string) => {
         setRowsPerPage(Number(value));
         setCurrentPage(1);
+        setPageCursors({ 1: undefined });
         localStorage.setItem('rowsPerPage', value);
     };
 
     const handleSelectOrder = (orderId: string) => {
-        setIsSelectAllPages(false);
         const isCurrentlySelected = selectedOrders.includes(orderId);
         if (isCurrentlySelected) {
             setSelectedOrders(prev => prev.filter(id => id !== orderId));
@@ -860,25 +863,23 @@ export default function BusinessOrdersPage() {
                 delete next[orderId];
                 return next;
             });
+            setSelectedOrdersDataMap(prev => {
+                const next = { ...prev };
+                delete next[orderId];
+                return next;
+            });
         } else {
             const order = orders.find(o => o.id === orderId);
             if (!order) return;
             setSelectedOrders(prev => [...prev, orderId]);
-            setSelectedOrdersMap(prev => ({ ...prev, [orderId]: order.storeId }));
-        }
-    };
-
-    const handleSelectAll = (isChecked: boolean) => {
-        const currentPageIds = orders.map(o => o.id);
-        if (isChecked) {
-            setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
-            setSelectedOrdersMap(prev => {
-                const next = { ...prev };
-                orders.forEach(o => { next[o.id] = o.storeId; });
-                return next;
-            });
-        } else {
-            clearAllSelections();
+            setSelectedOrdersMap(prev => ({
+                ...prev,
+                [orderId]: order.storeId,
+            }));
+            setSelectedOrdersDataMap(prev => ({
+                ...prev,
+                [orderId]: order,
+            }));
         }
     };
 
@@ -886,27 +887,45 @@ export default function BusinessOrdersPage() {
     const handlePageCheckbox = (isChecked: boolean) => {
         const currentPageIds = orders.map(o => o.id);
         if (isChecked) {
-            setSelectedOrders(prev => Array.from(new Set([...prev, ...currentPageIds])));
+            setSelectedOrders(prev =>
+                Array.from(new Set([...prev, ...currentPageIds]))
+            );
             setSelectedOrdersMap(prev => {
                 const next = { ...prev };
-                orders.forEach(o => { next[o.id] = o.storeId; });
+                orders.forEach(o => {
+                    next[o.id] = o.storeId;
+                });
+                return next;
+            });
+            setSelectedOrdersDataMap(prev => {
+                const next = { ...prev };
+                orders.forEach(o => {
+                    next[o.id] = o;
+                });
                 return next;
             });
         } else {
-            setSelectedOrders(prev => prev.filter(id => !currentPageIds.includes(id)));
+            setSelectedOrders(prev =>
+                prev.filter(id => !currentPageIds.includes(id))
+            );
             setSelectedOrdersMap(prev => {
                 const next = { ...prev };
                 currentPageIds.forEach(id => delete next[id]);
                 return next;
             });
-            setIsSelectAllPages(false);
+            setSelectedOrdersDataMap(prev => {
+                const next = { ...prev };
+                currentPageIds.forEach(id => delete next[id]);
+                return next;
+            });
         }
     };
 
     const clearAllSelections = () => {
         setSelectedOrders([]);
         setSelectedOrdersMap({});
-        setIsSelectAllPages(false);
+        setSelectedOrdersDataMap({});
+
     };
 
     const areAllOnPageSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
@@ -983,7 +1002,22 @@ export default function BusinessOrdersPage() {
                 return (
                     <>
                         {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
-                            <DropdownMenuItem onClick={() => { setSelectedOrders([order.id]); handleAssignAwbClick(); }}>Assign AWB</DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setSelectedOrders([order.id]);
+                                    setSelectedOrdersMap({ [order.id]: order.storeId });
+                                    setSelectedOrdersDataMap({ [order.id]: order });
+
+                                    if (1 > unusedAwbsCount) {
+                                        setIsLowAwbAlertOpen(true);
+                                    } else {
+                                        setOrdersForAwb([order]);
+                                        setIsAwbDialogOpen(true);
+                                    }
+                                }}
+                            >
+                                Assign AWB
+                            </DropdownMenuItem>
                         }
                         {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
                             <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
@@ -1511,12 +1545,10 @@ export default function BusinessOrdersPage() {
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     checked={areAllOnPageSelected}
-                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                    onCheckedChange={(checked) => handlePageCheckbox(!!checked)}
                                 />
                                 <span className="text-xs font-medium">
-                                    {isSelectAllPages
-                                        ? `All ${totalFilteredCount} orders selected`
-                                        : `${selectedOrders.length} selected`}
+                                    {`${selectedOrders.length} selected`}
                                 </span>
                                 <Button
                                     variant="ghost"
@@ -1669,17 +1701,12 @@ export default function BusinessOrdersPage() {
                         </div>
 
                         {/* ── Select-all-pages banner ── */}
-                        {areAllOnPageSelected && totalFilteredCount > rowsPerPage && (
+                        {areAllOnPageSelected && hasMore && (
                             <div className="px-3 pb-2 flex items-center gap-2 text-xs border-t pt-2">
-                                {isSelectAllPages ? (
-                                    <span className="text-muted-foreground">
-                                        All <strong>{totalFilteredCount}</strong> orders across all pages are selected.
-                                    </span>
-                                ) : (
-                                    <span className="text-muted-foreground">
-                                        All <strong>{rowsPerPage}</strong> orders on this page are selected.
-                                    </span>
-                                )}
+                                <span className="text-muted-foreground">
+                                    All <strong>{orders.length}</strong> orders on this page are selected.
+                                    More orders may exist on next pages.
+                                </span>
                             </div>
                         )}
                     </div>
@@ -1851,11 +1878,12 @@ export default function BusinessOrdersPage() {
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-xs text-muted-foreground hidden sm:block">
                             {orders.length > 0
-                                ? `${((currentPage - 1) * rowsPerPage) + 1}-${Math.min(currentPage * rowsPerPage, totalFilteredCount)} of ${totalFilteredCount}`
+                                ? `Page ${currentPage} • Showing ${orders.length} order${orders.length === 1 ? '' : 's'}`
                                 : 'No orders'}
                         </p>
+
                         <p className="text-xs text-muted-foreground sm:hidden">
-                            {totalFilteredCount} orders
+                            Page {currentPage}
                         </p>
 
                         <div className="flex items-center gap-2">
@@ -1876,19 +1904,19 @@ export default function BusinessOrdersPage() {
                                     size="icon"
                                     className="h-8 w-8"
                                     onClick={handlePreviousPage}
-                                    disabled={currentPage === 1}
+                                    disabled={currentPage === 1 || isFetching}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
                                 <div className="flex items-center px-2 text-xs font-medium">
-                                    {currentPage}/{totalPages || 1}
+                                    Page {currentPage}
                                 </div>
                                 <Button
                                     variant="outline"
                                     size="icon"
                                     className="h-8 w-8"
                                     onClick={handleNextPage}
-                                    disabled={currentPage >= totalPages}
+                                    disabled={!hasMore || isFetching}
                                 >
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
@@ -1933,14 +1961,19 @@ export default function BusinessOrdersPage() {
                     onClose={() => setIsAwbDialogOpen(false)}
                     orders={ordersForAwb}
                     onConfirm={(courier, pickupName, shippingMode) => {
-                        const ordersToProcess = orders.filter(o => selectedOrders.includes(o.id));
                         processAwbAssignments(
-                            ordersToProcess.map(o => ({ id: o.id, name: o.name, storeId: o.storeId })),
+                            ordersForAwb.map(o => ({
+                                id: o.id,
+                                name: o.name,
+                                storeId: o.storeId,
+                            })),
                             courier,
                             pickupName,
                             shippingMode
                         );
-                        clearAllSelections()
+
+                        clearAllSelections();
+                        setOrdersForAwb([]);
                     }}
                     businessId={businessId}
                 />
@@ -1995,7 +2028,11 @@ export default function BusinessOrdersPage() {
                             setIsGeneratePODialogOpen(false);
                             clearAllSelections()
                         }}
-                        selectedOrders={orders.filter(o => selectedOrders.includes(o.id))}
+                        selectedOrders={
+                            selectedOrders
+                                .map(orderId => selectedOrdersDataMap[orderId])
+                                .filter((order): order is Order => Boolean(order))
+                        }
                         shopId={validation.storeId}
                         user={user}
                         businessId={businessId}

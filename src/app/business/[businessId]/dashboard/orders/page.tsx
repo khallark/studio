@@ -166,18 +166,18 @@ type TabFilterState = {
 };
 
 const getDefaultTabFilters = (): TabFilterState => ({
-        searchQuery: '',
-        invertSearch: false,
-        dateRange: undefined,
-        courierFilter: 'all',
-        availabilityFilter: 'all',
-        rtoInTransitFilter: 'all',
-        packedFilter: 'all',
-        paymentTypeFilter: 'all',
-        stateFilter: 'all',
-        statusFilter: [],
-        selectedStores: [],
-    });
+    searchQuery: '',
+    invertSearch: false,
+    dateRange: undefined,
+    courierFilter: 'all',
+    availabilityFilter: 'all',
+    rtoInTransitFilter: 'all',
+    packedFilter: 'all',
+    paymentTypeFilter: 'all',
+    stateFilter: 'all',
+    statusFilter: [],
+    selectedStores: [],
+});
 
 // ============================================================
 // MOBILE ORDER CARD COMPONENT
@@ -365,6 +365,17 @@ export default function BusinessOrdersPage() {
                 ...updates,
             },
         }));
+    };
+
+    const clearCurrentTabFilters = () => {
+        setFiltersByTab(prev => ({
+            ...prev,
+            [activeTab]: getDefaultTabFilters(),
+        }));
+
+        setCurrentPage(1);
+        setPageCursors({ 1: undefined });
+        clearAllSelections();
     };
 
     // Dialog state
@@ -1117,6 +1128,7 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const activeFiltersCount = [
+        currentFilters.searchQuery.trim().length > 0,
         currentFilters.selectedStores.length > 0,
         currentFilters.dateRange?.from,
         currentFilters.courierFilter !== 'all',
@@ -1542,9 +1554,15 @@ export default function BusinessOrdersPage() {
                                     </div>
 
                                     <SheetFooter className="shrink-0 border-t px-6 py-4">
-                                        <SheetClose asChild>
-                                            <Button className="w-full">Apply Filters</Button>
-                                        </SheetClose>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={clearCurrentTabFilters}
+                                            disabled={activeFiltersCount === 0}
+                                        >
+                                            Clear All Filters
+                                        </Button>
                                     </SheetFooter>
                                 </SheetContent>
                             </Sheet>

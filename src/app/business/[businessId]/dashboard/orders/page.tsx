@@ -1280,8 +1280,8 @@ export default function BusinessOrdersPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="forwardAwb">Forward AWB</SelectItem>
                                         <SelectItem value="orderNumber">Order Number</SelectItem>
+                                        <SelectItem value="forwardAwb">Forward AWB</SelectItem>
                                         <SelectItem value="reverseAwb">Reverse AWB</SelectItem>
                                         <SelectItem value="general">General Search</SelectItem>
                                     </SelectContent>

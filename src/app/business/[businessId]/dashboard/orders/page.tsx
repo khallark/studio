@@ -151,8 +151,11 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
     { value: 'Cancelled', label: 'Cancelled', shortLabel: 'Cancel' },
 ];
 
+type SearchMode = 'forwardAwb' | 'orderNumber' | 'reverseAwb' | 'general';
+
 type TabFilterState = {
     searchQuery: string;
+    searchMode: SearchMode;
     invertSearch: boolean;
     dateRange: { from?: Date; to?: Date } | undefined;
     courierFilter: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
@@ -167,6 +170,7 @@ type TabFilterState = {
 
 const getDefaultTabFilters = (): TabFilterState => ({
     searchQuery: '',
+    searchMode: 'general',
     invertSearch: false,
     dateRange: undefined,
     courierFilter: 'all',
@@ -416,6 +420,7 @@ export default function BusinessOrdersPage() {
         rowsPerPage,
         {
             searchQuery: debouncedSearchQuery,
+            searchMode: currentFilters.searchMode,
             invertSearch: currentFilters.invertSearch,
             dateRange: currentFilters.dateRange?.from
                 ? { from: currentFilters.dateRange.from, to: currentFilters.dateRange.to }
@@ -836,6 +841,7 @@ export default function BusinessOrdersPage() {
     }, [
         activeTab,
         debouncedSearchQuery,
+        currentFilters.searchMode,
         currentFilters.invertSearch,
         currentFilters.dateRange,
         currentFilters.courierFilter,
@@ -1257,24 +1263,56 @@ export default function BusinessOrdersPage() {
 
                         {/* Search & Filters Row */}
                         <div className="flex items-center gap-2">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search orders..."
-                                    value={currentFilters.searchQuery}
-                                    onChange={(e) => updateCurrentTabFilters({ searchQuery: e.target.value })}
-                                    className="pl-9 h-9 text-sm"
-                                />
-                                {currentFilters.searchQuery && (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                                        onClick={() => updateCurrentTabFilters({ searchQuery: '' })}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
-                                )}
+                            <div className="flex w-full flex-col gap-2 sm:flex-1 sm:flex-row sm:items-center">
+                                <Select
+                                    value={currentFilters.searchMode}
+                                    onValueChange={(value) =>
+                                        updateCurrentTabFilters({
+                                            searchMode: value as TabFilterState['searchMode'],
+                                            searchQuery: '',
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger className="h-9 w-full text-xs sm:w-[170px] sm:shrink-0">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="forwardAwb">Forward AWB</SelectItem>
+                                        <SelectItem value="orderNumber">Order Number</SelectItem>
+                                        <SelectItem value="reverseAwb">Reverse AWB</SelectItem>
+                                        <SelectItem value="general">General Search</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                                    <Input
+                                        placeholder={
+                                            currentFilters.searchMode === 'forwardAwb'
+                                                ? 'Search forward AWB...'
+                                                : currentFilters.searchMode === 'orderNumber'
+                                                    ? 'Search order number...'
+                                                    : currentFilters.searchMode === 'reverseAwb'
+                                                        ? 'Search reverse AWB...'
+                                                        : 'Search customer, vendor, status...'
+                                        }
+                                        value={currentFilters.searchQuery}
+                                        onChange={(e) => updateCurrentTabFilters({ searchQuery: e.target.value })}
+                                        className="h-9 pl-9 pr-9 text-sm"
+                                    />
+
+                                    {currentFilters.searchQuery && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                                            onClick={() => updateCurrentTabFilters({ searchQuery: '' })}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Filters Sheet Trigger */}
@@ -1908,7 +1946,7 @@ export default function BusinessOrdersPage() {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-center text-sm">
-                                                        {order.raw?.line_items?.length || 0}
+                                                        {order.raw?.line_items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
                                                     </TableCell>
                                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                                         <DropdownMenu>

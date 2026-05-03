@@ -146,7 +146,14 @@ export interface UseOrdersFilters {
   invertSearch?: boolean;
   stateFilter?: string;
   storeFilter?: string[]; // ✅ NEW: Array of store IDs to filter by
+  searchMode?: OrderSearchMode;
 }
+
+export type OrderSearchMode =
+  | 'forwardAwb'
+  | 'orderNumber'
+  | 'reverseAwb'
+  | 'general';
 
 export type StatusCounts = Record<CustomStatus | 'All Orders', number>;
 

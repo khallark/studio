@@ -130,23 +130,29 @@ export function useOrders(
             // DETERMINE SEARCH TYPE
             // ============================================================
 
-            let searchType: 'none' | 'name' | 'awb' | 'clientSide' = 'none';
+            type InternalSearchType =
+                | 'none'
+                | 'forwardAwb'
+                | 'orderNumber'
+                | 'reverseAwb'
+                | 'general';
+
+            let searchType: InternalSearchType = 'none';
             let searchValue = '';
 
-            if (filters.searchQuery) {
-                const searchQuery = filters.searchQuery.trim();
+            const rawSearchQuery = filters.searchQuery?.trim() || '';
 
-                if (/^#[\w-]+$/i.test(searchQuery)) {
-                    searchType = 'name';
-                    searchValue = searchQuery.toUpperCase();
-                }
-                else if (/^[A-Z0-9]{10,}$/i.test(searchQuery)) {
-                    searchType = 'awb';
-                    searchValue = searchQuery.toUpperCase();
-                }
-                else {
-                    searchType = 'clientSide';
-                    searchValue = searchQuery.toLowerCase();
+            if (rawSearchQuery) {
+                searchType = filters.searchMode || 'general';
+
+                if (
+                    searchType === 'forwardAwb' ||
+                    searchType === 'reverseAwb' ||
+                    searchType === 'orderNumber'
+                ) {
+                    searchValue = rawSearchQuery.toUpperCase();
+                } else {
+                    searchValue = rawSearchQuery.toLowerCase();
                 }
             }
 
@@ -180,7 +186,10 @@ export function useOrders(
                 }
 
                 const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
-                const hasServerSideSearch = searchType === 'name' || searchType === 'awb';
+                const hasServerSideSearch =
+                    searchType === 'orderNumber' ||
+                    searchType === 'forwardAwb' ||
+                    searchType === 'reverseAwb';
 
                 // Filter by status tab - use customStatus for all tabs
                 if (activeTab === 'All Orders') {
@@ -202,11 +211,15 @@ export function useOrders(
                 }
 
                 // Server-side search
-                if (searchType === 'name') {
-                    constraints.push(where('name', '==', searchValue));
-                } else if (searchType === 'awb') {
+                if (searchType === 'orderNumber') {
+                    constraints.push(where('name', '>=', searchValue));
+                    constraints.push(where('name', '<=', searchValue));
+                } else if (searchType === 'forwardAwb') {
                     constraints.push(where('awb', '>=', searchValue));
                     constraints.push(where('awb', '<=', searchValue + '\uf8ff'));
+                } else if (searchType === 'reverseAwb') {
+                    constraints.push(where('awb_reverse', '>=', searchValue));
+                    constraints.push(where('awb_reverse', '<=', searchValue + '\uf8ff'));
                 }
 
                 // Date range filter
@@ -244,7 +257,7 @@ export function useOrders(
 
                 // Fetch slightly extra per store so client-side filters and merge sorting still have enough candidates.
                 const hasClientSideFilters =
-                    searchType === 'clientSide' ||
+                    searchType === 'general' ||
                     (!!filters.availabilityFilter && filters.availabilityFilter !== 'all') ||
                     (!!filters.rtoInTransitFilter && filters.rtoInTransitFilter !== 'all') ||
                     (!!filters.stateFilter && filters.stateFilter !== 'all') ||
@@ -330,7 +343,7 @@ export function useOrders(
             let filteredOrders: OrderWithDocSnap[] = allOrders;
 
             // Client-side search
-            if (searchType === 'clientSide' && searchValue) {
+            if (searchType === 'general' && searchValue) {
                 filteredOrders = filteredOrders.filter((order) => {
                     const customerName =
                         (
@@ -356,12 +369,23 @@ export function useOrders(
                         (() => {
                             const line_items = order.raw.line_items;
                             if (!line_items) return false;
-                            for (let i = 0; i < line_items.length; ++i) {
-                                if (
-                                    line_items[i].vendor &&
-                                    String(line_items[i].vendor)
+                            const condition = (field: string, index: number) => {
+                                const item = line_items[index] as any;
+                                return (
+                                    item?.[field] &&
+                                    String(item[field])
                                         .toLowerCase()
                                         .includes(searchValue)
+                                );
+                            };
+                            for (let i = 0; i < line_items.length; ++i) {
+                                if (
+                                    condition('name', i) ||
+                                    condition('sku', i) ||
+                                    condition('title', i) ||
+                                    condition('variant_id', i) ||
+                                    condition('product_id', i) ||
+                                    condition('vendor', i)
                                 ) {
                                     return true;
                                 }

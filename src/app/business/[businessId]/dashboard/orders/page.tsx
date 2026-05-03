@@ -350,7 +350,7 @@ export default function BusinessOrdersPage() {
 
     // Filter state
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchMode, setSearchMode] = useState<SearchMode>('general');
+    const [searchMode, setSearchMode] = useState<SearchMode>('orderNumber');
     const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
 
     const [filtersByTab, setFiltersByTab] = useState<

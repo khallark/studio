@@ -194,11 +194,12 @@ export function useOrders(
                 // Filter by status tab - use customStatus for all tabs
                 if (activeTab === 'All Orders') {
                     if (isSharedStoreNonSuperAdmin) {
-                        // Firestore does not allow this not-in combination with some search filters.
-                        if (!hasServerSideSearch) {
-                            constraints.push(where('customStatus', 'not-in', excludedStatuses));
-                        } else {
+                        const isOwrSharedVendor = vendorName === 'OWR';
+
+                        if (isOwrSharedVendor || hasServerSideSearch) {
                             needsClientSideStatusFilter = true;
+                        } else {
+                            constraints.push(where('customStatus', 'not-in', excludedStatuses));
                         }
                     }
                 } else {

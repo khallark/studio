@@ -46,7 +46,6 @@ import {
     SheetTitle,
     SheetTrigger,
     SheetFooter,
-    SheetClose,
 } from '@/components/ui/sheet';
 import {
     Download,
@@ -1321,7 +1320,7 @@ export default function BusinessOrdersPage() {
                             {/* Filters Sheet Trigger */}
                             <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
                                 <SheetTrigger asChild>
-                                    <Button variant="outline" size="sm" className="shrink-0 gap-2">
+                                    <Button variant="outline" size="sm" className="items-start shrink-0 gap-2">
                                         <Filter className="h-4 w-4" />
                                         <span className="hidden sm:inline">Filters</span>
                                         {activeFiltersCount > 0 && (

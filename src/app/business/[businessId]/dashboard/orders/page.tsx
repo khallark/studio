@@ -1024,6 +1024,10 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const renderActionItems = (order: Order) => {
+        if (activeTab === 'All Orders') {
+            return <DropdownMenuItem disabled>No actions available in All Orders</DropdownMenuItem>;
+        }
+
         switch (order.customStatus) {
             case 'Cancelled':
                 return <DropdownMenuItem disabled>Order Cancelled</DropdownMenuItem>;

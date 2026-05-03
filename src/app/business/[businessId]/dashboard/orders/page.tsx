@@ -159,7 +159,6 @@ const ORDER_STATUS_FILTER_TABS = STATUS_TABS.filter(
 type SearchMode = 'forwardAwb' | 'orderNumber' | 'reverseAwb' | 'general';
 
 type TabFilterState = {
-    invertSearch: boolean;
     dateRange: { from?: Date; to?: Date } | undefined;
     courierFilter: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
     availabilityFilter: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
@@ -172,7 +171,6 @@ type TabFilterState = {
 };
 
 const getDefaultTabFilters = (): TabFilterState => ({
-    invertSearch: false,
     dateRange: undefined,
     courierFilter: 'all',
     availabilityFilter: 'all',
@@ -430,7 +428,6 @@ export default function BusinessOrdersPage() {
         {
             searchQuery: debouncedSearchQuery,
             searchMode,
-            invertSearch: currentFilters.invertSearch,
             dateRange: currentFilters.dateRange?.from
                 ? { from: currentFilters.dateRange.from, to: currentFilters.dateRange.to }
                 : undefined,
@@ -851,7 +848,6 @@ export default function BusinessOrdersPage() {
         activeTab,
         debouncedSearchQuery,
         searchMode,
-        currentFilters.invertSearch,
         currentFilters.dateRange,
         currentFilters.courierFilter,
         currentFilters.availabilityFilter,
@@ -1249,7 +1245,6 @@ export default function BusinessOrdersPage() {
         currentFilters.courierFilter !== 'all',
         currentFilters.availabilityFilter !== 'all',
         currentFilters.rtoInTransitFilter !== 'all',
-        currentFilters.invertSearch,
         currentFilters.packedFilter !== 'all',
         currentFilters.paymentTypeFilter !== 'all',
         currentFilters.stateFilter !== 'all',
@@ -1773,12 +1768,6 @@ export default function BusinessOrdersPage() {
                                                 </Select>
                                             </div>
                                         )}
-
-                                        {/* Invert Search */}
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-sm font-medium">Invert Search</Label>
-                                            <Switch checked={currentFilters.invertSearch} onCheckedChange={(checked) => updateCurrentTabFilters({ invertSearch: checked })} />
-                                        </div>
                                     </div>
 
                                     <SheetFooter className="shrink-0 border-t px-6 py-4">

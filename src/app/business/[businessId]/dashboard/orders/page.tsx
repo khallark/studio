@@ -1319,8 +1319,8 @@ export default function BusinessOrdersPage() {
 
                             {/* Filters Sheet Trigger */}
                             <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
-                                <SheetTrigger asChild>
-                                    <Button variant="outline" size="sm" className="items-start shrink-0 gap-2">
+                                <SheetTrigger asChild className='items-start'>
+                                    <Button variant="outline" size="sm" className="shrink-0 gap-2">
                                         <Filter className="h-4 w-4" />
                                         <span className="hidden sm:inline">Filters</span>
                                         {activeFiltersCount > 0 && (

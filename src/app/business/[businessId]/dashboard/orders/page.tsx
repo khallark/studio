@@ -247,19 +247,21 @@ function MobileOrderCard({
                             {order.customStatus}
                         </Badge>
                     )}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={onView}>View Details</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {renderActionItems(order)}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {activeTab !== 'All Orders' && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={onView}>View Details</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {renderActionItems(order)}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
             </div>
 
@@ -296,7 +298,10 @@ function MobileOrderCard({
                     )}
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                         <BoxIcon className="h-3 w-3 mr-1" />
-                        {order.raw?.line_items?.length || 0}
+                        {order.raw?.line_items?.reduce(
+                            (sum, item) => sum + Number(item.quantity || 0),
+                            0
+                        ) || 0}
                     </Badge>
                 </div>
             </div>
@@ -1882,7 +1887,9 @@ export default function BusinessOrdersPage() {
                                             <TableHead>Payment</TableHead>
                                             <TableHead>Fulfillment</TableHead>
                                             <TableHead className="text-center">Items</TableHead>
-                                            <TableHead className="w-12"></TableHead>
+                                            {activeTab !== 'All Orders' && (
+                                                <TableHead className="w-12"></TableHead>
+                                            )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1944,20 +1951,25 @@ export default function BusinessOrdersPage() {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-center text-sm">
-                                                        {order.raw?.line_items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                                                        {order.raw?.line_items?.reduce(
+                                                            (sum, item) => sum + Number(item.quantity || 0),
+                                                            0
+                                                        ) || 0}
                                                     </TableCell>
                                                     <TableCell onClick={(e) => e.stopPropagation()}>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                    <MoreHorizontal className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                {renderActionItems(order)}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                        {activeTab !== 'All Orders' && (
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                                    {renderActionItems(order)}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             );

@@ -7,6 +7,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { buildProductData } from '@/lib/shopify/product-utils';
 import { UPC } from '@/types/warehouse';
+import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -58,17 +59,147 @@ async function logWebhookToCentralCollection(
 // ORDER HELPERS
 // ============================================================
 
+type NormalizedPaymentStatus =
+  | 'Refund'
+  | 'Prepaid'
+  | 'Partially Paid'
+  | 'COD';
+
 function normalizePhoneNumber(phoneNumber: string): string {
   // Remove all whitespace characters from the phone number
-  const cleanedNumber = String(phoneNumber)?.replace(/\s/g, "");
+  const cleanedNumber = String(phoneNumber || '').replace(/\s/g, '');
   // Check if the cleaned number length is >= 10
-  if (String(cleanedNumber)?.length >= 10) {
+  if (String(cleanedNumber).length >= 10) {
     // Extract the last 10 digits
-    return String(cleanedNumber)?.slice(-10);
-  } else {
-    // Return the whole string if length is less than 10
-    return cleanedNumber;
+    return String(cleanedNumber).slice(-10);
   }
+  // Return the whole string if length is less than 10
+  return cleanedNumber;
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/,/g, '').trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function normalizePaymentStatus(orderData: any): NormalizedPaymentStatus {
+  const totalOutstanding = toNumber(orderData?.total_outstanding);
+  const totalPrice = toNumber(orderData?.total_price);
+
+  if (totalOutstanding < 0) return 'Refund';
+  if (totalOutstanding === 0) return 'Prepaid';
+
+  if (totalOutstanding > 0 && totalOutstanding < totalPrice) {
+    return 'Partially Paid';
+  }
+
+  return 'COD';
+}
+
+function getShippingOrBillingState(orderData: any): string {
+  return (
+    orderData?.shipping_address?.province ||
+    orderData?.billing_address?.province ||
+    orderData?.customer?.default_address?.province ||
+    'N/A'
+  );
+}
+
+function getShippingOrBillingCity(orderData: any): string {
+  return (
+    orderData?.shipping_address?.city ||
+    orderData?.billing_address?.city ||
+    orderData?.customer?.default_address?.city ||
+    'N/A'
+  );
+}
+
+function getPhoneNumber(orderData: any): string {
+  const phone =
+    orderData?.shipping_address?.phone ||
+    orderData?.billing_address?.phone ||
+    orderData?.customer?.phone ||
+    orderData?.customer?.default_address?.phone ||
+    '';
+
+  const normalized = normalizePhoneNumber(phone);
+  return normalized || 'N/A';
+}
+
+/**
+ * HELPER: Extracts unique vendor names from line items
+ */
+function extractVendors(lineItems: any[]): string[] {
+  if (!Array.isArray(lineItems) || lineItems.length === 0) {
+    return [];
+  }
+
+  const vendorSet = new Set<string>();
+
+  for (const item of lineItems) {
+    if (item.vendor && typeof item.vendor === 'string') {
+      const trimmedVendor = item.vendor.trim();
+      if (trimmedVendor.length > 0) {
+        vendorSet.add(trimmedVendor);
+      }
+    }
+  }
+
+  return Array.from(vendorSet).sort(); // Sort for consistency
+}
+
+function normalizeVendorsForSharedStore(vendors: string[]): {
+  vendors: string[];
+  prevVendors?: string[];
+} {
+  const prevVendors = Array.isArray(vendors)
+    ? vendors.map(v => String(v).trim()).filter(Boolean)
+    : [];
+
+  const hasOwrAlias = prevVendors.some((vendor) => {
+    const upper = vendor.toUpperCase();
+    return upper === 'BBB' || upper === 'GHAMAND';
+  });
+
+  if (!hasOwrAlias) {
+    return { vendors: prevVendors };
+  }
+
+  const nextSet = new Set<string>();
+
+  for (const vendor of prevVendors) {
+    const upper = vendor.toUpperCase();
+
+    if (upper === 'BBB' || upper === 'GHAMAND' || upper === 'OWR') {
+      nextSet.add('OWR');
+    } else {
+      nextSet.add(vendor);
+    }
+  }
+
+  return {
+    vendors: Array.from(nextSet),
+    prevVendors,
+  };
+}
+
+function buildNormalizedOrderFields(orderData: any): Record<string, any> {
+  return {
+    shippingOrBillingState: getShippingOrBillingState(orderData),
+    paymentStatus: normalizePaymentStatus(orderData),
+    phoneNumber: getPhoneNumber(orderData),
+    totalOutstanding: toNumber(orderData?.total_outstanding),
+    shippingOrBillingCity: getShippingOrBillingCity(orderData),
+    normalizedClientSideFieldsAt: FieldValue.serverTimestamp(),
+  };
 }
 
 async function captureShopifyCreditPayment(
@@ -160,28 +291,6 @@ async function captureShopifyCreditPayment(
 }
 
 /**
- * HELPER: Extracts unique vendor names from line items
- */
-function extractVendors(lineItems: any[]): string[] {
-  if (!Array.isArray(lineItems) || lineItems.length === 0) {
-    return [];
-  }
-
-  const vendorSet = new Set<string>();
-
-  for (const item of lineItems) {
-    if (item.vendor && typeof item.vendor === "string") {
-      const trimmedVendor = item.vendor.trim();
-      if (trimmedVendor.length > 0) {
-        vendorSet.add(trimmedVendor);
-      }
-    }
-  }
-
-  return Array.from(vendorSet).sort(); // Sort for consistency
-}
-
-/**
  * HELPER: Checks if an order is a split order by looking at note_attributes
  */
 function isSplitOrder(orderData: any): boolean {
@@ -191,7 +300,7 @@ function isSplitOrder(orderData: any): boolean {
 
   // Check for the presence of split order attributes
   return orderData.note_attributes.some(
-    (attr: any) => attr.name === "_original_order_id" || attr.name === "_split_vendor"
+    (attr: any) => attr.name === '_original_order_id' || attr.name === '_split_vendor'
   );
 }
 
@@ -213,19 +322,19 @@ function extractSplitMetadata(orderData: any): {
 
   for (const attr of orderData.note_attributes) {
     switch (attr.name) {
-      case "_original_order_id":
+      case '_original_order_id':
         metadata.originalOrderId = attr.value;
         break;
-      case "_original_order_name":
+      case '_original_order_name':
         metadata.originalOrderName = attr.value;
         break;
-      case "_split_vendor":
+      case '_split_vendor':
         metadata.splitVendor = attr.value;
         break;
-      case "_split_index":
+      case '_split_index':
         metadata.splitIndex = attr.value;
         break;
-      case "_total_splits":
+      case '_total_splits':
         metadata.totalSplits = attr.value;
         break;
     }
@@ -253,8 +362,13 @@ async function handleOrderWebhook(
   const accountRef = db.collection('accounts').doc(shopDomain);
   const orderRef = accountRef.collection('orders').doc(orderId);
 
-  // Extract vendors from line items
-  const vendors = extractVendors(orderData.line_items || []);
+  // Extract and normalize vendors from line items.
+  // For shared stores, BBB/GHAMAND aliases are normalized to OWR.
+  const extractedVendors = extractVendors(orderData.line_items || []);
+  const vendorNormalization = SHARED_STORE_IDS.includes(shopDomain)
+    ? normalizeVendorsForSharedStore(extractedVendors)
+    : { vendors: extractedVendors };
+  const vendors = vendorNormalization.vendors;
 
   // Check if this is a split order
   const isSplit = isSplitOrder(orderData);
@@ -277,8 +391,15 @@ async function handleOrderWebhook(
     fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
     totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
     currency: orderData.currency,
+
     vendors,
+    ...(vendorNormalization.prevVendors
+      ? { prevVendors: vendorNormalization.prevVendors }
+      : {}),
+
     raw: orderData,
+    ...buildNormalizedOrderFields(orderData),
+
     lastWebhookTopic: topic,
     receivedAt: FieldValue.serverTimestamp(),
   };
@@ -290,6 +411,7 @@ async function handleOrderWebhook(
   }
 
   let created = false;
+  let shouldLogWebhook = false;
 
   // Use a transaction so we never "create on update" due to races.
   await db.runTransaction(async (tx) => {
@@ -304,7 +426,7 @@ async function handleOrderWebhook(
           lastWebhookTopic: topic,
         });
         console.log(`Tombstoned order ${orderId} for shop ${shopDomain}`);
-        await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+        shouldLogWebhook = true;
       }
       return;
     }
@@ -327,30 +449,32 @@ async function handleOrderWebhook(
         // Split order: Mark as Confirmed
         customStatus = 'Confirmed';
         log = [{
-          status: "Confirmed",
+          status: 'Confirmed',
           createdAt: Timestamp.now(),
-          remarks: `This order was confirmed and splitted successfully`
+          remarks: 'This order was confirmed and splitted successfully'
         }];
         console.log(`Created SPLIT order ${orderId} with status: Confirmed`);
       } else {
         // Normal order: Mark as New
         customStatus = 'New';
         log = [{
-          status: "New",
+          status: 'New',
           createdAt: Timestamp.now(),
-          remarks: `This order was newly created on Shopify`
+          remarks: 'This order was newly created on Shopify'
         }];
         console.log(`Created order ${orderId} for ${shopDomain}`);
       }
+
       tx.set(orderRef, {
         ...dataToSave,
         customStatus,
+        isPacked: false,
         isDeleted: false,
         createdByTopic: topic,
         customStatusesLogs: log, // Initialize logs array
       });
 
-      await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+      shouldLogWebhook = true;
       return;
     }
 
@@ -397,9 +521,9 @@ async function handleOrderWebhook(
       if (isCancelled && !alreadyCancelled) {
         // First time we're seeing the cancellation — do the full thing
         log = {
-          status: "Cancelled",
+          status: 'Cancelled',
           createdAt: Timestamp.now(),
-          remarks: `This order was cancelled on Shopify`
+          remarks: 'This order was cancelled on Shopify'
         };
         updateData.customStatus = 'Cancelled';
         console.log(`Order ${orderId} was cancelled for ${shopDomain}`);
@@ -511,9 +635,9 @@ async function handleOrderWebhook(
         }
       } else {
         log = {
-          status: "Updated By Shopify",
+          status: 'Updated By Shopify',
           createdAt: Timestamp.now(),
-          remarks: `This order was updated on shopify`
+          remarks: 'This order was updated on shopify'
         };
         console.log(`Updated order ${orderId} for ${shopDomain}`);
       }
@@ -521,9 +645,13 @@ async function handleOrderWebhook(
       updateData.customStatusesLogs = FieldValue.arrayUnion(log);
 
       tx.update(orderRef, updateData);
-      await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+      shouldLogWebhook = true;
     }
   });
+
+  if (shouldLogWebhook) {
+    await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
+  }
 
   // Post-transaction side effects: Skip for split orders
   if (created && !isSplit) {
@@ -593,6 +721,8 @@ async function handleProductWebhook(
   const accountRef = db.collection('accounts').doc(shopDomain);
   const productRef = accountRef.collection('products').doc(productId);
 
+  let shouldLogWebhook = false;
+
   // Use a transaction for consistency
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(productRef);
@@ -611,10 +741,10 @@ async function handleProductWebhook(
         // Option B: Hard delete (uncomment if you prefer)
         // tx.delete(productRef);
         // console.log(`🗑️ Deleted product ${productId} for shop ${shopDomain}`);
+        shouldLogWebhook = true;
       } else {
         console.log(`Product ${productId} not found for deletion, skipping.`);
       }
-      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
       return;
     }
 
@@ -641,7 +771,7 @@ async function handleProductWebhook(
         console.log(`✅ Created product ${productId} (${productData.title}) for ${shopDomain}`);
         console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
       }
-      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+      shouldLogWebhook = true;
       return;
     }
 
@@ -675,9 +805,13 @@ async function handleProductWebhook(
       }
       console.log(`📝 Updated product ${productId} (${productData.title}) for ${shopDomain}`);
       console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
-      await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+      shouldLogWebhook = true;
     }
   });
+
+  if (shouldLogWebhook) {
+    await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
+  }
 }
 
 // ============================================================

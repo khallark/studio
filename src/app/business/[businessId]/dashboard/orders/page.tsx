@@ -154,8 +154,6 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
 type SearchMode = 'forwardAwb' | 'orderNumber' | 'reverseAwb' | 'general';
 
 type TabFilterState = {
-    searchQuery: string;
-    searchMode: SearchMode;
     invertSearch: boolean;
     dateRange: { from?: Date; to?: Date } | undefined;
     courierFilter: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
@@ -169,8 +167,6 @@ type TabFilterState = {
 };
 
 const getDefaultTabFilters = (): TabFilterState => ({
-    searchQuery: '',
-    searchMode: 'general',
     invertSearch: false,
     dateRange: undefined,
     courierFilter: 'all',
@@ -348,6 +344,10 @@ export default function BusinessOrdersPage() {
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
     // Filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchMode, setSearchMode] = useState<SearchMode>('general');
+    const [debouncedSearchQuery] = useDebounce(searchQuery, 400);
+
     const [filtersByTab, setFiltersByTab] = useState<
         Record<CustomStatus | 'All Orders', TabFilterState>
     >(() => {
@@ -358,8 +358,6 @@ export default function BusinessOrdersPage() {
     });
 
     const currentFilters = filtersByTab[activeTab];
-
-    const [debouncedSearchQuery] = useDebounce(currentFilters.searchQuery, 400);
 
     const updateCurrentTabFilters = (updates: Partial<TabFilterState>) => {
         setFiltersByTab(prev => ({
@@ -420,7 +418,7 @@ export default function BusinessOrdersPage() {
         rowsPerPage,
         {
             searchQuery: debouncedSearchQuery,
-            searchMode: currentFilters.searchMode,
+            searchMode,
             invertSearch: currentFilters.invertSearch,
             dateRange: currentFilters.dateRange?.from
                 ? { from: currentFilters.dateRange.from, to: currentFilters.dateRange.to }
@@ -841,7 +839,7 @@ export default function BusinessOrdersPage() {
     }, [
         activeTab,
         debouncedSearchQuery,
-        currentFilters.searchMode,
+        searchMode,
         currentFilters.invertSearch,
         currentFilters.dateRange,
         currentFilters.courierFilter,
@@ -1134,7 +1132,6 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const activeFiltersCount = [
-        currentFilters.searchQuery.trim().length > 0,
         currentFilters.selectedStores.length > 0,
         currentFilters.dateRange?.from,
         currentFilters.courierFilter !== 'all',
@@ -1265,13 +1262,10 @@ export default function BusinessOrdersPage() {
                         <div className="flex items-center gap-2">
                             <div className="flex w-full flex-col gap-2 sm:flex-1 sm:flex-row sm:items-center">
                                 <Select
-                                    value={currentFilters.searchMode}
-                                    onValueChange={(value) =>
-                                        updateCurrentTabFilters({
-                                            searchMode: value as TabFilterState['searchMode'],
-                                            searchQuery: '',
-                                        })
-                                    }
+                                    value={searchMode}
+                                    onValueChange={(value) => {
+                                        setSearchMode(value as SearchMode);
+                                    }}
                                 >
                                     <SelectTrigger className="h-9 w-full text-xs sm:w-[170px] sm:shrink-0">
                                         <SelectValue />
@@ -1289,25 +1283,25 @@ export default function BusinessOrdersPage() {
 
                                     <Input
                                         placeholder={
-                                            currentFilters.searchMode === 'forwardAwb'
+                                            searchMode === 'forwardAwb'
                                                 ? 'Search forward AWB...'
-                                                : currentFilters.searchMode === 'orderNumber'
+                                                : searchMode === 'orderNumber'
                                                     ? 'Search order number...'
-                                                    : currentFilters.searchMode === 'reverseAwb'
+                                                    : searchMode === 'reverseAwb'
                                                         ? 'Search reverse AWB...'
                                                         : 'Search customer, vendor, status...'
                                         }
-                                        value={currentFilters.searchQuery}
-                                        onChange={(e) => updateCurrentTabFilters({ searchQuery: e.target.value })}
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
                                         className="h-9 pl-9 pr-9 text-sm"
                                     />
 
-                                    {currentFilters.searchQuery && (
+                                    {searchQuery && (
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
-                                            onClick={() => updateCurrentTabFilters({ searchQuery: '' })}
+                                            onClick={() => setSearchQuery('')}
                                         >
                                             <X className="h-3 w-3" />
                                         </Button>
@@ -1834,7 +1828,7 @@ export default function BusinessOrdersPage() {
                             <Package className="h-16 w-16 text-muted-foreground/30 mb-4" />
                             <h3 className="text-lg font-medium mb-1">No orders found</h3>
                             <p className="text-sm text-muted-foreground text-center">
-                                {currentFilters.searchQuery ? 'Try adjusting your search or filters' : `No ${activeTab.toLowerCase()} orders yet`}
+                                {searchQuery ? 'Try adjusting your search or filters' : `No ${activeTab.toLowerCase()} orders yet`}
                             </p>
                         </div>
                     ) : (

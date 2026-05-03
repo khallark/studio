@@ -212,8 +212,9 @@ export function useOrders(
 
                 // Server-side search
                 if (searchType === 'orderNumber') {
+                    searchValue = searchValue[0] !== '#' ? '#' + searchValue : searchValue;
                     constraints.push(where('name', '>=', searchValue));
-                    constraints.push(where('name', '<=', searchValue));
+                    constraints.push(where('name', '<=', searchValue + '\uf8ff'));
                 } else if (searchType === 'forwardAwb') {
                     constraints.push(where('awb', '>=', searchValue));
                     constraints.push(where('awb', '<=', searchValue + '\uf8ff'));

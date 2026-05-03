@@ -39,7 +39,7 @@ export async function applyClientSideFilters(
                         item.vendor && String(item.vendor).toLowerCase().includes(searchValue)
                     );
 
-                return filters.invertSearch ? !match : match;
+                return match;
             });
         }
     }

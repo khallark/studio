@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
                 packingVidUrl,
                 packedAt: timestamp
             }),
+            isPacked: true,
             lastPackedAt: timestamp
         });
 

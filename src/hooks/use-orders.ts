@@ -169,36 +169,23 @@ export function useOrders(
                 const ordersRef = collection(db, 'accounts', storeId, 'orders');
                 const constraints: QueryConstraint[] = [];
 
-                let needsClientSideStatusFilter = false;
                 const excludedStatuses = ['New', 'DTO Requested', 'Pending Refunds'];
 
-                // Filter by vendor for shared stores
-                if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
-                    if (vendorName === 'OWR') {
-                        constraints.push(where('vendors', 'array-contains-any', ['OWR', 'BBB', 'Ghamand']));
-
-                        if (activeTab === 'All Orders') {
-                            needsClientSideStatusFilter = true;
-                        }
-                    } else {
-                        constraints.push(where('vendors', 'array-contains', vendorName));
-                    }
+                // Vendor visibility for shared stores
+                if (
+                    SHARED_STORE_IDS.includes(storeId) &&
+                    businessId !== SUPER_ADMIN_ID &&
+                    vendorName
+                ) {
+                    constraints.push(where('vendors', 'array-contains', vendorName));
                 }
 
                 const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
-
-                const hasServerSideSearch =
-                    searchType === 'orderNumber' ||
-                    searchType === 'forwardAwb' ||
-                    searchType === 'reverseAwb';
 
                 const selectedStatuses =
                     activeTab === 'All Orders'
                         ? (filters.statusFilter || [])
                         : [];
-
-                const hasAllOrdersStatusFilter =
-                    activeTab === 'All Orders' && selectedStatuses.length > 0;
 
                 const visibleSelectedStatuses =
                     isSharedStoreNonSuperAdmin
@@ -207,24 +194,17 @@ export function useOrders(
 
                 // Filter by status tab / All Orders status filter
                 if (activeTab === 'All Orders') {
-                    if (hasAllOrdersStatusFilter) {
-                        // The All Orders status checkbox filter must be server-side.
-                        // Otherwise cursor pagination creates empty/sparse pages.
-                        if (visibleSelectedStatuses.length === 0) {
-                            constraints.push(where('customStatus', '==', '__NO_MATCH__'));
-                        } else if (visibleSelectedStatuses.length === 1) {
+                    if (visibleSelectedStatuses.length > 0) {
+                        if (visibleSelectedStatuses.length === 1) {
                             constraints.push(where('customStatus', '==', visibleSelectedStatuses[0]));
                         } else {
                             constraints.push(where('customStatus', 'in', visibleSelectedStatuses.slice(0, 10)));
                         }
+                    } else if (selectedStatuses.length > 0) {
+                        // User selected only statuses that are hidden for this vendor.
+                        constraints.push(where('customStatus', '==', '__NO_MATCH__'));
                     } else if (isSharedStoreNonSuperAdmin) {
-                        const isOwrSharedVendor = vendorName === 'OWR';
-
-                        if (isOwrSharedVendor || hasServerSideSearch) {
-                            needsClientSideStatusFilter = true;
-                        } else {
-                            constraints.push(where('customStatus', 'not-in', excludedStatuses));
-                        }
+                        constraints.push(where('customStatus', 'not-in', excludedStatuses));
                     }
                 } else {
                     if (isSharedStoreNonSuperAdmin && excludedStatuses.includes(activeTab)) {
@@ -236,9 +216,11 @@ export function useOrders(
 
                 // Server-side search
                 if (searchType === 'orderNumber') {
-                    searchValue = searchValue[0] !== '#' ? '#' + searchValue : searchValue;
-                    constraints.push(where('name', '>=', searchValue));
-                    constraints.push(where('name', '<=', searchValue + '\uf8ff'));
+                    const orderNameSearchValue = searchValue.startsWith('#')
+                        ? searchValue
+                        : `#${searchValue}`;
+                    constraints.push(where('name', '>=', orderNameSearchValue));
+                    constraints.push(where('name', '<=', orderNameSearchValue + '\uf8ff'));
                 } else if (searchType === 'forwardAwb') {
                     constraints.push(where('awb', '>=', searchValue));
                     constraints.push(where('awb', '<=', searchValue + '\uf8ff'));
@@ -272,6 +254,42 @@ export function useOrders(
                     constraints.push(where('vendors', 'array-contains', filters.vendorName));
                 }
 
+                if (filters.stateFilter && filters.stateFilter !== 'all') {
+                    constraints.push(where('shippingOrBillingState', '==', filters.stateFilter));
+                }
+
+                if (filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all') {
+                    if (filters.paymentTypeFilter === 'prepaid') {
+                        constraints.push(where('paymentStatus', '==', 'Prepaid'));
+                    } else if (filters.paymentTypeFilter === 'cod') {
+                        constraints.push(where('paymentStatus', '==', 'COD'));
+                    }
+                }
+
+                if (
+                    activeTab === 'Ready To Dispatch' &&
+                    filters.packedFilter &&
+                    filters.packedFilter !== 'all'
+                ) {
+                    if (filters.packedFilter === 'packed') {
+                        constraints.push(where('isPacked', '==', true));
+                    } else if (filters.packedFilter === 'unpacked') {
+                        constraints.push(where('isPacked', '==', false));
+                    }
+                }
+
+                if (
+                    activeTab === 'RTO In Transit' &&
+                    filters.rtoInTransitFilter &&
+                    filters.rtoInTransitFilter !== 'all'
+                ) {
+                    if (filters.rtoInTransitFilter === 're-attempt') {
+                        constraints.push(where('tags_rtoInTransit', '==', ['Re-attempt']));
+                    } else if (filters.rtoInTransitFilter === 'refused') {
+                        constraints.push(where('tags_rtoInTransit', '==', ['Refused']));
+                    }
+                }
+
                 // Sorting - always by time for business-wide view
                 constraints.push(orderBy(sortField, 'desc'));
 
@@ -283,15 +301,14 @@ export function useOrders(
                 // Fetch slightly extra per store so client-side filters and merge sorting still have enough candidates.
                 const hasClientSideFilters =
                     searchType === 'general' ||
-                    needsClientSideStatusFilter ||
-                    (!!filters.availabilityFilter && filters.availabilityFilter !== 'all') ||
-                    (!!filters.rtoInTransitFilter && filters.rtoInTransitFilter !== 'all') ||
-                    (!!filters.stateFilter && filters.stateFilter !== 'all') ||
-                    (!!filters.packedFilter && filters.packedFilter !== 'all') ||
-                    (!!filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all');
+                    (
+                        activeTab === 'Confirmed' &&
+                        !!filters.availabilityFilter &&
+                        filters.availabilityFilter !== 'all'
+                    );
 
                 const perStoreFetchLimit = hasClientSideFilters
-                    ? Math.max(rowsPerPage * 2, 50)
+                    ? Math.max(rowsPerPage * 5, 50)
                     : rowsPerPage + 1;
 
                 constraints.push(limit(perStoreFetchLimit));
@@ -306,10 +323,6 @@ export function useOrders(
                         __docSnap: docSnap,
                     })) as OrderWithDocSnap[];
 
-                    if (needsClientSideStatusFilter) {
-                        orders = orders.filter(order => !excludedStatuses.includes(order.customStatus));
-                    }
-
                     return {
                         storeId,
                         orders,
@@ -318,16 +331,6 @@ export function useOrders(
                     };
                 } catch (error: any) {
                     console.error(`Error fetching orders from store ${storeId}:`, error);
-
-                    if (error?.message?.includes('The query requires an index.')) {
-                        try {
-                            await fetch('/api/test', {
-                                method: 'POST',
-                                body: JSON.stringify({ str: error.message }),
-                            });
-                        } catch { }
-                    }
-
                     return {
                         storeId,
                         orders: [],
@@ -418,7 +421,7 @@ export function useOrders(
                             return false;
                         })();
 
-                    return filters.invertSearch ? !match : match;
+                    return match;
                 });
             }
 
@@ -595,68 +598,6 @@ export function useOrders(
                         order.tags_confirmed?.includes('Available')
                     );
                 }
-            }
-
-            // RTO In Transit filter
-            if (
-                activeTab === 'RTO In Transit' &&
-                filters.rtoInTransitFilter !== 'all'
-            ) {
-                if (filters.rtoInTransitFilter === 're-attempt') {
-                    filteredOrders = filteredOrders.filter(
-                        (order) =>
-                            order.tags_rtoInTransit?.length === 1 &&
-                            order.tags_rtoInTransit[0] === 'Re-attempt'
-                    );
-                } else if (filters.rtoInTransitFilter === 'refused') {
-                    filteredOrders = filteredOrders.filter(
-                        (order) =>
-                            order.tags_rtoInTransit?.length === 1 &&
-                            order.tags_rtoInTransit[0] === 'Refused'
-                    );
-                } else if (filters.rtoInTransitFilter === 'no-reply') {
-                    filteredOrders = filteredOrders.filter(
-                        (order) =>
-                            !order.tags_rtoInTransit ||
-                            order.tags_rtoInTransit.length === 0 ||
-                            (!order.tags_rtoInTransit.includes('Re-attempt') &&
-                                !order.tags_rtoInTransit.includes('Refused'))
-                    );
-                }
-            }
-
-            // Packed filter (Ready To Dispatch tab only)
-            if (activeTab === 'Ready To Dispatch' && filters.packedFilter && filters.packedFilter !== 'all') {
-                if (filters.packedFilter === 'packed') {
-                    filteredOrders = filteredOrders.filter((order) => !!order.lastPackedAt);
-                } else if (filters.packedFilter === 'unpacked') {
-                    filteredOrders = filteredOrders.filter((order) => !order.lastPackedAt);
-                }
-            }
-
-            // Payment type filter (global)
-            if (filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all') {
-                if (filters.paymentTypeFilter === 'cod') {
-                    filteredOrders = filteredOrders.filter(
-                        (order) => order.financialStatus === 'pending'
-                    );
-                } else if (filters.paymentTypeFilter === 'prepaid') {
-                    filteredOrders = filteredOrders.filter(
-                        (order) => order.financialStatus !== 'pending'
-                    );
-                }
-            }
-
-            // State (province) filter — global
-            if (filters.stateFilter && filters.stateFilter !== 'all') {
-                filteredOrders = filteredOrders.filter((order) => {
-                    const province =
-                        order.raw.shipping_address?.province ||
-                        order.raw.billing_address?.province ||
-                        order.raw.customer?.default_address?.province ||
-                        null;
-                    return province === filters.stateFilter;
-                });
             }
 
             // ============================================================

@@ -162,7 +162,7 @@ type TabFilterState = {
     dateRange: { from?: Date; to?: Date } | undefined;
     courierFilter: 'all' | 'Blue Dart' | 'Delhivery' | 'Shiprocket' | 'Xpressbees';
     availabilityFilter: 'all' | 'eligible' | 'not eligible' | 'picked up' | 'unmapped' | 'available' | 'unavailable' | 'pending';
-    rtoInTransitFilter: 'all' | 're-attempt' | 'refused' | 'no-reply';
+    rtoInTransitFilter: 'all' | 're-attempt' | 'refused';
     packedFilter: 'all' | 'packed' | 'unpacked';
     paymentTypeFilter: 'all' | 'prepaid' | 'cod';
     stateFilter: string;
@@ -1763,7 +1763,6 @@ export default function BusinessOrdersPage() {
                                                         <SelectItem value="all">All</SelectItem>
                                                         <SelectItem value="re-attempt">Re-attempt ({rtoInTransitCounts?.reAttempt || 0})</SelectItem>
                                                         <SelectItem value="refused">Refused ({rtoInTransitCounts?.refused || 0})</SelectItem>
-                                                        <SelectItem value="no-reply">No Reply ({rtoInTransitCounts?.noReply || 0})</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

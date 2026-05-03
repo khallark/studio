@@ -150,6 +150,12 @@ const STATUS_TABS: { value: CustomStatus | 'All Orders'; label: string; shortLab
     { value: 'Cancelled', label: 'Cancelled', shortLabel: 'Cancel' },
 ];
 
+const MAX_STATUS_FILTER_SELECTIONS = 10;
+
+const ORDER_STATUS_FILTER_TABS = STATUS_TABS.filter(
+    (tab) => tab.value !== 'All Orders'
+);
+
 type SearchMode = 'forwardAwb' | 'orderNumber' | 'reverseAwb' | 'general';
 
 type TabFilterState = {
@@ -346,6 +352,7 @@ export default function BusinessOrdersPage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [statusFilterSearch, setStatusFilterSearch] = useState('');
 
     // Filter state
     const [searchQuery, setSearchQuery] = useState('');
@@ -963,6 +970,79 @@ export default function BusinessOrdersPage() {
         }
     };
 
+    const handleToggleStatusFilter = (status: CustomStatus, checked: boolean) => {
+        if (checked) {
+            if (currentFilters.statusFilter.includes(status)) return;
+
+            if (currentFilters.statusFilter.length >= MAX_STATUS_FILTER_SELECTIONS) {
+                toast({
+                    title: 'Status limit reached',
+                    description: `You can select up to ${MAX_STATUS_FILTER_SELECTIONS} statuses at a time.`,
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            updateCurrentTabFilters({
+                statusFilter: [...currentFilters.statusFilter, status],
+            });
+
+            return;
+        }
+
+        updateCurrentTabFilters({
+            statusFilter: currentFilters.statusFilter.filter((s) => s !== status),
+        });
+    };
+
+    const handleToggleAllVisibleStatuses = (checked: boolean) => {
+        if (!checked) {
+            updateCurrentTabFilters({
+                statusFilter: currentFilters.statusFilter.filter(
+                    (status) => !visibleStatusValues.includes(status)
+                ),
+            });
+            return;
+        }
+
+        const alreadySelected = currentFilters.statusFilter;
+        const remainingSlots = MAX_STATUS_FILTER_SELECTIONS - alreadySelected.length;
+
+        if (remainingSlots <= 0) {
+            toast({
+                title: 'Status limit reached',
+                description: `You can select up to ${MAX_STATUS_FILTER_SELECTIONS} statuses at a time.`,
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const statusesToAdd = visibleStatusValues
+            .filter((status) => !alreadySelected.includes(status))
+            .slice(0, remainingSlots);
+
+        const nextStatuses = [...alreadySelected, ...statusesToAdd];
+
+        updateCurrentTabFilters({
+            statusFilter: nextStatuses,
+        });
+
+        const unselectedVisibleCount = visibleStatusValues.filter(
+            (status) => !alreadySelected.includes(status)
+        ).length;
+
+        if (unselectedVisibleCount > statusesToAdd.length) {
+            toast({
+                title: 'Only first 10 statuses selected',
+                description: `Status filter supports up to ${MAX_STATUS_FILTER_SELECTIONS} statuses. Selected the first available statuses in the current order.`,
+            });
+        }
+    };
+
+    const clearStatusFilterSearch = () => {
+        setStatusFilterSearch('');
+    };
+
     const clearAllSelections = () => {
         setSelectedOrders([]);
         setSelectedOrdersMap({});
@@ -1134,6 +1214,30 @@ export default function BusinessOrdersPage() {
                 return null;
         }
     };
+
+    const normalizedStatusFilterSearch = statusFilterSearch.trim().toLowerCase();
+
+    const visibleStatusFilterOptions = ORDER_STATUS_FILTER_TABS.filter((tab) =>
+        tab.label.toLowerCase().includes(normalizedStatusFilterSearch) ||
+        tab.shortLabel.toLowerCase().includes(normalizedStatusFilterSearch) ||
+        String(tab.value).toLowerCase().includes(normalizedStatusFilterSearch)
+    );
+
+    const visibleStatusValues = visibleStatusFilterOptions.map(
+        (tab) => tab.value as CustomStatus
+    );
+
+    const selectedVisibleStatusCount = visibleStatusValues.filter((status) =>
+        currentFilters.statusFilter.includes(status)
+    ).length;
+
+    const areAllVisibleStatusesSelected =
+        visibleStatusValues.length > 0 &&
+        selectedVisibleStatusCount === visibleStatusValues.length;
+
+    const areSomeVisibleStatusesSelected =
+        selectedVisibleStatusCount > 0 &&
+        selectedVisibleStatusCount < visibleStatusValues.length;
 
     // ============================================================
     // ACTIVE FILTERS COUNT
@@ -1360,40 +1464,124 @@ export default function BusinessOrdersPage() {
                                         {/* Order Status Filter */}
                                         {activeTab === 'All Orders' && (
                                             <div className="space-y-3">
-                                                <Label className="text-sm font-medium">Order Status</Label>
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => updateCurrentTabFilters({ statusFilter: [] })}
-                                                        className="flex-1"
-                                                    >
-                                                        Clear
-                                                    </Button>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <Label className="text-sm font-medium">Order Status</Label>
+
+                                                    {currentFilters.statusFilter.length > 0 && (
+                                                        <Badge variant="secondary" className="text-xs">
+                                                            {currentFilters.statusFilter.length}/{MAX_STATUS_FILTER_SELECTIONS}
+                                                        </Badge>
+                                                    )}
                                                 </div>
-                                                <div className="max-h-52 overflow-y-auto space-y-2 border rounded-lg p-2">
-                                                    {STATUS_TABS.filter(t => t.value !== 'All Orders').map(tab => (
-                                                        <div key={tab.value} className="flex items-center space-x-2">
+
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                                    <Input
+                                                        value={statusFilterSearch}
+                                                        onChange={(e) => setStatusFilterSearch(e.target.value)}
+                                                        placeholder="Search statuses..."
+                                                        className="h-9 pl-9 pr-9 text-sm"
+                                                    />
+
+                                                    {statusFilterSearch && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                                                            onClick={clearStatusFilterSearch}
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+
+                                                <div className="rounded-lg border">
+                                                    <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                                                        <div className="flex items-center gap-2">
                                                             <Checkbox
-                                                                id={`status-${tab.value}`}
-                                                                checked={currentFilters.statusFilter.includes(tab.value as CustomStatus)}
-                                                                onCheckedChange={(checked) => {
-                                                                    updateCurrentTabFilters({
-                                                                        statusFilter: checked
-                                                                            ? [...currentFilters.statusFilter, tab.value as CustomStatus]
-                                                                            : currentFilters.statusFilter.filter(s => s !== tab.value),
-                                                                    });
-                                                                }}
+                                                                checked={
+                                                                    areAllVisibleStatusesSelected
+                                                                        ? true
+                                                                        : areSomeVisibleStatusesSelected
+                                                                            ? 'indeterminate'
+                                                                            : false
+                                                                }
+                                                                onCheckedChange={(checked) =>
+                                                                    handleToggleAllVisibleStatuses(Boolean(checked))
+                                                                }
+                                                                disabled={visibleStatusValues.length === 0}
                                                             />
-                                                            <Label htmlFor={`status-${tab.value}`} className="text-sm font-normal cursor-pointer">
-                                                                {tab.label}
-                                                            </Label>
+
+                                                            <span className="text-sm font-medium">
+                                                                Select all visible
+                                                            </span>
                                                         </div>
-                                                    ))}
+
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-xs"
+                                                            onClick={() => updateCurrentTabFilters({ statusFilter: [] })}
+                                                            disabled={currentFilters.statusFilter.length === 0}
+                                                        >
+                                                            Clear
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="max-h-52 overflow-y-auto p-2">
+                                                        {visibleStatusFilterOptions.length === 0 ? (
+                                                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                                                No statuses found
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1">
+                                                                {visibleStatusFilterOptions.map((tab) => {
+                                                                    const status = tab.value as CustomStatus;
+                                                                    const isChecked = currentFilters.statusFilter.includes(status);
+
+                                                                    const isDisabled =
+                                                                        !isChecked &&
+                                                                        currentFilters.statusFilter.length >= MAX_STATUS_FILTER_SELECTIONS;
+
+                                                                    return (
+                                                                        <label
+                                                                            key={tab.value}
+                                                                            htmlFor={`status-${tab.value}`}
+                                                                            className={cn(
+                                                                                'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted',
+                                                                                isChecked && 'bg-muted/70',
+                                                                                isDisabled && 'cursor-not-allowed opacity-50'
+                                                                            )}
+                                                                        >
+                                                                            <Checkbox
+                                                                                id={`status-${tab.value}`}
+                                                                                checked={isChecked}
+                                                                                disabled={isDisabled}
+                                                                                onCheckedChange={(checked) =>
+                                                                                    handleToggleStatusFilter(status, Boolean(checked))
+                                                                                }
+                                                                            />
+
+                                                                            <span className="flex-1 truncate">
+                                                                                {tab.label}
+                                                                            </span>
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
+
+                                                {currentFilters.statusFilter.length >= MAX_STATUS_FILTER_SELECTIONS && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Maximum {MAX_STATUS_FILTER_SELECTIONS} statuses can be selected at once.
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
-
                                         {/* State Filter */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-medium">State</Label>

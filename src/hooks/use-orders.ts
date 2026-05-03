@@ -186,14 +186,38 @@ export function useOrders(
                 }
 
                 const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
+
                 const hasServerSideSearch =
                     searchType === 'orderNumber' ||
                     searchType === 'forwardAwb' ||
                     searchType === 'reverseAwb';
 
-                // Filter by status tab - use customStatus for all tabs
+                const selectedStatuses =
+                    activeTab === 'All Orders'
+                        ? (filters.statusFilter || [])
+                        : [];
+
+                const hasAllOrdersStatusFilter =
+                    activeTab === 'All Orders' && selectedStatuses.length > 0;
+
+                const visibleSelectedStatuses =
+                    isSharedStoreNonSuperAdmin
+                        ? selectedStatuses.filter(status => !excludedStatuses.includes(status))
+                        : selectedStatuses;
+
+                // Filter by status tab / All Orders status filter
                 if (activeTab === 'All Orders') {
-                    if (isSharedStoreNonSuperAdmin) {
+                    if (hasAllOrdersStatusFilter) {
+                        // The All Orders status checkbox filter must be server-side.
+                        // Otherwise cursor pagination creates empty/sparse pages.
+                        if (visibleSelectedStatuses.length === 0) {
+                            constraints.push(where('customStatus', '==', '__NO_MATCH__'));
+                        } else if (visibleSelectedStatuses.length === 1) {
+                            constraints.push(where('customStatus', '==', visibleSelectedStatuses[0]));
+                        } else {
+                            constraints.push(where('customStatus', 'in', visibleSelectedStatuses.slice(0, 10)));
+                        }
+                    } else if (isSharedStoreNonSuperAdmin) {
                         const isOwrSharedVendor = vendorName === 'OWR';
 
                         if (isOwrSharedVendor || hasServerSideSearch) {
@@ -204,8 +228,7 @@ export function useOrders(
                     }
                 } else {
                     if (isSharedStoreNonSuperAdmin && excludedStatuses.includes(activeTab)) {
-                        // Hide these tabs for non-super-admin users on shared stores.
-                        constraints.push(where('customStatus', '==', 'some-random-shit'));
+                        constraints.push(where('customStatus', '==', '__NO_MATCH__'));
                     } else {
                         constraints.push(where('customStatus', '==', activeTab));
                     }
@@ -260,12 +283,12 @@ export function useOrders(
                 // Fetch slightly extra per store so client-side filters and merge sorting still have enough candidates.
                 const hasClientSideFilters =
                     searchType === 'general' ||
+                    needsClientSideStatusFilter ||
                     (!!filters.availabilityFilter && filters.availabilityFilter !== 'all') ||
                     (!!filters.rtoInTransitFilter && filters.rtoInTransitFilter !== 'all') ||
                     (!!filters.stateFilter && filters.stateFilter !== 'all') ||
                     (!!filters.packedFilter && filters.packedFilter !== 'all') ||
-                    (!!filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all') ||
-                    (activeTab === 'All Orders' && !!filters.statusFilter?.length);
+                    (!!filters.paymentTypeFilter && filters.paymentTypeFilter !== 'all');
 
                 const perStoreFetchLimit = hasClientSideFilters
                     ? Math.max(rowsPerPage * 2, 50)
@@ -634,13 +657,6 @@ export function useOrders(
                         null;
                     return province === filters.stateFilter;
                 });
-            }
-
-            // Order status filter (All Orders tab only)
-            if (activeTab === 'All Orders' && filters.statusFilter && filters.statusFilter.length > 0) {
-                filteredOrders = filteredOrders.filter(order =>
-                    filters.statusFilter!.includes(order.customStatus as CustomStatus)
-                );
             }
 
             // ============================================================

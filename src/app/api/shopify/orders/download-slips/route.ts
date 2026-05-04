@@ -174,7 +174,7 @@ function generateSlipHTML(
   const orderNumber = order.name || `#${order.orderId || 'N/A'}`;
   const orderDate = ddmmyyyy(order.createdAt);
 
-  const paymentMethod = order.raw?.payment_gateway_names?.join(',').toLowerCase().includes('cod') ? 'COD' : 'Prepaid';
+  const paymentMethod = Number(order.raw?.total_outstanding ?? 0) > 0 ? 'COD' : 'Prepaid';
   const shippingMode = order?.courier === 'Delhivery'
     ? order?.shippingMode || 'Surface/Express'
     : (String(order?.courier || '').split(':')[1] || 'Express').trim();

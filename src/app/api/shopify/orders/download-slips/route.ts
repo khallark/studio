@@ -394,7 +394,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
         }
         
         .barcode {
-          max-width: 380px;
+          max-width: 520px;
           height: 100px;
         }
         
@@ -549,7 +549,7 @@ function generateFullHTML(orders: any[], sellerDetails: { name: string; gst: str
             try {
               JsBarcode(svg, awb, {
                 format: "CODE128",
-                width: 2.5,
+                width: 3.2,
                 height: 80,
                 displayValue: true,
                 fontSize: 18,

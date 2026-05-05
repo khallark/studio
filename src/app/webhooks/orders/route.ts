@@ -588,7 +588,7 @@ async function handleOrderWebhook(
                   query: db
                     .collection(`users/${variantMapping.businessId}/upcs`)
                     .where('orderId', '==', String(orderId))
-                    .where('putAway', '==', 'outbound'),
+                  // .where('putAway', '==', 'outbound'),
                 });
               }
 
@@ -610,7 +610,10 @@ async function handleOrderWebhook(
 
                 for (const upcDoc of upcSnapshot.docs) {
                   const upcData = upcDoc.data() as UPC;
-                  if (upcData.orderId === String(orderId) && upcData.putAway === 'outbound') {
+                  if (
+                    upcData.orderId === String(orderId)
+                    // && upcData.putAway === 'outbound'
+                  ) {
                     tx.update(upcDoc.ref, {
                       putAway: 'inbound',
                       updatedAt: Timestamp.now(),

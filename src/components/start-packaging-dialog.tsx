@@ -99,7 +99,7 @@ export function StartPackagingDialog({
     const startCamera = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 }, facingMode: { ideal: 'environment' } },
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 }, facingMode: { ideal: 'environment' } },
                 audio: true,
             });
             streamRef.current = stream;
@@ -236,8 +236,8 @@ export function StartPackagingDialog({
         chunksRef.current = [];
 
         const options = [
-            { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 500_000, audioBitsPerSecond: 32_000 },
-            { mimeType: 'video/webm', videoBitsPerSecond: 500_000, audioBitsPerSecond: 32_000 },
+            { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 32_000 },
+            { mimeType: 'video/webm', videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 32_000 },
             {},
         ];
 
@@ -540,7 +540,7 @@ export function StartPackagingDialog({
                                         playsInline
                                     />
                                     {/* Hidden canvas — same dimensions, used for recording */}
-                                    <canvas ref={canvasRef} width={640} height={480} className="hidden" />
+                                    <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
                                     {isRecording && (
                                         <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                                             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />

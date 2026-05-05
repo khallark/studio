@@ -207,8 +207,8 @@ export function StartPackagingDialog({
                 hour12: false,
             });
 
-            const padding = 6;
-            const fontSize = 13;
+            const padding = 10;
+            const fontSize = 24;
             ctx.font = `${fontSize}px monospace`;
             const textWidth = ctx.measureText(stamp).width;
 
@@ -236,9 +236,21 @@ export function StartPackagingDialog({
         chunksRef.current = [];
 
         const options = [
-            { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 32_000 },
-            { mimeType: 'video/webm', videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 32_000 },
-            {},
+            {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 2_000_000,
+                audioBitsPerSecond: 64_000,
+            },
+            {
+                mimeType: 'video/webm;codecs=vp8',
+                videoBitsPerSecond: 2_000_000,
+                audioBitsPerSecond: 64_000,
+            },
+            {
+                mimeType: 'video/webm',
+                videoBitsPerSecond: 2_000_000,
+                audioBitsPerSecond: 64_000,
+            },
         ];
 
         let recorder: MediaRecorder | null = null;

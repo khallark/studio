@@ -238,17 +238,17 @@ export function StartPackagingDialog({
         const options = [
             {
                 mimeType: 'video/webm;codecs=vp9',
-                videoBitsPerSecond: 2_000_000,
+                videoBitsPerSecond: 3_000_000,
                 audioBitsPerSecond: 64_000,
             },
             {
                 mimeType: 'video/webm;codecs=vp8',
-                videoBitsPerSecond: 2_000_000,
+                videoBitsPerSecond: 3_000_000,
                 audioBitsPerSecond: 64_000,
             },
             {
                 mimeType: 'video/webm',
-                videoBitsPerSecond: 2_000_000,
+                videoBitsPerSecond: 3_000_000,
                 audioBitsPerSecond: 64_000,
             },
         ];

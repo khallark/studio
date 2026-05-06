@@ -218,10 +218,15 @@ function MobileOrderCard({
         order.email ||
         'Unknown';
 
+    const isAlreadyRefunded =
+        order.refundedAmount !== undefined &&
+        order.refundedAmount !== null;
+
     return (
         <div
             className={cn(
                 'border rounded-xl p-3 bg-card transition-all',
+                isAlreadyRefunded && 'bg-green-50/60 border-green-100',
                 isSelected && 'ring-2 ring-primary border-primary'
             )}
         >
@@ -1104,6 +1109,10 @@ export default function BusinessOrdersPage() {
     // ============================================================
 
     const renderActionItems = (order: Order) => {
+        const isAlreadyRefunded =
+            order.refundedAmount !== undefined &&
+            order.refundedAmount !== null;
+
         if (activeTab === 'All Orders') {
             return <DropdownMenuItem disabled>No actions available in All Orders</DropdownMenuItem>;
         }
@@ -1169,21 +1178,46 @@ export default function BusinessOrdersPage() {
                 return (
                     <>
                         <DropdownMenuItem onClick={() => { setOrderForReturn(order); setIsReturnDialogOpen(true); }}>Book Return</DropdownMenuItem>
+                        {!isAlreadyRefunded && (
+                            <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>
+                                Process Refund
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Back to Delivered</DropdownMenuItem>
                     </>
                 );
             case 'DTO Booked':
                 return (
                     <>
+                        {!isAlreadyRefunded && (
+                            <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>
+                                Process Refund
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleRevertStatus(order.id, 'Delivered')}>Back to Delivered</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Closed')}>Close Order</DropdownMenuItem>
                     </>
                 );
-            case 'DTO Delivered':
             case 'DTO In Transit':
+                return (
+                    <>
+                        {!isAlreadyRefunded && (
+                            <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>
+                                Process Refund
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => { setOrderForQc(order); setIsQcDialogOpen(true); }}>Start QC</DropdownMenuItem>
+                    </>
+                );
+
+            case 'DTO Delivered':
                 return <DropdownMenuItem onClick={() => { setOrderForQc(order); setIsQcDialogOpen(true); }}>Start QC</DropdownMenuItem>;
             case 'Pending Refunds':
-                return <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>Process Refund</DropdownMenuItem>;
+                return (
+                    <DropdownMenuItem onClick={() => { setOrderForRefund(order); setIsRefundDialogOpen(true); }}>
+                        {isAlreadyRefunded ? 'Mark as DTO Refunded' : 'Process Refund'}
+                    </DropdownMenuItem>
+                );
             case 'RTO Delivered':
                 return (
                     <DropdownMenuItem
@@ -2075,12 +2109,19 @@ export default function BusinessOrdersPage() {
                                                     `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim()) ||
                                                 order.email || '';
 
+                                            const isAlreadyRefunded =
+                                                order.refundedAmount !== undefined &&
+                                                order.refundedAmount !== null;
+
                                             return (
                                                 <TableRow
                                                     key={order.id}
                                                     data-state={selectedOrders.includes(order.id) && "selected"}
                                                     onClick={() => setViewingOrder(order)}
-                                                    className="cursor-pointer"
+                                                    className={cn(
+                                                        'cursor-pointer',
+                                                        isAlreadyRefunded && 'bg-green-50/60 hover:bg-green-50'
+                                                    )}
                                                 >
                                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                                         <Checkbox
@@ -2175,7 +2216,7 @@ export default function BusinessOrdersPage() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {[10, 20, 50].map((size) => (
+                                    {[10, 20, 50, 100].map((size) => (
                                         <SelectItem key={size} value={`${size}`}>{size}</SelectItem>
                                     ))}
                                 </SelectContent>

@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Order } from '@/types/order';
-import { Loader2, AlertCircle, Images, Video } from 'lucide-react';
+import { Loader2, AlertCircle, Images, Video, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useProcessRefund } from '@/hooks/use-order-mutations';
 import { User } from 'firebase/auth';
@@ -63,6 +63,11 @@ export function RefundDialog({
   // Get line items from order
   const lineItems = order.raw.line_items || [];
   const returnItemIds = new Set(order.returnItemsVariantIds || []);
+
+  const isAlreadyRefundedPendingRefund =
+    order.customStatus === 'Pending Refunds' &&
+    order.refundedAmount !== undefined &&
+    order.refundedAmount !== null;
 
   // Fetch customer images and QC video
   const fetchMedia = useCallback(async () => {
@@ -212,8 +217,38 @@ export function RefundDialog({
     return result;
   };
 
+  const resetState = () => {
+    setSelectedItems(new Set());
+    setRefundMethod('store_credit');
+    setItemRefundAmounts({});
+    setError(null);
+  };
+
   // Handle refund submission
   const handleRefund = () => {
+    if (isAlreadyRefundedPendingRefund) {
+      setError(null);
+
+      processRefund.mutate(
+        {
+          orderId: order.id,
+          storeId: order.storeId,
+        } as any,
+        {
+          onSuccess: () => {
+            onRefundSuccess();
+            onClose();
+            resetState();
+          },
+          onError: (err: any) => {
+            setError(err.message || 'An unexpected error occurred');
+          },
+        }
+      );
+
+      return;
+    }
+
     if (selectedItems.size === 0) {
       setError('Please select at least one item to refund');
       return;
@@ -255,9 +290,7 @@ export function RefundDialog({
           onRefundSuccess();
           onClose();
           // Reset state
-          setSelectedItems(new Set());
-          setRefundMethod('store_credit');
-          setItemRefundAmounts({});
+          resetState();
         },
         onError: (err: any) => {
           setError(err.message || 'An unexpected error occurred');
@@ -269,10 +302,7 @@ export function RefundDialog({
   // Reset state when dialog closes
   const handleClose = () => {
     if (!processRefund.isPending) {
-      setSelectedItems(new Set());
-      setRefundMethod('store_credit');
-      setItemRefundAmounts({});
-      setError(null);
+      resetState();
       onClose();
     }
   };
@@ -283,14 +313,36 @@ export function RefundDialog({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Process Refund - {order.name}</DialogTitle>
+          <DialogTitle>
+            {isAlreadyRefundedPendingRefund
+              ? `Mark DTO Refunded - ${order.name}`
+              : `Process Refund - ${order.name}`}
+          </DialogTitle>
           <DialogDescription>
-            Select items to refund and enter the refund amount for each item.
+            {isAlreadyRefundedPendingRefund
+              ? 'Refund for this order is already processed. You can now mark it as DTO Refunded.'
+              : 'Select items to refund and enter the refund amount for each item.'}
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 overflow-y-auto pr-4 -mr-4">
           <div className="space-y-6 py-4">
+            {isAlreadyRefundedPendingRefund && (
+              <Alert className="border-green-200 bg-green-50 text-green-900">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  Refund of{' '}
+                  <span className="font-mono font-semibold">
+                    {new Intl.NumberFormat('en-IN', {
+                      style: 'currency',
+                      currency: order.currency,
+                    }).format(Number(order.refundedAmount))}
+                  </span>{' '}
+                  is already processed for this order. You can now mark this order as DTO Refunded.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Return Reason */}
             {order.booked_return_reason && (
               <div className="space-y-2">
@@ -365,212 +417,213 @@ export function RefundDialog({
               </>
             )}
 
-            {/* Line Items Selection */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold">Items</h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAllReturnItems}
-                  disabled={returnItemIds.size === 0}
-                >
-                  Select All Return Items
-                </Button>
-              </div>
-
-              <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
-                {lineItems.map((item: any, index: number) => {
-                  const itemId = item.variant_id || item.id;
-                  const isReturnItem = returnItemIds.has(itemId);
-                  const isSelected = selectedItems.has(itemId);
-                  const itemTotal = getItemTotal(item);
-                  const currentAmount = itemRefundAmounts[itemId] || '';
-
-                  return (
-                    <div
-                      key={index}
-                      className={`p-4 space-y-3 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-muted/30' : ''}`}
+            {!isAlreadyRefundedPendingRefund && (
+              <>
+                {/* Line Items Selection */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold">Items</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAllReturnItems}
+                      disabled={returnItemIds.size === 0}
                     >
-                      <div className="flex items-start gap-4">
-                        <Checkbox
-                          id={`item-${itemId}`}
-                          checked={isSelected}
-                          onCheckedChange={() => handleItemToggle(itemId, item)}
-                        />
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 gap-2">
-                              <Label
-                                htmlFor={`item-${itemId}`}
-                                className="font-medium cursor-pointer"
-                              >
-                                {item.name}
-                              </Label>
-                              {isReturnItem && (
-                                <Badge variant="secondary" className="ml-2">
-                                  Return Item
-                                </Badge>
-                              )}
-                              {item.qc_status && (
-                                <Badge
-                                  className={`ml-2 ${item.qc_status === 'QC Fail'
-                                    ? 'bg-red-100 text-red-700 border-red-200'
-                                    : item.qc_status === 'Not Received'
-                                      ? 'bg-orange-100 text-orange-700 border-orange-200'
-                                      : item.qc_status === 'QC Pass'
-                                        ? 'bg-green-100 text-green-700 border-green-200'
-                                        : ''
-                                    }`}
-                                >
-                                  {item.qc_status}
-                                </Badge>
-                              )}
+                      Select All Return Items
+                    </Button>
+                  </div>
+
+                  <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
+                    {lineItems.map((item: any, index: number) => {
+                      const itemId = item.variant_id || item.id;
+                      const isReturnItem = returnItemIds.has(itemId);
+                      const isSelected = selectedItems.has(itemId);
+                      const itemTotal = getItemTotal(item);
+                      const currentAmount = itemRefundAmounts[itemId] || '';
+
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 space-y-3 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-muted/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <Checkbox
+                              id={`item-${itemId}`}
+                              checked={isSelected}
+                              onCheckedChange={() => handleItemToggle(itemId, item)}
+                            />
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 gap-2">
+                                  <Label
+                                    htmlFor={`item-${itemId}`}
+                                    className="font-medium cursor-pointer"
+                                  >
+                                    {item.name}
+                                  </Label>
+                                  {isReturnItem && (
+                                    <Badge variant="secondary" className="ml-2">
+                                      Return Item
+                                    </Badge>
+                                  )}
+                                  {item.qc_status && (
+                                    <Badge
+                                      className={`ml-2 ${item.qc_status === 'QC Fail'
+                                        ? 'bg-red-100 text-red-700 border-red-200'
+                                        : item.qc_status === 'Not Received'
+                                          ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                          : item.qc_status === 'QC Pass'
+                                            ? 'bg-green-100 text-green-700 border-green-200'
+                                            : ''
+                                        }`}
+                                    >
+                                      {item.qc_status}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-mono text-sm">
+                                    {new Intl.NumberFormat('en-US', {
+                                      style: 'currency',
+                                      currency: order.currency,
+                                    }).format(itemTotal)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                {item.sku && <span>SKU: {item.sku}</span>}
+                                <span>Qty: {item.quantity}</span>
+                                <span className='font-mono'>
+                                  Price: {new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: order.currency,
+                                  }).format(parseFloat(item.price))}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-mono text-sm">
-                                {new Intl.NumberFormat('en-US', {
+                          </div>
+
+                          {/* Per-item refund amount input */}
+                          {isSelected && (
+                            <div className="ml-8 flex items-center gap-3">
+                              <Label htmlFor={`amount-${itemId}`} className="text-sm text-muted-foreground whitespace-nowrap">
+                                Refund Amount:
+                              </Label>
+                              <div className="flex items-center gap-2 flex-1 max-w-xs">
+                                <span className="text-sm font-medium">{order.currency}</span>
+                                <Input
+                                  id={`amount-${itemId}`}
+                                  type="number"
+                                  min="0"
+                                  max={itemTotal}
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={currentAmount}
+                                  onChange={(e) => handleItemAmountChange(itemId, e.target.value)}
+                                  className="font-mono"
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                max: {new Intl.NumberFormat('en-US', {
                                   style: 'currency',
                                   currency: order.currency,
                                 }).format(itemTotal)}
-                              </p>
+                              </span>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            {item.sku && <span>SKU: {item.sku}</span>}
-                            <span>Qty: {item.quantity}</span>
-                            <span className='font-mono'>
-                              Price: {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: order.currency,
-                              }).format(parseFloat(item.price))}
-                            </span>
-                          </div>
+                          )}
                         </div>
-                      </div>
-
-                      {/* Per-item refund amount input */}
-                      {isSelected && (
-                        <div className="ml-8 flex items-center gap-3">
-                          <Label htmlFor={`amount-${itemId}`} className="text-sm text-muted-foreground whitespace-nowrap">
-                            Refund Amount:
-                          </Label>
-                          <div className="flex items-center gap-2 flex-1 max-w-xs">
-                            <span className="text-sm font-medium">{order.currency}</span>
-                            <Input
-                              id={`amount-${itemId}`}
-                              type="number"
-                              min="0"
-                              max={itemTotal}
-                              step="0.01"
-                              placeholder="0.00"
-                              value={currentAmount}
-                              onChange={(e) => handleItemAmountChange(itemId, e.target.value)}
-                              className="font-mono"
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            (max: {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: order.currency,
-                            }).format(itemTotal)})
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Refund Amount Summary */}
-            <div className="space-y-4">
-              <h4 className="font-semibold">Refund Summary</h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Order Total:</span>
-                  <span className="font-mono">
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: order.currency,
-                    }).format(Number(order.raw?.total_price))}
-                  </span>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Show breakdown of selected items */}
-                {selectedItems.size > 0 && (
-                  <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                    <p className="text-sm font-medium">Selected Items Breakdown:</p>
-                    {lineItems
-                      .filter((item: any) => selectedItems.has(item.variant_id || item.id))
-                      .map((item: any, index: number) => {
-                        const itemId = item.variant_id || item.id;
-                        const amount = parseFloat(itemRefundAmounts[itemId] || '0') || 0;
-                        return (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground truncate max-w-[60%]">
-                              {item.name}
-                            </span>
-                            <span className="font-mono">
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: order.currency,
-                              }).format(amount)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    <Separator className="my-2" />
-                    <div className="flex justify-between font-semibold">
-                      <span>Total Refund Amount:</span>
-                      <span className="font-mono text-lg">
+                <Separator />
+
+                {/* Refund Summary */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Refund Summary</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Order Total:</span>
+                      <span className="font-mono">
                         {new Intl.NumberFormat('en-US', {
                           style: 'currency',
                           currency: order.currency,
-                        }).format(totalRefundAmount)}
+                        }).format(Number(order.raw?.total_price))}
                       </span>
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <Separator />
+                    {selectedItems.size > 0 && (
+                      <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
+                        <p className="text-sm font-medium">Selected Items Breakdown:</p>
+                        {lineItems
+                          .filter((item: any) => selectedItems.has(item.variant_id || item.id))
+                          .map((item: any, index: number) => {
+                            const itemId = item.variant_id || item.id;
+                            const amount = parseFloat(itemRefundAmounts[itemId] || '0') || 0;
 
-            {/* Refund Method Selection */}
-            <div className="space-y-4">
-              <h4 className="font-semibold">Refund Method</h4>
-              <RadioGroup
-                value={refundMethod}
-                onValueChange={(value) => setRefundMethod(value as RefundMethod)}
-              >
-                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <RadioGroupItem value="store_credit" id="store_credit" />
-                  <div className="flex-1">
-                    <Label htmlFor="store_credit" className="font-medium cursor-pointer">
-                      Add to Customer's Store Credits
-                    </Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Refund will be added to customer's store credit balance via Shopify
-                    </p>
+                            return (
+                              <div key={index} className="flex justify-between text-sm">
+                                <span className="text-muted-foreground truncate max-w-[60%]">
+                                  {item.name}
+                                </span>
+                                <span className="font-mono">
+                                  {new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: order.currency,
+                                  }).format(amount)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Refund Amount:</span>
+                          <span className="font-mono text-lg">
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: order.currency,
+                            }).format(totalRefundAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <RadioGroupItem value="manual" id="manual" />
-                  <div className="flex-1">
-                    <Label htmlFor="manual" className="font-medium cursor-pointer">
-                      Manually Paid
-                    </Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Mark as refunded without processing through Shopify
-                    </p>
-                  </div>
+                <Separator />
+
+                {/* Refund Method */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Refund Method</h4>
+                  <RadioGroup value={refundMethod} onValueChange={(value) => setRefundMethod(value as RefundMethod)}>
+                    <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <RadioGroupItem value="store_credit" id="store_credit" />
+                      <div className="flex-1">
+                        <Label htmlFor="store_credit" className="font-medium cursor-pointer">
+                          Add to Customer's Store Credits
+                        </Label>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Refund will be added to customer's store credit balance via Shopify
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <RadioGroupItem value="manual" id="manual" />
+                      <div className="flex-1">
+                        <Label htmlFor="manual" className="font-medium cursor-pointer">
+                          Manually Paid
+                        </Label>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Mark as refunded without processing through Shopify
+                        </p>
+                      </div>
+                    </div>
+                  </RadioGroup>
                 </div>
-              </RadioGroup>
-            </div>
+              </>
+            )}
 
             {/* Error Alert */}
             {error && (
@@ -588,7 +641,13 @@ export function RefundDialog({
           </Button>
           <Button
             onClick={handleRefund}
-            disabled={processRefund.isPending || selectedItems.size === 0 || !isValidAmount || totalRefundAmount <= 0}
+            disabled={
+              processRefund.isPending ||
+              (
+                !isAlreadyRefundedPendingRefund &&
+                (selectedItems.size === 0 || !isValidAmount || totalRefundAmount <= 0)
+              )
+            }
             className='font-mono'
           >
             {processRefund.isPending ? (
@@ -596,6 +655,8 @@ export function RefundDialog({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
               </>
+            ) : isAlreadyRefundedPendingRefund ? (
+              'Mark as DTO Refunded'
             ) : (
               `Process Refund${totalRefundAmount > 0 ? ` (${new Intl.NumberFormat('en-US', {
                 style: 'currency',

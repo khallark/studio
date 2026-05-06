@@ -5,6 +5,15 @@ import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } 
 import { sendDTORefundedWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
+const EARLY_DTO_REFUND_STATUSES = ['DTO Requested', 'DTO Booked', 'DTO In Transit'];
+
+const ALLOWED_REFUND_STATUSES = [
+    'DTO Requested',
+    'DTO Booked',
+    'DTO In Transit',
+    'Pending Refunds',
+];
+
 export async function POST(req: NextRequest) {
     try {
         const {
@@ -25,19 +34,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
         }
 
-        if (!shop || !orderId || !selectedItemIds || !refundAmount || !refundMethod || !currency) {
+        /**
+         * Only validate shop/orderId here.
+         * The other refund fields are validated later, after checking whether this is:
+         * 1. actual refund processing, or
+         * 2. Pending Refunds + already refundedAmount exists.
+         */
+        if (!shop || !orderId) {
             console.warn('Missing required parameters');
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-        }
-
-        if (!itemRefundAmounts || typeof itemRefundAmounts !== 'object') {
-            console.warn('Missing itemRefundAmounts');
-            return NextResponse.json({ error: 'Missing itemRefundAmounts' }, { status: 400 });
-        }
-
-        if (refundMethod === 'store_credit' && !customerId) {
-            console.warn('Customer ID required for store credit refunds');
-            return NextResponse.json({ error: 'Customer ID required for store credit refunds' }, { status: 400 });
         }
 
         // ----- Auth -----
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
 
         const orderData = orderDoc.data();
 
-        if(!orderData) {
+        if (!orderData) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
@@ -74,6 +79,105 @@ export async function POST(req: NextRequest) {
                 const { error, status } = canProcess;
                 return NextResponse.json({ error }, { status });
             }
+        }
+
+        const currentStatus = orderData.customStatus;
+
+        if (!ALLOWED_REFUND_STATUSES.includes(currentStatus)) {
+            return NextResponse.json(
+                { error: `Refund is not allowed for status ${currentStatus}` },
+                { status: 400 }
+            );
+        }
+
+        const hasExistingRefund =
+            orderData.refundedAmount !== undefined &&
+            orderData.refundedAmount !== null;
+
+        const isEarlyDtoRefund = EARLY_DTO_REFUND_STATUSES.includes(currentStatus);
+
+        const isAlreadyRefundedPendingRefund =
+            currentStatus === 'Pending Refunds' &&
+            hasExistingRefund;
+
+        const isNormalPendingRefund =
+            currentStatus === 'Pending Refunds' &&
+            !hasExistingRefund;
+
+        if (isEarlyDtoRefund && hasExistingRefund) {
+            return NextResponse.json(
+                { error: 'Refund has already been processed for this order.' },
+                { status: 400 }
+            );
+        }
+
+        /**
+         * Case 2:
+         * Order is in Pending Refunds and refundedAmount already exists.
+         * This means the actual refund was already processed earlier
+         * in DTO Requested / DTO Booked / DTO In Transit.
+         *
+         * No Shopify call.
+         * No refund fields update.
+         * Only mark as DTO Refunded.
+         */
+        if (isAlreadyRefundedPendingRefund) {
+            await orderRef?.update({
+                customStatus: 'DTO Refunded',
+                lastStatusUpdate: Timestamp.now(),
+                customStatusesLogs: FieldValue.arrayUnion({
+                    status: 'DTO Refunded',
+                    createdAt: Timestamp.now(),
+                    remarks: 'Marked as DTO Refunded. Refund was already processed earlier.',
+                }),
+            });
+
+            try {
+                const shopData = (await db.collection('accounts').doc(shop).get()).data() as any;
+                await sendDTORefundedWhatsAppMessage(shopData, {
+                    ...orderData,
+                    customStatus: 'DTO Refunded',
+                    refundMethod: orderData.refundMethod === 'store_credit' ? 'Store Credit' : orderData.refundMethod,
+                } as any);
+            } catch (error: any) {
+                console.error(`Whatsapp sending error: ${error?.message}`);
+            }
+
+            return NextResponse.json({
+                success: true,
+                message: 'Order marked as DTO Refunded. Refund was already processed earlier.',
+            });
+        }
+
+        /**
+         * From here onward, this is actual refund processing.
+         * Keep the original required field validation here.
+         */
+        if (!shop || !orderId || !selectedItemIds || !refundAmount || !refundMethod || !currency) {
+            console.warn('Missing required parameters');
+            return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+        }
+
+        if (!itemRefundAmounts || typeof itemRefundAmounts !== 'object') {
+            console.warn('Missing itemRefundAmounts');
+            return NextResponse.json({ error: 'Missing itemRefundAmounts' }, { status: 400 });
+        }
+
+        if (refundMethod === 'store_credit' && !customerId) {
+            console.warn('Customer ID required for store credit refunds');
+            return NextResponse.json({ error: 'Customer ID required for store credit refunds' }, { status: 400 });
+        }
+
+        /**
+         * At this point, only these actual refund cases are valid:
+         * 1. Early DTO refund: DTO Requested / DTO Booked / DTO In Transit
+         * 2. Normal Pending Refunds refund: Pending Refunds without refundedAmount
+         */
+        if (!isEarlyDtoRefund && !isNormalPendingRefund) {
+            return NextResponse.json(
+                { error: `Refund cannot be processed for status ${currentStatus}` },
+                { status: 400 }
+            );
         }
 
         // Get access token
@@ -192,27 +296,57 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Update Firestore order document
+        const refundRemarks = refundMethod === 'store_credit'
+            ? `Refunded ${currency} ${refundAmount.toFixed(2)} to customer's store credits`
+            : `Manually refunded ${currency} ${refundAmount.toFixed(2)}`;
+
+        /**
+         * Common fields only when we are processing a fresh refund now.
+         * This block does not run for Pending Refunds orders that already have refundedAmount,
+         * because that case returns earlier after only changing status to DTO Refunded.
+         */
+        const refundCreatedAt = Timestamp.now();
+
         const updateData: any = {
             refundedAmount: refundAmount,
             refundMethod: refundMethod,
+            refundedAt: refundCreatedAt,
             'raw.line_items': updatedLineItems,
-            customStatus: 'DTO Refunded',
-            customStatusesLogs: FieldValue.arrayUnion({
-                status: 'DTO Refunded',
-                createdAt: Timestamp.now(),
-                remarks: refundMethod === 'store_credit'
-                    ? `Refunded ${currency} ${refundAmount.toFixed(2)} to customer's store credits`
-                    : `Manually refunded ${currency} ${refundAmount.toFixed(2)}`,
+            refundLogs: FieldValue.arrayUnion({
+                amount: refundAmount,
+                method: refundMethod,
+                currency,
+                createdAt: refundCreatedAt,
+                statusAtRefundTime: currentStatus,
+                remarks: refundRemarks,
             }),
         };
 
+        /**
+         * Normal Pending Refunds refund:
+         * Actual refund is processed and order becomes DTO Refunded.
+         */
+        if (isNormalPendingRefund) {
+            updateData.customStatus = 'DTO Refunded';
+            updateData.lastStatusUpdate = Timestamp.now();
+            updateData.customStatusesLogs = FieldValue.arrayUnion({
+                status: 'DTO Refunded',
+                createdAt: Timestamp.now(),
+                remarks: refundRemarks,
+            });
+        }
+
         await orderRef?.update(updateData);
+
         orderData.refundedAmount = refundAmount;
         orderData.refundMethod = refundMethod === 'store_credit' ? 'Store Credit' : 'Manual';
 
-
-        if (refundMethod === 'store_credit') {
+        /**
+         * Send DTO Refunded WhatsApp only when order actually becomes DTO Refunded.
+         * For early DTO refunds, status stays DTO Requested / DTO Booked / DTO In Transit,
+         * so do not send DTO Refunded message yet.
+         */
+        if (refundMethod === 'store_credit' && isNormalPendingRefund) {
             try {
                 const shopData = (await db.collection('accounts').doc(shop).get()).data() as any;
                 await sendDTORefundedWhatsAppMessage(shopData, orderData as any);
@@ -223,13 +357,18 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: refundMethod === 'store_credit'
-                ? 'Refund processed and added to customer\'s store credits successfully'
-                : 'Refund marked as manually paid successfully',
+            message: isEarlyDtoRefund
+                ? refundMethod === 'store_credit'
+                    ? 'Refund processed and added to customer\'s store credits successfully. Order status was not changed.'
+                    : 'Refund marked as manually paid successfully. Order status was not changed.'
+                : refundMethod === 'store_credit'
+                    ? 'Refund processed and added to customer\'s store credits successfully'
+                    : 'Refund marked as manually paid successfully',
             refundAmount,
             itemRefundAmounts,
             refundMethod,
             shopifyRefund: refundResult,
+            storeCreditResult,
         });
 
     } catch (error: any) {

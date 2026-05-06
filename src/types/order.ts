@@ -71,6 +71,7 @@ export interface Order {
   unboxing_video_path?: string;
   pickupReady?: boolean;
   isEligibleForPickup?: boolean;
+  refundedAmount?: number;
   raw: {
     total_price: string;
     cancelled_at: string | null;

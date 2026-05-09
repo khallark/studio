@@ -1553,38 +1553,6 @@ export default function ProductsPage() {
                                     Remove
                                 </Button>
                             </div>
-
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-background px-2 text-muted-foreground">or</span>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/5">
-                                <div>
-                                    <p className="text-sm font-medium">All products</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {mappedProductsCount} product(s) with {totalMappingsCount} mapping(s)
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleRemoveMappings(true)}
-                                    disabled={isRemovingMappings || totalMappingsCount === 0}
-                                    className="gap-2"
-                                >
-                                    {isRemovingMappings ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Unlink className="h-4 w-4" />
-                                    )}
-                                    Remove All
-                                </Button>
-                            </div>
                         </div>
                     </div>
 

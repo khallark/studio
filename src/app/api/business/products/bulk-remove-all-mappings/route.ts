@@ -93,11 +93,10 @@ export async function POST(req: NextRequest) {
 
         if (removeAll) {
             // Get all products that have mappings
-            const allProductsSnap = await productsRef.get();
-            productsToProcess = allProductsSnap.docs.filter(doc => {
-                const data = doc.data();
-                return data.mappedVariants && data.mappedVariants.length > 0;
-            });
+            return NextResponse.json(
+                { error: 'Bad Request', message: 'Not an available option' },
+                { status: 404 }
+            );
         } else {
             // Get only specified products
             for (const sku of skus!) {

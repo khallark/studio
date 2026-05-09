@@ -14,21 +14,20 @@ const formatAddress = (address: any): string => {
   return parts.filter(Boolean).join(', ');
 };
 
-const formatDate = (timestamp: any): string => {
-  // If it's an ISO string with timezone, extract the date part directly
-  if (typeof timestamp === 'string' && timestamp.includes('T')) {
-    // Extract YYYY-MM-DD part before the 'T'
-    const datePart = timestamp.split('T')[0];
-    const [year, month, day] = datePart.split('-');
-    return `${day}/${month}/${year}`;
+const formatDate = (timestamp: any): Date | null => {
+  if (!timestamp) return null;
+
+  // ISO string
+  if (typeof timestamp === 'string') {
+    return new Date(timestamp);
   }
 
-  // Fallback for other formats
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${day}/${month}/${year}`;
+  // Firestore Timestamp
+  if (timestamp?.toDate) {
+    return timestamp.toDate();
+  }
+
+  return new Date(timestamp);
 };
 
 export async function POST(req: NextRequest) {
@@ -107,7 +106,7 @@ export async function POST(req: NextRequest) {
             returnAwb: order.awb_reverse ?? 'N/A',
             courier: order.courierProvider ?? 'N/A',
             orderDate: formatDate(order.createdAt),
-            lastStatusUpdate: formatDate(order.lastStatusUpdate?.toDate()?.toISOString() || ''),
+            lastStatusUpdate: formatDate(order.lastStatusUpdate),
             customer: customerName,
             email: order.raw.customer?.email || order.raw?.contact_email || 'N/A',
             phone: order.raw.customer?.phone || order.raw.billing_address?.phone || order.raw.shipping_address?.phone || 'N/A',
@@ -216,6 +215,9 @@ export async function POST(req: NextRequest) {
       { header: 'Shipping Pincode', key: 'shippingPincode', width: 12 },
       { header: 'Shipping Country', key: 'shippingCountry', width: 15 },
     ];
+
+    worksheet.getColumn('orderDate').numFmt = 'dd-mm-yyyy hh:mm AM/PM';
+    worksheet.getColumn('lastStatusUpdate').numFmt = 'dd-mm-yyyy hh:mm AM/PM';
 
     // Add rows
     worksheet.addRows(flattenedData);

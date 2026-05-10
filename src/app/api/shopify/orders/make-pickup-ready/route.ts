@@ -7,10 +7,8 @@ import { UPC } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
     try {
-        // Parse request body
         const { businessId, shop, orderId, assignedUpcIds } = await req.json();
 
-        // Validate required fields
         if (!businessId || !shop || !orderId || !assignedUpcIds || !Array.isArray(assignedUpcIds)) {
             return NextResponse.json(
                 { error: 'Missing required fields: businessId, shop, orderId, assignedUpcIds' },
@@ -18,20 +16,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Verify authentication
         const result = await authUserForBusinessAndStore({ businessId, shop, req });
 
         if (!result.authorised) {
             return NextResponse.json(
                 { error: result.error },
                 { status: result.status }
-            )
+            );
         }
 
-        // Get and validate order (check exists BEFORE calling data())
         const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(orderId);
         const orderDoc = await orderRef.get();
-        
+
         if (!orderDoc.exists) {
             return NextResponse.json(
                 { error: 'Order not found' },
@@ -40,7 +36,7 @@ export async function POST(req: NextRequest) {
         }
 
         const orderData = orderDoc.data();
-        
+
         if (!orderData) {
             return NextResponse.json(
                 { error: 'Order data is invalid' },
@@ -55,7 +51,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Get line items to determine correct businessId for each UPC
         const lineItems = orderData?.raw?.line_items || [];
 
         if (lineItems.length === 0) {
@@ -65,18 +60,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Build a map of UPC IDs to their correct businessId
-        // We need to query each UPC to find which business it belongs to
         const upcToBusinessId = new Map<string, string>();
+        const upcRefs = new Map<string, FirebaseFirestore.DocumentReference>();
 
-        // First, get all unique product mappings from the order
-        const productMappings = new Map<string, { businessId: string; businessProductSku: string }>();
+        const productMappings = new Map<
+            string,
+            { businessId: string; businessProductSku: string }
+        >();
 
         for (const item of lineItems) {
             const productId = String(item.product_id);
             const variantId = String(item.variant_id);
 
-            // Get product mapping to find actual businessId
             const storeProductDoc = await db
                 .doc(`accounts/${shop}/products/${productId}`)
                 .get();
@@ -87,38 +82,50 @@ export async function POST(req: NextRequest) {
             }
 
             const storeProductData = storeProductDoc.data();
-            const variantMapping = storeProductData?.variantMappingDetails?.[variantId]
-                || storeProductData?.variantMappings?.[variantId];
+
+            const variantMapping =
+                storeProductData?.variantMappingDetails?.[variantId] ||
+                storeProductData?.variantMappings?.[variantId];
 
             if (!variantMapping) {
                 console.warn(`⚠️ No mapping for variant ${variantId} in order ${orderId}`);
                 continue;
             }
 
-            const actualBusinessId = typeof variantMapping === 'object'
-                ? variantMapping.businessId
-                : null;
+            const actualBusinessId =
+                typeof variantMapping === 'object'
+                    ? variantMapping.businessId
+                    : null;
 
-            const businessProductSku = typeof variantMapping === 'object'
-                ? variantMapping.businessProductSku
-                : variantMapping;
+            const businessProductSku =
+                typeof variantMapping === 'object'
+                    ? variantMapping.businessProductSku
+                    : variantMapping;
 
             if (actualBusinessId && businessProductSku) {
-                productMappings.set(businessProductSku, { businessId: actualBusinessId, businessProductSku });
+                productMappings.set(businessProductSku, {
+                    businessId: actualBusinessId,
+                    businessProductSku,
+                });
             }
         }
 
-        // Now query each UPC to find its businessId
+        // Resolve all UPC docs first
         for (const upcId of assignedUpcIds) {
-            // We need to search across all potential businessIds
-            // Try each businessId from our mappings
             let found = false;
-            for (const [sku, { businessId: actualBusinessId }] of productMappings.entries()) {
-                const upcRef = db.collection(`users/${actualBusinessId}/upcs`).doc(upcId);
+
+            for (const [, { businessId: actualBusinessId }] of productMappings.entries()) {
+                const upcRef = db
+                    .collection('users')
+                    .doc(actualBusinessId)
+                    .collection('upcs')
+                    .doc(upcId);
+
                 const upcDoc = await upcRef.get();
-                
+
                 if (upcDoc.exists) {
                     upcToBusinessId.set(upcId, actualBusinessId);
+                    upcRefs.set(upcId, upcRef);
                     found = true;
                     break;
                 }
@@ -129,19 +136,50 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Start a batch write
+        // NEW CHECK:
+        // Before updating anything, verify none of the assigned UPCs are already attached to an order.
+        const alreadyAssignedUpcs: string[] = [];
+
+        for (const upcId of assignedUpcIds) {
+            const upcRef = upcRefs.get(upcId);
+
+            if (!upcRef) {
+                continue;
+            }
+
+            const upcDoc = await upcRef.get();
+            const upcData = upcDoc.data();
+
+            if (upcData?.orderId !== null && upcData?.orderId !== undefined) {
+                alreadyAssignedUpcs.push(upcId);
+            }
+        }
+
+        if (alreadyAssignedUpcs.length > 0) {
+            return NextResponse.json(
+                {
+                    error: 'At least one of the UPCs is already assigned to another order',
+                    assignedUpcs: alreadyAssignedUpcs,
+                },
+                { status: 400 }
+            );
+        }
+
         const batch = db.batch();
 
-        // Update each UPC document using the correct businessId
         for (const upcId of assignedUpcIds) {
             const actualBusinessId = upcToBusinessId.get(upcId);
-            
+
             if (!actualBusinessId) {
                 console.warn(`⚠️ Skipping UPC ${upcId} - businessId not found`);
                 continue;
             }
 
-            const upcRef = db.collection('users').doc(actualBusinessId).collection('upcs').doc(upcId);
+            const upcRef = db
+                .collection('users')
+                .doc(actualBusinessId)
+                .collection('upcs')
+                .doc(upcId);
 
             const updateData: Partial<UPC> = {
                 storeId: shop,
@@ -153,14 +191,12 @@ export async function POST(req: NextRequest) {
             batch.update(upcRef, updateData);
         }
 
-        // Update the order to mark it as pickup ready
         batch.update(orderRef, {
             pickupReady: true,
             pickupReadyAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // Commit the batch
         await batch.commit();
 
         return NextResponse.json({
@@ -171,6 +207,7 @@ export async function POST(req: NextRequest) {
         });
     } catch (error: any) {
         console.error('Error in make-pickup-ready:', error);
+
         return NextResponse.json(
             {
                 error: 'Failed to process pickup',

@@ -30,6 +30,7 @@ function formatDate(timestamp: Timestamp | null): string {
 
 interface DraftItem extends CreditNoteItem {
     selectedUpcs: string[];
+    warehouseId: string;
 }
 
 type Step = 'party' | 'items' | 'confirm';
@@ -413,6 +414,7 @@ function CreateCreditNoteDialog({
                     quantity: 1,
                     upcs: [upc.id],
                     selectedUpcs: [upc.id],
+                    warehouseId: upc.warehouseId ?? '',
                 },
             ];
         });
@@ -431,36 +433,44 @@ function CreateCreditNoteDialog({
     // ── Submit ───────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!selectedParty) return;
+
         setSubmitting(true);
         setError(null);
 
         try {
-            const firstShelfUpc = shelfUpcs.find((u) =>
-                draftItems[0]?.selectedUpcs.includes(u.id)
-            );
+            const warehouseId = draftItems[0]?.warehouseId ?? '';
+
+            if (!warehouseId) {
+                throw new Error('Warehouse ID missing for selected UPCs');
+            }
 
             const idToken = await user?.getIdToken();
+
             const res = await fetch('/api/business/warehouse/credit-notes/complete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`
+                    Authorization: `Bearer ${idToken}`,
                 },
                 body: JSON.stringify({
                     businessId,
                     partyId: selectedParty.id,
                     partyName: selectedParty.name,
-                    warehouseId: firstShelfUpc?.warehouseId ?? '',
+                    warehouseId,
                     reason,
                     notes: notes || null,
-                    items: draftItems.map(({ selectedUpcs: _s, ...rest }) => rest),
+                    items: draftItems.map(({ selectedUpcs: _s, warehouseId: _w, ...rest }) => rest),
                     totalItems,
                     totalValue,
                 }),
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed');
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed');
+            }
+
             onCreated();
         } catch (err: any) {
             setError(err.message);

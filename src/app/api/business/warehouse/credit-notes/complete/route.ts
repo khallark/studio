@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
 
         // ── Basic validation ──────────────────────────────────────────────────
         if (!businessId || !partyId || !partyName || !warehouseId || !reason) {
+            console.log(businessId, partyId, partyName, warehouseId, reason);
             return NextResponse.json(
                 { error: 'Missing required fields: businessId, partyId, partyName, warehouseId, reason' },
                 { status: 400 },

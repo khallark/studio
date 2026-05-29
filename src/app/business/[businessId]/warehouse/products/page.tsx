@@ -1,4 +1,4 @@
-// /business/[businessId]/dashboard/products/page.tsx
+// /business/[businessId]/dashboard/warehouse/products/page.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';

@@ -69,4 +69,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to refresh token', details: errorMessage }, { status: 500 });
   }
 }
-    

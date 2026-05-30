@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 const formatAddress = (address: any): string => {
   if (!address) return 'N/A';
@@ -17,17 +16,15 @@ const formatAddress = (address: any): string => {
 const formatDate = (timestamp: any): Date | null => {
   if (!timestamp) return null;
 
-  // ISO string
-  if (typeof timestamp === 'string') {
-    return new Date(timestamp);
-  }
+  const date =
+    typeof timestamp === 'string'
+      ? new Date(timestamp)
+      : timestamp?.toDate
+        ? timestamp.toDate()
+        : new Date(timestamp);
 
-  // Firestore Timestamp
-  if (timestamp?.toDate) {
-    return timestamp.toDate();
-  }
-
-  return new Date(timestamp);
+  // Convert UTC → IST
+  return new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
 };
 
 export async function POST(req: NextRequest) {
@@ -76,15 +73,6 @@ export async function POST(req: NextRequest) {
     allDocs.forEach(doc => {
       const order = doc.data();
       if (!order) return;
-
-      if (SHARED_STORE_IDS.includes(shop)) {
-        const vendorName = businessData?.vendorName;
-        const vendors = order?.vendors;
-        const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-        if (!canProcess.authorised) {
-          return;
-        }
-      }
 
       const customerName = `${order.raw.customer?.first_name || ''} ${order.raw.customer?.last_name || ''}`.trim() || order.email;
 

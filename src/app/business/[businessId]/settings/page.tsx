@@ -44,7 +44,13 @@ interface CustomerServices {
 interface SettingsData {
     companyAddress?: CompanyAddress;
     primaryContact?: PrimaryContact;
+    stores?: string[];
+}
+
+interface StoreServiceData {
+    storeId: string;
     customerServices?: CustomerServices;
+    loading: boolean;
 }
 
 export default function SettingsPage() {
@@ -62,7 +68,8 @@ export default function SettingsPage() {
 
     const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
     const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-    const [isTogglingService, setIsTogglingService] = useState(false);
+    const [storeServices, setStoreServices] = useState<Record<string, StoreServiceData>>({});
+    const [togglingStores, setTogglingStores] = useState<Record<string, boolean>>({});
 
 
     useEffect(() => {
@@ -104,6 +111,75 @@ export default function SettingsPage() {
 
     }, [businessId, isAuthorized, user, toast, authLoading]);
 
+    useEffect(() => {
+        if (
+            authLoading ||
+            !isAuthorized ||
+            !businessId ||
+            !displayedData?.stores ||
+            displayedData.stores.length === 0
+        ) {
+            setStoreServices({});
+            return;
+        }
+
+        const storeIds = displayedData.stores;
+
+        setStoreServices(
+            Object.fromEntries(
+                storeIds.map((storeId) => [
+                    storeId,
+                    {
+                        storeId,
+                        customerServices: undefined,
+                        loading: true,
+                    },
+                ])
+            )
+        );
+
+        const unsubs = storeIds.map((storeId) => {
+            const storeRef = doc(db, 'accounts', storeId);
+
+            return onSnapshot(
+                storeRef,
+                (storeSnap) => {
+                    const data = storeSnap.exists() ? storeSnap.data() : null;
+
+                    setStoreServices((prev) => ({
+                        ...prev,
+                        [storeId]: {
+                            storeId,
+                            customerServices: data?.customerServices,
+                            loading: false,
+                        },
+                    }));
+                },
+                (error) => {
+                    console.error(`Error fetching store settings for ${storeId}:`, error);
+
+                    setStoreServices((prev) => ({
+                        ...prev,
+                        [storeId]: {
+                            storeId,
+                            customerServices: undefined,
+                            loading: false,
+                        },
+                    }));
+
+                    toast({
+                        title: 'Error Loading Store Settings',
+                        description: `Could not load settings for ${storeId}.`,
+                        variant: 'destructive',
+                    });
+                }
+            );
+        });
+
+        return () => {
+            unsubs.forEach((unsub) => unsub());
+        };
+    }, [authLoading, isAuthorized, businessId, displayedData?.stores, toast]);
 
     const hasAddress = !!displayedData?.companyAddress?.address;
     const hasContact = !!displayedData?.primaryContact?.name;
@@ -151,26 +227,56 @@ export default function SettingsPage() {
         }
     };
 
-    const handleToggleService = async (serviceName: 'bookReturnPage', isEnabled: boolean) => {
-        if (!user) return;
-        setIsTogglingService(true);
+    const handleToggleService = async (
+        storeId: string,
+        serviceName: 'bookReturnPage',
+        isEnabled: boolean
+    ) => {
+        if (!user || !businessId) return;
+
+        setTogglingStores((prev) => ({
+            ...prev,
+            [storeId]: true,
+        }));
+
         try {
             const idToken = await user.getIdToken();
+
             const response = await fetch('/api/shopify/account/toggle-service', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, serviceName, isEnabled }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    storeId,
+                    serviceName,
+                    isEnabled,
+                }),
             });
+
             const result = await response.json();
-            if (!response.ok) throw new Error(result.details || 'Failed to toggle service');
+
+            if (!response.ok) {
+                throw new Error(result.details || result.error || 'Failed to toggle service');
+            }
+
             toast({
                 title: 'Service Updated',
-                description: `'Booking a return' page has been ${isEnabled ? 'enabled' : 'disabled'}.`
+                description: `'Booking a return' page has been ${isEnabled ? 'enabled' : 'disabled'} for ${storeId}.`,
             });
         } catch (error) {
-            toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
+            toast({
+                title: 'Update Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
+                variant: 'destructive',
+            });
         } finally {
-            setIsTogglingService(false);
+            setTogglingStores((prev) => ({
+                ...prev,
+                [storeId]: false,
+            }));
         }
     };
 
@@ -327,28 +433,69 @@ export default function SettingsPage() {
                         </section>
                         <>
                             <Separator />
+                            
                             {/* Customer Services Section */}
                             <section>
                                 <h2 className="text-xl font-semibold mb-4">Customer Services</h2>
+
                                 <div className="rounded-lg border p-6 space-y-6">
                                     <div>
-                                        <h3 className="font-semibold">Enabled Services</h3>
+                                        <h3 className="font-semibold">Store-Level Services</h3>
                                         <p className="text-sm text-muted-foreground mt-1 mb-4">
-                                            Enable or disable public-facing pages for your customers.
+                                            Enable or disable public-facing customer pages separately for each store.
                                         </p>
-                                        <div className="flex items-center justify-between p-4 border rounded-md">
-                                            <div>
-                                                <h4 className="font-medium">'Booking a return' page</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Allows customers to initiate returns from a public page.
-                                                </p>
+
+                                        {!displayedData?.stores || displayedData.stores.length === 0 ? (
+                                            <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                                                No stores are connected to this business yet.
                                             </div>
-                                            <Switch
-                                                checked={displayedData?.customerServices?.bookReturnPage?.enabled || false}
-                                                onCheckedChange={(isChecked) => handleToggleService('bookReturnPage', isChecked)}
-                                                disabled={isTogglingService}
-                                            />
-                                        </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {displayedData.stores.map((storeId) => {
+                                                    const storeService = storeServices[storeId];
+
+                                                    const isBookReturnEnabled =
+                                                        storeService?.customerServices?.bookReturnPage?.enabled || false;
+
+                                                    const isStoreLoading =
+                                                        storeService?.loading ?? true;
+
+                                                    const isToggling =
+                                                        togglingStores[storeId] || false;
+
+                                                    return (
+                                                        <div
+                                                            key={storeId}
+                                                            className="p-4 border rounded-md space-y-4"
+                                                        >
+                                                            <div>
+                                                                <h4 className="font-medium">{storeId}</h4>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    Manage customer-facing services for this store.
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between gap-4 rounded-md border p-4">
+                                                                <div>
+                                                                    <h5 className="font-medium">'Booking a return' page</h5>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Allows customers to initiate returns from a public page for this store.
+                                                                    </p>
+                                                                </div>
+
+                                                                <Switch
+                                                                    checked={isBookReturnEnabled}
+                                                                    onCheckedChange={(isChecked) =>
+                                                                        handleToggleService(storeId, 'bookReturnPage', isChecked)
+                                                                    }
+                                                                    disabled={isStoreLoading || isToggling}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </section>

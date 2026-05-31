@@ -19,7 +19,6 @@ import {
 import { db } from '@/lib/firebase';
 import { addDays } from 'date-fns';
 import { CustomStatus, Order, UseOrdersFilters } from '@/types/order';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // HOOK - Business-wide cursor pagination
@@ -73,7 +72,6 @@ function toMillis(value: unknown): number {
 export function useOrders(
     businessId: string | null,
     stores: string[],
-    vendorName: string | null,
     activeTab: CustomStatus | 'All Orders',
     currentPage: number,
     rowsPerPage: number,
@@ -169,48 +167,20 @@ export function useOrders(
                 const ordersRef = collection(db, 'accounts', storeId, 'orders');
                 const constraints: QueryConstraint[] = [];
 
-                const excludedStatuses = ['New', 'DTO Requested', 'Pending Refunds'];
-
-                // Vendor visibility for shared stores
-                if (
-                    SHARED_STORE_IDS.includes(storeId) &&
-                    businessId !== SUPER_ADMIN_ID &&
-                    vendorName
-                ) {
-                    constraints.push(where('vendors', 'array-contains', vendorName));
-                }
-
-                const isSharedStoreNonSuperAdmin = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID;
-
                 const selectedStatuses =
                     activeTab === 'All Orders'
                         ? (filters.statusFilter || [])
                         : [];
 
-                const visibleSelectedStatuses =
-                    isSharedStoreNonSuperAdmin
-                        ? selectedStatuses.filter(status => !excludedStatuses.includes(status))
-                        : selectedStatuses;
 
                 // Filter by status tab / All Orders status filter
                 if (activeTab === 'All Orders') {
-                    if (visibleSelectedStatuses.length > 0) {
-                        if (visibleSelectedStatuses.length === 1) {
-                            constraints.push(where('customStatus', '==', visibleSelectedStatuses[0]));
+                    if (selectedStatuses.length > 0) {
+                        if (selectedStatuses.length === 1) {
+                            constraints.push(where('customStatus', '==', selectedStatuses[0]));
                         } else {
-                            constraints.push(where('customStatus', 'in', visibleSelectedStatuses.slice(0, 10)));
+                            constraints.push(where('customStatus', 'in', selectedStatuses.slice(0, 10)));
                         }
-                    } else if (selectedStatuses.length > 0) {
-                        // User selected only statuses that are hidden for this vendor.
-                        constraints.push(where('customStatus', '==', '__NO_MATCH__'));
-                    } else if (isSharedStoreNonSuperAdmin) {
-                        constraints.push(where('customStatus', 'not-in', excludedStatuses));
-                    }
-                } else {
-                    if (isSharedStoreNonSuperAdmin && excludedStatuses.includes(activeTab)) {
-                        constraints.push(where('customStatus', '==', '__NO_MATCH__'));
-                    } else {
-                        constraints.push(where('customStatus', '==', activeTab));
                     }
                 }
 

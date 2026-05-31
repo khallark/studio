@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth as adminAuth, storage } from '@/lib/firebase-admin';
+import { db, storage } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { UPC } from '@/types/warehouse';
 
 export async function POST(req: NextRequest) {
@@ -12,10 +11,10 @@ export async function POST(req: NextRequest) {
     const { businessId, shop, orderId, qcStatuses, videoPath } = body;
 
     // Validate required fields
-    if (!shop || !orderId || !qcStatuses || !videoPath) {
+    if (!businessId || !shop || !orderId || !qcStatuses || !videoPath) {
       return NextResponse.json({
         error: 'Missing required fields',
-        details: 'shopId, orderId, qcStatuses, and videoPath are all required'
+        details: 'businessId, shop, orderId, qcStatuses, and videoPath are all required'
       }, { status: 400 });
     }
 
@@ -33,6 +32,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: 'Invalid qcStatuses format',
         details: 'qcStatuses must be an object'
+      }, { status: 400 });
+    }
+
+    const expectedVideoPrefix = `return-images/${shop}/${orderId}/`;
+
+    if (
+      typeof videoPath !== 'string' ||
+      !videoPath.startsWith(expectedVideoPrefix) ||
+      !videoPath.endsWith('.webm')
+    ) {
+      return NextResponse.json({
+        error: 'Invalid QC video path',
+        details: 'The video path does not belong to this store, and order.'
       }, { status: 400 });
     }
 
@@ -70,16 +82,6 @@ export async function POST(req: NextRequest) {
 
     if (orderData.customStatus && !['DTO In Transit', 'DTO Delivered'].includes(String(orderData.customStatus))) {
       return NextResponse.json({ error: "Only 'DTO In Transit' and 'DTO Delivered' orders can be processed" }, { status: 400 });
-    }
-
-    if (SHARED_STORE_IDS.includes(shop)) {
-      const vendorName = businessData?.vendorName;
-      const vendors = orderData?.vendors;
-      const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-      if (!canProcess.authorised) {
-        const { error, status } = canProcess;
-        return NextResponse.json({ error }, { status });
-      }
     }
 
     // Update line items with QC statuses

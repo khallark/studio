@@ -1,7 +1,6 @@
 // apps/web/src/app/api/shipments/bulk-create/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { authUserForBusinessAndStore } from "@/lib/authoriseUser";
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from "@/lib/shared-constants";
 
 export const runtime = "nodejs";
 
@@ -19,10 +18,6 @@ export async function POST(req: NextRequest) {
 
     if (!businessId) {
       return NextResponse.json({ error: 'No business id provided.' }, { status: 400 });
-    }
-
-    if(SHARED_STORE_IDS.includes(shop) && businessId !== SUPER_ADMIN_ID) {
-      return NextResponse.json({ error: 'This business cannot perform this task.' }, { status: 400 });
     }
     
     if (!shop || !courier || !pickupName || !shippingMode || !Array.isArray(orders) || orders.length === 0) {

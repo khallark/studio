@@ -7,7 +7,6 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendNewOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { buildProductData } from '@/lib/shopify/product-utils';
 import { UPC } from '@/types/warehouse';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 export const runtime = 'nodejs';         // ensure Node (crypto) runtime
 export const dynamic = 'force-dynamic';  // webhooks should not be cached
@@ -24,35 +23,6 @@ function verifyWebhookHmac(rawBody: string, hmacHeader: string, secret: string):
     .update(Buffer.from(rawBody, 'utf8'))
     .digest(); // bytes, not 'hex' or 'base64'
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
-}
-
-// ============================================================
-// LOGGING HELPERS
-// ============================================================
-
-async function logWebhookToCentralCollection(
-  db: FirebaseFirestore.Firestore,
-  shopDomain: string,
-  topic: string,
-  entityId: string,
-  payload: any,
-  hmac: string
-) {
-  const logEntry = {
-    type: 'WEBHOOK',
-    topic,
-    entityId,
-    timestamp: FieldValue.serverTimestamp(),
-    payload,
-    hmacVerified: true,
-    source: 'Shopify',
-    headers: { shopDomain, topic, hmac },
-  };
-  try {
-    await db.collection('accounts').doc(shopDomain).collection('logs').add(logEntry);
-  } catch (error) {
-    console.error('Failed to write webhook log to central collection:', error);
-  }
 }
 
 // ============================================================
@@ -365,9 +335,7 @@ async function handleOrderWebhook(
   // Extract and normalize vendors from line items.
   // For shared stores, BBB/GHAMAND aliases are normalized to OWR.
   const extractedVendors = extractVendors(orderData.line_items || []);
-  const vendorNormalization = SHARED_STORE_IDS.includes(shopDomain)
-    ? normalizeVendorsForSharedStore(extractedVendors)
-    : { vendors: extractedVendors };
+  const vendorNormalization = { vendors: extractedVendors };
   const vendors = vendorNormalization.vendors;
 
   // Check if this is a split order
@@ -391,12 +359,7 @@ async function handleOrderWebhook(
     fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
     totalPrice: orderData.total_price ? parseFloat(orderData.total_price) : null,
     currency: orderData.currency,
-
     vendors,
-    ...(vendorNormalization.prevVendors
-      ? { prevVendors: vendorNormalization.prevVendors }
-      : {}),
-
     raw: orderData,
     ...buildNormalizedOrderFields(orderData),
 
@@ -652,10 +615,6 @@ async function handleOrderWebhook(
     }
   });
 
-  if (shouldLogWebhook) {
-    await logWebhookToCentralCollection(db, shopDomain, topic, orderId, orderData, hmacHeader);
-  }
-
   // Post-transaction side effects: Skip for split orders
   if (created && !isSplit) {
     // WhatsApp message: Only for non-split orders
@@ -724,8 +683,6 @@ async function handleProductWebhook(
   const accountRef = db.collection('accounts').doc(shopDomain);
   const productRef = accountRef.collection('products').doc(productId);
 
-  let shouldLogWebhook = false;
-
   // Use a transaction for consistency
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(productRef);
@@ -740,11 +697,6 @@ async function handleProductWebhook(
           lastWebhookTopic: topic,
         });
         console.log(`🗑️ Tombstoned product ${productId} (${productData.title || 'Unknown'}) for shop ${shopDomain}`);
-
-        // Option B: Hard delete (uncomment if you prefer)
-        // tx.delete(productRef);
-        // console.log(`🗑️ Deleted product ${productId} for shop ${shopDomain}`);
-        shouldLogWebhook = true;
       } else {
         console.log(`Product ${productId} not found for deletion, skipping.`);
       }
@@ -774,7 +726,6 @@ async function handleProductWebhook(
         console.log(`✅ Created product ${productId} (${productData.title}) for ${shopDomain}`);
         console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
       }
-      shouldLogWebhook = true;
       return;
     }
 
@@ -808,13 +759,8 @@ async function handleProductWebhook(
       }
       console.log(`📝 Updated product ${productId} (${productData.title}) for ${shopDomain}`);
       console.log(`   Variants: ${dataToSave.variantCount}, SKUs: ${dataToSave.skus.join(', ') || 'none'}`);
-      shouldLogWebhook = true;
     }
   });
-
-  if (shouldLogWebhook) {
-    await logWebhookToCentralCollection(db, shopDomain, topic, productId, productData, hmacHeader);
-  }
 }
 
 // ============================================================

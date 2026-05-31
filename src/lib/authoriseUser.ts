@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { db, auth as adminAuth } from "./firebase-admin";
 import { DocumentSnapshot } from "firebase-admin/firestore";
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from "./shared-constants";
 
 export async function getUserIdFromToken(req: NextRequest): Promise<string | null> {
     const authHeader = req.headers.get('authorization');
@@ -31,7 +30,6 @@ interface BusinessAuthParams {
 
 interface StoreAuthOutput {
     authorised: boolean;
-    isExpection?: boolean;
     error?: string;
     status?: number;
     userId?: string;
@@ -39,18 +37,6 @@ interface StoreAuthOutput {
     userDoc?: DocumentSnapshot;
     shopDoc?: DocumentSnapshot;
     businessDoc?: DocumentSnapshot;
-}
-
-interface BusinessOrderInput {
-    businessId: string;
-    vendorName: string;
-    vendors: any;
-}
-
-interface BusinessOrderOutput {
-    authorised: boolean;
-    error?: string;
-    status?: number;
 }
 
 export async function authUserForBusiness({ businessId, req }: BusinessAuthParams): Promise<StoreAuthOutput> {
@@ -121,8 +107,6 @@ export async function authUserForBusiness({ businessId, req }: BusinessAuthParam
 
 export async function authUserForBusinessAndStore({ businessId, shop, req }: BusinessStoreAuthParams): Promise<StoreAuthOutput> {
     try {
-        const isExpection = SHARED_STORE_IDS.includes(shop);
-
         // ✅ Added: Input validation
         if (!businessId || !shop) {
             return {
@@ -187,7 +171,6 @@ export async function authUserForBusinessAndStore({ businessId, shop, req }: Bus
 
         return {
             authorised: true,
-            isExpection,
             userId,
             memberDoc,
             userDoc,
@@ -199,51 +182,6 @@ export async function authUserForBusinessAndStore({ businessId, shop, req }: Bus
             authorised: false,
             status: 500,
             error: error.message ?? "Unknown error occurred",
-        }
-    }
-}
-
-export function authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors }: BusinessOrderInput): BusinessOrderOutput {
-    try {
-        if (businessId === SUPER_ADMIN_ID) {
-            return {
-                authorised: true,
-            }
-        }
-        if (!vendorName) {
-            return {
-                authorised: false,
-                error: "No vendorName provided",
-                status: 400,
-            }
-        } if (!vendors || !Array.isArray(vendors) || !vendors.length) {
-            return {
-                authorised: false,
-                error: "Invalid vendors array",
-                status: 400,
-            }
-        }
-
-        const isAuthorized = vendorName !== 'OWR'
-            ? vendors.includes(vendorName)
-            : (vendors.includes(vendorName) || vendors.includes('Ghamand') || vendors.includes('BBB')) && !vendors.includes('ENDORA') && !vendors.includes('STYLE 05');
-
-        if (!isAuthorized) {
-            return {
-                authorised: false,
-                error: "Not authorised to process this order",
-                status: 403,
-            }
-        }
-
-        return {
-            authorised: true
-        }
-    } catch (error: any) {
-        return {
-            authorised: false,
-            error: error?.message ?? "Unknown error occurred",
-            status: 500,
         }
     }
 }

@@ -242,18 +242,6 @@ const nextConfig: NextConfig = {
         destination: '/api/business/members/join/route',
       },
       {
-        source: '/api/business/members/request-join',
-        destination: '/api/business/members/request-join/route',
-      },
-      {
-        source: '/api/business/members/accept-request',
-        destination: '/api/business/members/accept-request/route',
-      },
-      {
-        source: '/api/business/members/decline-request',
-        destination: '/api/business/members/decline-request/route',
-      },
-      {
         source: '/api/business/generate-tax-report',
         destination: '/api/business/generate-tax-report/route',
       },
@@ -548,10 +536,6 @@ const nextConfig: NextConfig = {
       {
         source: '/api/public/join-business/[sessionId]',
         destination: '/api/public/join-business/[sessionId]/route',
-      },
-      {
-        source: '/api/settings/get-details',
-        destination: '/api/settings/get-details/route',
       },
       {
         source: '/api/integrations/courier/delete',

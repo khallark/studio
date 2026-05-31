@@ -1,8 +1,8 @@
 // src/app/api/public/book-return/request/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
+import { getSessionScopedOrderRef } from "@/lib/getSessionScopedOrderRef";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { sendDTORequestedOrderWhatsAppMessage } from "@/lib/communication/whatsappMessagesSendingFuncs";
 
@@ -26,6 +26,131 @@ interface TrackingResponse {
     ShipmentData: ShipmentData[];
 }
 
+function getPublicSessionErrorResponse(errorMessage: string) {
+    const sessionExpired = errorMessage === "SESSION_EXPIRED";
+
+    return NextResponse.json({
+        error: sessionExpired
+            ? "Your session has expired. Please refresh the page."
+            : "Your session is invalid. Please refresh the page.",
+        sessionError: true,
+    }, { status: 401 });
+}
+
+function normalizeVariantId(value: unknown): string | null {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+        return String(value);
+    }
+
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+
+        if (/^\d+$/.test(trimmed)) {
+            return trimmed;
+        }
+    }
+
+    return null;
+}
+
+function validateBookedReturnImages(bookedReturnImages: unknown): {
+    ok: true;
+    imageNames: string[];
+} | {
+    ok: false;
+    response: NextResponse;
+} {
+    if (!bookedReturnImages || !Array.isArray(bookedReturnImages)) {
+        return {
+            ok: false,
+            response: NextResponse.json({
+                error: "At least one image is required for return request."
+            }, { status: 400 }),
+        };
+    }
+
+    if (bookedReturnImages.length === 0) {
+        return {
+            ok: false,
+            response: NextResponse.json({
+                error: "At least one image is required for return request."
+            }, { status: 400 }),
+        };
+    }
+
+    if (bookedReturnImages.length > 10) {
+        return {
+            ok: false,
+            response: NextResponse.json({
+                error: "Maximum 10 images are allowed."
+            }, { status: 400 }),
+        };
+    }
+
+    const imageNames = bookedReturnImages.filter((name: unknown) =>
+        typeof name === "string" &&
+        name.trim() !== "" &&
+        /^[a-zA-Z0-9._-]+$/.test(name)
+    ) as string[];
+
+    if (imageNames.length !== bookedReturnImages.length) {
+        return {
+            ok: false,
+            response: NextResponse.json({
+                error: "Invalid image filename."
+            }, { status: 400 }),
+        };
+    }
+
+    return {
+        ok: true,
+        imageNames,
+    };
+}
+
+async function submitDTORequest(params: {
+    orderRef: any;
+    storeRef: any;
+    selectedReturnVariantIds: Array<string | number>;
+    bookedReturnImageNames: string[];
+    bookedReturnReason: string;
+    requestedAgain?: boolean;
+}) {
+    const {
+        orderRef,
+        storeRef,
+        selectedReturnVariantIds,
+        bookedReturnImageNames,
+        bookedReturnReason,
+        requestedAgain = false,
+    } = params;
+
+    const logEntry = {
+        status: requestedAgain ? "DTO Requested Again" : "DTO Requested",
+        createdAt: Timestamp.now(),
+        remarks: requestedAgain
+            ? `The Return for this order was requested again by the customer. Reason: ${bookedReturnReason}`
+            : `The Return for this order was requested by the customer. Reason: ${bookedReturnReason}`,
+    };
+
+    await orderRef.update({
+        customStatus: "DTO Requested",
+        returnItemsVariantIds: selectedReturnVariantIds,
+        booked_return_images: bookedReturnImageNames,
+        booked_return_reason: bookedReturnReason,
+        return_request_date: Timestamp.now(),
+        customStatusesLogs: FieldValue.arrayUnion(logEntry),
+    });
+
+    const shopData = (await storeRef.get()).data() as any;
+    const orderDataUpdated = (await orderRef.get()).data() as any;
+
+    await sendDTORequestedOrderWhatsAppMessage(
+        shopData,
+        orderDataUpdated
+    );
+}
+
 export async function POST(req: NextRequest) {
     try {
         // Validate session first
@@ -33,76 +158,122 @@ export async function POST(req: NextRequest) {
 
         // Parse and validate request body
         const body = await req.json();
-        const { storeId, orderId, selectedVariantIds, booked_return_images, booked_return_reason } = body;
 
-        // Input validation
-        if (!storeId || !orderId || typeof orderId !== 'string' || orderId.trim() === '') {
+        const {
+            orderId,
+            selectedVariantIds,
+            booked_return_images,
+            booked_return_reason,
+        } = body;
+
+        if (!orderId || typeof orderId !== "string" || orderId.trim() === "") {
             return NextResponse.json({
-                error: 'Valid Order ID is required.'
+                error: "Valid Order ID is required."
             }, { status: 400 });
         }
 
         if (!selectedVariantIds || !Array.isArray(selectedVariantIds) || selectedVariantIds.length === 0) {
             return NextResponse.json({
-                error: 'At least one item variant must be selected for return.'
+                error: "At least one item variant must be selected for return."
             }, { status: 400 });
         }
 
-        // Validate variant IDs are numbers
-        const validVariantIds = selectedVariantIds.filter(id =>
-            typeof id === 'number' && !isNaN(id) && id > 0
+        const normalizedSelectedVariantIds = selectedVariantIds.map(normalizeVariantId);
+
+        if (normalizedSelectedVariantIds.some((id: string | null) => id === null)) {
+            return NextResponse.json({
+                error: "Valid item variant IDs are required."
+            }, { status: 400 });
+        }
+
+        const selectedVariantIdSet = new Set(
+            normalizedSelectedVariantIds.filter((id: string | null): id is string => id !== null)
         );
 
-        if (validVariantIds.length === 0) {
-            return NextResponse.json({
-                error: 'Valid item variant IDs are required.'
-            }, { status: 400 });
+        const imageValidation = validateBookedReturnImages(booked_return_images);
+
+        if (!imageValidation.ok) {
+            return imageValidation.response;
         }
 
-        // Validate return images
-        if (!booked_return_images || !Array.isArray(booked_return_images)) {
-            return NextResponse.json({
-                error: 'At least one image is required for return request.'
-            }, { status: 400 });
-        }
-
-        if (booked_return_images.length > 10) {
-            return NextResponse.json({
-                error: 'Maximum 10 images are allowed.'
-            }, { status: 400 });
-        }
+        const bookedReturnImageNames = imageValidation.imageNames;
 
         // Validate return reason
-        if (!booked_return_reason || typeof booked_return_reason !== 'string' || booked_return_reason.trim() === '') {
+        if (!booked_return_reason || typeof booked_return_reason !== "string" || booked_return_reason.trim() === "") {
             return NextResponse.json({
-                error: 'Return reason is required.'
+                error: "Return reason is required."
             }, { status: 400 });
         }
 
-        if (booked_return_reason.length > 500) {
+        const cleanReturnReason = booked_return_reason.trim();
+
+        if (cleanReturnReason.length > 500) {
             return NextResponse.json({
-                error: 'Return reason must not exceed 500 characters.'
+                error: "Return reason must not exceed 500 characters."
             }, { status: 400 });
         }
 
-        // Get store and order references
-        const storeRef = db.collection('accounts').doc(storeId);
-        const orderRef = storeRef.collection('orders').doc(orderId.trim());
+        // Get store and order references from trusted session scope
+        const {
+            storeRef,
+            orderRef,
+        } = getSessionScopedOrderRef(session, orderId);
 
         // Fetch order
         const orderDoc = await orderRef.get();
+
         if (!orderDoc.exists) {
             return NextResponse.json({
-                error: 'Order not found. Please check the order number.'
+                error: "Order not found. Please check the order number."
             }, { status: 404 });
         }
 
         const orderData = orderDoc.data()!;
+
+        const lineItems = Array.isArray(orderData.raw?.line_items)
+            ? orderData.raw.line_items
+            : [];
+
+        if (lineItems.length === 0) {
+            return NextResponse.json({
+                error: "Order items are not available."
+            }, { status: 400 });
+        }
+
+        const orderVariantIds = new Set(
+            lineItems
+                .map((item: any) => normalizeVariantId(item.variant_id))
+                .filter((id: string | null): id is string => id !== null)
+        );
+
+        const invalidVariantIds = [...selectedVariantIdSet].filter(
+            id => !orderVariantIds.has(id)
+        );
+
+        if (invalidVariantIds.length > 0) {
+            return NextResponse.json({
+                error: "One or more selected items do not belong to this order."
+            }, { status: 400 });
+        }
+
+        const selectedReturnVariantIds = lineItems
+            .filter((item: any) => {
+                const normalizedVariantId = normalizeVariantId(item.variant_id);
+                return normalizedVariantId && selectedVariantIdSet.has(normalizedVariantId);
+            })
+            .map((item: any) => item.variant_id);
+
+        if (selectedReturnVariantIds.length === 0) {
+            return NextResponse.json({
+                error: "Valid item variant IDs are required."
+            }, { status: 400 });
+        }
+
         const currentStatus = orderData.customStatus;
 
         if (!currentStatus) {
             return NextResponse.json({
-                error: 'Order status is not available.'
+                error: "Order status is not available."
             }, { status: 400 });
         }
 
@@ -116,28 +287,14 @@ export async function POST(req: NextRequest) {
 
         // Handle delivered orders - immediate return approval
         if (DELIVERABLE_STATUSES.includes(currentStatus)) {
-            let logEntry = {
-                status: "DTO Requested",
-                createdAt: Timestamp.now(),
-                remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
-            }
-            if (currentStatus === 'DTO Requested') {
-                logEntry = {
-                    status: "DTO Requested Again",
-                    createdAt: Timestamp.now(),
-                    remarks: `The Return for this order was requested again by the customer. Reason: ${booked_return_reason}`
-                }
-            }
-            await orderRef.update({
-                customStatus: "DTO Requested",
-                returnItemsVariantIds: validVariantIds,
-                booked_return_images: booked_return_images,
-                booked_return_reason: booked_return_reason.trim(),
-                return_request_date: Timestamp.now(),
-                customStatusesLogs: FieldValue.arrayUnion(logEntry)
+            await submitDTORequest({
+                orderRef,
+                storeRef,
+                selectedReturnVariantIds,
+                bookedReturnImageNames,
+                bookedReturnReason: cleanReturnReason,
+                requestedAgain: currentStatus === "DTO Requested",
             });
-
-
 
             return NextResponse.json({
                 success: true,
@@ -151,26 +308,13 @@ export async function POST(req: NextRequest) {
                 const updatedStatus = await checkDeliveryStatus(storeRef, orderData);
 
                 if (updatedStatus === "Delivered") {
-                    // Order was delivered, allow return
-                    await orderRef.update({
-                        customStatus: "DTO Requested",
-                        returnItemsVariantIds: validVariantIds,
-                        booked_return_images: booked_return_images,
-                        booked_return_reason: booked_return_reason.trim(),
-                        return_request_date: Timestamp.now(),
-                        customStatusesLogs: FieldValue.arrayUnion({
-                            status: "DTO Requested",
-                            createdAt: Timestamp.now(),
-                            remarks: `The Return for this order was requested by the customer. Reason: ${booked_return_reason}`
-                        })
+                    await submitDTORequest({
+                        orderRef,
+                        storeRef,
+                        selectedReturnVariantIds,
+                        bookedReturnImageNames,
+                        bookedReturnReason: cleanReturnReason,
                     });
-
-                    const shopData = (await storeRef.get()).data() as any;
-                    const orderDataUpdated = (await orderRef.get()).data() as any;
-                    await sendDTORequestedOrderWhatsAppMessage(
-                        shopData,
-                        orderDataUpdated
-                    );
 
                     return NextResponse.json({
                         success: true,
@@ -195,7 +339,7 @@ export async function POST(req: NextRequest) {
                 }, { status: 200 });
 
             } catch (trackingError) {
-                console.error('Delivery tracking failed:', trackingError);
+                console.error("Delivery tracking failed:", trackingError);
 
                 // Fallback: deny return if we can't verify delivery
                 return NextResponse.json({
@@ -212,29 +356,32 @@ export async function POST(req: NextRequest) {
         }, { status: 200 });
 
     } catch (error: any) {
-        console.error('Book return request failed:', error);
+        console.error("Book return request failed:", error);
 
-        // Handle specific session errors
-        if (error.message?.includes('SESSION') || error.message?.includes('CSRF')) {
-            const sessionExpired = error.message === 'SESSION_EXPIRED';
-            return NextResponse.json({
-                error: sessionExpired
-                    ? 'Your session has expired. Please refresh the page.'
-                    : 'Your session is invalid. Please refresh the page.',
-                sessionError: true
-            }, { status: 401 });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        switch (errorMessage) {
+            case "NO_SESSION_COOKIE":
+            case "NO_CSRF_TOKEN":
+            case "INVALID_SESSION":
+            case "INVALID_SESSION_SCOPE":
+            case "INVALID_BUSINESS":
+            case "STORE_NOT_OWNED_BY_BUSINESS":
+            case "CSRF_MISMATCH":
+            case "SESSION_EXPIRED":
+                return getPublicSessionErrorResponse(errorMessage);
         }
 
         // Handle JSON parsing errors
         if (error instanceof SyntaxError) {
             return NextResponse.json({
-                error: 'Invalid request format.'
+                error: "Invalid request format."
             }, { status: 400 });
         }
 
         // Generic server error
         return NextResponse.json({
-            error: 'An internal server error occurred. Please try again later.'
+            error: "An internal server error occurred. Please try again later."
         }, { status: 500 });
     }
 }

@@ -3,6 +3,7 @@ import { db } from "./firebase-admin";
 import { getClientIP } from "./getClientIP";
 
 interface SessionData {
+  businessId: string;
   storeId: string;
   storeAlias: string;
   csrfToken: string;

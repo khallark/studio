@@ -5,9 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Order } from './use-orders';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
-export function useAvailabilityCounts(businessId: string | null, activeTab: string, stores: string[], vendorName: string | null | undefined) {
+export function useAvailabilityCounts(businessId: string | null, activeTab: string, stores: string[]) {
   return useQuery({
     queryKey: ['availabilityCounts', businessId, stores, activeTab],
 
@@ -41,14 +40,6 @@ export function useAvailabilityCounts(businessId: string | null, activeTab: stri
           ordersRef,
           where('customStatus', '==', 'Confirmed')
         );
-
-        if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
-          if (vendorName !== 'OWR') {
-            q = query(q, where("vendors", "array-contains", vendorName));
-          } else {
-            q = query(q, where("vendors", "array-contains-any", ['OWR', 'BBB', 'Ghamand']));
-          }
-        }
 
         const snapshot = await getDocs(q);
 

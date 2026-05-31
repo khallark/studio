@@ -25,29 +25,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { businessDoc } = result;
-    // const memberData = memberDoc?.data();
-    // const memberRole = memberData?.role;
-    // if (!memberRole) {
-    //   return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
-    // }
-
-    // // Vendors have their own isolated settings
-    // if (memberRole === 'Vendor') {
-    //   await memberDoc?.ref.update({
-    //     primaryContact: contact,
-    //     lastUpdatedAt: FieldValue.serverTimestamp(),
-    //   });
-    // } else if (memberRole === 'SuperAdmin' || memberRole === 'Admin') {
-    //   // SuperAdmins and Admins edit the main account document
-    //   const accountRef = db.collection('accounts').doc(shop);
-    //   await accountRef.update({
-    //     primaryContact: contact,
-    //     lastUpdatedAt: FieldValue.serverTimestamp(),
-    //   });
-    // } else {
-    //   // Staff members are read-only
-    //   return NextResponse.json({ error: 'Forbidden: You do not have permission to edit settings.' }, { status: 403 });
-    // }
     await businessDoc?.ref.update({
       primaryContact: contact,
       lastUpdatedAt: FieldValue.serverTimestamp(),

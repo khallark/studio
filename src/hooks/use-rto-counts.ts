@@ -4,9 +4,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
-export function useRtoInTransitCounts(businessId: string | null, stores: string[], vendorName: string | null | undefined) {
+export function useRtoInTransitCounts(businessId: string | null, stores: string[]) {
   return useQuery({
     queryKey: ['rtoInTransitCounts', businessId, stores],
 
@@ -28,10 +27,6 @@ export function useRtoInTransitCounts(businessId: string | null, stores: string[
           ordersRef,
           where('customStatus', '==', 'RTO In Transit')
         );
-
-        if (SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID && vendorName) {
-          q = query(q, where("vendors", "array-contains", vendorName));
-        }
 
         const snapshot = await getDocs(q);
 

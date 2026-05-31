@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
 import { sendCancelOrderWhatsAppMessage, sendConfirmOrderWhatsAppMessage, sendDTORequestedCancelledWhatsAppMessage, sendRTOInTransitIWantThisOrderWhatsAppMessage, sendRTOInTransitIDontWantThisOrderWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
 import { db } from '@/lib/firebase-admin';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 // Fire-and-forget pattern: Webhook responds immediately and processes async
 // This prevents timeout issues on starter plans with 45-50 second limits
@@ -248,81 +247,17 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
             return false;
         }
 
-        // ============================================
-        // ✅ SPLIT ORDER LOGIC (ONLY for SHARED_STORE_ID)
-        // ============================================
-
-        let isSplitEligible = false;
-
         // Extract store ID from document
-        const shop = orderData?.storeId;
+        const log = {
+            status: 'Confirmed',
+            createdAt: Timestamp.now(),
+            remarks: 'This order was confirmed by the customer via Whatsapp',
+        };
 
-        if (shop && SHARED_STORE_IDS.includes(shop)) {
-            const vendors = orderData?.vendors || [];
-            const orderId = orderData?.orderId || orderDoc.id;
-
-            // Check if order needs splitting (multiple vendors)
-            if (orderId && vendors && vendors.length > 1) {
-                isSplitEligible = true;
-                console.log(`🔀 Order ${orderData?.name} has ${vendors.length} vendors - triggering split`);
-
-                // Call enqueue function
-                const url = process.env.ENQUEUE_ORDER_SPLIT_FUNCTION_URL;
-                const secret = process.env.ENQUEUE_FUNCTION_SECRET;
-
-                if (!url || !secret) {
-                    console.warn('⚠️ Split function not configured (missing ENQUEUE_ORDER_SPLIT_FUNCTION_URL or ENQUEUE_FUNCTION_SECRET)');
-                    return true; // Still return true since confirmation succeeded
-                }
-
-                try {
-                    console.log(`📤 Enqueueing split for order ${orderId}...`);
-
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Api-Key': secret,
-                        },
-                        body: JSON.stringify({
-                            shop,
-                            orderId: String(orderId),
-                            requestedBy: "customer_via_whatsapp"
-                        }),
-                    });
-
-                    if (!resp.ok) {
-                        const json = await resp.json();
-                        console.warn(`⚠️ Order split enqueue failed: ${json.error || resp.statusText}`);
-                    } else {
-                        const json = await resp.json();
-                        console.log(`✅ Order split enqueued! Batch: ${json.batchId}, Jobs: ${json.jobCount}`);
-                    }
-                } catch (enqueueError) {
-                    console.error('❌ Error enqueueing split:', enqueueError);
-                    // Don't fail the confirmation - splitting can be retried manually
-                }
-            } else if (vendors.length === 1) {
-                console.log(`✓ Order ${orderData?.name} is single-vendor (${vendors[0]}), no split needed`);
-            } else {
-                console.log(`✓ Order ${orderData?.name} has no vendor info, skipping split check`);
-            }
-        } else {
-            console.log(`✓ Shop ${shop} is not shared store, skipping split logic`);
-        }
-
-        if (!isSplitEligible) {
-            const log = {
-                status: 'Confirmed',
-                createdAt: Timestamp.now(),
-                remarks: 'This order was confirmed by the customer via Whatsapp',
-            };
-
-            await orderDoc.ref.update({
-                customStatus: 'Confirmed',
-                customStatusesLogs: FieldValue.arrayUnion(log),
-            });
-        }
+        await orderDoc.ref.update({
+            customStatus: 'Confirmed',
+            customStatusesLogs: FieldValue.arrayUnion(log),
+        });
 
         console.log(`✅ Order ${orderData?.name ?? '{Unknown}'} confirmed`);
 

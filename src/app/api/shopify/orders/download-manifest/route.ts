@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { DocumentSnapshot } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 const chromiumConfig = chromium as typeof chromium & {
   defaultViewport: { width: number; height: number } | null;
@@ -494,12 +492,6 @@ export async function POST(req: NextRequest) {
     const authorizedOrders: any[] = [];
     for (const d of allDocs) {
       const order = d.data();
-      if (SHARED_STORE_IDS.includes(shop)) {
-        const vendorName = businessData?.vendorName;
-        const vendors = order?.vendors;
-        const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-        if (!canProcess.authorised) continue;
-      }
       authorizedOrders.push(order);
     }
 

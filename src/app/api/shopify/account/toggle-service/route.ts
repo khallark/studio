@@ -31,15 +31,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { businessDoc } = result;
-    // const memberRole = memberDoc?.data()?.role;
-    // if (!memberRole) {
-    //   return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
-    // }
-    // if (memberRole === 'Vendor' || memberRole === 'Staff') {
-    //   return NextResponse.json({ error: 'Forbidden: Insufficient permissions.' }, { status: 403 });
-    // }
-
-    // const accountRef = db.collection('accounts').doc(shop);
 
     await businessDoc?.ref.set({
       customerServices: {

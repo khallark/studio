@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { db } from '@/lib/firebase-admin';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 // Type assertion for chromium properties that exist at runtime but not in types
 const chromiumConfig = chromium as typeof chromium & {
@@ -243,15 +242,6 @@ export async function POST(req: NextRequest) {
 
     allDocs.forEach((order) => {
       if (order.isDeleted) return;
-
-      if (SHARED_STORE_IDS.includes(shop)) {
-        const vendorName = businessData?.vendorName;
-        const vendors = order?.vendors;
-        const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-        if (!canProcess.authorised) {
-          return;
-        }
-      }
 
       if (order.raw?.line_items) {
         order.raw.line_items.forEach((item: any) => {

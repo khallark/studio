@@ -325,8 +325,6 @@ export default function SettingsPage() {
                                 </div>
                             )}
                         </section>
-
-                        {/* Customer services can only be toggled by SuperAdmins/Admins, not Vendors */}
                         <>
                             <Separator />
                             {/* Customer Services Section */}

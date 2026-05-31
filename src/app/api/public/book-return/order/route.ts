@@ -1,13 +1,13 @@
 // src/app/api/public/book-return/order/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { validateCustomerSession } from "@/lib/validateBookReturnSession";
-import { SHARED_STORE_ID, SHARED_STORE_ID_2, SHARED_STORE_IDS } from "@/lib/shared-constants";
 
 // Helper to normalize phone numbers for comparison
 function normalizePhoneNumber(phone: string): string {
     if (!phone) return '';
-    // Removes non-digit characters and takes the last 10 digits
+
     const digitsOnly = phone.replace(/\D/g, '');
     return digitsOnly.slice(-10);
 }
@@ -19,42 +19,55 @@ export async function POST(req: NextRequest) {
         const { orderNumber, phoneNo } = await req.json();
 
         if (!orderNumber || !phoneNo) {
-            return NextResponse.json({ error: 'Order Number and Phone Number are required.' }, { status: 400 });
+            return NextResponse.json(
+                { error: 'Order Number and Phone Number are required.' },
+                { status: 400 }
+            );
         }
 
         const normalizedPhone = normalizePhoneNumber(phoneNo);
+
         if (!normalizedPhone) {
-            return NextResponse.json({ error: 'A valid phone number is required.' }, { status: 400 });
+            return NextResponse.json(
+                { error: 'A valid phone number is required.' },
+                { status: 400 }
+            );
         }
 
-        // Query for the order by name within the correct account
-        let ordersRef, querySnapshot;
+        /**
+         * Every store is now owned by exactly one business.
+         * So the customer session's storeId is the only store we should query.
+         */
+        const ordersRef = db
+            .collection('accounts')
+            .doc(session.storeId)
+            .collection('orders');
 
-        if (SHARED_STORE_IDS.includes(session.storeId)) {
-            let finalStoreId = '';
-            if (orderNumber.toLowerCase().includes('owr-mt')) finalStoreId = SHARED_STORE_ID;
-            if (orderNumber.toLowerCase().includes('owr-maj-')) finalStoreId = SHARED_STORE_ID_2;
-            ordersRef = db.collection('accounts').doc(finalStoreId).collection('orders');
-            querySnapshot = await ordersRef.where(
-                'name',
-                '==',
-                orderNumber
-            ).limit(1).get();
-        } else {
-            ordersRef = db.collection('accounts').doc(session.storeId).collection('orders');
-            querySnapshot = await ordersRef.where(
-                'name',
-                '==',
-                orderNumber
-            ).limit(1).get();
-        }
+        const querySnapshot = await ordersRef
+            .where('name', '==', orderNumber)
+            .limit(1)
+            .get();
 
         if (querySnapshot.empty) {
-            return NextResponse.json({ error: 'Order not found. Please check the order number.' }, { status: 404 });
+            return NextResponse.json(
+                { error: 'Order not found. Please check the order number.' },
+                { status: 404 }
+            );
         }
 
         const orderDoc = querySnapshot.docs[0];
         const orderData = orderDoc.data();
+
+        /**
+         * Extra safety check:
+         * The found order must belong to the same store as the customer session.
+         */
+        if (orderData.storeId && orderData.storeId !== session.storeId) {
+            return NextResponse.json(
+                { error: 'Order does not belong to this store.' },
+                { status: 403 }
+            );
+        }
 
         // Verify phone number
         const billingPhone = normalizePhoneNumber(orderData.raw?.billing_address?.phone || '');
@@ -66,18 +79,20 @@ export async function POST(req: NextRequest) {
             normalizedPhone !== shippingPhone &&
             normalizedPhone !== customerPhone
         ) {
-            return NextResponse.json({ error: 'Phone number does not match our records for this order.' }, { status: 403 });
+            return NextResponse.json(
+                { error: 'Phone number does not match our records for this order.' },
+                { status: 403 }
+            );
         }
 
-        // Return curated order data
         return NextResponse.json({
             id: orderDoc.id,
-            storeId: orderData.storeId,
+            storeId: session.storeId,
             name: orderData.raw.name,
             awb: orderData.awb ?? '',
             awb_reverse: orderData.awb_reverse ?? '',
             status: orderData.customStatus,
-            logs: orderData.customStatusesLogs || [], // Ensure it's an array
+            logs: orderData.customStatusesLogs || [],
             payment_gateway_names: orderData.raw.payment_gateway_names,
             total_price: orderData.raw.total_price,
             total_outstanding: orderData.raw.total_outstanding,
@@ -93,6 +108,7 @@ export async function POST(req: NextRequest) {
 
     } catch (error: any) {
         console.error('Order lookup error:', error.message);
+
         let status = 500;
         let message = 'An internal server error occurred.';
 
@@ -101,15 +117,22 @@ export async function POST(req: NextRequest) {
             case 'NO_CSRF_TOKEN':
             case 'INVALID_SESSION':
             case 'CSRF_MISMATCH':
+            case 'INVALID_SESSION_SCOPE':
+            case 'INVALID_BUSINESS':
+            case 'STORE_NOT_OWNED_BY_BUSINESS':
                 status = 401;
                 message = 'Your session is invalid. Please refresh the page.';
                 break;
+
             case 'SESSION_EXPIRED':
                 status = 401;
                 message = 'Your session has expired. Please refresh the page.';
                 break;
         }
 
-        return NextResponse.json({ error: message, details: error.message }, { status });
+        return NextResponse.json(
+            { error: message, details: error.message },
+            { status }
+        );
     }
 }

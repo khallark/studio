@@ -418,10 +418,7 @@ export default function Dashboard() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
                     businessId: businessAuth.businessId,
-                    storeIds: [
-                        "gj9ejg-cu.myshopify.com",
-                        "nfkjgp-sv.myshopify.com"
-                    ],
+                    storeIds: businessAuth.stores,
                     startDate: grossProfitData.startDate,
                     endDate: grossProfitData.endDate,
                 }),

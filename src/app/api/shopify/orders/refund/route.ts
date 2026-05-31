@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { sendDTORefundedWhatsAppMessage } from '@/lib/communication/whatsappMessagesSendingFuncs';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 const EARLY_DTO_REFUND_STATUSES = ['DTO Requested', 'DTO Booked', 'DTO In Transit'];
 
@@ -68,17 +67,6 @@ export async function POST(req: NextRequest) {
 
         if (!orderData) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-        }
-
-        // Additional auth for shared store
-        if (SHARED_STORE_IDS.includes(shop)) {
-            const vendorName = businessData?.vendorName;
-            const vendors = orderData?.vendors;
-            const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-            if (!canProcess.authorised) {
-                const { error, status } = canProcess;
-                return NextResponse.json({ error }, { status });
-            }
         }
 
         const currentStatus = orderData.customStatus;

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth as adminAuth } from '@/lib/firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { authBusinessForOrderOfTheExceptionStore, authUserForBusinessAndStore } from '@/lib/authoriseUser';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
+import { db } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,16 +28,6 @@ export async function POST(req: NextRequest) {
     const orderRef = db.collection('accounts').doc(shop).collection('orders').doc(String(orderId));
 
     const orderData = (await orderRef.get()).data();
-
-    if (SHARED_STORE_IDS.includes(shop)) {
-      const vendorName = businessData?.vendorName;
-      const vendors = orderData?.vendors;
-      const canProcess = authBusinessForOrderOfTheExceptionStore({ businessId, vendorName, vendors });
-      if (!canProcess.authorised) {
-        const { error, status } = canProcess;
-        return NextResponse.json({ error }, { status });
-      }
-    }
 
     const rawLogs: any[] = orderData?.customStatusesLogs ?? [];
 

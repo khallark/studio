@@ -19,7 +19,6 @@ import { Loader2, Camera, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import Image from 'next/image';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 type QcStatus = 'QC Pass' | 'QC Fail' | 'Not Received';
 
@@ -46,7 +45,7 @@ interface StartQcDialogProps {
   onClose: () => void;
   order: Order;
   shopId: string;
-  businessId: any;
+  businessId: string;
 }
 
 export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: StartQcDialogProps) {
@@ -80,24 +79,12 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
         const urls = await Promise.all(
           order.booked_return_images!.map(async (imageName) => {
             try {
-              // ✅ Try appropriate path based on store
-              let imageRef;
-              if (SHARED_STORE_IDS.includes(shopId)) {
-                imageRef = ref(storage, `return-images/shared/${shopId}/${order.id}/${imageName}`);
-              } else {
-                imageRef = ref(storage, `return-images/${businessId}/${shopId}/${order.id}/${imageName}`);
-              }
+              const imageRef = ref(
+                storage,
+                `return-images/${shopId}/${order.id}/${imageName}`
+              );
 
-              try {
-                return await getDownloadURL(imageRef);
-              } catch (err: any) {
-                // Fallback to legacy path
-                if (err.code === 'storage/object-not-found') {
-                  const legacyRef = ref(storage, `return-images/${shopId}/${order.id}/${imageName}`);
-                  return await getDownloadURL(legacyRef);
-                }
-                throw err;
-              }
+              return await getDownloadURL(imageRef);
             } catch (error) {
               console.error(`Failed to get download URL for ${imageName}`, error);
               return null;
@@ -276,13 +263,8 @@ export function StartQcDialog({ isOpen, onClose, order, shopId, businessId }: St
 
       const fileName = `unboxing_video_${Date.now()}.webm`;
 
-      // ✅ Use appropriate path based on store
-      let filePath: string;
-      if (SHARED_STORE_IDS.includes(shopId)) {
-        filePath = `return-images/shared/${shopId}/${order.id}/${fileName}`;
-      } else {
-        filePath = `return-images/${businessId}/${shopId}/${order.id}/${fileName}`;
-      }
+      // Store-scoped return media path
+      const filePath = `return-images/${shopId}/${order.id}/${fileName}`;
 
       console.log(`Uploading QC video to: ${filePath}`);
 

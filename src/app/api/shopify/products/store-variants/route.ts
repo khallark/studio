@@ -7,7 +7,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { authUserForBusiness, authUserForBusinessAndStore } from '@/lib/authoriseUser';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // TYPES
@@ -123,20 +122,11 @@ export async function POST(req: NextRequest) {
 
         for (const storeId of storesToQuery) {
             // Fetch products 
-            const productsQuery = SHARED_STORE_IDS.includes(storeId) && businessId !== SUPER_ADMIN_ID ? (
-                db
+            const productsQuery = db
                 .collection('accounts')
                 .doc(storeId)
                 .collection('products')
-                .where('isDeleted', '==', false)
-                .where('vendor', '==', businessData?.vendorName)
-            ) : (
-                db
-                .collection('accounts')
-                .doc(storeId)
-                .collection('products')
-                .where('isDeleted', '==', false)
-            );
+                .where('isDeleted', '==', false);
 
             const productsSnap = await productsQuery.get();
 

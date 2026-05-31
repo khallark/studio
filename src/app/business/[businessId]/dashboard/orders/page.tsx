@@ -119,7 +119,6 @@ import { useBusinessContext } from '../../layout';
 import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 import { StartPackagingDialog } from '@/components/start-packaging-dialog';
 
 // ============================================================
@@ -404,7 +403,6 @@ export default function BusinessOrdersPage() {
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
     const [orderForReturn, setOrderForReturn] = useState<Order | null>(null);
     const [isQcDialogOpen, setIsQcDialogOpen] = useState(false);
-    const [isTaxReportDialogOpen, setIsTaxReportDialogOpen] = useState(false);
     const [orderForQc, setOrderForQc] = useState<Order | null>(null);
     const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
     const [isGeneratePODialogOpen, setIsGeneratePODialogOpen] = useState(false);
@@ -426,7 +424,6 @@ export default function BusinessOrdersPage() {
     } = useOrders(
         businessId,
         stores,
-        vendorName,
         activeTab,
         currentPage,
         rowsPerPage,
@@ -451,9 +448,9 @@ export default function BusinessOrdersPage() {
     const orders = ordersData?.orders || [];
     const availableProvinces = ordersData?.availableProvinces || [];
 
-    const { data: statusCounts } = useOrderCounts(businessId, vendorName, stores);
-    const { data: availabilityCounts } = useAvailabilityCounts(businessId, activeTab, stores, vendorName);
-    const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores, vendorName);
+    const { data: statusCounts } = useOrderCounts(businessId, stores);
+    const { data: availabilityCounts } = useAvailabilityCounts(businessId, activeTab, stores);
+    const { data: rtoInTransitCounts } = useRtoInTransitCounts(businessId, stores);
     const { data: unusedAwbsCount = 0 } = useAwbCount(businessId);
 
     // ============================================================
@@ -490,12 +487,6 @@ export default function BusinessOrdersPage() {
 
     const isAnyOrderSelected = selectedOrders.length > 0;
     const isDisabled = !isAnyOrderSelected;
-    const isSharedStoreAdmin = businessId === SUPER_ADMIN_ID;
-
-    const hasSharedStoreOrder = selectedOrders.some(orderId => {
-        const storeId = selectedOrdersMap[orderId];
-        return SHARED_STORE_IDS.includes(String(storeId));
-    });
 
     const isDispatching = dispatchOrders.isPending;
     const isBulkUpdating = bulkUpdate.isPending;
@@ -1121,38 +1112,26 @@ export default function BusinessOrdersPage() {
             case 'Cancelled':
                 return <DropdownMenuItem disabled>Order Cancelled</DropdownMenuItem>;
             case 'New':
-                return (
-                    <>
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'Confirmed')}>Confirm</DropdownMenuItem>
-                        {(businessId === SUPER_ADMIN_ID || SHARED_STORE_IDS.includes(order.storeId)) &&
-                            <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
-                        }
-                    </>
-                );
+                return (<></>);
             case 'Confirmed':
                 return (
                     <>
-                        {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    setSelectedOrders([order.id]);
-                                    setSelectedOrdersMap({ [order.id]: order.storeId });
-                                    setSelectedOrdersDataMap({ [order.id]: order });
+                        <DropdownMenuItem
+                            onClick={() => {
+                                setSelectedOrders([order.id]);
+                                setSelectedOrdersMap({ [order.id]: order.storeId });
+                                setSelectedOrdersDataMap({ [order.id]: order });
 
-                                    if (1 > unusedAwbsCount) {
-                                        setIsLowAwbAlertOpen(true);
-                                    } else {
-                                        setOrdersForAwb([order]);
-                                        setIsAwbDialogOpen(true);
-                                    }
-                                }}
-                            >
-                                Assign AWB
-                            </DropdownMenuItem>
-                        }
-                        {(businessId === SUPER_ADMIN_ID || !SHARED_STORE_IDS.includes(order.storeId)) &&
-                            <DropdownMenuItem onClick={() => splitOrder.mutate({ orderId: order.id, storeId: order.storeId })}>Split Order</DropdownMenuItem>
-                        }
+                                if (1 > unusedAwbsCount) {
+                                    setIsLowAwbAlertOpen(true);
+                                } else {
+                                    setOrdersForAwb([order]);
+                                    setIsAwbDialogOpen(true);
+                                }
+                            }}
+                        >
+                            Assign AWB
+                        </DropdownMenuItem>
                         {order.isEligibleForPickup && (
                             <DropdownMenuItem
                                 onClick={() => {
@@ -1358,12 +1337,6 @@ export default function BusinessOrdersPage() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        {businessId === SUPER_ADMIN_ID && (
-                                            <DropdownMenuItem onClick={() => setIsTaxReportDialogOpen(true)}>
-                                                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                                                Tax Report
-                                            </DropdownMenuItem>
-                                        )}
                                         {activeTab === 'Confirmed' && (
                                             <DropdownMenuItem
                                                 onClick={() => setIsAvailabilityDialogOpen(true)}
@@ -1947,17 +1920,12 @@ export default function BusinessOrdersPage() {
                                                 >
                                                     Generate PO
                                                 </DropdownMenuItem>
-                                                {(businessId === SUPER_ADMIN_ID || !selectedOrders.some(orderId => {
-                                                    const storeId = selectedOrdersMap[orderId];
-                                                    return SHARED_STORE_IDS.includes(String(storeId));
-                                                })) && (
-                                                        <DropdownMenuItem
-                                                            onClick={handleAssignAwbClick}
-                                                            disabled={isDisabled || (!isSharedStoreAdmin && hasSharedStoreOrder) || isAnyOperationInProgress}
-                                                        >
-                                                            Assign AWBs
-                                                        </DropdownMenuItem>
-                                                    )}
+                                                <DropdownMenuItem
+                                                    onClick={handleAssignAwbClick}
+                                                    disabled={isDisabled || isAnyOperationInProgress}
+                                                >
+                                                    Assign AWBs
+                                                </DropdownMenuItem>
                                             </>
                                         )}
                                         {activeTab === 'Ready To Dispatch' && (
@@ -2376,14 +2344,6 @@ export default function BusinessOrdersPage() {
                     }}
                 />
             )}
-
-            <TaxReportDialog
-                isOpen={isTaxReportDialogOpen}
-                onClose={() => setIsTaxReportDialogOpen(false)}
-                stores={stores}
-                user={user}
-                businessId={businessId}
-            />
 
             {orderForPickup && user && (
                 <PerformPickupDialog

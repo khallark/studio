@@ -45,17 +45,6 @@ export async function POST(req: NextRequest) {
     const token = await getXpressbeesToken(email, password);
 
     const { businessDoc } = result;
-    // const memberRole = memberDoc?.data()?.role;
-    // if (!memberRole) {
-    //   return NextResponse.json({ error: 'No member role assigned, assign the member a role.' }, { status: 403 });
-    // }
-
-    // let targetRef;
-    // if (memberRole === 'Vendor') {
-    //   targetRef = memberDoc?.ref;
-    // } else {
-    //   targetRef = db.collection('accounts').doc(shop);
-    // }
 
     await businessDoc?.ref.set({
       integrations: {

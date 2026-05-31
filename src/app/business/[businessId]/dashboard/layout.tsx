@@ -67,8 +67,6 @@ import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../layout';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SUPER_ADMIN_ID = process.env.NEXT_PUBLIC_SUPER_ADMIN_ID!;
-
 // ============================================================
 // BUSINESS SWITCHER COMPONENT
 // ============================================================
@@ -558,8 +556,6 @@ export default function BusinessLayout({
     );
   }
 
-  const isSuperAdmin = businessId === SUPER_ADMIN_ID;
-
   return (
     <ProcessingQueueProvider
       businessId={businessId}
@@ -739,14 +735,6 @@ export default function BusinessLayout({
                   label="Members"
                   isActive={pathname.startsWith(`/business/${businessId}/dashboard/members`)}
                 >
-                  {isSuperAdmin && (
-                    <NavItem
-                      href={`/business/${businessId}/dashboard/members/requests`}
-                      icon={Inbox}
-                      label="Requests"
-                      isActive={pathname === `/business/${businessId}/dashboard/members/requests`}
-                    />
-                  )}
                   <NavItem
                     href={`/business/${businessId}/dashboard/members/invite`}
                     icon={UserPlus}

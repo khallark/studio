@@ -11,7 +11,6 @@ import { Building2, ChevronRight, Users, Crown, Sparkles, ArrowRight, Package, Z
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/logo';
 import { doc, getDoc } from 'firebase/firestore';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 interface BusinessMembership {
   businessId: string;
@@ -225,7 +224,6 @@ export default function BusinessListPage() {
   const [businesses, setBusinesses] = useState<BusinessMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showJoinMajime, setShowJoinMajime] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
 
   useEffect(() => {
@@ -235,37 +233,13 @@ export default function BusinessListPage() {
   // Check if user should see Join Majime promotion
   useEffect(() => {
     const checkUserAccess = async () => {
-      if (!user) {
-        setShowJoinMajime(false);
-        setCheckingAccess(false);
-        return;
-      }
-
       try {
-        if (user.uid === SUPER_ADMIN_ID) {
-          setShowJoinMajime(false);
+        if (!user) {
           setCheckingAccess(false);
           return;
         }
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const userStores = userData.stores as string[] || [];
-
-          if (userStores.every(ele => SHARED_STORE_IDS.includes(ele))) {
-            setShowJoinMajime(false);
-          } else {
-            setShowJoinMajime(true);
-          }
-        } else {
-          setShowJoinMajime(true);
-        }
       } catch (error) {
         console.error('Error checking user access:', error);
-        setShowJoinMajime(true);
       } finally {
         setCheckingAccess(false);
       }
@@ -333,7 +307,7 @@ export default function BusinessListPage() {
 
   // Show skeleton while loading data
   if (loading || checkingAccess) {
-    return <ContentSkeleton showPromo={!checkingAccess && showJoinMajime} />;
+    return <ContentSkeleton showPromo={!checkingAccess} />;
   }
 
   if (error) {
@@ -389,84 +363,6 @@ export default function BusinessListPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
-          {/* Join Majime Promotional Banner */}
-          {showJoinMajime && (
-            <Card className="mb-8 border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-
-              <CardHeader className="relative pb-4">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-xl bg-primary p-3 shadow-lg">
-                    <Sparkles className="h-8 w-8 text-primary-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-2xl font-bold">Join MAJIME's own business</CardTitle>
-                      <Badge className="bg-primary/20 text-primary border-primary/30 font-semibold">
-                        Exclusive Access
-                      </Badge>
-                    </div>
-                    <CardDescription className="text-base">
-                      Don't have experience to sell on own? Sell your products at <b>MAJIME</b>!
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="relative space-y-6">
-                {/* Features Grid */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-background/60 backdrop-blur-sm border border-primary/20">
-                    <div className="rounded-lg bg-primary/10 p-2 mt-1">
-                      <Package className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">Let us sell your products</h4>
-                      <p className="text-xs text-muted-foreground">Once you feel like yourself, sell it yourself, by creating a store.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-background/60 backdrop-blur-sm border border-primary/20">
-                    <div className="rounded-lg bg-primary/10 p-2 mt-1">
-                      <Zap className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">All orders on a single Dashboard</h4>
-                      <p className="text-xs text-muted-foreground">Manage all your orders from one powerful dashboard ( MAJIME's too! )</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-background/60 backdrop-blur-sm border border-primary/20">
-                    <div className="rounded-lg bg-primary/10 p-2 mt-1">
-                      <Contact className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">Contact us</h4>
-                      <p className="text-xs text-muted-foreground">If there are any queries regarding the joining process, contact us!</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CTA Section */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-xl bg-background/60 backdrop-blur-sm border border-primary/20">
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Ready to get started?</h4>
-                    <p className="text-sm text-muted-foreground">Join <b>MAJIME</b> today and transform your business operations</p>
-                  </div>
-                  <Button
-                    size="lg"
-                    onClick={() => router.push('/join-majime')}
-                    className="shadow-lg hover:shadow-xl transition-all duration-300 gap-2 group whitespace-nowrap"
-                  >
-                    Join MAJIME Now
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Page Title */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2">

@@ -6,13 +6,12 @@ import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { StatusCounts } from '@/types/order';
 import { CustomStatus } from './use-orders';
-import { SHARED_STORE_IDS, SUPER_ADMIN_ID } from '@/lib/shared-constants';
 
 // ============================================================
 // HOOK WITH REAL-TIME UPDATES - Business-wide aggregation
 // ============================================================
 
-export function useOrderCounts(businessId: string | null, vendorName: string | null, stores: string[]) {
+export function useOrderCounts(businessId: string | null, stores: string[]) {
   const [counts, setCounts] = useState<StatusCounts>({
     'All Orders': 0,
     'New': 0,
@@ -92,15 +91,7 @@ export function useOrderCounts(businessId: string | null, vendorName: string | n
     // Set up listener for each store
     stores.forEach((storeId) => {
       let metadataRef = null;
-      if(SHARED_STORE_IDS.includes(storeId)) {
-        if(businessId === SUPER_ADMIN_ID) {
-          metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');  
-        } else {
-          metadataRef = doc(db, 'accounts', storeId, 'members', businessId);
-        }
-      } else {
-        metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
-      }
+      metadataRef = doc(db, 'accounts', storeId, 'metadata', 'orderCounts');
 
       const unsubscribe = onSnapshot(
         metadataRef,

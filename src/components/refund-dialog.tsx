@@ -25,7 +25,6 @@ import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SHARED_STORE_IDS } from '@/lib/shared-constants';
 
 interface RefundDialogProps {
   isOpen: boolean;
@@ -81,26 +80,14 @@ export function RefundDialog({
         const imageUrls = await Promise.all(
           order.booked_return_images.map(async (imageName) => {
             try {
-              // Try appropriate path based on store
-              let imageRef;
-              if (SHARED_STORE_IDS.includes(order.storeId)) {
-                imageRef = ref(storage, `return-images/shared/${order.storeId}/${order.id}/${imageName}`);
-              } else {
-                imageRef = ref(storage, `return-images/${businessId}/${order.storeId}/${order.id}/${imageName}`);
-              }
+              const imageRef = ref(
+                storage,
+                `return-images/${order.storeId}/${order.id}/${imageName}`
+              );
 
-              try {
-                return await getDownloadURL(imageRef);
-              } catch (err: any) {
-                // Fallback to legacy path
-                if (err.code === 'storage/object-not-found') {
-                  const legacyRef = ref(storage, `return-images/${order.storeId}/${order.id}/${imageName}`);
-                  return await getDownloadURL(legacyRef);
-                }
-                throw err;
-              }
+              return await getDownloadURL(imageRef);
             } catch (error) {
-              console.error(`Failed to get download URL for ${imageName}`, error);
+              console.error(`Failed to get customer image URL for ${imageName}`, error);
               return null;
             }
           })

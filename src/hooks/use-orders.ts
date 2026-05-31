@@ -174,6 +174,7 @@ export function useOrders(
 
 
                 // Filter by status tab / All Orders status filter
+                // Filter by status tab / All Orders status filter
                 if (activeTab === 'All Orders') {
                     if (selectedStatuses.length > 0) {
                         if (selectedStatuses.length === 1) {
@@ -182,6 +183,8 @@ export function useOrders(
                             constraints.push(where('customStatus', 'in', selectedStatuses.slice(0, 10)));
                         }
                     }
+                } else {
+                    constraints.push(where('customStatus', '==', activeTab));
                 }
 
                 // Server-side search

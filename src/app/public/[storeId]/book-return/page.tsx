@@ -382,6 +382,28 @@ export default function BookReturnPage() {
         throw new Error(result.error || 'An unknown error occurred.');
       }
 
+      if (!result.success) {
+        try {
+          await fetch('/api/public/book-return/delete-images', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken!,
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              orderId: order.id,
+            }),
+          });
+        } catch (cleanupError) {
+          console.warn('Failed to clean up uploaded images after rejected return request:', cleanupError);
+        }
+
+        setUploadProgress('');
+        setReturnResponse(result);
+        return;
+      }
+
       setUploadProgress('');
       setReturnResponse(result);
 
@@ -420,7 +442,6 @@ export default function BookReturnPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          storeId: order.storeId,
           orderId: order.id
         })
       });

@@ -271,7 +271,83 @@ export default function BookReturnPage() {
       const csrfToken = localStorage.getItem('csrfToken');
       const finalReason = returnReason === 'Others' ? otherReasonText : returnReason;
 
-      // Step 1: Submit return request first (without images)
+      // Step 1: Delete existing images first
+      try {
+        setUploadProgress('Preparing image upload...');
+
+        const deleteResponse = await fetch('/api/public/book-return/delete-images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken!,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            orderId: order.id,
+          }),
+        });
+
+        if (!deleteResponse.ok) {
+          const deleteResult = await deleteResponse.json().catch(() => null);
+          console.warn(
+            'Failed to delete existing images, continuing with upload:',
+            deleteResult?.error || deleteResponse.statusText
+          );
+        }
+      } catch (deleteError) {
+        console.warn('Failed to delete existing images, continuing with upload:', deleteError);
+      }
+
+      // Step 2: Upload new images one by one
+      const uploadedImageNames: string[] = [];
+
+      for (let i = 0; i < uploadedImages.length; i++) {
+        setUploadProgress(`Uploading image ${i + 1} of ${uploadedImages.length}...`);
+
+        const formData = new FormData();
+        formData.append('orderId', order.id);
+        formData.append('image', uploadedImages[i]);
+
+        const uploadResponse = await fetch('/api/public/book-return/upload-image', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': csrfToken!,
+          },
+          credentials: 'include',
+          body: formData,
+        });
+
+        let uploadResult: any = null;
+        const uploadContentType = uploadResponse.headers.get('content-type');
+
+        if (uploadContentType && uploadContentType.includes('application/json')) {
+          uploadResult = await uploadResponse.json();
+        }
+
+        if (!uploadResponse.ok) {
+          if (uploadResult?.sessionError) {
+            setError('Your session has expired. Please refresh the page to continue.');
+          }
+
+          throw new Error(
+            uploadResult?.error || `Image ${i + 1} upload failed. Please try again.`
+          );
+        }
+
+        if (!uploadResult?.fileName) {
+          throw new Error(`Image ${i + 1} uploaded but no filename was returned.`);
+        }
+
+        uploadedImageNames.push(uploadResult.fileName);
+      }
+
+      if (uploadedImageNames.length === 0) {
+        throw new Error('At least one image must be uploaded successfully.');
+      }
+
+      // Step 3: Submit return request with uploaded image filenames
+      setUploadProgress('Submitting your return request...');
+
       const response = await fetch('/api/public/book-return/request', {
         method: 'POST',
         headers: {
@@ -280,12 +356,11 @@ export default function BookReturnPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          storeId: order.storeId,
           orderId: order.id,
           selectedVariantIds: Array.from(selectedVariantIds),
           booked_return_reason: finalReason,
-          booked_return_images: [] // Placeholder, will be updated
-        })
+          booked_return_images: uploadedImageNames,
+        }),
       });
 
       let result;
@@ -303,62 +378,8 @@ export default function BookReturnPage() {
         if (result.sessionError) {
           setError('Your session has expired. Please refresh the page to continue.');
         }
+
         throw new Error(result.error || 'An unknown error occurred.');
-      }
-
-      // If request was not successful, don't proceed with image upload
-      if (!result.success) {
-        setUploadProgress('');
-        setReturnResponse(result);
-        return;
-      }
-
-      // Step 2: Delete existing images (if any)
-      try {
-        setUploadProgress('Preparing image upload...');
-        await fetch('/api/public/book-return/delete-images', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken!,
-          },
-          credentials: 'include',
-          body: JSON.stringify({ storeId: order.storeId, orderId: order.id })
-        });
-      } catch (deleteError) {
-        console.warn('Failed to delete existing images, continuing with upload:', deleteError);
-      }
-
-      // Step 3: Upload new images one by one
-      const uploadedImageNames: string[] = [];
-      for (let i = 0; i < uploadedImages.length; i++) {
-        try {
-          setUploadProgress(`Uploading image ${i + 1} of ${uploadedImages.length}...`);
-
-          const formData = new FormData();
-          formData.append('storeId', order.storeId);
-          formData.append('orderId', order.id);
-          formData.append('image', uploadedImages[i]);
-
-          const uploadResponse = await fetch('/api/public/book-return/upload-image', {
-            method: 'POST',
-            headers: {
-              'X-CSRF-Token': csrfToken!,
-            },
-            credentials: 'include',
-            body: formData
-          });
-
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            uploadedImageNames.push(uploadResult.fileName);
-          } else {
-            console.warn(`Failed to upload image ${i + 1}, continuing...`);
-          }
-        } catch (uploadError) {
-          console.warn(`Error uploading image ${i + 1}:`, uploadError);
-          // Continue with next image
-        }
       }
 
       setUploadProgress('');

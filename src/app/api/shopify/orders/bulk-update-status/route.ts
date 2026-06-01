@@ -4,6 +4,38 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { authUserForBusinessAndStore } from '@/lib/authoriseUser';
 import { UPC } from '@/types/warehouse';
 
+function normalizeVariantId(value: unknown): string | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+    }
+
+    if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+    }
+
+    return null;
+}
+
+function buildBulkRtoReceivedUpdate(orderData: any) {
+    const lineItems = Array.isArray(orderData?.raw?.line_items)
+        ? orderData.raw.line_items
+        : [];
+
+    const updatedLineItems = lineItems.map((item: any) => ({
+        ...item,
+        rtoReceived: true,
+    }));
+
+    const rtoReceived = lineItems
+        .map((item: any) => item?.variant_id)
+        .filter((variantId: unknown) => variantId !== undefined && variantId !== null);
+
+    return {
+        updatedLineItems,
+        rtoReceived,
+    };
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { businessId, shop, orderIds, status } = await req.json();
@@ -77,10 +109,20 @@ export async function POST(req: NextRequest) {
                     })()
                 };
 
-                transaction.update(orderRef, {
+                const updatePayload: Record<string, any> = {
                     customStatus: status,
                     customStatusesLogs: FieldValue.arrayUnion(log),
-                });
+                };
+
+                if (status === 'RTO Closed') {
+                    const orderData = orderDoc.data();
+                    const { updatedLineItems, rtoReceived } = buildBulkRtoReceivedUpdate(orderData);
+
+                    updatePayload['raw.line_items'] = updatedLineItems;
+                    updatePayload.rtoReceived = rtoReceived;
+                }
+
+                transaction.update(orderRef, updatePayload);
 
                 updatedCount++;
                 successfullyUpdatedOrderIds.push(orderId);

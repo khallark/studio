@@ -62,6 +62,10 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/orders/mark-packed/route',
       },
       {
+        source: '/api/shopify/orders/rto-close',
+        destination: '/api/shopify/orders/rto-close/route',
+      },
+      {
         source: '/api/shopify/account/update-address',
         destination: '/api/shopify/account/update-address/route',
       },

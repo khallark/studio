@@ -116,10 +116,10 @@ import { Order, CustomStatus } from '@/types/order';
 import { useDebounce } from 'use-debounce';
 import { toast } from '@/hooks/use-toast';
 import { useBusinessContext } from '../../layout';
-import { TaxReportDialog } from '@/components/tax-report-dialog';
 import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { StartPackagingDialog } from '@/components/start-packaging-dialog';
+import { RtoCloseDialog } from '@/components/rto-close-dialog';
 
 // ============================================================
 // STATUS TABS CONFIGURATION
@@ -411,6 +411,8 @@ export default function BusinessOrdersPage() {
     const [isPerformPickupDialogOpen, setIsPerformPickupDialogOpen] = useState(false);
     const [orderForPickup, setOrderForPickup] = useState<Order | null>(null);
     const [isStartPackagingOpen, setIsStartPackagingOpen] = useState(false);
+    const [isRtoCloseDialogOpen, setIsRtoCloseDialogOpen] = useState(false);
+    const [orderForRtoClose, setOrderForRtoClose] = useState<Order | null>(null);
 
     // ============================================================
     // DATA FETCHING
@@ -1031,6 +1033,11 @@ export default function BusinessOrdersPage() {
         }
     };
 
+    const handleOpenRtoCloseDialog = (order: Order) => {
+        setOrderForRtoClose(order);
+        setIsRtoCloseDialogOpen(true);
+    };
+
     const clearStatusFilterSearch = () => {
         setStatusFilterSearch('');
     };
@@ -1198,22 +1205,20 @@ export default function BusinessOrdersPage() {
                     </DropdownMenuItem>
                 );
             case 'RTO Delivered':
-                return (
-                    <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId })}
-                    >
-                        Mark as Lost
-                    </DropdownMenuItem>
-                );
             case 'RTO In Transit':
                 return (
-                    <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId })}
-                    >
-                        Mark as Lost
-                    </DropdownMenuItem>
+                    <>
+                        <DropdownMenuItem onClick={() => handleOpenRtoCloseDialog(order)}>
+                            Mark it as Closed
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => bulkUpdate.mutate({ orderIds: [order.id], status: 'Lost', storeId: order.storeId })}
+                        >
+                            Mark as Lost
+                        </DropdownMenuItem>
+                    </>
                 );
             case 'Closed':
                 return (
@@ -2358,6 +2363,22 @@ export default function BusinessOrdersPage() {
                     onSuccess={() => {
                         refetchOrders();
                         queryClient.invalidateQueries({ queryKey: ['availabilityCounts', businessId] });
+                    }}
+                />
+            )}
+
+            {isRtoCloseDialogOpen && orderForRtoClose && user && (
+                <RtoCloseDialog
+                    open={isRtoCloseDialogOpen}
+                    onOpenChange={setIsRtoCloseDialogOpen}
+                    order={orderForRtoClose}
+                    businessId={businessId}
+                    user={user}
+                    onSuccess={() => {
+                        setOrderForRtoClose(null);
+                        queryClient.invalidateQueries({ queryKey: ['orders'] });
+                        queryClient.invalidateQueries({ queryKey: ['orderCounts'] });
+                        refetchOrders();
                     }}
                 />
             )}

@@ -30,6 +30,7 @@ import {
   MessageCircleReplyIcon,
   Handshake,
   FolderClockIcon,
+  Search,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -706,6 +707,12 @@ export default function BusinessLayout({
                     icon={Warehouse}
                     label="Inventory"
                     isActive={pathname === `/business/${businessId}/warehouse/inventory`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/warehouse/items-finders`}
+                    icon={Search}
+                    label="Items Finder"
+                    isActive={pathname === `/business/${businessId}/warehouse/items-finder`}
                   />
                   <NavItem
                     href={`/business/${businessId}/warehouse`}

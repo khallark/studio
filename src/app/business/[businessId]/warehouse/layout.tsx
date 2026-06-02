@@ -23,6 +23,7 @@ import {
     Shirt,
     Handshake,
     X,
+    Search,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -228,6 +229,12 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/inventory`,
             icon: Warehouse,
             description: 'Manage stock levels',
+        },
+        {
+            label: 'Items Finder',
+            href: `/business/${businessId}/warehouse/items-finder`,
+            icon: Search,
+            description: 'Find Product UPCs across the warehouse',
         },
         {
             label: 'Warehouses',

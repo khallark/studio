@@ -418,7 +418,7 @@ export default function ItemFinderPage() {
 
         const upcsQuery = query(
             collection(db, 'users', businessId, 'upcs'),
-            where('productId', '==', productId)
+            where('productId', '==', productId.toUpperCase())
         );
 
         const unsubscribe = onSnapshot(
@@ -449,7 +449,9 @@ export default function ItemFinderPage() {
     const handleSearch = (e?: React.FormEvent) => {
         e?.preventDefault();
 
-        if (!trimmedProductId || !businessId) {
+        if (!businessId) return;
+
+        if (!trimmedProductId) {
             cleanupListener();
             resetResultState();
             setActiveProductId('');
@@ -457,11 +459,6 @@ export default function ItemFinderPage() {
         }
 
         setActiveProductId(trimmedProductId);
-        resetResultState();
-
-        if (document.visibilityState === 'visible') {
-            startListener(trimmedProductId);
-        }
     };
 
     useEffect(() => {
@@ -470,8 +467,13 @@ export default function ItemFinderPage() {
 
     useEffect(() => {
         if (!businessId || !activeProductId) {
-            cleanupListener();
             return;
+        }
+
+        resetResultState();
+
+        if (document.visibilityState === 'visible') {
+            startListener(activeProductId);
         }
 
         const handleVisibilityChange = () => {

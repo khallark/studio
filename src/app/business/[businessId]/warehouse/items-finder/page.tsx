@@ -418,7 +418,8 @@ export default function ItemFinderPage() {
 
         const upcsQuery = query(
             collection(db, 'users', businessId, 'upcs'),
-            where('productId', '==', productId.toUpperCase())
+            where('productId', '==', productId.toUpperCase()),
+            where('putAway', '==', 'none'),
         );
 
         const unsubscribe = onSnapshot(

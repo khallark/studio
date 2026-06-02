@@ -709,7 +709,7 @@ export default function BusinessLayout({
                     isActive={pathname === `/business/${businessId}/warehouse/inventory`}
                   />
                   <NavItem
-                    href={`/business/${businessId}/warehouse/items-finders`}
+                    href={`/business/${businessId}/warehouse/items-finder`}
                     icon={Search}
                     label="Items Finder"
                     isActive={pathname === `/business/${businessId}/warehouse/items-finder`}

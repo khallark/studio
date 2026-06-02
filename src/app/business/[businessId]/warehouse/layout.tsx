@@ -264,9 +264,9 @@ export default function WarehouseLayout({
     };
 
     return (
-        <div className="flex min-h-dvh">
+        <div className="flex h-dvh overflow-hidden">
             {/* Side Menu */}
-            <aside className="hidden lg:flex flex-col w-[280px] border-r bg-gradient-to-b from-background via-background to-muted/20">
+            <aside className="hidden lg:flex h-dvh w-[280px] shrink-0 flex-col overflow-hidden border-r bg-gradient-to-b from-background via-background to-muted/20">
                 {/* Header */}
                 <div className="p-6 border-b">
                     <div className="flex items-center gap-3">
@@ -284,7 +284,7 @@ export default function WarehouseLayout({
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-2">
+                <nav className="flex min-h-0 flex-1 flex-col p-4">
                     {/* Back to Dashboard */}
                     <Link
                         href={`/business/${businessId}/dashboard/orders`}
@@ -309,7 +309,7 @@ export default function WarehouseLayout({
                     </div>
 
                     {/* Nav Items */}
-                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                    <div className="min-h-0 flex-1 overflow-y-auto space-y-1.5 pr-1">
                         {navItems.map((item) => {
                             const active = isActive(item.href);
                             const Icon = item.icon;
@@ -443,7 +443,7 @@ export default function WarehouseLayout({
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-auto lg:pt-0 pt-[60px]">
+            <main className="h-dvh min-w-0 flex-1 overflow-auto lg:pt-0 pt-[60px]">
                 {children}
             </main>
         </div>

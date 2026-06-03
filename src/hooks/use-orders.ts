@@ -220,7 +220,7 @@ export function useOrders(
                     filters.courierFilter &&
                     filters.courierFilter !== 'all'
                 ) {
-                    constraints.push(where('courier', '==', filters.courierFilter));
+                    constraints.push(where('courierProvider', '==', filters.courierFilter));
                 }
 
                 if (filters.vendorName) {

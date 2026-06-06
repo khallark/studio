@@ -24,6 +24,7 @@ import {
     Handshake,
     X,
     Search,
+    MoveUpRight,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -239,7 +240,7 @@ export default function WarehouseLayout({
         {
             label: 'Items Mover',
             href: `/business/${businessId}/warehouse/items-mover`,
-            icon: Search,
+            icon: MoveUpRight,
             description: 'Find Product and mover them across warehouse',
         },
         {

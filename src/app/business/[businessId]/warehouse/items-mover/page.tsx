@@ -381,7 +381,7 @@ function DestShelfRow({
 // ──────────────────────────────────────────────────────────────────────────
 
 export default function ItemsMoverPage() {
-    const { isAuthorized, loading: authLoading, businessId } = useBusinessContext();
+    const { isAuthorized, loading: authLoading, businessId, user } = useBusinessContext();
 
     // ── Source state (productId-driven, live) ──────────────────────────────
     const [productIdInput, setProductIdInput] = useState('');
@@ -764,9 +764,16 @@ export default function ItemsMoverPage() {
         setError(null);
 
         try {
+            const idToken = await user?.getIdToken();
+            if (!idToken) {
+                throw new Error('Move failed. User not logged in');
+            }
             const res = await fetch('/api/business/warehouse/move-upcs', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
                 credentials: 'include',
                 body: JSON.stringify({
                     businessId,

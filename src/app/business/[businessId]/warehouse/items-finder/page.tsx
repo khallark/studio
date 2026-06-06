@@ -1,4 +1,4 @@
-// /business/[businessId]/warehouse/item-finder/page.tsx
+// /business/[businessId]/warehouse/items-finder/page.tsx
 
 'use client';
 

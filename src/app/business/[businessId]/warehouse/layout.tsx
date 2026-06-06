@@ -237,6 +237,12 @@ export default function WarehouseLayout({
             description: 'Find Product UPCs across the warehouse',
         },
         {
+            label: 'Items Mover',
+            href: `/business/${businessId}/warehouse/items-mover`,
+            icon: Search,
+            description: 'Find Product and mover them across warehouse',
+        },
+        {
             label: 'Warehouses',
             href: `/business/${businessId}/warehouse`,
             icon: LayoutGrid,

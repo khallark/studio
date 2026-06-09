@@ -245,7 +245,7 @@ function generateSlipHTML(
           ${phone ? `
             <div class="address-line phone">
               Phone:
-              ${String(order?.courierProvider || '') === 'Blue Dart'
+              ${["Blue Dart", "Delhivery"].includes(String(order?.courierProvider || ''))
         ? escapeHtml(maskPhoneForBlueDart(phone))
         : escapeHtml(phone)
       }

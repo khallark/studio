@@ -639,28 +639,6 @@ export default function BusinessLayout({
                 </NavSection>
               </SidebarMenuItem>
 
-              {/* Products Section */}
-              {/* <SidebarMenuItem>
-                <NavSection
-                  icon={Shirt}
-                  label="Products"
-                  isActive={pathname.startsWith(`/business/${businessId}/products`)}
-                >
-                  <NavItem
-                    href={`/business/${businessId}/products`}
-                    icon={BriefcaseBusiness}
-                    label="Business Products"
-                    isActive={pathname === `/business/${businessId}/products`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/inventory`}
-                    icon={Warehouse}
-                    label="Inventory"
-                    isActive={pathname === `/business/${businessId}/inventory`}
-                  />
-                </NavSection>
-              </SidebarMenuItem> */}
-
               {/* Warehouse Section */}
               <SidebarMenuItem>
                 <NavSection

@@ -227,6 +227,7 @@ export function BulkUploadDialog({
         worksheet.columns = [
             { header: 'Product Name', key: 'productName', width: 25 },
             { header: 'SKU', key: 'sku', width: 15 },
+            { header: 'Parent Product', key: 'parentProduct', width: 22 },
             { header: 'Weight', key: 'weight', width: 10 },
             { header: 'Category', key: 'category', width: 20 },
             { header: 'HSN', key: 'hsn', width: 12 },
@@ -246,6 +247,7 @@ export function BulkUploadDialog({
         worksheet.addRow({
             productName: 'Cotton T-Shirt',
             sku: 'TSH-001',
+            parentProduct: 'Cotton T-Shirt',
             weight: 250,
             category: 'Apparel',
             hsn: '6109',
@@ -257,6 +259,7 @@ export function BulkUploadDialog({
         worksheet.addRow({
             productName: 'Denim Jeans',
             sku: 'JNS-002',
+            parentProduct: 'Cotton T-Shirt',
             weight: 450,
             category: 'Apparel',
             hsn: '6203',
@@ -268,6 +271,7 @@ export function BulkUploadDialog({
         worksheet.addRow({
             productName: 'Running Shoes',
             sku: 'SHO-003',
+            parentProduct: 'Cotton T-Shirt',
             weight: 350,
             category: 'Footwear',
             hsn: '6404',
@@ -368,6 +372,10 @@ export function BulkUploadDialog({
                                 </li>
                                 {mode === 'add' && (
                                     <>
+                                        <li>
+                                            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Parent Product</code>
+                                            {' '}- Name of an existing parent product (must already exist)
+                                        </li>
                                         <li>
                                             <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Product Name</code>
                                             {' '}- Name of the product

@@ -74,12 +74,13 @@ export async function POST(req: NextRequest) {
         const trimmedHsn = String(hsn ?? '').trim().toUpperCase();
         const trimmedCategory = String(category ?? '').trim();
         const trimmedDescription = product.description ? String(product.description).trim() : null;
+        const normalizedParentId = String(product.parentProductId ?? '').trim();
 
         // ============================================================
         // REQUIRED FIELDS CHECK
         // ============================================================
 
-        if (!trimmedName || !normalizedSku || weight === undefined || weight === null || !trimmedCategory || !trimmedHsn || taxRate === undefined || taxRate === null) {
+        if (!trimmedName || !normalizedSku || weight === undefined || weight === null || !trimmedCategory || !trimmedHsn || taxRate === undefined || taxRate === null || !normalizedParentId) {
             return NextResponse.json(
                 {
                     error: 'Validation Error',
@@ -204,6 +205,21 @@ export async function POST(req: NextRequest) {
         }
 
         // ============================================================
+        // PARENT VALIDATION
+        // ============================================================
+
+        const parentRef = businessDoc?.ref.collection('parentProducts').doc(normalizedParentId);
+        const parentSnap = await parentRef?.get();
+
+        if (!parentSnap?.exists) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'Parent product does not exist' },
+                { status: 400 }
+            );
+        }
+        const parentName = parentSnap.data()?.name ?? normalizedParentId;
+        
+        // ============================================================
         // CHECK EXISTING PRODUCT
         // ============================================================
 
@@ -224,6 +240,7 @@ export async function POST(req: NextRequest) {
         const productData: Omit<Product, 'id'> = {
             name: trimmedName,
             sku: normalizedSku,
+            parentProductId: normalizedParentId,
             weight: parsedWeight,
             category: trimmedCategory,
             hsn: trimmedHsn,
@@ -260,6 +277,7 @@ export async function POST(req: NextRequest) {
             changes: [
                 { field: 'name', fieldLabel: 'Product Name', oldValue: null, newValue: productData.name },
                 { field: 'sku', fieldLabel: 'SKU', oldValue: null, newValue: normalizedSku },
+                { field: 'parentProductId', fieldLabel: 'Parent Product', oldValue: null, newValue: parentName },
                 { field: 'weight', fieldLabel: 'Weight', oldValue: null, newValue: productData.weight },
                 { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
                 { field: 'hsn', fieldLabel: 'HSN Code', oldValue: null, newValue: productData.hsn },

@@ -25,6 +25,7 @@ import {
     X,
     Search,
     MoveUpRight,
+    Briefcase,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -218,6 +219,12 @@ export default function WarehouseLayout({
             href: `/business/${businessId}/warehouse/put-away`,
             icon: Truck,
             description: 'Process put away UPCs',
+        },
+        {
+            label: 'Parent Products',
+            href: `/business/${businessId}/warehouse/parent-products`,
+            icon: Briefcase,
+            description: 'Your Parent Products',
         },
         {
             label: 'Business Products',

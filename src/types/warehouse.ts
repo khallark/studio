@@ -2,12 +2,23 @@
 
 import { Timestamp } from "firebase-admin/firestore";
 
+// user/{businessId}/parentProducts/{productId}
+export interface ParentProduct {
+    id: string;
+    name: string;
+    createdBy: string | null;
+    createdAt: Timestamp | null;
+    updatedBy: string | null;
+    updatedAt: Timestamp | null;
+}
+
 // user/{businessId}/products/{productId}
 export interface Product {
     /** Firestore document ID — same value as `sku`. */
     id: string;
     name: string;
     sku: string;
+    parentProductId: string;
     weight: number;
     category: string;
 

@@ -13,6 +13,7 @@ import { Product } from '@/types/warehouse';
 interface ProductRow {
     'Product Name'?: string;
     'SKU'?: string;
+    'Parent Product'?: string;
     'Weight'?: number | string;
     'Category'?: string;
     'HSN'?: string;
@@ -72,7 +73,7 @@ function validateFileStructure(data: ProductRow[], mode: 'add' | 'update'): Vali
 
     const requiredColumns = ['SKU'];
     if (mode === 'add') {
-        requiredColumns.push('Product Name', 'Weight', 'HSN', 'Tax Rate');
+        requiredColumns.push('Product Name', 'Weight', 'HSN', 'Tax Rate', 'Parent Product');
     }
 
     for (const col of requiredColumns) {
@@ -112,6 +113,8 @@ function normalizeColumnNames(row: any): ProductRow {
             normalized['Price'] = value as number;
         } else if (/^stock$/i.test(normalizedKey) || /^opening\s*stock$/i.test(normalizedKey)) {
             normalized['Stock'] = value as number;
+        } else if (/^parent(\s*product)?$/i.test(normalizedKey)) {
+            normalized['Parent Product'] = value as string;
         } else {
             normalized[normalizedKey] = value;
         }
@@ -175,6 +178,12 @@ function validateRow(
         const taxRate = parseFloat(taxRateRaw.toString());
         if (isNaN(taxRate) || !VALID_TAX_RATES.includes(taxRate)) {
             return { valid: false, error: `Row ${rowIndex}: Tax Rate must be one of: ${VALID_TAX_RATES.join(', ')}` };
+        }
+
+        // Parent Product
+        const parentName = row['Parent Product']?.toString().trim();
+        if (!parentName) {
+            return { valid: false, error: `Row ${rowIndex}: Parent Product is required for adding new products` };
         }
     }
 
@@ -315,6 +324,7 @@ async function generateResultExcel(results: ProcessedRow[]): Promise<Buffer> {
     worksheet.columns = [
         { header: 'Product Name', key: 'Product Name', width: 25 },
         { header: 'SKU', key: 'SKU', width: 15 },
+        { header: 'Parent Product', key: 'Parent Product', width: 22 },
         { header: 'Weight', key: 'Weight', width: 10 },
         { header: 'Category', key: 'Category', width: 18 },
         { header: 'HSN', key: 'HSN', width: 12 },
@@ -451,6 +461,17 @@ export async function POST(req: NextRequest) {
         });
 
         // ============================================================
+        // GET PARENT PRODUCTS (name -> id, case-insensitive)
+        // ============================================================
+
+        const parentsSnap = await businessDoc?.ref.collection('parentProducts').get();
+        const parentNameToId = new Map<string, string>();
+        parentsSnap?.docs.forEach((doc) => {
+            const nm = (doc.data().name ?? '').toString().trim().toLowerCase();
+            if (nm) parentNameToId.set(nm, doc.id);
+        });
+
+        // ============================================================
         // PROCESS ROWS
         // ============================================================
 
@@ -516,6 +537,19 @@ export async function POST(req: NextRequest) {
                     continue;
                 }
 
+                const parentId = parentNameToId.get(
+                    row['Parent Product']!.toString().trim().toLowerCase()
+                );
+                if (!parentId) {
+                    results.push({
+                        ...row,
+                        Status: 'Error',
+                        Message: `Parent Product "${row['Parent Product']}" does not exist`,
+                    });
+                    errorCount++;
+                    continue;
+                }
+
                 const stockValue =
                     row['Stock'] !== undefined && row['Stock'] !== ''
                         ? parseInt(row['Stock'].toString())
@@ -524,6 +558,7 @@ export async function POST(req: NextRequest) {
                 const productData: Omit<Product, 'id'> = {
                     name: row['Product Name']!.toString().trim(),
                     sku: skuUpper,
+                    parentProductId: parentId,
                     weight: parseFloat(row['Weight']?.toString() ?? '0'),
                     category: row['Category']?.toString().trim() ?? 'Other',
                     hsn: row['HSN']!.toString().trim().toUpperCase(),
@@ -559,6 +594,7 @@ export async function POST(req: NextRequest) {
                     { field: 'category', fieldLabel: 'Category', oldValue: null, newValue: productData.category },
                     { field: 'hsn', fieldLabel: 'HSN Code', oldValue: null, newValue: productData.hsn },
                     { field: 'taxRate', fieldLabel: 'GST Rate', oldValue: null, newValue: productData.taxRate },
+                    { field: 'parentProductId', fieldLabel: 'Parent Product', oldValue: null, newValue: parentId },
                     ...(stockValue > 0
                         ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }]
                         : []),
@@ -632,6 +668,22 @@ export async function POST(req: NextRequest) {
                 if (row['Stock'] !== undefined && row['Stock'] !== '') {
                     updateData.stock = parseInt(row['Stock'].toString());
                     changes.push({ field: 'stock', fieldLabel: 'Stock', oldValue: '(previous)', newValue: updateData.stock });
+                }
+                if (row['Parent Product'] !== undefined && row['Parent Product'].toString().trim() !== '') {
+                    const pid = parentNameToId.get(
+                        row['Parent Product'].toString().trim().toLowerCase()
+                    );
+                    if (!pid) {
+                        results.push({
+                            ...row,
+                            Status: 'Error',
+                            Message: `Parent Product "${row['Parent Product']}" does not exist`,
+                        });
+                        errorCount++;
+                        continue;
+                    }
+                    updateData.parentProductId = pid;
+                    changes.push({ field: 'parentProductId', fieldLabel: 'Parent Product', oldValue: '(previous)', newValue: pid });
                 }
 
                 // Only write if there's something beyond the bookkeeping fields

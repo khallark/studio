@@ -30,6 +30,7 @@ interface ProductLog {
 
 // Field labels for human-readable logs
 const FIELD_LABELS: Record<string, string> = {
+    parentProductId: 'Parent Product',
     name: 'Product Name',
     weight: 'Weight',
     category: 'Category',
@@ -51,7 +52,7 @@ function getChanges(
 ): ChangeLogEntry[] {
     const changes: ChangeLogEntry[] = [];
     const fieldsToTrack: Array<keyof Omit<Product, 'id' | 'sku' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy' | 'mappedVariants' | 'inventory' | 'inShelfQuantity'>> = [
-        'name', 'weight', 'category', 'hsn', 'taxRate',
+        'name', 'weight', 'category', 'hsn', 'taxRate', 'parentProductId',
         'description', 'price', 'stock', 'status',
     ];
 
@@ -139,12 +140,13 @@ export async function POST(req: NextRequest) {
         // ============================================================
 
         const { name, weight, category, hsn, taxRate } = product;
+        const normalizedParentId = String(product.parentProductId ?? '').trim();
 
-        if (!name || !weight || !category || !hsn || taxRate === undefined || taxRate === null) {
+        if (!name || !weight || !category || !hsn || taxRate === undefined || taxRate === null || !normalizedParentId) {
             return NextResponse.json(
                 {
                     error: 'Validation Error',
-                    message: 'Missing required fields: name, weight, category, hsn, or taxRate',
+                    message: 'Missing required fields: name, parentProductId, weight, category, hsn, or taxRate',
                 },
                 { status: 400 }
             );
@@ -160,11 +162,24 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const parentSnap = await businessDoc?.ref
+            .collection('parentProducts')
+            .doc(normalizedParentId)
+            .get();
+
+        if (!parentSnap?.exists) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'Parent product does not exist' },
+                { status: 400 }
+            );
+        }
+
         const existingData = productDoc.data() ?? {};
 
         // Build the update payload — typed as Partial<Product> since we only
         // write fields that are explicitly provided.
         const updateData: Partial<Product> & { updatedBy: string; updatedAt: Timestamp } = {
+            parentProductId: normalizedParentId,
             name: product.name!,
             weight: product.weight!,
             category: product.category!,

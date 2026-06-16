@@ -32,6 +32,7 @@ import {
   FolderClockIcon,
   Search,
   MoveUpRight,
+  Briefcase,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -698,8 +699,14 @@ export default function BusinessLayout({
                     isActive={pathname === `/business/${businessId}/warehouse/put-away`}
                   />
                   <NavItem
+                    href={`/business/${businessId}/warehouse/parent-products`}
+                    icon={Briefcase}
+                    label="Parent Products"
+                    isActive={pathname === `/business/${businessId}/warehouse/parent-products`}
+                  />
+                  <NavItem
                     href={`/business/${businessId}/warehouse/products`}
-                    icon={BriefcaseBusiness}
+                    icon={Package}
                     label="Business Products"
                     isActive={pathname === `/business/${businessId}/warehouse/products`}
                   />

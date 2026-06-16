@@ -98,6 +98,9 @@ import { ProductMappingsDialog } from '@/components/product-mappings-dialog';
 import { BulkUploadDialog } from '@/components/bulk-upload-dialog';
 import { Product } from '@/types/warehouse';
 import { Timestamp } from 'firebase-admin/firestore';
+import { ParentProduct } from '@/types/warehouse';
+import { useParentProducts } from '@/hooks/use-parent-products';
+import { ParentProductCombobox } from '@/components/parent-product-combobox';
 
 // ============================================================
 // TYPES
@@ -106,6 +109,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 interface ProductFormData {
     name: string;
     sku: string;
+    parentProductId: string;
     weight: string;
     category: string;
     hsn: string;
@@ -120,6 +124,7 @@ const TAX_RATES = [0, 5, 12, 18, 28];
 const initialFormData: ProductFormData = {
     name: '',
     sku: '',
+    parentProductId: '',
     weight: '',
     category: '',
     hsn: '',
@@ -163,6 +168,11 @@ const cardVariants = {
 export default function ProductsPage() {
     const { isAuthorized, loading: authLoading, user, businessId } = useBusinessContext();
     const { toast } = useToast();
+    const { parents } = useParentProducts(businessId);
+    const parentMap = useMemo(
+        () => new Map(parents.map((p) => [p.id, p.name])),
+        [parents]
+    );
 
     // Data state
     const [products, setProducts] = useState<Product[]>([]);
@@ -387,6 +397,7 @@ export default function ProductsPage() {
                 name: product.name,
                 sku: product.sku,
                 weight: product.weight.toString(),
+                parentProductId: product.parentProductId ?? '',
                 category: product.category,
                 hsn: product.hsn,
                 taxRate: product.taxRate.toString(),
@@ -419,6 +430,7 @@ export default function ProductsPage() {
 
         if (!formData.name.trim()) errors.name = 'Name is required';
         if (!formData.sku.trim()) errors.sku = 'SKU is required';
+        if (!formData.parentProductId) errors.parentProductId = 'Parent product is required' as any;
         if (!formData.weight || parseFloat(formData.weight) <= 0) {
             errors.weight = 'Valid weight is required';
         }
@@ -455,6 +467,7 @@ export default function ProductsPage() {
             const productPayload: Partial<Product> = {
                 name: formData.name.trim(),
                 sku: formData.sku.trim().toUpperCase(),
+                parentProductId: formData.parentProductId,
                 weight: parseFloat(formData.weight),
                 category: formData.category,
                 hsn: formData.hsn.trim().toUpperCase(),
@@ -1070,6 +1083,12 @@ export default function ProductsPage() {
                                                                     {product.description}
                                                                 </p>
                                                             )}
+                                                            {product.parentProductId && parentMap.get(product.parentProductId) && (
+                                                                <p className="text-[11px] text-muted-foreground/80 mt-0.5 flex items-center gap-1">
+                                                                    <Package className="h-2.5 w-2.5" />
+                                                                    {parentMap.get(product.parentProductId)}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </TableCell>
@@ -1306,6 +1325,26 @@ export default function ProductsPage() {
                                         <p className="text-xs text-destructive">{formErrors.weight}</p>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Parent Product */}
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                    Parent Product <span className="text-destructive">*</span>
+                                </Label>
+                                <ParentProductCombobox
+                                    parents={parents}
+                                    value={formData.parentProductId || null}
+                                    onChange={(id) =>
+                                        setFormData({ ...formData, parentProductId: id })
+                                    }
+                                    error={!!formErrors.parentProductId}
+                                />
+                                {formErrors.parentProductId && (
+                                    <p className="text-xs text-destructive">
+                                        {formErrors.parentProductId}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Category */}

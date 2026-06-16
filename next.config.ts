@@ -278,6 +278,18 @@ const nextConfig: NextConfig = {
         destination: '/api/business/products/bulk-remove-all-mappings/route',
       },
       {
+        source: '/api/business/parent-products/create',
+        destination: '/api/business/parent-products/create/route',
+      },
+      {
+        source: '/api/business/parent-products/update',
+        destination: '/api/business/parent-products/update/route',
+      },
+      {
+        source: '/api/business/parent-products/delete',
+        destination: '/api/business/parent-products/delete/route',
+      },
+      {
         source: '/api/business/inventory/adjust',
         destination: '/api/business/inventory/adjust/route',
       },

@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
         const trimmedCategory = String(category ?? '').trim();
         const trimmedDescription = product.description ? String(product.description).trim() : null;
         const normalizedParentId = String(product.parentProductId ?? '').trim();
+        const normalizedSizeName = product.sizeName
+            ? String(product.sizeName).trim()
+            : null;
 
         // ============================================================
         // REQUIRED FIELDS CHECK
@@ -241,6 +244,7 @@ export async function POST(req: NextRequest) {
             name: trimmedName,
             sku: normalizedSku,
             parentProductId: normalizedParentId,
+            sizeName: normalizedSizeName,
             weight: parsedWeight,
             category: trimmedCategory,
             hsn: trimmedHsn,
@@ -290,6 +294,9 @@ export async function POST(req: NextRequest) {
                     : []),
                 ...(stockValue > 0
                     ? [{ field: 'inventory.openingStock', fieldLabel: 'Opening Stock', oldValue: null, newValue: stockValue }]
+                    : []),
+                ...(normalizedSizeName
+                    ? [{ field: 'sizeName', fieldLabel: 'Size Name', oldValue: null, newValue: normalizedSizeName }]
                     : []),
             ],
             performedBy: userId ?? 'unknown',

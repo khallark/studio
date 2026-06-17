@@ -39,6 +39,10 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ParentProduct } from '@/types/warehouse';
 import { Timestamp } from 'firebase-admin/firestore';
+import { Product } from '@/types/warehouse';
+import { Ruler } from 'lucide-react';
+import { ParentSizeChartDialog } from '@/components/parent-size-chart-dialog';
+import { ManagePresetsDialog } from '@/components/manage-presets-dialog';
 
 const tableRowVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -59,7 +63,7 @@ export default function ParentProductsPage() {
     const { toast } = useToast();
 
     const { parents, loading } = useParentProducts(businessId);
-    const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+    const [childProducts, setChildProducts] = useState<Product[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch] = useDebounce(searchQuery, 300);
@@ -74,6 +78,9 @@ export default function ParentProductsPage() {
     const [idInput, setIdInput] = useState('');
     const [nameError, setNameError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [sizeChartParent, setSizeChartParent] = useState<ParentProduct | null>(null);
+    const [sizeChartOpen, setSizeChartOpen] = useState(false);
+    const [managePresetsOpen, setManagePresetsOpen] = useState(false);
 
     const [toDelete, setToDelete] = useState<ParentProduct | null>(null);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -82,21 +89,25 @@ export default function ParentProductsPage() {
         document.title = 'Parent Products - Business Dashboard';
     }, []);
 
-    // Live product counts per parent
+    // Live child products (for counts + size-chart prefill)
     useEffect(() => {
         if (!authLoading && isAuthorized && businessId && user) {
             const ref = collection(db, 'users', businessId, 'products');
             const unsubscribe = onSnapshot(ref, (snapshot) => {
-                const counts: Record<string, number> = {};
-                snapshot.docs.forEach((d) => {
-                    const pid = d.data().parentProductId as string | undefined;
-                    if (pid) counts[pid] = (counts[pid] || 0) + 1;
-                });
-                setProductCounts(counts);
+                const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Product[];
+                setChildProducts(list);
             });
             return () => unsubscribe();
         }
     }, [authLoading, isAuthorized, businessId, user]);
+
+    const productCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const p of childProducts) {
+            if (p.parentProductId) counts[p.parentProductId] = (counts[p.parentProductId] || 0) + 1;
+        }
+        return counts;
+    }, [childProducts]);
 
     useEffect(() => { setCurrentPage(1); }, [debouncedSearch, sortField, sortDirection]);
 
@@ -258,10 +269,16 @@ export default function ParentProductsPage() {
                         <p className="text-sm text-muted-foreground">Group your product variants under a parent</p>
                     </div>
                 </div>
-                <Button onClick={() => openDialog()} className="gap-2 shadow-lg shadow-primary/20">
-                    <Plus className="h-4 w-4" />
-                    Add Parent
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setManagePresetsOpen(true)} className="gap-2">
+                        <Ruler className="h-4 w-4" />
+                        Manage Templates
+                    </Button>
+                    <Button onClick={() => openDialog()} className="gap-2 shadow-lg shadow-primary/20">
+                        <Plus className="h-4 w-4" />
+                        Add Parent
+                    </Button>
+                </div>
             </motion.div>
 
             {/* Stats */}
@@ -436,6 +453,16 @@ export default function ParentProductsPage() {
                                                                 <DropdownMenuItem onClick={() => openDialog(parent)} className="gap-2">
                                                                     <Pencil className="h-4 w-4" /> Rename
                                                                 </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    onClick={() => {
+                                                                        setSizeChartParent(parent);
+                                                                        setSizeChartOpen(true);
+                                                                    }}
+                                                                    className="gap-2"
+                                                                >
+                                                                    <Ruler className="h-4 w-4" />
+                                                                    {parent.sizeChart ? 'Edit Size Chart' : 'Size Chart'}
+                                                                </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
                                                                     disabled={count > 0}
@@ -559,6 +586,28 @@ export default function ParentProductsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <ParentSizeChartDialog
+                open={sizeChartOpen}
+                onOpenChange={(o) => {
+                    setSizeChartOpen(o);
+                    if (!o) setSizeChartParent(null);
+                }}
+                businessId={businessId}
+                user={user}
+                parent={sizeChartParent}
+                children={
+                    sizeChartParent
+                        ? childProducts.filter((p) => p.parentProductId === sizeChartParent.id)
+                        : []
+                }
+            />
+
+            <ManagePresetsDialog
+                open={managePresetsOpen}
+                onOpenChange={setManagePresetsOpen}
+                businessId={businessId}
+                user={user}
+            />
         </div>
     );
 }

@@ -109,6 +109,7 @@ import { ParentProductCombobox } from '@/components/parent-product-combobox';
 interface ProductFormData {
     name: string;
     sku: string;
+    sizeName: string;
     parentProductId: string;
     weight: string;
     category: string;
@@ -124,6 +125,7 @@ const TAX_RATES = [0, 5, 12, 18, 28];
 const initialFormData: ProductFormData = {
     name: '',
     sku: '',
+    sizeName: '',
     parentProductId: '',
     weight: '',
     category: '',
@@ -396,6 +398,7 @@ export default function ProductsPage() {
             setFormData({
                 name: product.name,
                 sku: product.sku,
+                sizeName: product.sizeName ?? '',
                 weight: product.weight.toString(),
                 parentProductId: product.parentProductId ?? '',
                 category: product.category,
@@ -468,6 +471,7 @@ export default function ProductsPage() {
                 name: formData.name.trim(),
                 sku: formData.sku.trim().toUpperCase(),
                 parentProductId: formData.parentProductId,
+                sizeName: formData.sizeName.trim() || null,
                 weight: parseFloat(formData.weight),
                 category: formData.category,
                 hsn: formData.hsn.trim().toUpperCase(),
@@ -1301,6 +1305,7 @@ export default function ProductsPage() {
                                         <p className="text-xs text-destructive">{formErrors.sku}</p>
                                     )}
                                 </div>
+                                
 
                                 <div className="space-y-2">
                                     <Label htmlFor="weight" className="text-sm font-medium">
@@ -1325,6 +1330,24 @@ export default function ProductsPage() {
                                         <p className="text-xs text-destructive">{formErrors.weight}</p>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Size Name */}
+                            <div className="space-y-2">
+                                <Label htmlFor="sizeName" className="text-sm font-medium">
+                                    Size Name
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                        (optional)
+                                    </span>
+                                </Label>
+                                <Input
+                                    id="sizeName"
+                                    value={formData.sizeName}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, sizeName: e.target.value })
+                                    }
+                                    placeholder="e.g. 26, S, XL — leave blank if not sized"
+                                />
                             </div>
 
                             {/* Parent Product */}

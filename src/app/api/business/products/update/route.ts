@@ -30,6 +30,7 @@ interface ProductLog {
 
 // Field labels for human-readable logs
 const FIELD_LABELS: Record<string, string> = {
+    sizeName: 'Size Name',
     parentProductId: 'Parent Product',
     name: 'Product Name',
     weight: 'Weight',
@@ -52,7 +53,7 @@ function getChanges(
 ): ChangeLogEntry[] {
     const changes: ChangeLogEntry[] = [];
     const fieldsToTrack: Array<keyof Omit<Product, 'id' | 'sku' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy' | 'mappedVariants' | 'inventory' | 'inShelfQuantity'>> = [
-        'name', 'weight', 'category', 'hsn', 'taxRate', 'parentProductId',
+        'name', 'weight', 'category', 'hsn', 'taxRate', 'parentProductId', 'sizeName',
         'description', 'price', 'stock', 'status',
     ];
 
@@ -201,6 +202,9 @@ export async function POST(req: NextRequest) {
         }
         if (product.status !== undefined) {
             updateData.status = product.status ?? null;
+        }
+        if (product.sizeName !== undefined) {
+            updateData.sizeName = product.sizeName ? String(product.sizeName).trim() : null;
         }
 
         // ============================================================

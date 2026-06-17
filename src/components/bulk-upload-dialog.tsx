@@ -228,6 +228,7 @@ export function BulkUploadDialog({
             { header: 'Product Name', key: 'productName', width: 25 },
             { header: 'SKU', key: 'sku', width: 15 },
             { header: 'Parent Product', key: 'parentProduct', width: 22 },
+            { header: 'Size Name', key: 'sizeName', width: 12 },
             { header: 'Weight', key: 'weight', width: 10 },
             { header: 'Category', key: 'category', width: 20 },
             { header: 'HSN', key: 'hsn', width: 12 },
@@ -248,6 +249,7 @@ export function BulkUploadDialog({
             productName: 'Cotton T-Shirt',
             sku: 'TSH-001',
             parentProduct: 'Cotton T-Shirt',
+            sizeName: 'S',     // (M / 32 for the others)
             weight: 250,
             category: 'Apparel',
             hsn: '6109',
@@ -260,6 +262,7 @@ export function BulkUploadDialog({
             productName: 'Denim Jeans',
             sku: 'JNS-002',
             parentProduct: 'Cotton T-Shirt',
+            sizeName: 'S',     // (M / 32 for the others)
             weight: 450,
             category: 'Apparel',
             hsn: '6203',
@@ -272,6 +275,7 @@ export function BulkUploadDialog({
             productName: 'Running Shoes',
             sku: 'SHO-003',
             parentProduct: 'Cotton T-Shirt',
+            sizeName: 'S',     // (M / 32 for the others)
             weight: 350,
             category: 'Footwear',
             hsn: '6404',
@@ -369,6 +373,10 @@ export function BulkUploadDialog({
                                 <li>
                                     <code className="px-1.5 py-0.5 bg-muted rounded text-xs">SKU</code>
                                     {' '}- Unique product identifier (always required)
+                                </li>
+                                <li>
+                                    <code className="px-1.5 py-0.5 bg-muted rounded text-xs">Size Name</code>
+                                    {' '}- Variant size label (e.g. 26, S, XL); blank if not sized
                                 </li>
                                 {mode === 'add' && (
                                     <>

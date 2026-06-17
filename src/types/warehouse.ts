@@ -2,10 +2,35 @@
 
 import { Timestamp } from "firebase-admin/firestore";
 
+export interface SizeChartPresetDoc {
+    id: string;
+    name: string;
+    columns: {
+        key: string;
+        label: string;
+    }[];
+    createdAt: Timestamp;
+    createdBy: string;
+    updatedAt: Timestamp | null;
+    updatedBy: string | null;
+}
+
+export interface ProductSizeChart {
+    presetId: string | null;
+    presetName: string | null;
+    rows: string[];
+    columns: {
+        key: string;
+        label: string;
+    }[];
+    values: Record<string, Record<string, string>>;
+}
+
 // user/{businessId}/parentProducts/{productId}
 export interface ParentProduct {
     id: string;
     name: string;
+    sizeChart: ProductSizeChart | null;
     createdBy: string | null;
     createdAt: Timestamp | null;
     updatedBy: string | null;
@@ -29,6 +54,7 @@ export interface Product {
 
     // Optional fields stored as explicit null rather than undefined so that
     // Firestore serialisation is predictable and type-narrowing is simple.
+    sizeName: string | null;
     description: string | null;
     price: number | null;
     stock: number | null;

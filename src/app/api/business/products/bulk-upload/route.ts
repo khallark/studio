@@ -14,6 +14,7 @@ interface ProductRow {
     'Product Name'?: string;
     'SKU'?: string;
     'Parent Product'?: string;
+    'Size Name'?: string;
     'Weight'?: number | string;
     'Category'?: string;
     'HSN'?: string;
@@ -115,6 +116,8 @@ function normalizeColumnNames(row: any): ProductRow {
             normalized['Stock'] = value as number;
         } else if (/^parent(\s*product)?$/i.test(normalizedKey)) {
             normalized['Parent Product'] = value as string;
+        } else if (/^size(\s*name)?$/i.test(normalizedKey)) {
+            normalized['Size Name'] = value as string;
         } else {
             normalized[normalizedKey] = value;
         }
@@ -559,6 +562,9 @@ export async function POST(req: NextRequest) {
                     name: row['Product Name']!.toString().trim(),
                     sku: skuUpper,
                     parentProductId: parentId,
+                    sizeName: row['Size Name']
+                        ? row['Size Name'].toString().trim()
+                        : null,
                     weight: parseFloat(row['Weight']?.toString() ?? '0'),
                     category: row['Category']?.toString().trim() ?? 'Other',
                     hsn: row['HSN']!.toString().trim().toUpperCase(),
@@ -640,6 +646,10 @@ export async function POST(req: NextRequest) {
                 if (row['Product Name']) {
                     updateData.name = row['Product Name'].toString().trim();
                     changes.push({ field: 'name', fieldLabel: 'Product Name', oldValue: '(previous)', newValue: updateData.name });
+                }
+                if (row['Size Name'] !== undefined && row['Size Name'].toString().trim() !== '') {
+                    updateData.sizeName = row['Size Name'].toString().trim();
+                    changes.push({ field: 'sizeName', fieldLabel: 'Size Name', oldValue: '(previous)', newValue: updateData.sizeName });
                 }
                 if (row['Weight'] !== undefined && row['Weight'] !== '') {
                     updateData.weight = parseFloat(row['Weight'].toString());

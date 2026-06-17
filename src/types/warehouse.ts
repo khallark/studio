@@ -9,6 +9,8 @@ export interface SizeChartPresetDoc {
         key: string;
         label: string;
     }[];
+    rows: string[];
+    values: Record<string, Record<string, string>>;
     createdAt: Timestamp;
     createdBy: string;
     updatedAt: Timestamp | null;

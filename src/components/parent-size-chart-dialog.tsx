@@ -92,14 +92,13 @@ export function ParentSizeChartDialog({
             }
             setValues(v);
         } else {
+            // Fresh chart: open empty. Rows + starter values get seeded when a
+            // template is applied (see applyPreset), since we need columns first.
             setPresetId(null);
             setPresetName(null);
             setColumns([]);
-            const localRows = derivedRowsRef.current.map((label) => ({ id: uid(), label }));
-            setRows(localRows);
-            const v: Record<string, Record<string, string>> = {};
-            for (const r of localRows) v[r.id] = {};
-            setValues(v);
+            setRows([]);
+            setValues({});
         }
 
         setCreatingPreset(false);
@@ -108,22 +107,51 @@ export function ParentSizeChartDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
-    // Apply an existing preset: swap columns, keep surviving keys' values
+    // Apply a template. Two modes:
+    //  - Empty grid (fresh chart, no rows yet): seed rows = derived ∪ template defaults,
+    //    and prefill values from the template's starter values.
+    //  - Populated grid (swapping templates mid-edit): swap columns only, keep
+    //    surviving keys' values, leave rows untouched.
     const applyPreset = (preset: SizeChartPresetDoc) => {
         const newCols = preset.columns ?? [];
         setPresetId(preset.id);
         setPresetName(preset.name);
         setColumns(newCols);
-        setValues((prev) => {
-            const next: Record<string, Record<string, string>> = {};
-            for (const r of rows) {
-                const old = prev[r.id] ?? {};
-                const kept: Record<string, string> = {};
-                for (const c of newCols) kept[c.key] = old[c.key] ?? '';
-                next[r.id] = kept;
+
+        if (rows.length === 0) {
+            // FRESH: union derived rows (first) with template default rows.
+            const seen = new Set<string>();
+            const mergedLabels: string[] = [];
+            for (const label of derivedRowsRef.current) {
+                if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
             }
-            return next;
-        });
+            for (const label of (preset.rows ?? [])) {
+                if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
+            }
+
+            const localRows = mergedLabels.map((label) => ({ id: uid(), label }));
+            const v: Record<string, Record<string, string>> = {};
+            for (const r of localRows) {
+                const presetRowVals = preset.values?.[r.label] ?? {};
+                const cell: Record<string, string> = {};
+                for (const c of newCols) cell[c.key] = presetRowVals[c.key] ?? '';
+                v[r.id] = cell;
+            }
+            setRows(localRows);
+            setValues(v);
+        } else {
+            // POPULATED: keep rows + surviving column values, drop dead columns.
+            setValues((prev) => {
+                const next: Record<string, Record<string, string>> = {};
+                for (const r of rows) {
+                    const old = prev[r.id] ?? {};
+                    const kept: Record<string, string> = {};
+                    for (const c of newCols) kept[c.key] = old[c.key] ?? '';
+                    next[r.id] = kept;
+                }
+                return next;
+            });
+        }
     };
 
     // Row ops

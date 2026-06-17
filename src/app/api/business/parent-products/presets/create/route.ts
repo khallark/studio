@@ -2,19 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authUserForBusiness } from '@/lib/authoriseUser';
 import { Timestamp } from 'firebase-admin/firestore';
+import { buildColumns } from '@/lib/size-chart-keys';
 
 const MAX_NAME_LENGTH = 200;
 const MAX_COLUMNS = 30;
 const MAX_LABEL_LENGTH = 60;
-
-// key: lowercase alphanumerics + underscore, derived from label
-function toKey(label: string): string {
-    return label
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-}
 
 export async function POST(req: NextRequest) {
     try {
@@ -22,10 +14,14 @@ export async function POST(req: NextRequest) {
             businessId,
             name,
             columns,
+            rows,
+            values,
         }: {
             businessId: string;
             name: string;
             columns: { label: string }[];
+            rows?: string[];
+            values?: Record<string, Record<string, string>>;
         } = await req.json();
 
         if (!businessId || typeof businessId !== 'string') {
@@ -62,10 +58,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Build {key, label}, validating labels and enforcing unique keys
-        const builtColumns: { key: string; label: string }[] = [];
-        const seenKeys = new Set<string>();
-
+        // Validate labels before building keys
         for (const col of columns) {
             const label = String(col?.label ?? '').trim();
             if (!label) {
@@ -80,23 +73,39 @@ export async function POST(req: NextRequest) {
                     { status: 400 }
                 );
             }
+        }
 
-            let key = toKey(label);
-            if (!key) {
-                return NextResponse.json(
-                    { error: 'Validation Error', message: `Column label "${label}" produces an empty key` },
-                    { status: 400 }
-                );
+        // Build {key,label} via the shared helper (same logic the client uses)
+        const builtColumns = buildColumns(columns.map((c) => String(c?.label ?? '')));
+        if (builtColumns.length === 0) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: 'Columns produced no valid keys' },
+                { status: 400 }
+            );
+        }
+
+        // Normalize default rows (optional): trim, drop empty, de-dupe (preserve order)
+        const seenRows = new Set<string>();
+        const cleanRows: string[] = [];
+        for (const r of Array.isArray(rows) ? rows : []) {
+            const t = String(r ?? '').trim();
+            if (t && !seenRows.has(t)) {
+                seenRows.add(t);
+                cleanRows.push(t);
             }
-            // Disambiguate collisions (e.g. "Hip (cm)" and "Hip (in)" -> hip_cm / hip_in already differ,
-            // but "Hip" twice would collide) by suffixing.
-            let unique = key;
-            let n = 2;
-            while (seenKeys.has(unique)) {
-                unique = `${key}_${n++}`;
+        }
+
+        // Rebuild default values strictly from cleanRows × builtColumns keys
+        const incomingValues = values && typeof values === 'object' ? values : {};
+        const cleanValues: Record<string, Record<string, string>> = {};
+        for (const row of cleanRows) {
+            const src = incomingValues[row] ?? {};
+            const cell: Record<string, string> = {};
+            for (const c of builtColumns) {
+                const raw = src[c.key];
+                cell[c.key] = raw === undefined || raw === null ? '' : String(raw).trim();
             }
-            seenKeys.add(unique);
-            builtColumns.push({ key: unique, label });
+            cleanValues[row] = cell;
         }
 
         const result = await authUserForBusiness({ businessId, req });
@@ -111,6 +120,8 @@ export async function POST(req: NextRequest) {
             id: ref.id,
             name: trimmedName,
             columns: builtColumns,
+            rows: cleanRows,
+            values: cleanValues,
             createdBy: userId ?? 'unknown',
             createdAt: Timestamp.now(),
             updatedBy: null,

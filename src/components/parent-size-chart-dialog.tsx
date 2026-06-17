@@ -57,6 +57,7 @@ export function ParentSizeChartDialog({
     const [newPresetRows, setNewPresetRows] = useState<GridRow[]>([]);
     const [newPresetValues, setNewPresetValues] = useState<Record<string, Record<string, string>>>({});
     const [savingPreset, setSavingPreset] = useState(false);
+    const [pristineFromPreset, setPristineFromPreset] = useState(false);
 
     const hadChart = !!parent?.sizeChart;
 
@@ -112,19 +113,16 @@ export function ParentSizeChartDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
-    // Apply a template. Two modes:
-    //  - Empty grid (fresh chart, no rows yet): seed rows = derived ∪ template defaults,
-    //    and prefill values from the template's starter values.
-    //  - Populated grid (swapping templates mid-edit): swap columns only, keep
-    //    surviving keys' values, leave rows untouched.
     const applyPreset = (preset: SizeChartPresetDoc) => {
         const newCols = preset.columns ?? [];
         setPresetId(preset.id);
         setPresetName(preset.name);
         setColumns(newCols);
 
-        if (rows.length === 0) {
-            // FRESH: union derived rows (first) with template default rows.
+        const canReseed = rows.length === 0 || pristineFromPreset;
+
+        if (canReseed) {
+            // FRESH/RESEED: union derived rows with template defaults, seed values
             const seen = new Set<string>();
             const mergedLabels: string[] = [];
             for (const label of derivedRowsRef.current) {
@@ -133,7 +131,6 @@ export function ParentSizeChartDialog({
             for (const label of (preset.rows ?? [])) {
                 if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
             }
-
             const localRows = mergedLabels.map((label) => ({ id: uid(), label }));
             const v: Record<string, Record<string, string>> = {};
             for (const r of localRows) {
@@ -144,8 +141,9 @@ export function ParentSizeChartDialog({
             }
             setRows(localRows);
             setValues(v);
+            setPristineFromPreset(true);   // still untouched after this apply
         } else {
-            // POPULATED: keep rows + surviving column values, drop dead columns.
+            // POPULATED + user-touched: preserve rows, keep surviving column values
             setValues((prev) => {
                 const next: Record<string, Record<string, string>> = {};
                 for (const r of rows) {
@@ -188,8 +186,10 @@ export function ParentSizeChartDialog({
         });
     };
 
-    const setCell = (rowId: string, colKey: string, val: string) =>
+    const setCell = (rowId: string, colKey: string, val: string) => {
+        setPristineFromPreset(false);
         setValues((prev) => ({ ...prev, [rowId]: { ...prev[rowId], [colKey]: val } }));
+    };
 
     // Inline preset create
     const addPresetCol = () => setNewPresetCols((prev) => [...prev, '']);

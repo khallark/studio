@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ParentProduct, Product, SizeChartPresetDoc, ProductSizeChart } from '@/types/warehouse';
 import { useSizeChartPresets } from '@/hooks/use-size-chart-presets';
+import { DefaultGridEditor, GridRow, buildDefaultGridPayload } from '@/components/default-grid-editor';
 
 // Local-only stable id for rows, so value cells stay attached across label edits.
 let _uid = 0;
@@ -53,6 +54,8 @@ export function ParentSizeChartDialog({
     const [creatingPreset, setCreatingPreset] = useState(false);
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetCols, setNewPresetCols] = useState<string[]>(['']);
+    const [newPresetRows, setNewPresetRows] = useState<GridRow[]>([]);
+    const [newPresetValues, setNewPresetValues] = useState<Record<string, Record<string, string>>>({});
     const [savingPreset, setSavingPreset] = useState(false);
 
     const hadChart = !!parent?.sizeChart;
@@ -104,6 +107,8 @@ export function ParentSizeChartDialog({
         setCreatingPreset(false);
         setNewPresetName('');
         setNewPresetCols(['']);
+        setNewPresetRows([]);
+        setNewPresetValues({});
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -209,10 +214,18 @@ export function ParentSizeChartDialog({
         setSavingPreset(true);
         try {
             const idToken = await user.getIdToken();
+            const grid = buildDefaultGridPayload(newPresetCols, newPresetRows, newPresetValues);
+
             const res = await fetch('/api/business/parent-products/presets/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, name, columns: cols.map((label) => ({ label })) }),
+                body: JSON.stringify({
+                    businessId,
+                    name,
+                    columns: cols.map((label) => ({ label })),
+                    rows: grid.rows,
+                    values: grid.values,
+                }),
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.message || 'Failed to create preset');
@@ -222,6 +235,8 @@ export function ParentSizeChartDialog({
             setCreatingPreset(false);
             setNewPresetName('');
             setNewPresetCols(['']);
+            setNewPresetRows([]);
+            setNewPresetValues({});
             toast({ title: 'Preset created', description: `"${name}" is ready to use.` });
         } catch (err) {
             toast({
@@ -427,6 +442,23 @@ export function ParentSizeChartDialog({
                                     <Plus className="h-3 w-3" /> Add column
                                 </Button>
                             </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                    Starter Values
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                        (optional — copied in when this template is applied)
+                                    </span>
+                                </Label>
+                                <DefaultGridEditor
+                                    columnLabels={newPresetCols}
+                                    rows={newPresetRows}
+                                    setRows={setNewPresetRows}
+                                    values={newPresetValues}
+                                    setValues={setNewPresetValues}
+                                />
+                            </div>
+
                             <div className="flex justify-end gap-2 pt-1">
                                 <Button type="button" variant="ghost" size="sm"
                                     onClick={() => setCreatingPreset(false)} disabled={savingPreset}>

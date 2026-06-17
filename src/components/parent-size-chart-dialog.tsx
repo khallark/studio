@@ -72,7 +72,11 @@ export function ParentSizeChartDialog({
         return out;
     }, [children]);
 
-    // (Re)initialize when the dialog opens
+    // Keep latest derivedRows reachable without making it an effect dependency
+    const derivedRowsRef = React.useRef(derivedRows);
+    derivedRowsRef.current = derivedRows;
+
+    // (Re)initialize ONLY when the dialog transitions to open
     useEffect(() => {
         if (!open || !parent) return;
 
@@ -92,7 +96,7 @@ export function ParentSizeChartDialog({
             setPresetId(null);
             setPresetName(null);
             setColumns([]);
-            const localRows = derivedRows.map((label) => ({ id: uid(), label }));
+            const localRows = derivedRowsRef.current.map((label) => ({ id: uid(), label }));
             setRows(localRows);
             const v: Record<string, Record<string, string>> = {};
             for (const r of localRows) v[r.id] = {};
@@ -102,7 +106,8 @@ export function ParentSizeChartDialog({
         setCreatingPreset(false);
         setNewPresetName('');
         setNewPresetCols(['']);
-    }, [open, parent, derivedRows]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     // Apply an existing preset: swap columns, keep surviving keys' values
     const applyPreset = (preset: SizeChartPresetDoc) => {

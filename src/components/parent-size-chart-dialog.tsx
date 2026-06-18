@@ -61,7 +61,7 @@ export function ParentSizeChartDialog({
     // Row-seeding mode read at template-apply time:
     //  'as-is'  -> rows = exactly the template's rows
     //  'match'  -> rows = product sizes ∪ template rows
-    const [applyMode, setApplyMode] = useState<'as-is' | 'match'>('as-is');
+    const [applyMode, setApplyMode] = useState<'as-is' | 'match'>('match');
     const hadChart = !!parent?.sizeChart;
 
     // Rows derived from children's sizeName (for fresh charts)
@@ -412,20 +412,20 @@ export function ParentSizeChartDialog({
                             <Button
                                 type="button"
                                 size="sm"
-                                variant={applyMode === 'as-is' ? 'default' : 'ghost'}
-                                onClick={() => setApplyMode('as-is')}
-                                className="h-7 text-xs"
-                            >
-                                Use template as-is
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
                                 variant={applyMode === 'match' ? 'default' : 'ghost'}
                                 onClick={() => setApplyMode('match')}
                                 className="h-7 text-xs"
                             >
                                 Match product sizes
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={applyMode === 'as-is' ? 'default' : 'ghost'}
+                                onClick={() => setApplyMode('as-is')}
+                                className="h-7 text-xs"
+                            >
+                                Use template as-is
                             </Button>
                         </div>
                         {columns.length > 0 && (

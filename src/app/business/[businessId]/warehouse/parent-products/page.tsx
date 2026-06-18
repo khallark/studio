@@ -457,9 +457,6 @@ export default function ParentProductsPage() {
                                                             <DropdownMenuContent align="end" className="w-48">
                                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem onClick={() => openDialog(parent)} className="gap-2">
-                                                                    <Pencil className="h-4 w-4" /> Rename
-                                                                </DropdownMenuItem>
                                                                 <DropdownMenuItem
                                                                     onClick={() => {
                                                                         setSizeChartParent(parent);
@@ -469,6 +466,9 @@ export default function ParentProductsPage() {
                                                                 >
                                                                     <Ruler className="h-4 w-4" />
                                                                     {parent.sizeChart ? 'Edit Size Chart' : 'Size Chart'}
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => openDialog(parent)} className="gap-2">
+                                                                    <Pencil className="h-4 w-4" /> Rename
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem

@@ -68,6 +68,18 @@ export function ManagePresetsDialog({
         setEditorOpen(true);
     };
 
+    // Seed the CREATE form from an existing template (duplicate-and-modify).
+    // editingId stays null, so saving creates a NEW preset; the source is untouched.
+    const seedFromTemplate = (p: SizeChartPresetDoc) => {
+        setName(`${p.name} (copy)`);
+        setCols(p.columns.length ? p.columns.map((c) => c.label) : ['']);
+        const localRows: GridRow[] = (p.rows ?? []).map((label) => ({ id: guid(), label }));
+        setGridRows(localRows);
+        const v: Record<string, Record<string, string>> = {};
+        for (const r of localRows) v[r.id] = { ...(p.values?.[r.label] ?? {}) };
+        setGridValues(v);
+    };
+
     const openEdit = (p: SizeChartPresetDoc) => {
         setEditingId(p.id);
         setName(p.name);
@@ -227,6 +239,31 @@ export function ManagePresetsDialog({
                                 <p className="text-sm font-semibold">
                                     {editingId ? 'Edit Template' : 'New Template'}
                                 </p>
+
+                                {/* Duplicate-and-modify: only when creating, only if templates exist */}
+                                {!editingId && presets.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-muted-foreground">
+                                            Start from existing (optional)
+                                        </Label>
+                                        <select
+                                            defaultValue=""
+                                            onChange={(e) => {
+                                                const p = presets.find((x) => x.id === e.target.value);
+                                                if (p) seedFromTemplate(p);
+                                                e.target.value = ''; // reset so the same one can be re-picked
+                                            }}
+                                            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                        >
+                                            <option value="" disabled>Choose a template to copy…</option>
+                                            {presets.map((p) => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.name} ({p.columns.length} cols{(p.rows?.length ?? 0) > 0 ? `, ${p.rows.length} rows` : ''})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium">Template Name</Label>

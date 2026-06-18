@@ -89,10 +89,6 @@ export function ParentProductCombobox({
                                         onChange(parent.id);
                                         setOpen(false);
                                     }}
-                                    onClick={() => {
-                                        onChange(parent.id);
-                                        setOpen(false);
-                                    }}
                                 >
                                     <Check
                                         className={cn(

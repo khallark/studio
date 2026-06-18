@@ -113,7 +113,7 @@ export function ParentSizeChartDialog({
         setNewPresetCols(['']);
         setNewPresetRows([]);
         setNewPresetValues({});
-        setApplyMode('as-is');
+        setApplyMode('match');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 

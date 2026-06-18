@@ -15,10 +15,15 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
-    Ruler, Plus, X, Trash2, Loader2, PackageOpen,
+    Ruler, Plus, X, Trash2, Loader2, PackageOpen, Pencil,
 } from 'lucide-react';
 import { SizeChartPresetDoc } from '@/types/warehouse';
 import { useSizeChartPresets } from '@/hooks/use-size-chart-presets';
+import { DefaultGridEditor, GridRow, buildDefaultGridPayload } from '@/components/default-grid-editor';
+
+// Local stable id for default-grid rows
+let _uid = 0;
+const guid = () => `mp_${++_uid}`;
 
 interface ManagePresetsDialogProps {
     open: boolean;
@@ -33,21 +38,53 @@ export function ManagePresetsDialog({
     const { toast } = useToast();
     const { presets, loading } = useSizeChartPresets(businessId);
 
-    const [creating, setCreating] = useState(false);
+    // Editor state — shared by create and edit. editingId === null means "create".
+    const [editorOpen, setEditorOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [name, setName] = useState('');
     const [cols, setCols] = useState<string[]>(['']);
+    const [gridRows, setGridRows] = useState<GridRow[]>([]);
+    const [gridValues, setGridValues] = useState<Record<string, Record<string, string>>>({});
     const [saving, setSaving] = useState(false);
 
     const [toDelete, setToDelete] = useState<SizeChartPresetDoc | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    const resetCreate = () => {
-        setCreating(false);
+    const resetEditor = () => {
+        setEditorOpen(false);
+        setEditingId(null);
         setName('');
         setCols(['']);
+        setGridRows([]);
+        setGridValues({});
     };
 
-    const handleCreate = async () => {
+    const openCreate = () => {
+        setEditingId(null);
+        setName('');
+        setCols(['']);
+        setGridRows([]);
+        setGridValues({});
+        setEditorOpen(true);
+    };
+
+    const openEdit = (p: SizeChartPresetDoc) => {
+        setEditingId(p.id);
+        setName(p.name);
+        setCols(p.columns.length ? p.columns.map((c) => c.label) : ['']);
+        // Seed grid rows/values from the preset. Values are keyed by row label + col key;
+        // DefaultGridEditor wants row.id-keyed values, so remap onto fresh local ids.
+        const localRows: GridRow[] = (p.rows ?? []).map((label) => ({ id: guid(), label }));
+        setGridRows(localRows);
+        const v: Record<string, Record<string, string>> = {};
+        for (const r of localRows) {
+            v[r.id] = { ...(p.values?.[r.label] ?? {}) };
+        }
+        setGridValues(v);
+        setEditorOpen(true);
+    };
+
+    const handleSave = async () => {
         const n = name.trim();
         const c = cols.map((x) => x.trim()).filter(Boolean);
         if (!n) { toast({ title: 'Name required', variant: 'destructive' }); return; }
@@ -57,19 +94,34 @@ export function ManagePresetsDialog({
         setSaving(true);
         try {
             const idToken = await user.getIdToken();
-            const res = await fetch('/api/business/parent-products/presets/create', {
+            // DefaultGridEditor keys values by row.id; buildDefaultGridPayload reprojects
+            // them to row-label + col-key, which is what the API stores.
+            const grid = buildDefaultGridPayload(cols, gridRows, gridValues);
+
+            const endpoint = editingId
+                ? '/api/business/parent-products/presets/update'
+                : '/api/business/parent-products/presets/create';
+            const body = editingId
+                ? { businessId, presetId: editingId, name: n, columns: c.map((label) => ({ label })), rows: grid.rows, values: grid.values }
+                : { businessId, name: n, columns: c.map((label) => ({ label })), rows: grid.rows, values: grid.values };
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ businessId, name: n, columns: c.map((label) => ({ label })) }),
+                body: JSON.stringify(body),
             });
             const result = await res.json();
-            if (!res.ok) throw new Error(result.message || 'Failed to create preset');
-            toast({ title: 'Preset created', description: `"${n}" added.` });
-            resetCreate();
+            if (!res.ok) throw new Error(result.message || 'Failed to save preset');
+
+            toast({
+                title: editingId ? 'Template updated' : 'Template created',
+                description: `"${n}" saved.`,
+            });
+            resetEditor();
         } catch (err) {
             toast({
                 title: 'Error',
-                description: err instanceof Error ? err.message : 'Failed to create preset.',
+                description: err instanceof Error ? err.message : 'Failed to save preset.',
                 variant: 'destructive',
             });
         } finally {
@@ -89,8 +141,10 @@ export function ManagePresetsDialog({
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.message || 'Failed to delete preset');
-            toast({ title: 'Preset deleted', description: `"${toDelete.name}" removed.` });
+            toast({ title: 'Template deleted', description: `"${toDelete.name}" removed.` });
             setToDelete(null);
+            // If we were editing the one just deleted, close the editor.
+            if (editingId === toDelete.id) resetEditor();
         } catch (err) {
             toast({
                 title: 'Error',
@@ -105,7 +159,7 @@ export function ManagePresetsDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={(o) => !o && onOpenChange(false)}>
-                <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10">
@@ -114,7 +168,8 @@ export function ManagePresetsDialog({
                             <div>
                                 <DialogTitle>Size Chart Templates</DialogTitle>
                                 <DialogDescription>
-                                    Reusable column sets. To change one, create a new template and delete the old.
+                                    Reusable column sets with optional starter values. Editing a template affects
+                                    only future applications — existing charts keep their copied values.
                                 </DialogDescription>
                             </div>
                         </div>
@@ -133,7 +188,7 @@ export function ManagePresetsDialog({
                             <div className="space-y-2">
                                 {presets.map((p) => (
                                     <div key={p.id}
-                                        className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                                        className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${editingId === p.id ? 'ring-1 ring-primary/40 bg-primary/5' : ''}`}>
                                         <div className="space-y-1.5 min-w-0">
                                             <p className="font-medium text-sm">{p.name}</p>
                                             <div className="flex flex-wrap gap-1">
@@ -143,25 +198,42 @@ export function ManagePresetsDialog({
                                                     </Badge>
                                                 ))}
                                             </div>
+                                            {(p.rows?.length ?? 0) > 0 && (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {p.rows.length} default row{p.rows.length === 1 ? '' : 's'}
+                                                </p>
+                                            )}
                                         </div>
-                                        <Button variant="ghost" size="icon"
-                                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                            onClick={() => setToDelete(p)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                            <Button variant="ghost" size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                onClick={() => openEdit(p)}>
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                onClick={() => setToDelete(p)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* Create */}
-                        {creating ? (
+                        {/* Editor (create OR edit) */}
+                        {editorOpen ? (
                             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                                <p className="text-sm font-semibold">
+                                    {editingId ? 'Edit Template' : 'New Template'}
+                                </p>
+
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium">Template Name</Label>
                                     <Input value={name} onChange={(e) => setName(e.target.value)}
                                         placeholder="e.g. Men's Pants" />
                                 </div>
+
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium">Columns</Label>
                                     {cols.map((col, i) => (
@@ -182,18 +254,35 @@ export function ManagePresetsDialog({
                                         <Plus className="h-3 w-3" /> Add column
                                     </Button>
                                 </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">
+                                        Starter Values
+                                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                            (optional — copied in when applied)
+                                        </span>
+                                    </Label>
+                                    <DefaultGridEditor
+                                        columnLabels={cols}
+                                        rows={gridRows}
+                                        setRows={setGridRows}
+                                        values={gridValues}
+                                        setValues={setGridValues}
+                                    />
+                                </div>
+
                                 <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" size="sm" onClick={resetCreate} disabled={saving}>
+                                    <Button variant="ghost" size="sm" onClick={resetEditor} disabled={saving}>
                                         Cancel
                                     </Button>
-                                    <Button size="sm" onClick={handleCreate} disabled={saving} className="gap-2">
+                                    <Button size="sm" onClick={handleSave} disabled={saving} className="gap-2">
                                         {saving && <Loader2 className="h-3 w-3 animate-spin" />}
-                                        Save Template
+                                        {editingId ? 'Save Changes' : 'Save Template'}
                                     </Button>
                                 </div>
                             </div>
                         ) : (
-                            <Button variant="outline" onClick={() => setCreating(true)} className="w-full gap-2">
+                            <Button variant="outline" onClick={openCreate} className="w-full gap-2">
                                 <Plus className="h-4 w-4" /> New Template
                             </Button>
                         )}
@@ -207,7 +296,7 @@ export function ManagePresetsDialog({
                         <AlertDialogTitle>Delete Template</AlertDialogTitle>
                         <AlertDialogDescription>
                             Delete <span className="font-semibold">{toDelete?.name}</span>? Existing size charts
-                            that used it keep their copied columns — only the reusable template is removed.
+                            that used it keep their copied columns and values — only the reusable template is removed.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

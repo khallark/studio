@@ -66,10 +66,6 @@ export function ParentProductCombobox({
             <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-0 z-[100]"
                 align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()}
-                onCloseAutoFocus={(e) => e.preventDefault()}
-                onFocusOutside={(e) => e.preventDefault()}
-                onInteractOutside={(e) => e.preventDefault()}
             >
                 <Command
                     filter={(itemValue, search) => {

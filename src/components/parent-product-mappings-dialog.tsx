@@ -364,9 +364,8 @@ export function ParentProductMappingsDialog({
                             <TableBody>
                                 <AnimatePresence mode="popLayout">
                                     {paginated.map((product, index) => (
-                                        <motion.tr
+                                        <tr
                                             key={`${product.storeId}-${product.productId}`}
-                                            custom={index} variants={rowVariants} initial="hidden" animate="visible"
                                             className="group border-b hover:bg-muted/50"
                                         >
                                             <TableCell className="py-3">
@@ -414,7 +413,7 @@ export function ParentProductMappingsDialog({
                                                     onMappingChange={handleRefresh}
                                                 />
                                             </TableCell>
-                                        </motion.tr>
+                                        </tr>
                                     ))}
                                 </AnimatePresence>
                             </TableBody>

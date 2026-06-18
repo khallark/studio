@@ -421,7 +421,7 @@ export function ParentSizeChartDialog({
                             <Button
                                 type="button"
                                 size="sm"
-                                variant={applyMode === 'match' ? 'secondary' : 'ghost'}
+                                variant={applyMode === 'match' ? 'outline' : 'ghost'}
                                 onClick={() => setApplyMode('match')}
                                 className="h-7 text-xs"
                             >

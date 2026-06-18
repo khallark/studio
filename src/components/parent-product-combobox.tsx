@@ -64,7 +64,7 @@ export function ParentProductCombobox({
                 </Button>
             </PopoverTrigger>
             <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0"
+                className="w-[--radix-popover-trigger-width] p-0 z-[100]"
                 align="start"
             >
                 <Command

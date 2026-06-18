@@ -58,7 +58,10 @@ export function ParentSizeChartDialog({
     const [newPresetValues, setNewPresetValues] = useState<Record<string, Record<string, string>>>({});
     const [savingPreset, setSavingPreset] = useState(false);
     const [pristineFromPreset, setPristineFromPreset] = useState(false);
-
+    // Row-seeding mode read at template-apply time:
+    //  'as-is'  -> rows = exactly the template's rows
+    //  'match'  -> rows = product sizes ∪ template rows
+    const [applyMode, setApplyMode] = useState<'as-is' | 'match'>('as-is');
     const hadChart = !!parent?.sizeChart;
 
     // Rows derived from children's sizeName (for fresh charts)
@@ -110,6 +113,7 @@ export function ParentSizeChartDialog({
         setNewPresetCols(['']);
         setNewPresetRows([]);
         setNewPresetValues({});
+        setApplyMode('as-is');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -122,11 +126,15 @@ export function ParentSizeChartDialog({
         const canReseed = rows.length === 0 || pristineFromPreset;
 
         if (canReseed) {
-            // FRESH/RESEED: union derived rows with template defaults, seed values
+            // FRESH/RESEED: build rows per applyMode.
+            //  'as-is' -> exactly the template's rows
+            //  'match' -> product sizes ∪ template rows
             const seen = new Set<string>();
             const mergedLabels: string[] = [];
-            for (const label of derivedRowsRef.current) {
-                if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
+            if (applyMode === 'match') {
+                for (const label of derivedRowsRef.current) {
+                    if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
+                }
             }
             for (const label of (preset.rows ?? [])) {
                 if (!seen.has(label)) { seen.add(label); mergedLabels.push(label); }
@@ -395,6 +403,29 @@ export function ParentSizeChartDialog({
                             >
                                 <Plus className="h-4 w-4" />
                                 New
+                            </Button>
+                        </div>
+
+                        {/* Apply mode — read when a template is picked */}
+                        <div className="flex items-center gap-1.5 pt-1">
+                            <span className="text-xs text-muted-foreground mr-1">On apply:</span>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={applyMode === 'as-is' ? 'secondary' : 'ghost'}
+                                onClick={() => setApplyMode('as-is')}
+                                className="h-7 text-xs"
+                            >
+                                Use template as-is
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={applyMode === 'match' ? 'secondary' : 'ghost'}
+                                onClick={() => setApplyMode('match')}
+                                className="h-7 text-xs"
+                            >
+                                Match product sizes
                             </Button>
                         </div>
                         {columns.length > 0 && (

@@ -40,7 +40,7 @@ export function ParentProductCombobox({
     const selected = parents.find((p) => p.id === value) ?? null;
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={setOpen} modal={true}>
             <PopoverTrigger asChild>
                 <Button
                     type="button"
@@ -82,6 +82,10 @@ export function ParentProductCombobox({
                                     key={parent.id}
                                     value={`${parent.name}__${parent.id}`}
                                     onSelect={() => {
+                                        onChange(parent.id);
+                                        setOpen(false);
+                                    }}
+                                    onClick={() => {
                                         onChange(parent.id);
                                         setOpen(false);
                                     }}

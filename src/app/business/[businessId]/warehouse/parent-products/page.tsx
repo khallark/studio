@@ -34,6 +34,7 @@ import { useDebounce } from 'use-debounce';
 import {
     Package2, Plus, Search, MoreHorizontal, Pencil, Trash2, Layers, ArrowUpDown,
     X, ChevronLeft, ChevronRight, Loader2, PackageOpen, Sparkles, Boxes, AlertTriangle,
+    Link2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -43,6 +44,7 @@ import { Product } from '@/types/warehouse';
 import { Ruler } from 'lucide-react';
 import { ParentSizeChartDialog } from '@/components/parent-size-chart-dialog';
 import { ManagePresetsDialog } from '@/components/manage-presets-dialog';
+import { ParentProductMappingsDialog } from '@/components/parent-product-mappings-dialog';
 
 const tableRowVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -81,6 +83,7 @@ export default function ParentProductsPage() {
     const [sizeChartParent, setSizeChartParent] = useState<ParentProduct | null>(null);
     const [sizeChartOpen, setSizeChartOpen] = useState(false);
     const [managePresetsOpen, setManagePresetsOpen] = useState(false);
+    const [mappingsOpen, setMappingsOpen] = useState(false);
 
     const [toDelete, setToDelete] = useState<ParentProduct | null>(null);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -273,6 +276,10 @@ export default function ParentProductsPage() {
                     <Button variant="outline" onClick={() => setManagePresetsOpen(true)} className="gap-2">
                         <Ruler className="h-4 w-4" />
                         Manage Templates
+                    </Button>
+                    <Button variant="outline" onClick={() => setMappingsOpen(true)} className="gap-2">
+                        <Link2 className="h-4 w-4" />
+                        Store Mappings
                     </Button>
                     <Button onClick={() => openDialog()} className="gap-2 shadow-lg shadow-primary/20">
                         <Plus className="h-4 w-4" />
@@ -605,6 +612,13 @@ export default function ParentProductsPage() {
             <ManagePresetsDialog
                 open={managePresetsOpen}
                 onOpenChange={setManagePresetsOpen}
+                businessId={businessId}
+                user={user}
+            />
+
+            <ParentProductMappingsDialog
+                open={mappingsOpen}
+                onOpenChange={setMappingsOpen}
                 businessId={businessId}
                 user={user}
             />

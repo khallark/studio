@@ -206,6 +206,18 @@ const nextConfig: NextConfig = {
         destination: '/api/shopify/products/export-store-variants/route',
       },
       {
+        source: '/api/shopify/parent-products/store-products',
+        destination: '/api/shopify/parent-products/store-products/route',
+      },
+      {
+        source: '/api/shopify/parent-products/create-mapping',
+        destination: '/api/shopify/parent-products/create-mapping/route',
+      },
+      {
+        source: '/api/shopify/parent-products/remove-mapping',
+        destination: '/api/shopify/parent-products/remove-mapping/route',
+      },
+      {
         source: '/proxy/api/checkout/customer',
         destination: '/proxy/api/checkout/customer/route',
       },

@@ -5,26 +5,18 @@ import { User } from 'firebase/auth';
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from 'use-debounce';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Link2, Link2Off, Search, Store, ChevronLeft, ChevronRight, Loader2,
-    X, Filter, RefreshCw, Unlink, PackageSearch, Package,
+    Link2, Link2Off, Search, ChevronLeft, ChevronRight, Loader2,
+    X, RefreshCw, Unlink, PackageSearch, Package,
 } from 'lucide-react';
-import { ParentProductCombobox } from '@/components/parent-product-combobox';
 import { useParentProducts } from '@/hooks/use-parent-products';
+import { ParentProduct } from '@/types/warehouse';
 
 interface StoreProduct {
     productId: string;
@@ -51,11 +43,6 @@ interface ParentProductMappingsDialogProps {
 
 type MappingFilter = 'all' | 'mapped' | 'unmapped';
 
-const rowVariants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.03, duration: 0.2 } }),
-};
-
 const STATUS_STYLES: Record<string, string> = {
     active: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
     draft: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
@@ -63,14 +50,14 @@ const STATUS_STYLES: Record<string, string> = {
     unlisted: 'bg-muted text-muted-foreground',
 };
 
-// ── Mapper cell ──────────────────────────────────────────────
+// ── Mapper cell: plain native <select> ───────────────────────
 function ParentMapperCell({
     product, businessId, user, parents, parentNameById, onMappingChange,
 }: {
     product: StoreProduct;
     businessId: string;
     user: User | null | undefined;
-    parents: ReturnType<typeof useParentProducts>['parents'];
+    parents: ParentProduct[];
     parentNameById: Map<string, string>;
     onMappingChange: () => void;
 }) {
@@ -79,6 +66,7 @@ function ParentMapperCell({
     const [isUnmapping, setIsUnmapping] = useState(false);
 
     const handleSelect = async (parentProductId: string) => {
+        if (!parentProductId) return;
         setIsMapping(true);
         try {
             const idToken = await user?.getIdToken();
@@ -144,21 +132,25 @@ function ParentMapperCell({
         );
     }
 
+    if (isMapping) {
+        return (
+            <div className="flex items-center gap-2 h-9 text-xs text-muted-foreground w-[240px]">
+                <Loader2 className="h-3 w-3 animate-spin" /> Mapping...
+            </div>
+        );
+    }
+
     return (
-        <div className="w-[240px]">
-            {isMapping ? (
-                <div className="flex items-center gap-2 h-8 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Mapping...
-                </div>
-            ) : (
-                <ParentProductCombobox
-                    parents={parents}
-                    value={null}
-                    onChange={handleSelect}
-                    placeholder="Select parent..."
-                />
-            )}
-        </div>
+        <select
+            defaultValue=""
+            onChange={(e) => handleSelect(e.target.value)}
+            className="w-[240px] h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+            <option value="" disabled>Select parent...</option>
+            {parents.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+        </select>
     );
 }
 
@@ -228,35 +220,24 @@ export function ParentProductMappingsDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-background via-muted/30 to-background">
+                <DialogHeader className="px-6 py-4 border-b">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20">
+                        <div className="p-2.5 rounded-xl bg-primary/10 ring-1 ring-primary/20">
                             <Link2 className="h-5 w-5 text-primary" />
                         </div>
                         <div>
                             <DialogTitle className="text-xl">Parent → Store Product Mappings</DialogTitle>
-                            <DialogDescription>
-                                Link parent products to Shopify store products
-                            </DialogDescription>
+                            <DialogDescription>Link parent products to Shopify store products</DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
                 {/* Stats */}
                 <div className="px-6 py-3 border-b bg-muted/30">
-                    <div className="flex items-center gap-6">
-                        <span className="text-sm text-muted-foreground flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-blue-500" />
-                            Total: <span className="font-semibold text-foreground">{products.length}</span>
-                        </span>
-                        <span className="text-sm text-muted-foreground flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                            Mapped: <span className="font-semibold text-emerald-600">{mappedCount}</span>
-                        </span>
-                        <span className="text-sm text-muted-foreground flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-amber-500" />
-                            Unmapped: <span className="font-semibold text-amber-600">{unmappedCount}</span>
-                        </span>
+                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                        <span>Total: <span className="font-semibold text-foreground">{products.length}</span></span>
+                        <span>Mapped: <span className="font-semibold text-emerald-600">{mappedCount}</span></span>
+                        <span>Unmapped: <span className="font-semibold text-amber-600">{unmappedCount}</span></span>
                     </div>
                 </div>
 
@@ -277,36 +258,26 @@ export function ParentProductMappingsDialog({
                             )}
                         </div>
 
-                        <Select value={selectedStore} onValueChange={setSelectedStore}>
-                            <SelectTrigger className="w-full sm:w-[200px]">
-                                <Store className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="All Stores" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Stores</SelectItem>
-                                {stores.map((s) => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                        {s.shopName.replace('.myshopify.com', '')}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <select
+                            value={selectedStore}
+                            onChange={(e) => setSelectedStore(e.target.value)}
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm sm:w-[200px]"
+                        >
+                            <option value="all">All Stores</option>
+                            {stores.map((s) => (
+                                <option key={s.id} value={s.id}>{s.shopName.replace('.myshopify.com', '')}</option>
+                            ))}
+                        </select>
 
-                        <Select value={mappingFilter} onValueChange={(v) => setMappingFilter(v as MappingFilter)}>
-                            <SelectTrigger className="w-full sm:w-[160px]">
-                                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Products</SelectItem>
-                                <SelectItem value="mapped">
-                                    <span className="flex items-center gap-2"><Link2 className="h-3 w-3 text-emerald-500" /> Mapped</span>
-                                </SelectItem>
-                                <SelectItem value="unmapped">
-                                    <span className="flex items-center gap-2"><Link2Off className="h-3 w-3 text-amber-500" /> Unmapped</span>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <select
+                            value={mappingFilter}
+                            onChange={(e) => setMappingFilter(e.target.value as MappingFilter)}
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm sm:w-[160px]"
+                        >
+                            <option value="all">All Products</option>
+                            <option value="mapped">Mapped</option>
+                            <option value="unmapped">Unmapped</option>
+                        </select>
 
                         <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
                             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
@@ -317,27 +288,15 @@ export function ParentProductMappingsDialog({
                 {/* Table */}
                 <div className="flex-1 overflow-auto">
                     {loading ? (
-                        <div className="p-6 space-y-4">
-                            {[...Array(5)].map((_, i) => (
-                                <div key={i} className="flex items-center gap-4">
-                                    <Skeleton className="h-10 w-10 rounded-lg" />
-                                    <div className="flex-1 space-y-2">
-                                        <Skeleton className="h-4 w-1/3" />
-                                        <Skeleton className="h-3 w-1/4" />
-                                    </div>
-                                    <Skeleton className="h-8 w-[240px]" />
-                                </div>
+                        <div className="p-6 space-y-3">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="h-12 rounded bg-muted/40 animate-pulse" />
                             ))}
                         </div>
                     ) : products.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-3xl rounded-full" />
-                                <div className="relative p-6 rounded-full bg-gradient-to-br from-muted to-muted/50 ring-1 ring-border/50">
-                                    <PackageSearch className="h-12 w-12 text-muted-foreground" />
-                                </div>
-                            </div>
-                            <h3 className="mt-6 text-lg font-semibold">No products found</h3>
+                            <PackageSearch className="h-12 w-12 text-muted-foreground/50" />
+                            <h3 className="mt-4 text-lg font-semibold">No products found</h3>
                             <p className="mt-2 text-muted-foreground text-center max-w-sm">
                                 {searchQuery || selectedStore !== 'all' || mappingFilter !== 'all'
                                     ? 'Try adjusting your filters.'
@@ -351,74 +310,68 @@ export function ParentProductMappingsDialog({
                             )}
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="w-[40%]">Store Product</TableHead>
-                                    <TableHead className="w-[12%]">Store</TableHead>
-                                    <TableHead className="w-[10%]">Status</TableHead>
-                                    <TableHead className="w-[8%] text-right">Variants</TableHead>
-                                    <TableHead className="w-[30%]">Parent Product Mapping</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <AnimatePresence mode="popLayout">
-                                    {paginated.map((product, index) => (
-                                        <motion.tr
-                                            key={`${product.storeId}-${product.productId}`}
-                                            custom={index} variants={rowVariants} initial="hidden" animate="visible"
-                                            className="group border-b hover:bg-muted/50"
-                                        >
-                                            <TableCell className="py-3">
-                                                <div className="flex items-center gap-3">
-                                                    {product.featuredImage ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={product.featuredImage} alt=""
-                                                            className="h-9 w-9 rounded-lg object-cover ring-1 ring-border/50" />
-                                                    ) : (
-                                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 ring-1 ring-primary/10">
-                                                            <Package className="h-4 w-4 text-primary" />
-                                                        </div>
-                                                    )}
-                                                    <div className="min-w-0">
-                                                        <p className="font-medium text-sm truncate max-w-[280px]">{product.title}</p>
-                                                        {product.vendor && (
-                                                            <p className="text-xs text-muted-foreground truncate">{product.vendor}</p>
-                                                        )}
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/50 sticky top-0 z-10">
+                                <tr className="border-b">
+                                    <th className="text-left font-medium px-4 py-2 w-[40%]">Store Product</th>
+                                    <th className="text-left font-medium px-4 py-2 w-[12%]">Store</th>
+                                    <th className="text-left font-medium px-4 py-2 w-[10%]">Status</th>
+                                    <th className="text-right font-medium px-4 py-2 w-[8%]">Variants</th>
+                                    <th className="text-left font-medium px-4 py-2 w-[30%]">Parent Product Mapping</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginated.map((product) => (
+                                    <tr key={`${product.storeId}-${product.productId}`} className="border-b hover:bg-muted/40">
+                                        <td className="px-4 py-2">
+                                            <div className="flex items-center gap-3">
+                                                {product.featuredImage ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={product.featuredImage} alt=""
+                                                        className="h-9 w-9 rounded-lg object-cover ring-1 ring-border/50" />
+                                                ) : (
+                                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/10">
+                                                        <Package className="h-4 w-4 text-primary" />
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="font-normal text-xs">
-                                                    {product.storeId.replace('.myshopify.com', '')}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {product.status && (
-                                                    <Badge variant="outline"
-                                                        className={cn('font-normal text-xs capitalize', STATUS_STYLES[product.status] ?? '')}>
-                                                        {product.status}
-                                                    </Badge>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                                                {product.variantCount}
-                                            </TableCell>
-                                            <TableCell>
-                                                <ParentMapperCell
-                                                    product={product}
-                                                    businessId={businessId}
-                                                    user={user}
-                                                    parents={parents}
-                                                    parentNameById={parentNameById}
-                                                    onMappingChange={handleRefresh}
-                                                />
-                                            </TableCell>
-                                        </motion.tr>
-                                    ))}
-                                </AnimatePresence>
-                            </TableBody>
-                        </Table>
+                                                <div className="min-w-0">
+                                                    <p className="font-medium truncate max-w-[280px]">{product.title}</p>
+                                                    {product.vendor && (
+                                                        <p className="text-xs text-muted-foreground truncate">{product.vendor}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <Badge variant="outline" className="font-normal text-xs">
+                                                {product.storeId.replace('.myshopify.com', '')}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            {product.status && (
+                                                <Badge variant="outline"
+                                                    className={cn('font-normal text-xs capitalize', STATUS_STYLES[product.status] ?? '')}>
+                                                    {product.status}
+                                                </Badge>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                                            {product.variantCount}
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <ParentMapperCell
+                                                product={product}
+                                                businessId={businessId}
+                                                user={user}
+                                                parents={parents}
+                                                parentNameById={parentNameById}
+                                                onMappingChange={handleRefresh}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
                 </div>
 

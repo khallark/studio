@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/validate-indian-pin-serviceability',
+        destination: '/api/validate-indian-pin-serviceability/route',
+      },
+      {
         source: '/api/shopify/auth',
         destination: '/api/shopify/auth/route',
       },

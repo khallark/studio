@@ -59,7 +59,10 @@ async function fetchJson(url: string): Promise<any | null> {
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        Authorization: "Token 82ab664d80d7401007279538fac0e67ad096453b",
+      },
       cache: "no-store",
     });
     if (!res.ok) return null;

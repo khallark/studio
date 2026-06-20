@@ -686,7 +686,7 @@ export default function BookReturnPage() {
                             <>
                               <span className="text-green-600">Return Booked</span>
                               <br />
-                              Your return has been booked. A delivery partner will reach you within 48 hours to pick up the items. Once picked, the parcel will reach our warehouse in 3–5 days. After a successful Quality Check (QC), your refund will be credited to your OWR wallet.
+                              Your return has been booked. A delivery partner will reach you within 48 hours to pick up the items. Once picked, the parcel will reach our warehouse in 3-5 days. After a successful Quality Check (QC), your refund will be credited to your OWR wallet.
                             </>
                           );
                         }
@@ -695,7 +695,7 @@ export default function BookReturnPage() {
                             <>
                               <span className="text-orange-600">Return In-Transit</span>
                               <br />
-                              Your return is on the way to our warehouse. Once delivered, it will go through our Quality Check (QC) process. After a successful QC, your refund will be credited to your OWR wallet. You can track your return parcel using the "Track" button above.
+                              Your return is on the way to our warehouse. Once delivered, it will go through our Quality Check (QC) process. After a successful QC, your refund will be credited to your OWR wallet. You can track your return parcel using the "Track" button below.
                             </>
                           );
                         }

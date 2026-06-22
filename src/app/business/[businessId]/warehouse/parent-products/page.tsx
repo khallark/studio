@@ -220,7 +220,7 @@ export default function ParentProductsPage() {
 
             toast({
                 title: editing ? 'Parent Updated' : 'Parent Created',
-                description: editing ? `Renamed to "${name}".` : `"${name}" has been added.`,
+                description: editing ? `Updated "${name}".` : `"${name}" has been added.`,
             });
             closeDialog();
         } catch (err) {

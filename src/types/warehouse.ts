@@ -32,6 +32,7 @@ export interface ProductSpecifications {
     fit: string;
     composition: string;
     technique: string;
+    fabric: string;
 }
 
 // user/{businessId}/parentProducts/{productId}

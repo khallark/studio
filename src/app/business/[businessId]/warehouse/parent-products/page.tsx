@@ -83,6 +83,7 @@ export default function ParentProductsPage() {
     const [specFit, setSpecFit] = useState('');
     const [specComposition, setSpecComposition] = useState('');
     const [specTechnique, setSpecTechnique] = useState('');
+    const [specFabric, setSpecFabric] = useState('');
     const [nameError, setNameError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [sizeChartParent, setSizeChartParent] = useState<ParentProduct | null>(null);
@@ -173,6 +174,7 @@ export default function ParentProductsPage() {
         setSpecFit(parent?.specifications?.fit ?? '');
         setSpecComposition(parent?.specifications?.composition ?? '');
         setSpecTechnique(parent?.specifications?.technique ?? '');
+        setSpecFabric(parent?.specifications?.fabric ?? '');
     };
     const closeDialog = () => {
         setIsDialogOpen(false);
@@ -184,6 +186,7 @@ export default function ParentProductsPage() {
         setSpecFit('');
         setSpecComposition('');
         setSpecTechnique('');
+        setSpecFabric('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -196,7 +199,8 @@ export default function ParentProductsPage() {
         const fit = specFit.trim();
         const composition = specComposition.trim();
         const technique = specTechnique.trim();
-        const specifications = (fit || composition || technique) ? { fit, composition, technique } : null;
+        const fabric = specFabric.trim();
+        const specifications = (fit || composition || technique || fabric) ? { fit, composition, technique, fabric } : null;
 
         const body = editing
             ? { businessId, parentProductId: editing.id, name, description, specifications }
@@ -598,6 +602,7 @@ export default function ParentProductsPage() {
                                 <Label className="text-sm font-medium">Specifications</Label>
                                 <div className="grid gap-2">
                                     <Input value={specFit} onChange={(e) => setSpecFit(e.target.value)} placeholder="Fit — e.g. Relaxed / Regular" />
+                                    <Input value={specFabric} onChange={(e) => setSpecFabric(e.target.value)} placeholder="Fabric — e.g. Denim / Knit" />
                                     <Input value={specComposition} onChange={(e) => setSpecComposition(e.target.value)} placeholder="Composition — e.g. 100% Cotton" />
                                     <Input value={specTechnique} onChange={(e) => setSpecTechnique(e.target.value)} placeholder="Technique — e.g. Garment Dyed" />
                                 </div>

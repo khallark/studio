@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
         // ── Validate optional specifications ──
         const MAX_SPEC_FIELD = 500;
-        let cleanSpecifications: { fit: string; composition: string; technique: string } | null = null;
+        let cleanSpecifications: { fit: string; composition: string; technique: string; fabric: string } | null = null;
         if (specifications !== undefined && specifications !== null) {
             if (typeof specifications !== 'object' || Array.isArray(specifications)) {
                 return NextResponse.json(
@@ -74,11 +74,12 @@ export async function POST(req: NextRequest) {
             const fit = String((specifications as any).fit ?? '').trim();
             const composition = String((specifications as any).composition ?? '').trim();
             const technique = String((specifications as any).technique ?? '').trim();
-            if (fit.length > MAX_SPEC_FIELD || composition.length > MAX_SPEC_FIELD || technique.length > MAX_SPEC_FIELD) {
+            const fabric = String((specifications as any).fabric ?? '').trim();
+            if (fit.length > MAX_SPEC_FIELD || composition.length > MAX_SPEC_FIELD || technique.length > MAX_SPEC_FIELD || fabric.length > MAX_SPEC_FIELD) {
                 return NextResponse.json(
                     { error: 'Validation Error', message: `Each specification field must not exceed ${MAX_SPEC_FIELD} characters` }, { status: 400 });
             }
-            cleanSpecifications = (fit || composition || technique) ? { fit, composition, technique } : null;
+            cleanSpecifications = (fit || composition || technique || fabric) ? { fit, composition, technique, fabric } : null;
         }
 
         const result = await authUserForBusiness({ businessId, req });

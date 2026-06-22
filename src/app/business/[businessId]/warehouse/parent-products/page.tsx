@@ -489,7 +489,7 @@ export default function ParentProductsPage() {
                                                                     {parent.sizeChart ? 'Edit Size Chart' : 'Size Chart'}
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuItem onClick={() => openDialog(parent)} className="gap-2">
-                                                                    <Pencil className="h-4 w-4" /> Rename
+                                                                    <Pencil className="h-4 w-4" /> Edit
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem

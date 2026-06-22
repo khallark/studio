@@ -216,6 +216,7 @@ function TreeNode({
 
 function UpcRow({ upc, level }: { upc: LocatedUpc; level: number }) {
     const updatedAt = timestampToText((upc as any).updatedAt);
+    const createdAt = timestampToText((upc as any).createdAt);
 
     return (
         <div
@@ -232,7 +233,7 @@ function UpcRow({ upc, level }: { upc: LocatedUpc; level: number }) {
                 <p className="truncate font-mono text-sm font-medium">{upc.id}</p>
                 {updatedAt && (
                     <p className="text-xs text-muted-foreground">
-                        Last updated: {updatedAt}
+                        Created: {createdAt} | Last updated: {updatedAt}
                     </p>
                 )}
             </div>

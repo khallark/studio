@@ -28,11 +28,19 @@ export interface ProductSizeChart {
     values: Record<string, Record<string, string>>;
 }
 
+export interface ProductSpecifications {
+    fit: string;
+    composition: string;
+    technique: string;
+}
+
 // user/{businessId}/parentProducts/{productId}
 export interface ParentProduct {
     id: string;
     name: string;
     sizeChart: ProductSizeChart | null;
+    description: string | null;
+    specifications: ProductSpecifications | null;
     createdBy: string | null;
     createdAt: Timestamp | null;
     updatedBy: string | null;

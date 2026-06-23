@@ -438,7 +438,7 @@ export default function Dashboard() {
                 description: 'Your COD performance report is queued and will be available shortly.',
                 action: (
                     <Button variant="outline" size="sm" asChild>
-                        <Link href={`/business/${businessAuth.businessId}/dashboard/reports/cod`}>
+                        <Link href={`/business/${businessAuth.businessId}/dashboard/reports/cod-performance`}>
                             View Progress<MoveRight className="ml-2 h-4 w-4" />
                         </Link>
                     </Button>

@@ -604,26 +604,6 @@ export default function BusinessLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Reports Section */}
-              <SidebarMenuItem>
-                <NavSection
-                  icon={FolderClockIcon}
-                  label="Reports"
-                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/reports`)}
-                >
-                  <NavItem
-                    href={`/business/${businessId}/dashboard/reports/tax`}
-                    label="Tax Reports"
-                    isActive={pathname === `/business/${businessId}/dashboard/reports/tax`}
-                  />
-                  <NavItem
-                    href={`/business/${businessId}/dashboard/reports/cod-performance`}
-                    label="COD Performance Reports"
-                    isActive={pathname === `/business/${businessId}/dashboard/reports/cod-performance`}
-                  />
-                </NavSection>
-              </SidebarMenuItem>
-
               {/* Orders Section */}
               <SidebarMenuItem>
                 <NavSection
@@ -728,6 +708,26 @@ export default function BusinessLayout({
                     icon={Logs}
                     label="Activity Logs"
                     isActive={pathname === `/business/${businessId}/warehouse/logs`}
+                  />
+                </NavSection>
+              </SidebarMenuItem>
+
+              {/* Reports Section */}
+              <SidebarMenuItem>
+                <NavSection
+                  icon={FolderClockIcon}
+                  label="Reports"
+                  isActive={pathname.startsWith(`/business/${businessId}/dashboard/reports`)}
+                >
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/reports/tax`}
+                    label="Tax Reports"
+                    isActive={pathname === `/business/${businessId}/dashboard/reports/tax`}
+                  />
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/reports/cod-performance`}
+                    label="COD Reports"
+                    isActive={pathname === `/business/${businessId}/dashboard/reports/cod-performance`}
                   />
                 </NavSection>
               </SidebarMenuItem>

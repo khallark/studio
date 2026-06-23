@@ -1,4 +1,4 @@
-// /business/[businessId]/dashboard/reports/tax
+// /business/[businessId]/dashboard/reports/cod/page.tsx
 
 'use client';
 
@@ -31,7 +31,8 @@ import {
   XCircle,
   Clock,
   Download,
-  FileSpreadsheet,
+  Truck,
+  PackageCheck,
   AlertTriangle,
   MoreVertical,
   RefreshCw,
@@ -52,29 +53,35 @@ import { cn } from '@/lib/utils';
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type TaxReportStatus = 'generating' | 'uploading' | 'completed' | 'failed';
-type StatusFilter = 'all' | TaxReportStatus;
+type CodReportStatus = 'generating' | 'uploading' | 'completed' | 'failed';
+type StatusFilter = 'all' | CodReportStatus;
+type Courier = 'Blue Dart' | 'Delhivery';
 
-interface TaxReportSummary {
-  salesLineItems: number;
-  returnLineItems: number;
-  statesCovered: number;
-  hsnCodes: number;
+interface CodReportSummary {
+  totalOrders: number;
+  prepaidCount: number;
+  codTotal: number;
+  yetToBeAttempted: number;
+  attempted: number;
+  delivered: number;
+  noTracking: number;
+  deliveredAttemptBuckets: Record<string, number>;
 }
 
-interface TaxReportDoc {
+interface CodReportDoc {
   id: string;
-  status: TaxReportStatus;
+  status: CodReportStatus;
   startedAt?: Timestamp;
   completedAt?: Timestamp;
   failedAt?: Timestamp;
+  courier: Courier;
   startDate: string;
   endDate: string;
   storeIds: string[];
   downloadUrl?: string;
   fileName?: string;
   error?: string;
-  summary?: TaxReportSummary;
+  summary?: CodReportSummary;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,6 +115,12 @@ function elapsedLabel(start?: Timestamp, end?: Timestamp) {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+// delivered / attempted, as a 1-dp percentage string (or null when nothing attempted)
+function deliveryRate(summary?: CodReportSummary): string | null {
+  if (!summary || summary.attempted <= 0) return null;
+  return `${((summary.delivered / summary.attempted) * 100).toFixed(1)}%`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // State / Loading components
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,10 +131,10 @@ function PageLoadingState() {
       <div className="relative mb-8">
         <div className="w-20 h-20 rounded-full border-2 border-primary/20 border-t-primary animate-spin absolute inset-0" style={{ animationDuration: '1.5s' }} />
         <div className="w-20 h-20 flex items-center justify-center">
-          <FileSpreadsheet className="h-7 w-7 text-primary" />
+          <Truck className="h-7 w-7 text-primary" />
         </div>
       </div>
-      <h2 className="text-lg font-semibold">Loading Tax Reports</h2>
+      <h2 className="text-lg font-semibold">Loading COD Reports</h2>
       <p className="text-sm text-muted-foreground mt-1">Fetching report history...</p>
     </div>
   );
@@ -140,7 +153,7 @@ function UnauthorizedState() {
       </div>
       <h2 className="text-xl font-semibold mb-2">Unauthorized Access</h2>
       <p className="text-muted-foreground text-center max-w-sm">
-        You don't have permission to access this business's tax reports.
+        You don't have permission to access this business's COD reports.
       </p>
     </div>
   );
@@ -152,13 +165,13 @@ function EmptyState({ filter }: { filter: StatusFilter }) {
       <div className="relative mb-6">
         <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl scale-150" />
         <div className="relative rounded-full bg-muted p-6">
-          <FileSpreadsheet className="h-10 w-10 text-muted-foreground" />
+          <Truck className="h-10 w-10 text-muted-foreground" />
         </div>
       </div>
       <h3 className="text-lg font-semibold mb-2">No Reports Found</h3>
       <p className="text-sm text-muted-foreground max-w-sm">
         {filter === 'all'
-          ? 'Queue a tax report from the Dashboard to see it here.'
+          ? 'Queue a COD report from the Dashboard to see it here.'
           : `No reports with status "${filter}" found.`}
       </p>
     </div>
@@ -191,7 +204,7 @@ function ReportCardSkeleton() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
-  TaxReportStatus,
+  CodReportStatus,
   { icon: React.ElementType; color: string; bg: string; iconClass: string; label: string }
 > = {
   generating: {
@@ -224,15 +237,28 @@ const STATUS_CONFIG: Record<
   },
 };
 
+// Courier accent — keeps Blue Dart / Delhivery visually distinct at a glance.
+const COURIER_CONFIG: Record<Courier, { label: string; className: string }> = {
+  'Blue Dart': {
+    label: 'Blue Dart',
+    className: 'border-blue-300 text-blue-700 dark:text-blue-400',
+  },
+  Delhivery: {
+    label: 'Delhivery',
+    className: 'border-red-300 text-red-700 dark:text-red-400',
+  },
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Report Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ReportCard({ report }: { report: TaxReportDoc }) {
+function ReportCard({ report }: { report: CodReportDoc }) {
   const { toast } = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const cfg = STATUS_CONFIG[report.status];
   const StatusIcon = cfg.icon;
+  const courierCfg = COURIER_CONFIG[report.courier];
 
   const isActive = report.status === 'generating' || report.status === 'uploading';
 
@@ -242,7 +268,7 @@ function ReportCard({ report }: { report: TaxReportDoc }) {
     try {
       const a = document.createElement('a');
       a.href = report.downloadUrl;
-      a.download = report.fileName ?? `tax-report_${report.startDate}_to_${report.endDate}.xlsx`;
+      a.download = report.fileName ?? `cod-report_${report.startDate}_to_${report.endDate}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -254,6 +280,17 @@ function ReportCard({ report }: { report: TaxReportDoc }) {
   }, [report, toast]);
 
   const elapsed = elapsedLabel(report.startedAt, report.completedAt ?? report.failedAt);
+  const rate = deliveryRate(report.summary);
+
+  // Attempt bifurcation chips, sorted by attempt number ascending.
+  const attemptBuckets = useMemo(() => {
+    const buckets = report.summary?.deliveredAttemptBuckets;
+    if (!buckets) return [];
+    return Object.entries(buckets)
+      .map(([k, v]) => [Number(k), v] as const)
+      .filter(([, v]) => v > 0)
+      .sort(([a], [b]) => a - b);
+  }, [report.summary]);
 
   return (
     <div
@@ -280,6 +317,13 @@ function ReportCard({ report }: { report: TaxReportDoc }) {
                   <> &rarr; {formatDateLabel(report.endDate)}</>
                 )}
               </span>
+              <Badge
+                variant="outline"
+                className={cn('text-xs shrink-0 gap-1', courierCfg.className)}
+              >
+                <Truck className="h-3 w-3" />
+                {courierCfg.label}
+              </Badge>
               <Badge
                 variant="secondary"
                 className={cn('text-xs shrink-0', cfg.color)}
@@ -351,13 +395,57 @@ function ReportCard({ report }: { report: TaxReportDoc }) {
         </div>
       )}
 
-      {/* Summary row for completed */}
+      {/* Summary for completed */}
       {report.status === 'completed' && report.summary && (
-        <div className="mt-3 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-          <span><span className="font-medium text-foreground">{report.summary.salesLineItems.toLocaleString('en-IN')}</span> sales lines</span>
-          <span><span className="font-medium text-foreground">{report.summary.returnLineItems.toLocaleString('en-IN')}</span> return lines</span>
-          <span><span className="font-medium text-foreground">{report.summary.statesCovered}</span> states</span>
-          <span><span className="font-medium text-foreground">{report.summary.hsnCodes}</span> HSN codes</span>
+        <div className="mt-3 pt-3 border-t space-y-3">
+          {/* Funnel */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
+            <span>
+              <span className="font-medium text-foreground">
+                {report.summary.totalOrders.toLocaleString('en-IN')}
+              </span>{' '}
+              total orders
+            </span>
+            <span>
+              <span className="font-medium text-foreground">
+                {report.summary.codTotal.toLocaleString('en-IN')}
+              </span>{' '}
+              COD orders
+            </span>
+            <span>
+              <span className="font-medium text-foreground">
+                {report.summary.delivered.toLocaleString('en-IN')}
+              </span>{' '}
+              delivered
+            </span>
+            <span className="flex items-center gap-1">
+              <PackageCheck className="h-3.5 w-3.5 text-green-600" />
+              <span className="font-medium text-foreground">{rate ?? '—'}</span>{' '}
+              delivery rate
+            </span>
+          </div>
+
+          {/* Attempt bifurcation */}
+          {attemptBuckets.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Delivered in:</span>
+              {attemptBuckets.map(([attempts, count]) => (
+                <Badge key={attempts} variant="secondary" className="text-xs font-normal">
+                  {attempts} {attempts === 1 ? 'attempt' : 'attempts'} · {count.toLocaleString('en-IN')}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* No-tracking note */}
+          {report.summary.noTracking > 0 && (
+            <p className="text-xs text-muted-foreground/80 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {report.summary.noTracking.toLocaleString('en-IN')} COD order
+              {report.summary.noTracking === 1 ? '' : 's'} had no tracking data
+              (counted under “Yet to be Attempted”).
+            </p>
+          )}
         </div>
       )}
 
@@ -376,11 +464,11 @@ function ReportCard({ report }: { report: TaxReportDoc }) {
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function TaxReportsPage() {
+export default function CodReportsPage() {
   const { isAuthorized, loading: authLoading, businessId } = useBusinessContext();
   const { toast } = useToast();
 
-  const [reports, setReports] = useState<TaxReportDoc[]>([]);
+  const [reports, setReports] = useState<CodReportDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -393,7 +481,7 @@ export default function TaxReportsPage() {
 
   // Set page title
   useEffect(() => {
-    document.title = 'Tax Reports';
+    document.title = 'COD Reports';
   }, []);
 
   // Core listener setup
@@ -410,7 +498,7 @@ export default function TaxReportsPage() {
         setLoadingMore(true);
       }
 
-      const ref = collection(db, 'users', businessId, 'tax_reports');
+      const ref = collection(db, 'users', businessId, 'cod_reports');
       const constraints: Parameters<typeof query>[1][] = [
         orderBy('startedAt', 'desc'),
         limit(PAGE_SIZE + 1), // fetch one extra to determine hasMore
@@ -426,9 +514,9 @@ export default function TaxReportsPage() {
           const hasNextPage = docs.length > PAGE_SIZE;
           const pageDocs = hasNextPage ? docs.slice(0, PAGE_SIZE) : docs;
 
-          const parsed: TaxReportDoc[] = pageDocs.map((d) => ({
+          const parsed: CodReportDoc[] = pageDocs.map((d) => ({
             id: d.id,
-            ...(d.data() as Omit<TaxReportDoc, 'id'>),
+            ...(d.data() as Omit<CodReportDoc, 'id'>),
           }));
 
           if (append) {
@@ -452,7 +540,7 @@ export default function TaxReportsPage() {
           setHasMore(hasNextPage);
         },
         (err) => {
-          console.error('Tax reports snapshot error:', err);
+          console.error('COD reports snapshot error:', err);
           toast({ title: 'Failed to load reports', description: 'Please refresh.', variant: 'destructive' });
           setLoading(false);
           setLoadingMore(false);
@@ -464,7 +552,7 @@ export default function TaxReportsPage() {
     [businessId, toast],
   );
 
-  // Re-attach on businessId or filter change (filter is client-side, but reset on change)
+  // Re-attach on businessId change
   useEffect(() => {
     if (!businessId || !isAuthorized) return;
     lastDocRef.current = null;
@@ -509,11 +597,11 @@ export default function TaxReportsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                <FileSpreadsheet className="h-6 w-6 text-primary" />
-                Tax Reports
+                <Truck className="h-6 w-6 text-primary" />
+                COD Reports
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                View and download generated tax report files.
+                View and download generated COD delivery performance reports.
               </p>
             </div>
           </div>
@@ -528,7 +616,7 @@ export default function TaxReportsPage() {
               <div>
                 <CardTitle className="text-lg">Report History</CardTitle>
                 <CardDescription className="mt-1">
-                  All tax report generation jobs, newest first.
+                  All COD report generation jobs, newest first.
                 </CardDescription>
               </div>
 

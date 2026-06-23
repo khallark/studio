@@ -337,6 +337,14 @@ export default function Dashboard() {
     const [remittanceSubmitError, setRemittanceSubmitError] = useState<string | null>(null);
     const remittanceCooldown = useCooldown();
 
+    // ── COD Performance Report ───────────────────────────────────────────────
+    const [codCourier, setCodCourier] = useState<RemittanceCourier>('Blue Dart');
+    const [codDateRange, setCodDateRange] = useState<DateRange | undefined>();
+    const [codCalendarOpen, setCodCalendarOpen] = useState(false);
+    const [isCodSubmitting, setIsCodSubmitting] = useState(false);
+    const [codSubmitError, setCodSubmitError] = useState<string | null>(null);
+    const codCooldown = useCooldown();
+
     // ── Computed ─────────────────────────────────────────────────────────────
     const currentDateRange = datePreset === 'custom' && customDateRange?.from
         ? { start: startOfDay(customDateRange.from), end: endOfDay(customDateRange.to || customDateRange.from) }
@@ -353,6 +361,9 @@ export default function Dashboard() {
     const remittanceEndDate = remittanceDateRange?.to ? format(remittanceDateRange.to, 'yyyy-MM-dd') : remittanceStartDate;
 
     const activeRemittanceData = remittanceRoot[COURIER_FS_KEY[remittanceCourier]] ?? null;
+
+    const codStartDate = codDateRange?.from ? format(codDateRange.from, 'yyyy-MM-dd') : null;
+    const codEndDate = codDateRange?.to ? format(codDateRange.to, 'yyyy-MM-dd') : codStartDate;
 
     // ── API calls ─────────────────────────────────────────────────────────────
     const fetchTableData = useCallback(async (force = false) => {
@@ -403,6 +414,44 @@ export default function Dashboard() {
         } catch (err: unknown) { setRemittanceSubmitError(err instanceof Error ? err.message : 'Something went wrong.'); }
         finally { setIsRemittanceSubmitting(false); }
     }, [user, businessAuth.businessId, remittanceStartDate, remittanceEndDate, remittanceCourier, remittanceCooldown]);
+
+    const handleGenerateCodReport = useCallback(async (force = false) => {
+        if (!user || !businessAuth.businessId || !codStartDate || !codEndDate) return;
+        if (!force && !codCooldown.canQuery()) return;
+        codCooldown.markQueried(); codCooldown.start();
+        setCodSubmitError(null); setIsCodSubmitting(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/business/generate-cod-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    businessId: businessAuth.businessId,
+                    courier: codCourier,
+                    startDate: codStartDate,
+                    endDate: codEndDate,
+                }),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message ?? e.error ?? `Status ${res.status}`); }
+            toast({
+                title: 'COD Report generation started',
+                description: 'Your COD performance report is queued and will be available shortly.',
+                action: (
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={`/business/${businessAuth.businessId}/dashboard/reports/cod`}>
+                            View Progress<MoveRight className="ml-2 h-4 w-4" />
+                        </Link>
+                    </Button>
+                ),
+            });
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Something went wrong.';
+            setCodSubmitError(msg);
+            toast({ title: 'Error', description: msg, variant: 'destructive' });
+        } finally {
+            setIsCodSubmitting(false);
+        }
+    }, [user, businessAuth.businessId, codCourier, codStartDate, codEndDate, codCooldown]);
 
     // ── Gross Profit row download handlers ────────────────────────────────────
 
@@ -565,6 +614,7 @@ export default function Dashboard() {
     const isRefreshDisabled = isLoading || orderCooldown.remaining > 0;
     const isRemittanceLoading = isRemittanceSubmitting || !!activeRemittanceData?.loading;
     const isRemittanceRefreshDisabled = isRemittanceLoading || remittanceCooldown.remaining > 0 || !remittanceStartDate;
+    const isCodRefreshDisabled = isCodSubmitting || codCooldown.remaining > 0 || !codStartDate;
 
     const getDateRangeLabel = () => {
         if (datePreset === 'custom' && customDateRange?.from) {
@@ -881,6 +931,57 @@ export default function Dashboard() {
                             <p className="text-muted-foreground">Select a courier and date range above to generate the remittance table.</p>
                         </div>
                     )}
+                </CardContent>
+            </Card>
+
+            {/* ── COD Performance Report ── */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        <span>COD Performance Report</span>
+                        <Button variant="ghost" size="sm" asChild className="text-xs font-normal text-muted-foreground">
+                            <Link href={`/business/${businessAuth.businessId}/dashboard/reports/cod`}>
+                                View report history<MoveRight className="ml-1 h-3 w-3" />
+                            </Link>
+                        </Button>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Select value={codCourier} onValueChange={(v) => setCodCourier(v as RemittanceCourier)} disabled={isCodSubmitting}>
+                            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Blue Dart">Blue Dart</SelectItem>
+                                <SelectItem value="Delhivery">Delhivery</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Popover open={codCalendarOpen} onOpenChange={setCodCalendarOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" disabled={isCodSubmitting} className={cn('w-[260px] justify-start text-left font-normal', !codDateRange && 'text-muted-foreground')}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {codDateRange?.from
+                                        ? codDateRange.to
+                                            ? <>{format(codDateRange.from, 'dd MMM yyyy')} – {format(codDateRange.to, 'dd MMM yyyy')}</>
+                                            : format(codDateRange.from, 'dd MMM yyyy')
+                                        : 'Pick a date range'}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar initialFocus mode="range" defaultMonth={codDateRange?.from} selected={codDateRange}
+                                    onSelect={(r) => { setCodDateRange(r); if (r?.from && r?.to) setCodCalendarOpen(false); }}
+                                    numberOfMonths={2} />
+                            </PopoverContent>
+                        </Popover>
+                        <Button onClick={() => handleGenerateCodReport()} disabled={isCodRefreshDisabled}>
+                            {isCodSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            {codCooldown.remaining > 0 ? `Generate (${codCooldown.remaining}s)` : 'Generate Report'}
+                        </Button>
+                    </div>
+                    {codSubmitError && <div className="flex items-start gap-2 p-3 mt-4 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950/30 dark:text-red-400"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{codSubmitError}</span></div>}
+                    <p className="text-xs text-muted-foreground mt-4">
+                        Generates a COD delivery-attempts report for the selected courier and date range. Progress and downloads appear on the{' '}
+                        <Link href={`/business/${businessAuth.businessId}/dashboard/reports/cod`} className="underline underline-offset-2">COD Reports</Link> page.
+                    </p>
                 </CardContent>
             </Card>
 

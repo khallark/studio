@@ -265,6 +265,10 @@ const nextConfig: NextConfig = {
         destination: '/api/business/generate-tax-report/route',
       },
       {
+        source: '/api/business/generate-cod-report',
+        destination: '/api/business/generate-cod-report/route',
+      },
+      {
         source: '/api/business/generate-gross-profit-report',
         destination: '/api/business/generate-gross-profit-report/route',
       },

@@ -130,7 +130,7 @@ export function PerformPickupDialog({
             where('productId', '==', String(businessProductSku)),
             where('putAway', '==', 'none'),
             where('orderId', '==', null),
-            orderBy('createdAt', 'asc'),
+            orderBy('updatedAt', 'desc'),
             limit(item.quantity)
           );
 

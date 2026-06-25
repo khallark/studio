@@ -906,13 +906,13 @@ export default function BusinessLayout({
       {portalContainer && createPortal(
         <>
           {/* Peek tab — right edge, vertically centred */}
-          <MajimeAgentPeekButton
+          {/* <MajimeAgentPeekButton
             isOpen={isChatOpen}
             onClick={handleChatOpen}
-          />
+          /> */}
 
           {/* Chat panel — slides in from right */}
-          <MajimeAgentChatPanel
+          {/* <MajimeAgentChatPanel
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             businessId={businessId}
@@ -922,7 +922,7 @@ export default function BusinessLayout({
             generatingStartedAt={generatingStartedAt}
             messages={messages}
             onSend={handleSend}
-          />
+          /> */}
         </>,
         portalContainer
       )}

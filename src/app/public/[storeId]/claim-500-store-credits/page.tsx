@@ -300,9 +300,7 @@ export default function Claim500Page() {
 
 function Logo() {
   return (
-    <svg className="c500-logo" viewBox="0 0 100 100" fill="none" aria-label={`Brand logo`}>
-      <circle cx="50" cy="50" r="34" stroke="currentColor" strokeWidth="13" />
-    </svg>
+    <img className="c500-logo" src="/LOGO.png" alt="Brand logo" />
   );
 }
 
@@ -355,7 +353,8 @@ const CSS = `
 
 .c500-logo{
   width:108px; height:108px;
-  color:#ffffff; opacity:0.55;
+  object-fit:contain;
+  opacity:0.55;
   margin-bottom:54px;
 }
 

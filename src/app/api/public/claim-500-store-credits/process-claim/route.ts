@@ -23,7 +23,7 @@ import {
 import {
   findOrCreateShopifyCustomer,
   addStoreCreditToCustomer,
-} from "@/lib/shopify/claim500shopify";
+} from "@/lib/shopify/claim500Shopify";
 import { sendClaim500GuideWhatsAppMessage } from "@/lib/communication/whatsappMessagesSendingFuncs";
 
 const isProd = process.env.NODE_ENV === "production";

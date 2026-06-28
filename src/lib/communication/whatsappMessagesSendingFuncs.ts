@@ -1,4 +1,4 @@
-// lib/whatsapp.ts
+// lib/communication/whatsappMessagesSendingFuncs.ts
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase-admin';
@@ -1085,4 +1085,180 @@ export async function sendRTOInTransitIDontWantThisOrderWhatsAppMessage(
         console.error('Error sending WhatsApp message:', error);
         return null;
     }
+}
+
+/**
+ * Send the "Claim 500 store credits" OTP.
+ *
+ * Template (image 1): `limited_offer_500_store_credits_otp`
+ *   - category: AUTHENTICATION (copy-code button)
+ *   - The verification code must appear TWICE in the payload: once in the body
+ *     ({{1}}) and once in the copy-code button — this is required by Meta for
+ *     authentication templates, otherwise delivery is marked INCOMPLETE.
+ *
+ * @param shop   { shopName, whatsappPhoneNumberId, whatsappAccessToken }
+ * @param phone  raw phone (any format) — normalised to 91XXXXXXXXXX here
+ * @param otp    the plaintext one-time code to deliver
+ * @param sessionId  claim-500 session id (for logging / traceability)
+ */
+export async function sendClaim500OtpWhatsAppMessage(
+  shop: any,
+  phone: string,
+  otp: string,
+  sessionId?: string,
+) {
+  try {
+    const customerPhone = String("91" + normalizePhoneNumber(phone));
+
+    if (!customerPhone || customerPhone.length < 12) {
+      console.error("Claim500 OTP: invalid phone number:", phone);
+      return null;
+    }
+
+    const payload = {
+      messaging_product: "whatsapp",
+      to: customerPhone,
+      type: "template",
+      template: {
+        name: "limited_offer_500_store_credits_otp",
+        language: { code: "en" },
+        components: [
+          {
+            type: "body",
+            parameters: [{ type: "text", text: otp }],
+          },
+          {
+            // Copy-code OTP button. sub_type is "url" for authentication
+            // templates; the code is repeated here.
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: otp }],
+          },
+        ],
+      },
+    };
+
+    const response = await fetch(
+      `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${shop.whatsappAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("WhatsApp API error (claim500 OTP):", error);
+      return null;
+    }
+
+    const result = (await response.json()) as any;
+    const messageId = result.messages[0].id;
+    const sentTo = result.contacts[0].input;
+
+    // NB: we never store the OTP itself — only that a code was dispatched.
+    const messageDoc = {
+      forStatus: "Claim 500 OTP",
+      claimSessionId: sessionId ?? null,
+      shopName: shop.shopName,
+      sentAt: FieldValue.serverTimestamp(),
+      messageStatus: "sent",
+      sentTo: sentTo,
+      messageId: messageId,
+    };
+
+    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
+
+    console.log(`✅ Claim500 OTP sent (session ${sessionId ?? "n/a"})`);
+    console.log(`   Message ID: ${messageId}`);
+
+    return { success: true, messageId, sentTo };
+  } catch (error) {
+    console.error("Error sending claim500 OTP message:", error);
+    return null;
+  }
+}
+
+/**
+ * Send the "store credits added — here's how to redeem" guide message.
+ *
+ * Template (image 2): `limited_offer_500_store_credits_guide`
+ *   - category: UTILITY
+ *   - Body is fully static (no variables), so no body parameters are sent.
+ *
+ * @param shop   { shopName, whatsappPhoneNumberId, whatsappAccessToken }
+ * @param phone  raw phone (any format) — normalised to 91XXXXXXXXXX here
+ * @param sessionId  claim-500 session id (for logging / traceability)
+ */
+export async function sendClaim500GuideWhatsAppMessage(
+  shop: any,
+  phone: string,
+  sessionId?: string,
+) {
+  try {
+    const customerPhone = String("91" + normalizePhoneNumber(phone));
+
+    if (!customerPhone || customerPhone.length < 12) {
+      console.error("Claim500 guide: invalid phone number:", phone);
+      return null;
+    }
+
+    const payload = {
+      messaging_product: "whatsapp",
+      to: customerPhone,
+      type: "template",
+      template: {
+        name: "limited_offer_500_store_credits_guide",
+        language: { code: "en" },
+        // No components — the approved template body has no variables.
+      },
+    };
+
+    const response = await fetch(
+      `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${shop.whatsappAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("WhatsApp API error (claim500 guide):", error);
+      return null;
+    }
+
+    const result = (await response.json()) as any;
+    const messageId = result.messages[0].id;
+    const sentTo = result.contacts[0].input;
+
+    const messageDoc = {
+      forStatus: "Claim 500 Guide",
+      claimSessionId: sessionId ?? null,
+      shopName: shop.shopName,
+      sentAt: FieldValue.serverTimestamp(),
+      messageStatus: "sent",
+      sentTo: sentTo,
+      messageId: messageId,
+    };
+
+    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
+
+    console.log(`✅ Claim500 guide sent (session ${sessionId ?? "n/a"})`);
+    console.log(`   Message ID: ${messageId}`);
+
+    return { success: true, messageId, sentTo };
+  } catch (error) {
+    console.error("Error sending claim500 guide message:", error);
+    return null;
+  }
 }

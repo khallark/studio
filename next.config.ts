@@ -161,6 +161,18 @@ const nextConfig: NextConfig = {
         destination: '/api/public/book-return/delete-images/route',
       },
       {
+        source: '/api/public/claim-500-store-credits/create-session',
+        destination: '/api/public/claim-500-store-credits/create-session/route',
+      },
+      {
+        source: '/api/public/claim-500-store-credits/verify-otp',
+        destination: '/api/public/claim-500-store-credits/verify-otp/route',
+      },
+      {
+        source: '/api/public/claim-500-store-credits/process-claim',
+        destination: '/api/public/claim-500-store-credits/process-claim/route',
+      },
+      {
         source: '/api/integrations/courier/update-priority',
         destination: '/api/integrations/courier/update-priority/route',
       },

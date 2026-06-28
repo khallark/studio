@@ -276,7 +276,7 @@ export default function Claim500Page() {
               ready to use on your next order.
             </p>
             <a className="c500-btn" href={storeUrl} target="_blank" rel="noreferrer">
-              Visit {brand} store
+              Visit the store
             </a>
           </div>
         )}
@@ -287,7 +287,7 @@ export default function Claim500Page() {
               Looks like this reward has already been claimed or isn't available for your account.
             </p>
             <a className="c500-btn" href={storeUrl} target="_blank" rel="noreferrer">
-              Visit {brand} store
+              Visit the store
             </a>
           </div>
         )}

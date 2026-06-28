@@ -1214,7 +1214,7 @@ export async function sendClaim500GuideWhatsAppMessage(
             type: "template",
             template: {
                 name: "limited_offer_500_store_credits_guide",
-                language: { code: "en_US" },
+                language: { code: "en" },
                 // No components — the approved template body has no variables.
             },
         };

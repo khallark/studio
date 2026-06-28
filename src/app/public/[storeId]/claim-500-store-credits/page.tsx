@@ -259,7 +259,7 @@ export default function Claim500Page() {
         {step === "confirm" && (
           <div className="c500-stack">
             <p className="c500-text">
-              You're verified. Tap below to add your ₹500 to your {brand} wallet.
+              You're verified. Tap below to add your ₹500 to your OWR wallet.
             </p>
             <button className="c500-btn" disabled={busy} onClick={processClaim}>
               {busy ? <Spin /> : `Claim ₹500`}

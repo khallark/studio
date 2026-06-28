@@ -1121,7 +1121,7 @@ export async function sendClaim500OtpWhatsAppMessage(
             type: "template",
             template: {
                 name: "limited_offer_500_store_credits_otp",
-                language: { code: "en_GB" },
+                language: { code: "en" },
                 components: [
                     {
                         type: "body",

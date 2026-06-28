@@ -90,7 +90,7 @@ export async function sendNewOrderWhatsAppMessage(
         const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
         const orderName = order.name;
         const totalPrice = String(order?.raw?.total_price);
-        
+
         // Format line items into string with line breaks
         const productsList = order.raw.line_items
             ?.map((item: any) => `${item.name} x ${item.quantity}`)
@@ -324,123 +324,123 @@ export async function sendConfirmOrderWhatsAppMessage(
  * Send WhatsApp order dto booked notification
  */
 export async function sendDTOBookedOrderWhatsAppMessage(shop: any, order: any) {
-  try {
-    const customerName = getCustomerName(order);
-    const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
-    const orderName = order.name;
-    const orderAWB = String(order?.awb_reverse ?? "NOT AVAILABLE");
-    const orderCourierProvider = String(order?.courierReverseProvider ?? order.courier_reverse);
-    const shopName = encodeURIComponent(shop.shopName);
-    const queryString = `?shop=${shopName}&order=${encodeURIComponent(orderName)}`;
+    try {
+        const customerName = getCustomerName(order);
+        const customerPhone = String("91" + normalizePhoneNumber(getCustomerPhone(order)));
+        const orderName = order.name;
+        const orderAWB = String(order?.awb_reverse ?? "NOT AVAILABLE");
+        const orderCourierProvider = String(order?.courierReverseProvider ?? order.courier_reverse);
+        const shopName = encodeURIComponent(shop.shopName);
+        const queryString = `?shop=${shopName}&order=${encodeURIComponent(orderName)}`;
 
-    if (!customerPhone) {
-      console.error("No phone number found for order:", orderName);
-      return null;
+        if (!customerPhone) {
+            console.error("No phone number found for order:", orderName);
+            return null;
+        }
+
+        const payload = {
+            messaging_product: "whatsapp",
+            to: customerPhone,
+            type: "template",
+            template: {
+                name: "dtobooked_order_1",
+                language: {
+                    code: "en",
+                },
+                components: [
+                    {
+                        type: "body",
+                        parameters: [
+                            {
+                                type: "text",
+                                text: customerName,
+                            },
+                            {
+                                type: "text",
+                                text: orderName,
+                            },
+                            {
+                                type: "text",
+                                text: orderAWB,
+                            },
+                            {
+                                type: "text",
+                                text: orderCourierProvider,
+                            },
+                        ],
+                    },
+                    {
+                        type: "button",
+                        sub_type: "url",
+                        index: "0",
+                        parameters: [
+                            {
+                                type: "text",
+                                text: queryString, // "?shop=onewhorules&order=%23OWR-MT2342"
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        const response = await fetch(
+            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${shop.whatsappAccessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error("WhatsApp API error:", error);
+            return null;
+        }
+
+        const result = (await response.json()) as any;
+        const messageId = result.messages[0].id;
+        const sentTo = result.contacts[0].input;
+
+        const messageDoc = {
+            orderName: orderName,
+            forStatus: "DTO Booked",
+            orderId: order.orderId,
+            shopName: shop.shopName,
+            sentAt: FieldValue.serverTimestamp(),
+            messageStatus: "sent",
+            sentTo: sentTo,
+            messageId: messageId,
+        };
+
+        await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
+
+        await db
+            .collection("accounts")
+            .doc(shop.shopName)
+            .collection("orders")
+            .doc(String(order.orderId))
+            .update({
+                whatsapp_messages: FieldValue.arrayUnion(messageId),
+            });
+
+        console.log(`✅ WhatsApp message sent for order ${orderName}`);
+        console.log(`   Message ID: ${messageId}`);
+        console.log(`   Sent to: ${sentTo}`);
+
+        return {
+            success: true,
+            messageId,
+            sentTo,
+        };
+    } catch (error) {
+        console.error("Error sending WhatsApp message:", error);
+        return null;
     }
-
-    const payload = {
-      messaging_product: "whatsapp",
-      to: customerPhone,
-      type: "template",
-      template: {
-        name: "dtobooked_order_1",
-        language: {
-          code: "en",
-        },
-        components: [
-          {
-            type: "body",
-            parameters: [
-              {
-                type: "text",
-                text: customerName,
-              },
-              {
-                type: "text",
-                text: orderName,
-              },
-              {
-                type: "text",
-                text: orderAWB,
-              },
-              {
-                type: "text",
-                text: orderCourierProvider,
-              },
-            ],
-          },
-          {
-            type: "button",
-            sub_type: "url",
-            index: "0",
-            parameters: [
-              {
-                type: "text",
-                text: queryString, // "?shop=onewhorules&order=%23OWR-MT2342"
-              },
-            ],
-          },
-        ],
-      },
-    };
-
-    const response = await fetch(
-      `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${shop.whatsappAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("WhatsApp API error:", error);
-      return null;
-    }
-
-    const result = (await response.json()) as any;
-    const messageId = result.messages[0].id;
-    const sentTo = result.contacts[0].input;
-
-    const messageDoc = {
-      orderName: orderName,
-      forStatus: "DTO Booked",
-      orderId: order.orderId,
-      shopName: shop.shopName,
-      sentAt: FieldValue.serverTimestamp(),
-      messageStatus: "sent",
-      sentTo: sentTo,
-      messageId: messageId,
-    };
-
-    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
-
-    await db
-      .collection("accounts")
-      .doc(shop.shopName)
-      .collection("orders")
-      .doc(String(order.orderId))
-      .update({
-        whatsapp_messages: FieldValue.arrayUnion(messageId),
-      });
-
-    console.log(`✅ WhatsApp message sent for order ${orderName}`);
-    console.log(`   Message ID: ${messageId}`);
-    console.log(`   Sent to: ${sentTo}`);
-
-    return {
-      success: true,
-      messageId,
-      sentTo,
-    };
-  } catch (error) {
-    console.error("Error sending WhatsApp message:", error);
-    return null;
-  }
 }
 
 /**
@@ -563,7 +563,7 @@ export async function sendDTORequestedOrderWhatsAppMessage(
             console.error('No phone number found for order:', orderName);
             return null;
         }
-        
+
         const payload = {
             messaging_product: 'whatsapp',
             to: customerPhone,
@@ -671,7 +671,7 @@ export async function sendDTORefundedWhatsAppMessage(
             console.error('No phone number found for order:', orderName);
             return null;
         }
-        
+
         const payload = {
             messaging_product: 'whatsapp',
             to: customerPhone,
@@ -785,7 +785,7 @@ export async function sendDTORequestedCancelledWhatsAppMessage(
             console.error('No phone number found for order:', orderName);
             return null;
         }
-        
+
         const payload = {
             messaging_product: 'whatsapp',
             to: customerPhone,
@@ -891,7 +891,7 @@ export async function sendRTOInTransitIWantThisOrderWhatsAppMessage(
             console.error('No phone number found for order:', orderName);
             return null;
         }
-        
+
         const payload = {
             messaging_product: 'whatsapp',
             to: customerPhone,
@@ -997,7 +997,7 @@ export async function sendRTOInTransitIDontWantThisOrderWhatsAppMessage(
             console.error('No phone number found for order:', orderName);
             return null;
         }
-        
+
         const payload = {
             messaging_product: 'whatsapp',
             to: customerPhone,
@@ -1102,86 +1102,86 @@ export async function sendRTOInTransitIDontWantThisOrderWhatsAppMessage(
  * @param sessionId  claim-500 session id (for logging / traceability)
  */
 export async function sendClaim500OtpWhatsAppMessage(
-  shop: any,
-  phone: string,
-  otp: string,
-  sessionId?: string,
+    shop: any,
+    phone: string,
+    otp: string,
+    sessionId?: string,
 ) {
-  try {
-    const customerPhone = String("91" + normalizePhoneNumber(phone));
+    try {
+        const customerPhone = String("91" + normalizePhoneNumber(phone));
 
-    if (!customerPhone || customerPhone.length < 12) {
-      console.error("Claim500 OTP: invalid phone number:", phone);
-      return null;
+        if (!customerPhone || customerPhone.length < 12) {
+            console.error("Claim500 OTP: invalid phone number:", phone);
+            return null;
+        }
+
+        const payload = {
+            messaging_product: "whatsapp",
+            to: customerPhone,
+            type: "template",
+            template: {
+                name: "limited_offer_500_store_credits_otp",
+                language: { code: "en_US" },
+                components: [
+                    {
+                        type: "body",
+                        parameters: [{ type: "text", text: otp }],
+                    },
+                    {
+                        // Copy-code OTP button. sub_type is "url" for authentication
+                        // templates; the code is repeated here.
+                        type: "button",
+                        sub_type: "url",
+                        index: "0",
+                        parameters: [{ type: "text", text: otp }],
+                    },
+                ],
+            },
+        };
+
+        const response = await fetch(
+            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${shop.whatsappAccessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error("WhatsApp API error (claim500 OTP):", error);
+            return null;
+        }
+
+        const result = (await response.json()) as any;
+        const messageId = result.messages[0].id;
+        const sentTo = result.contacts[0].input;
+
+        // NB: we never store the OTP itself — only that a code was dispatched.
+        const messageDoc = {
+            forStatus: "Claim 500 OTP",
+            claimSessionId: sessionId ?? null,
+            shopName: shop.shopName,
+            sentAt: FieldValue.serverTimestamp(),
+            messageStatus: "sent",
+            sentTo: sentTo,
+            messageId: messageId,
+        };
+
+        await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
+
+        console.log(`✅ Claim500 OTP sent (session ${sessionId ?? "n/a"})`);
+        console.log(`   Message ID: ${messageId}`);
+
+        return { success: true, messageId, sentTo };
+    } catch (error) {
+        console.error("Error sending claim500 OTP message:", error);
+        return null;
     }
-
-    const payload = {
-      messaging_product: "whatsapp",
-      to: customerPhone,
-      type: "template",
-      template: {
-        name: "limited_offer_500_store_credits_otp",
-        language: { code: "en" },
-        components: [
-          {
-            type: "body",
-            parameters: [{ type: "text", text: otp }],
-          },
-          {
-            // Copy-code OTP button. sub_type is "url" for authentication
-            // templates; the code is repeated here.
-            type: "button",
-            sub_type: "url",
-            index: "0",
-            parameters: [{ type: "text", text: otp }],
-          },
-        ],
-      },
-    };
-
-    const response = await fetch(
-      `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${shop.whatsappAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("WhatsApp API error (claim500 OTP):", error);
-      return null;
-    }
-
-    const result = (await response.json()) as any;
-    const messageId = result.messages[0].id;
-    const sentTo = result.contacts[0].input;
-
-    // NB: we never store the OTP itself — only that a code was dispatched.
-    const messageDoc = {
-      forStatus: "Claim 500 OTP",
-      claimSessionId: sessionId ?? null,
-      shopName: shop.shopName,
-      sentAt: FieldValue.serverTimestamp(),
-      messageStatus: "sent",
-      sentTo: sentTo,
-      messageId: messageId,
-    };
-
-    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
-
-    console.log(`✅ Claim500 OTP sent (session ${sessionId ?? "n/a"})`);
-    console.log(`   Message ID: ${messageId}`);
-
-    return { success: true, messageId, sentTo };
-  } catch (error) {
-    console.error("Error sending claim500 OTP message:", error);
-    return null;
-  }
 }
 
 /**
@@ -1196,69 +1196,69 @@ export async function sendClaim500OtpWhatsAppMessage(
  * @param sessionId  claim-500 session id (for logging / traceability)
  */
 export async function sendClaim500GuideWhatsAppMessage(
-  shop: any,
-  phone: string,
-  sessionId?: string,
+    shop: any,
+    phone: string,
+    sessionId?: string,
 ) {
-  try {
-    const customerPhone = String("91" + normalizePhoneNumber(phone));
+    try {
+        const customerPhone = String("91" + normalizePhoneNumber(phone));
 
-    if (!customerPhone || customerPhone.length < 12) {
-      console.error("Claim500 guide: invalid phone number:", phone);
-      return null;
+        if (!customerPhone || customerPhone.length < 12) {
+            console.error("Claim500 guide: invalid phone number:", phone);
+            return null;
+        }
+
+        const payload = {
+            messaging_product: "whatsapp",
+            to: customerPhone,
+            type: "template",
+            template: {
+                name: "limited_offer_500_store_credits_guide",
+                language: { code: "en_US" },
+                // No components — the approved template body has no variables.
+            },
+        };
+
+        const response = await fetch(
+            `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${shop.whatsappAccessToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error("WhatsApp API error (claim500 guide):", error);
+            return null;
+        }
+
+        const result = (await response.json()) as any;
+        const messageId = result.messages[0].id;
+        const sentTo = result.contacts[0].input;
+
+        const messageDoc = {
+            forStatus: "Claim 500 Guide",
+            claimSessionId: sessionId ?? null,
+            shopName: shop.shopName,
+            sentAt: FieldValue.serverTimestamp(),
+            messageStatus: "sent",
+            sentTo: sentTo,
+            messageId: messageId,
+        };
+
+        await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
+
+        console.log(`✅ Claim500 guide sent (session ${sessionId ?? "n/a"})`);
+        console.log(`   Message ID: ${messageId}`);
+
+        return { success: true, messageId, sentTo };
+    } catch (error) {
+        console.error("Error sending claim500 guide message:", error);
+        return null;
     }
-
-    const payload = {
-      messaging_product: "whatsapp",
-      to: customerPhone,
-      type: "template",
-      template: {
-        name: "limited_offer_500_store_credits_guide",
-        language: { code: "en" },
-        // No components — the approved template body has no variables.
-      },
-    };
-
-    const response = await fetch(
-      `https://graph.facebook.com/v24.0/${shop.whatsappPhoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${shop.whatsappAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("WhatsApp API error (claim500 guide):", error);
-      return null;
-    }
-
-    const result = (await response.json()) as any;
-    const messageId = result.messages[0].id;
-    const sentTo = result.contacts[0].input;
-
-    const messageDoc = {
-      forStatus: "Claim 500 Guide",
-      claimSessionId: sessionId ?? null,
-      shopName: shop.shopName,
-      sentAt: FieldValue.serverTimestamp(),
-      messageStatus: "sent",
-      sentTo: sentTo,
-      messageId: messageId,
-    };
-
-    await db.collection("whatsapp_messages").doc(messageId).set(messageDoc);
-
-    console.log(`✅ Claim500 guide sent (session ${sessionId ?? "n/a"})`);
-    console.log(`   Message ID: ${messageId}`);
-
-    return { success: true, messageId, sentTo };
-  } catch (error) {
-    console.error("Error sending claim500 guide message:", error);
-    return null;
-  }
 }

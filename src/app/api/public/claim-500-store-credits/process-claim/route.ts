@@ -118,7 +118,6 @@ export async function POST(req: NextRequest) {
     try {
       const customer = await findOrCreateShopifyCustomer(shopCtx, {
         email: session.email,
-        phoneE164: toE164India(session.phone),
         name: session.name,
       });
 

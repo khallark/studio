@@ -45,7 +45,7 @@ export async function shopifyGraphQL<T = any>(
 const FIND_CUSTOMER = /* GraphQL */ `
   query findCustomer($q: String!) {
     customers(first: 1, query: $q) {
-      edges { node { id email phone } }
+      edges { node { id email phone firstName lastName } }
     }
   }
 `;
@@ -97,50 +97,38 @@ function isTakenError(message: string): boolean {
  */
 export async function findOrCreateShopifyCustomer(
   ctx: ShopCtx,
-  args: { email: string; phoneE164: string; name: string },
+  args: { email: string; name: string },
 ): Promise<ResolvedCustomer> {
   const email = args.email.trim().toLowerCase();
-  const { firstName, lastName } = splitName(args.name);
+  const firstName = String(args.name || "").trim();
+  const lastName = "";
 
   // 1) Lookup by email
-  const found = await shopifyGraphQL(ctx, FIND_CUSTOMER, {
-    q: `email:${email}`,
-  });
+  const found = await shopifyGraphQL(ctx, FIND_CUSTOMER, { q: `email:${email}` });
   const existing = found?.customers?.edges?.[0]?.node;
 
   if (existing?.id) {
-    // best-effort: attach phone if customer has none
-    if (!existing.phone && args.phoneE164) {
+    // Fill in the name only if they don't already have one.
+    const hasName = !!(existing.firstName || existing.lastName);
+    if (!hasName && firstName) {
       const upd = await shopifyGraphQL(ctx, UPDATE_CUSTOMER, {
-        input: { id: existing.id, phone: args.phoneE164 },
+        input: { id: existing.id, firstName },
       });
-      // ignore phone-taken or validation errors — non-fatal
       void upd?.customerUpdate?.userErrors;
     }
     return { id: existing.id, created: false };
   }
 
-  // 2) Create with phone
+  // 2) Create with name only (no phone)
   const create = await shopifyGraphQL(ctx, CREATE_CUSTOMER, {
-    input: { email, phone: args.phoneE164, firstName, lastName },
+    input: { email, firstName, lastName },
   });
 
-  let errs = create?.customerCreate?.userErrors ?? [];
-  let customer = create?.customerCreate?.customer;
-
+  const errs = create?.customerCreate?.userErrors ?? [];
+  const customer = create?.customerCreate?.customer;
   if (customer?.id) return { id: customer.id, created: true };
 
-  // 2a) Phone already belongs to someone else -> create without phone
-  if (errs.some((e: any) => isTakenError(e.message) && /phone/i.test(e.field?.join?.(".") || e.field || ""))) {
-    const retry = await shopifyGraphQL(ctx, CREATE_CUSTOMER, {
-      input: { email, firstName, lastName },
-    });
-    customer = retry?.customerCreate?.customer;
-    errs = retry?.customerCreate?.userErrors ?? [];
-    if (customer?.id) return { id: customer.id, created: true };
-  }
-
-  // 2b) Email got taken in a race -> re-lookup
+  // Email taken in a race -> re-lookup
   if (errs.some((e: any) => isTakenError(e.message))) {
     const refound = await shopifyGraphQL(ctx, FIND_CUSTOMER, { q: `email:${email}` });
     const node = refound?.customers?.edges?.[0]?.node;

@@ -270,7 +270,7 @@ export default function Claim500Page() {
 
         {step === "success" && (
           <div className="c500-stack">
-            <p className="c500-text">Done! ₹500 has been credited to your {brand} wallet.</p>
+            <p className="c500-text">Done! ₹500 has been credited to your OWR wallet.</p>
             <p className="c500-text">
               Log in with the same email address you mentioned, &amp; your ₹500 wallet balance will be
               ready to use on your next order.

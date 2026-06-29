@@ -1121,6 +1121,7 @@ export default function BusinessOrdersPage() {
             case 'New':
                 return (<></>);
             case 'Confirmed':
+            case 'Dispatched':
                 return (
                     <>
                         <DropdownMenuItem

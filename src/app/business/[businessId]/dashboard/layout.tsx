@@ -729,6 +729,11 @@ export default function BusinessLayout({
                     label="COD Reports"
                     isActive={pathname === `/business/${businessId}/dashboard/reports/cod-performance`}
                   />
+                  <NavItem
+                    href={`/business/${businessId}/dashboard/reports/complaints`}
+                    label="Complaints"
+                    isActive={pathname === `/business/${businessId}/dashboard/reports/complaints`}
+                  />
                 </NavSection>
               </SidebarMenuItem>
 

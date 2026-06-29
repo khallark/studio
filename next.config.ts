@@ -489,6 +489,22 @@ const nextConfig: NextConfig = {
         destination: '/api/business/warehouse/move-upcs/routes',
       },
       {
+        source: '/api/business/complaints/create',
+        destination: '/api/business/complaints/create/route',
+      },
+      {
+        source: '/api/business/complaints/close',
+        destination: '/api/business/complaints/close/route',
+      },
+      {
+        source: '/api/business/complaints/delete',
+        destination: '/api/business/complaints/delete/route',
+      },
+      {
+        source: '/api/business/complaints/bulk-create',
+        destination: '/api/business/complaints/bulk-create/route',
+      },
+      {
         source: '/api/business/b2b/add-stock',
         destination: '/api/business/b2b/add-stock/route',
       },

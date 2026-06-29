@@ -31,7 +31,7 @@ export interface Complaint {
   subject: string;
   description: string;
   orderNumber: string | null;
-  awb: string;
+  awb: string | null;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   status: ComplaintStatus;
@@ -54,7 +54,7 @@ export interface CreateComplaintInput {
   subject: string;
   description: string;
   orderNumber: string | null;
-  awb: string;
+  awb: string | null;
 }
 
 /** Body for POST /api/business/complaints/close */

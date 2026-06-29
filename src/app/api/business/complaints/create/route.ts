@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const subject = toRequiredString(body.subject);
     const description = toRequiredString(body.description);
-    const awb = toRequiredString(body.awb);
+    const awb = toOptionalString(body.awb);
     const orderNumber = toOptionalString(body.orderNumber);
 
     if (!subject) {
@@ -37,9 +37,6 @@ export async function POST(req: NextRequest) {
     }
     if (!description) {
       return NextResponse.json({ error: 'Description is required.' }, { status: 400 });
-    }
-    if (!awb) {
-      return NextResponse.json({ error: 'AWB is required.' }, { status: 400 });
     }
 
     // ── Auth ─────────────────────────────────────────────────────────────

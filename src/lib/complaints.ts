@@ -85,7 +85,7 @@ export function buildOpenComplaintBody(args: {
   subject: string;
   description: string;
   orderNumber: string | null;
-  awb: string;
+  awb: string | null;
   createdBy: string;
   source: Complaint['source'];
 }): Omit<Complaint, 'id' | 'complaintNumber' | 'createdAt'> {

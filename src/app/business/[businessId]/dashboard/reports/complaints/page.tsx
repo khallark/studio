@@ -140,7 +140,7 @@ export default function ComplaintsPage() {
       return (
         c.complaintNumber?.toLowerCase().includes(term) ||
         c.subject.toLowerCase().includes(term) ||
-        c.awb.toLowerCase().includes(term) ||
+        (c.awb ?? '').toLowerCase().includes(term) ||
         (c.orderNumber ?? '').toLowerCase().includes(term)
       );
     });
@@ -227,14 +227,14 @@ export default function ComplaintsPage() {
             className="hidden"
             onChange={onBulkFile}
           />
-          <Button
+          {/* <Button
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
           >
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
             Bulk upload
-          </Button>
+          </Button> */}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New complaint
@@ -258,11 +258,10 @@ export default function ComplaintsPage() {
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`rounded px-3 py-1 text-sm capitalize transition ${
-                statusFilter === f
+              className={`rounded px-3 py-1 text-sm capitalize transition ${statusFilter === f
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               {f}
             </button>
@@ -311,7 +310,7 @@ export default function ComplaintsPage() {
                 <TableRow key={c.id}>
                   <TableCell className="font-mono text-xs">{c.complaintNumber ?? '—'}</TableCell>
                   <TableCell className="max-w-[280px] truncate font-medium">{c.subject}</TableCell>
-                  <TableCell className="font-mono text-xs">{c.awb}</TableCell>
+                  <TableCell className="font-mono text-xs">{c.awb ?? '—'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.orderNumber ?? '—'}</TableCell>
                   <TableCell>
                     <Badge variant={c.status === 'open' ? 'default' : 'secondary'} className="capitalize">
@@ -406,7 +405,7 @@ function CreateComplaintDialog({ onClose, authHeaders, businessId, toast }: Dial
   const [awb, setAwb] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const canSubmit = subject.trim() && description.trim() && awb.trim();
+  const canSubmit = subject.trim() && description.trim();
 
   async function submit() {
     if (!canSubmit) return;
@@ -420,7 +419,7 @@ function CreateComplaintDialog({ onClose, authHeaders, businessId, toast }: Dial
           subject: subject.trim(),
           description: description.trim(),
           orderNumber: orderNumber.trim() || null,
-          awb: awb.trim(),
+          awb: awb.trim() || null,
         }),
       });
       const j = await res.json();
@@ -459,7 +458,7 @@ function CreateComplaintDialog({ onClose, authHeaders, businessId, toast }: Dial
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="AWB" required>
-              <Input value={awb} onChange={(e) => setAwb(e.target.value)} placeholder="Tracking number" />
+              <Input value={awb} onChange={(e) => setAwb(e.target.value)} placeholder="Optional" />
             </Field>
             <Field label="Order number">
               <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="Optional" />

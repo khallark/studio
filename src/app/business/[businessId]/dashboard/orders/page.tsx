@@ -1121,7 +1121,6 @@ export default function BusinessOrdersPage() {
             case 'New':
                 return (<></>);
             case 'Confirmed':
-            case 'Dispatched':
                 return (
                     <>
                         <DropdownMenuItem
@@ -1918,7 +1917,7 @@ export default function BusinessOrdersPage() {
                                                 Confirm
                                             </DropdownMenuItem>
                                         )}
-                                        {activeTab === 'Confirmed' && (
+                                        {['Confirmed', 'Dispatched'].includes(activeTab) && (
                                             <>
                                                 <DropdownMenuItem
                                                     onClick={handleGeneratePOClick}

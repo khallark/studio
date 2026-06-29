@@ -457,7 +457,7 @@ function CreateComplaintDialog({ onClose, authHeaders, businessId, toast }: Dial
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="AWB" required>
+            <Field label="AWB">
               <Input value={awb} onChange={(e) => setAwb(e.target.value)} placeholder="Optional" />
             </Field>
             <Field label="Order number">

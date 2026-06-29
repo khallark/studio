@@ -1917,7 +1917,7 @@ export default function BusinessOrdersPage() {
                                                 Confirm
                                             </DropdownMenuItem>
                                         )}
-                                        {['Confirmed', 'Dispatched'].includes(activeTab) && (
+                                        {activeTab === 'Confirmed' && (
                                             <>
                                                 <DropdownMenuItem
                                                     onClick={handleGeneratePOClick}

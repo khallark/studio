@@ -268,30 +268,81 @@ async function updateToConfirmed(orderDoc: DocumentSnapshot): Promise<Boolean> {
     }
 }
 
-// Handle cancel order action
+// Latest stable Shopify Admin API version — bump each quarter
+const SHOPIFY_API_VERSION = '2026-07';
+
+// Handle cancellation request:
+// Cancel the Shopify order and refund any paid amount to the customer's
+// store credit. No Firestore writes. Returns true so the caller still
+// sends the cancellation WhatsApp message.
 async function updateToCancallationRequested(orderDoc: DocumentSnapshot): Promise<Boolean> {
     try {
         const orderData = orderDoc.data();
+
+        // Safety guard (a read, not a status write) — only act while still New
         if (orderData?.customStatus !== 'New') {
             console.warn(`⚠️ Order ${orderData?.name ?? '{Unknown}'} status is "${orderData?.customStatus}", not "New"`);
             return false;
         }
 
-        const log = {
-            status: 'Cancellation Requested',
-            createdAt: Timestamp.now(),
-            remarks: 'Cancellation was requested by the customer via Whatsapp',
+        // Resolve shop from the order's path: accounts/{shopName} where shopName is the domain
+        const accountRef = orderDoc.ref.parent.parent;
+        if (!accountRef) {
+            console.error('❌ Could not resolve account ref from order path');
+            return false;
+        }
+        const shopName = accountRef.id; // e.g. "owr.myshopify.com"
+        const accessToken: string | undefined = (await accountRef.get()).data()?.accessToken;
+
+        if (!accessToken) {
+            console.error(`❌ Missing Shopify access token for shop "${shopName}"`);
+            return false;
+        }
+
+        const shopifyOrderId = orderData?.orderId ?? orderDoc.id;
+        const orderGid = `gid://shopify/Order/${shopifyOrderId}`;
+
+        // Cancel + refund paid amount (if any) to store credit in ONE mutation.
+        // storeCreditRefund auto-computes the refundable amount → unpaid/COD
+        // orders simply cancel with nothing issued.
+        const query = `
+            mutation OrderCancel($orderId: ID!, $refundMethod: OrderCancelRefundMethodInput!, $restock: Boolean!, $reason: OrderCancelReason!, $notifyCustomer: Boolean) {
+                orderCancel(orderId: $orderId, refundMethod: $refundMethod, restock: $restock, reason: $reason, notifyCustomer: $notifyCustomer) {
+                    job { id done }
+                    orderCancelUserErrors { field message code }
+                }
+            }`;
+
+        const variables = {
+            orderId: orderGid,
+            refundMethod: { storeCreditRefund: {} }, // {} = no expiry
+            restock: true,        // return committed inventory to stock
+            reason: 'CUSTOMER',
+            notifyCustomer: true,
         };
 
-        await orderDoc.ref.update({
-            customStatus: 'Cancellation Requested',
-            customStatusesLogs: FieldValue.arrayUnion(log),
+        const res = await fetch(`https://${shopName}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+            },
+            body: JSON.stringify({ query, variables }),
         });
 
-        console.log(`⚠️ Cancellation requested for order ${orderData?.name ?? '{Unknown}'}`);
+        const json = await res.json();
+        const gqlErrors = json?.errors;
+        const userErrors = json?.data?.orderCancel?.orderCancelUserErrors;
+
+        if (gqlErrors?.length || userErrors?.length) {
+            console.error(`❌ orderCancel failed for ${orderData?.name ?? '{Unknown}'}:`, JSON.stringify(gqlErrors ?? userErrors));
+            return false;
+        }
+
+        console.log(`✅ Order ${orderData?.name ?? '{Unknown}'} cancelled; paid amount (if any) refunded to store credit`);
         return true;
     } catch (error) {
-        console.error('❌ Error requesting cancellation:', error);
+        console.error('❌ Error cancelling order / refunding to store credit:', error);
         return false;
     }
 }

@@ -41,6 +41,7 @@ const FIELD_LABELS: Record<string, string> = {
     price: 'Price',
     stock: 'Stock',
     status: 'Status',
+    syncInventory: 'Shopify Inventory Sync',
 };
 
 // ============================================================
@@ -54,7 +55,7 @@ function getChanges(
     const changes: ChangeLogEntry[] = [];
     const fieldsToTrack: Array<keyof Omit<Product, 'id' | 'sku' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy' | 'mappedVariants' | 'inventory' | 'inShelfQuantity'>> = [
         'name', 'weight', 'category', 'hsn', 'taxRate', 'parentProductId', 'sizeName',
-        'description', 'price', 'stock', 'status',
+        'description', 'price', 'stock', 'status', 'syncInventory',
     ];
 
     for (const field of fieldsToTrack) {
@@ -84,6 +85,7 @@ function formatValueForLog(value: any, field: string): string {
     if (field === 'price') return `₹${value}`;
     if (field === 'stock') return `${value} units`;
     if (field === 'taxRate') return `${value}%`;
+    if (field === 'syncInventory') return value ? 'On' : 'Off';
     return String(value);
 }
 
@@ -205,6 +207,9 @@ export async function POST(req: NextRequest) {
         }
         if (product.sizeName !== undefined) {
             updateData.sizeName = product.sizeName ? String(product.sizeName).trim() : null;
+        }
+        if (product.syncInventory !== undefined) {
+            updateData.syncInventory = product.syncInventory === true;
         }
 
         // ============================================================

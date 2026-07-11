@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
                 description: productData?.description || null,
                 price: productData?.price || null,
                 stock: productData?.stock || null,
+                syncInventory: productData?.syncInventory ?? true,
                 createdAt: productData?.createdAt,
                 createdBy: productData?.createdBy,
                 // Include mapping info for audit trail

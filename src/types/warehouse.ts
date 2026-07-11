@@ -71,6 +71,7 @@ export interface Product {
     stock: number | null;
     status: 'active' | 'draft' | 'archived' | null;
     mappedVariants: MappedVariant[] | null;
+    syncInventory: boolean;
 
     createdBy: string | null;
     createdAt: Timestamp;

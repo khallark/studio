@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
             );
         }
         const parentName = parentSnap.data()?.name ?? normalizedParentId;
-        
+
         // ============================================================
         // CHECK EXISTING PRODUCT
         // ============================================================
@@ -252,6 +252,7 @@ export async function POST(req: NextRequest) {
             description: trimmedDescription,
             price: parsedPrice,
             stock: stockValue > 0 ? stockValue : null,
+            syncInventory: true,
             status: null,
             mappedVariants: null,
             createdBy: userId ?? 'unknown',

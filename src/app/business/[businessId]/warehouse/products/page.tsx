@@ -59,6 +59,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from 'use-debounce';
 import {
@@ -212,6 +213,9 @@ export default function ProductsPage() {
 
     // Bulk Upload Dialog state
     const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
+
+    // Sync toggle state
+    const [togglingSyncSku, setTogglingSyncSku] = useState<string | null>(null);
 
     // Form state
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
@@ -582,6 +586,52 @@ export default function ProductsPage() {
         } finally {
             setIsDeleteDialogOpen(false);
             setProductToDelete(null);
+        }
+    };
+
+    const handleToggleSync = async (product: Product, enabled: boolean) => {
+        if (!user || !businessId) return;
+        setTogglingSyncSku(product.sku);
+
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/business/products/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    businessId,
+                    sku: product.sku,
+                    product: {
+                        name: product.name,
+                        parentProductId: product.parentProductId,
+                        weight: product.weight,
+                        category: product.category,
+                        hsn: product.hsn,
+                        taxRate: product.taxRate,
+                        syncInventory: enabled,
+                    },
+                }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to update sync setting');
+
+            toast({
+                title: enabled ? 'Sync Enabled' : 'Sync Disabled',
+                description: `Shopify inventory sync ${enabled ? 'enabled' : 'disabled'} for ${product.sku}.`,
+            });
+        } catch (error) {
+            console.error('Error toggling sync:', error);
+            toast({
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to update sync setting.',
+                variant: 'destructive',
+            });
+        } finally {
+            setTogglingSyncSku(null);
         }
     };
 
@@ -1035,6 +1085,7 @@ export default function ProductsPage() {
                                                 <ArrowUpDown className="h-3 w-3" />
                                             </Button>
                                         </TableHead>
+                                        <TableHead className="w-[70px] text-center">Sync</TableHead>
                                         <TableHead className="w-[60px]">
                                             <span className="sr-only">Actions</span>
                                         </TableHead>
@@ -1125,6 +1176,16 @@ export default function ProductsPage() {
                                                 </TableCell>
                                                 <TableCell className="text-muted-foreground text-sm">
                                                     {formatDate(product.createdAt)}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Switch
+                                                        checked={product.syncInventory !== false}
+                                                        disabled={togglingSyncSku === product.sku}
+                                                        onCheckedChange={(checked) =>
+                                                            handleToggleSync(product, checked)
+                                                        }
+                                                        aria-label={`Toggle Shopify sync for ${product.name}`}
+                                                    />
                                                 </TableCell>
                                                 <TableCell>
                                                     <DropdownMenu>
@@ -1305,7 +1366,7 @@ export default function ProductsPage() {
                                         <p className="text-xs text-destructive">{formErrors.sku}</p>
                                     )}
                                 </div>
-                                
+
 
                                 <div className="space-y-2">
                                     <Label htmlFor="weight" className="text-sm font-medium">

@@ -120,17 +120,6 @@ export async function POST(req: NextRequest) {
                 }),
             });
 
-            try {
-                const shopData = (await db.collection('accounts').doc(shop).get()).data() as any;
-                await sendDTORefundedWhatsAppMessage(shopData, {
-                    ...orderData,
-                    customStatus: 'DTO Refunded',
-                    refundMethod: orderData.refundMethod === 'store_credit' ? 'Store Credit' : orderData.refundMethod,
-                } as any);
-            } catch (error: any) {
-                console.error(`Whatsapp sending error: ${error?.message}`);
-            }
-
             return NextResponse.json({
                 success: true,
                 message: 'Order marked as DTO Refunded. Refund was already processed earlier.',
@@ -141,7 +130,15 @@ export async function POST(req: NextRequest) {
          * From here onward, this is actual refund processing.
          * Keep the original required field validation here.
          */
-        if (!shop || !orderId || !selectedItemIds || !refundAmount || !refundMethod || !currency) {
+        if (
+            !shop ||
+            !orderId ||
+            !selectedItemIds ||
+            refundAmount === undefined ||
+            refundAmount === null ||
+            !refundMethod ||
+            !currency
+        ) {
             console.warn('Missing required parameters');
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
@@ -334,7 +331,11 @@ export async function POST(req: NextRequest) {
          * For early DTO refunds, status stays DTO Requested / DTO Booked / DTO In Transit,
          * so do not send DTO Refunded message yet.
          */
-        if (refundMethod === 'store_credit' && isNormalPendingRefund) {
+        if (
+            refundMethod === 'store_credit' &&
+            refundAmount > 0 &&
+            isNormalPendingRefund
+        ) {
             try {
                 const shopData = (await db.collection('accounts').doc(shop).get()).data() as any;
                 await sendDTORefundedWhatsAppMessage(shopData, orderData as any);

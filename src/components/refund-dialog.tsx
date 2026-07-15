@@ -246,8 +246,8 @@ export function RefundDialog({
       return;
     }
 
-    if (totalRefundAmount <= 0) {
-      setError('Total refund amount must be greater than 0');
+    if (totalRefundAmount < 0) {
+      setError('Total refund amount cannot be negative');
       return;
     }
 
@@ -632,7 +632,7 @@ export function RefundDialog({
               processRefund.isPending ||
               (
                 !isAlreadyRefundedPendingRefund &&
-                (selectedItems.size === 0 || !isValidAmount || totalRefundAmount <= 0)
+                (selectedItems.size === 0 || !isValidAmount || totalRefundAmount < 0)
               )
             }
             className='font-mono'
@@ -645,10 +645,12 @@ export function RefundDialog({
             ) : isAlreadyRefundedPendingRefund ? (
               'Mark as DTO Refunded'
             ) : (
-              `Process Refund${totalRefundAmount > 0 ? ` (${new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: order.currency,
-              }).format(totalRefundAmount)})` : ''}`
+              totalRefundAmount > 0
+                ? `Process Refund (${new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: order.currency,
+                }).format(totalRefundAmount)})`
+                : 'Mark as No Refund'
             )}
           </Button>
         </DialogFooter>

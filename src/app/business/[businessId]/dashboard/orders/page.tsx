@@ -71,6 +71,7 @@ import {
     AlignLeft,
     Video,
     ExternalLink,
+    Film,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -120,6 +121,8 @@ import { PerformPickupDialog } from '@/components/perform-pickup-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { StartPackagingDialog } from '@/components/start-packaging-dialog';
 import { RtoCloseDialog } from '@/components/rto-close-dialog';
+import { getDownloadURL, ref } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 
 // ============================================================
 // STATUS TABS CONFIGURATION
@@ -195,6 +198,81 @@ interface MobileOrderCardProps {
     activeTab: CustomStatus | 'All Orders';
     getStatusBadgeVariant: (status: CustomStatus | string | null) => "default" | "secondary" | "destructive" | "outline" | "success";
     getPaymentBadgeVariant: (status: string | null) => string;
+}
+
+function ReturnMediaSection({ order }: { order: any }) {
+    const images: string[] = order.booked_return_images || [];
+    const videoPath: string | undefined = order.unboxing_video_path;
+
+    const [urls, setUrls] = useState<{ images: string[]; video?: string }>({ images: [] });
+
+    useEffect(() => {
+        let cancelled = false;
+
+
+        // booked_return_images are filenames in the same dir as unboxing_video_path:
+        // return-images/{storeId}/{shopifyOrderId}/
+        const baseDir = videoPath
+            ? videoPath.substring(0, videoPath.lastIndexOf('/'))
+            : `return-images/${order.storeId}/${order.raw?.id}`;
+
+        (async () => {
+            const [imageUrls, videoUrl] = await Promise.all([
+                Promise.all(
+                    images.map((name) =>
+                        getDownloadURL(ref(storage, `${baseDir}/${name}`)).catch(() => null)
+                    )
+                ),
+                videoPath
+                    ? getDownloadURL(ref(storage, videoPath)).catch(() => null)
+                    : Promise.resolve(null),
+            ]);
+            if (!cancelled) {
+                setUrls({
+                    images: imageUrls.filter(Boolean) as string[],
+                    video: videoUrl || undefined,
+                });
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [order.id]);
+
+    if (images.length === 0 && !videoPath) return null;
+
+    return (
+        <div>
+            <h4 className="text-sm font-semibold mb-2">
+                Return Media ({images.length + (videoPath ? 1 : 0)})
+            </h4>
+            <div className="space-y-2">
+                {urls.images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                        {urls.images.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                className="block rounded-lg overflow-hidden bg-muted/50 hover:opacity-80 transition-opacity">
+                                <img src={url} alt={`Return image ${i + 1}`} className="h-24 w-full object-cover" />
+                            </a>
+                        ))}
+                    </div>
+                )}
+                {urls.video && (
+                    <a href={urls.video} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-between gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Film className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            <p className="text-xs font-medium truncate">Unboxing Video</p>
+                        </div>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </a>
+                )}
+                {/* paths exist but URL resolution pending/failed */}
+                {urls.images.length === 0 && !urls.video && (
+                    <p className="text-xs text-muted-foreground">Loading media…</p>
+                )}
+            </div>
+        </div>
+    );
 }
 
 function MobileOrderCard({
@@ -2605,6 +2683,9 @@ export default function BusinessOrdersPage() {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* Return Media */}
+                                        <ReturnMediaSection order={viewingOrder} />
                                     </div>
 
                                     {/* History */}

@@ -1917,7 +1917,7 @@ export default function BusinessOrdersPage() {
                                                 Confirm
                                             </DropdownMenuItem>
                                         )}
-                                        {(activeTab === 'Confirmed') && (
+                                        {(activeTab === 'Confirmed' || activeTab === 'Ready To Dispatch' || activeTab === 'Dispatched') && (
                                             <>
                                                 <DropdownMenuItem
                                                     onClick={handleGeneratePOClick}
